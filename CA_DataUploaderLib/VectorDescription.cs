@@ -1,0 +1,32 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace CA_DataUploaderLib
+{
+    [Serializable]
+    public class VectorDescription
+    {
+        public List<VectorDescriptionItem> _items;  // only public because we need to Serialize
+        public string Hardware;
+        public string Software;
+        public int Length { get { return _items.Count(); } }
+
+        public VectorDescription() { }
+        public VectorDescription(List<VectorDescriptionItem> items, string hardware, string software) { _items = items; Hardware = hardware; Software = software; }
+        public string GetVectorItemDescriptions() { return string.Join(Environment.NewLine, _items.Select(x => x.Descriptor)); }
+        public string GetVectorItemTypes() { return string.Join(Environment.NewLine, _items.Select(x => x.DataType)); }
+        public string GetVectorInputOutput() { return string.Join(Environment.NewLine, _items.Select(x => x.DirectionType.ToString())); }
+
+    }
+
+    [Serializable]
+    public class VectorDescriptionItem
+    {
+        public VectorDescriptionItem() { }
+        public VectorDescriptionItem(string datatype, string descriptor, DataTypeEnum direction) { Descriptor = descriptor; DataType = datatype; DirectionType = direction; }
+        public string Descriptor { get; set; }
+        public DataTypeEnum DirectionType { get; set; }
+        public string DataType { get; set; }
+    }
+}
