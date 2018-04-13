@@ -95,7 +95,7 @@ namespace CA_DataUploaderLib
 
         private void ProcessLine(List<double> numbers)
         {
-            var timestamp = DateTime.Now;
+            var timestamp = DateTime.UtcNow;
             var hubID = Validate(numbers);
 
             int i = 0;
