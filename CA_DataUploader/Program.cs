@@ -18,7 +18,7 @@ namespace CA_DataUploader
                 if(args.Any())
                     com = args[0];
 
-                Console.WriteLine(RpiVersion.GetWelcomeMessage("Upload temperature data to cloud"));
+                Console.WriteLine(RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud{Environment.NewLine}From port: {com}"));
 
                 int filterLen = (args.Count() > 1)?int.Parse(args[1]):10;
                 using (var usb = new CAThermalBox(com, 8, filterLen))

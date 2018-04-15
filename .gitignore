@@ -1,0 +1,12 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+*.suo
+*.user
+/CA_DataUploader/bin
+/CA_DataUploader/obj
+/CA_DataUploaderLib/bin
+/CA_DataUploaderLib/obj
+/.vs/CA_DataUploader/v15/Server/sqlite3
+/packages
