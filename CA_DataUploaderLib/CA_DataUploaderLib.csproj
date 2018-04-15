@@ -47,6 +47,8 @@
     </Compile>
     <Compile Include="DataVector.cs" />
     <Compile Include="Enums.cs" />
+    <Compile Include="Extensions\LinqExtensions.cs" />
+    <Compile Include="Extensions\StringExtensions.cs" />
     <Compile Include="IOconf.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RpiVersion.cs" />
@@ -60,5 +62,6 @@
   <ItemGroup>
     <Content Include="MIT license.txt" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
