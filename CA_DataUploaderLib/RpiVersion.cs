@@ -16,6 +16,7 @@ namespace CA_DataUploaderLib
         {
             var sb = new StringBuilder();
             sb.AppendLine("Code made by Thomas Jam Pedersen...");
+            sb.AppendLine("UTC time now: " + DateTime.UtcNow.ToString("ddd MMM dd. HH:mm:ss"));
             sb.AppendLine(purpose);
             sb.AppendLine();
             sb.AppendLine(GetSoftware());

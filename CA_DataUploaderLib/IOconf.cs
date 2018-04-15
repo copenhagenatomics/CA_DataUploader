@@ -31,7 +31,7 @@ namespace CA_DataUploaderLib
             return list;
         }
 
-        internal static string GetLoopName()
+        public static string GetLoopName()
         {
             return new IOconf().Table.Single(x => x.First() == "LoopName")[1];
         }
