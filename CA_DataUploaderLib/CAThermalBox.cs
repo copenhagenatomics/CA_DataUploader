@@ -35,10 +35,14 @@ namespace CA_DataUploaderLib
                 throw new Exception("Unable to open Serial port");
             }
 
-            for (int i = 0; i < 2; i++)
-                Console.WriteLine(ReadLine());
+            if (IOconf.GetOutputLevel() == LogLevel.Normal)
+            {
+                for (int i = 0; i < 2; i++)
+                    Console.WriteLine(ReadLine());
+            }
 
-            // ShowConfig();
+            if(IOconf.GetOutputLevel() == LogLevel.Debug)
+                ShowConfig();
 
             new Thread(() => this.LoopForever()).Start();
         }
@@ -73,9 +77,13 @@ namespace CA_DataUploaderLib
 
             try
             {
+                var logLevel = IOconf.GetOutputLevel();
                 while(_running)
                 {
                     row = ReadLine();
+                    if (logLevel == LogLevel.Debug)
+                        Console.WriteLine(row);
+
                     values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                     numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
                     ProcessLine(numbers);

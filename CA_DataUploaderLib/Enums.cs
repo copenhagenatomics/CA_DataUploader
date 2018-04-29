@@ -52,4 +52,14 @@ namespace CA_DataUploaderLib
         AirFlow = 4,
         MotorSpeed = 5
     }
+
+    public enum LogLevel
+    {
+        None = 0,   // silent
+        Normal = 1,  // Default output
+        Exception = 2,  // only exceptions
+        Error = 3,  // only exceptions and errors
+        Warning = 4, // all of the above + warnings
+        Debug = 5   // all possible loggint is output. 
+    }
 }
