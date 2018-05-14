@@ -142,7 +142,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Unable to upload vector to server");
+                Console.WriteLine("Unable to upload vector to server: " + dv.timestamp.ToString("HH:mm:ss"));
                 Console.WriteLine(ex.Message);
             }
         }

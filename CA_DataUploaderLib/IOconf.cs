@@ -15,6 +15,9 @@ namespace CA_DataUploaderLib
             lines = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
             Table = lines.Select(x => x.Split(",".ToCharArray()).ToList()).ToList();
 
+            foreach (var row in Table.Where(x => x.Count() < 3))
+                Console.WriteLine($"ERROR: too few parameters in: {lines[Table.IndexOf(row)]}");
+
             var groups = Table.GroupBy(x => x[0] + x[1]);
             foreach (var g in groups.Where(x => x.Count() > 1))
                 Console.WriteLine($"WARNING: Name: {g.First()[1]} occure {g.Count()} times in this group: {g.First()[0]}");
@@ -34,6 +37,16 @@ namespace CA_DataUploaderLib
         public static string GetLoopName()
         {
             return new IOconf().Table.Single(x => x.First() == "LoopName")[1];
+        }
+
+        public static LogLevel GetOutputLevel()
+        {
+            LogLevel logLevel;
+            var loop = new IOconf().Table.Single(x => x.First() == "LoopName");
+            if (Enum.TryParse(loop[2], true, out logLevel))
+                return logLevel;
+
+            return LogLevel.Normal;
         }
 
         public static IEnumerable<List<string>> GetInTypeK()
