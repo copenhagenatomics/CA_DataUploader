@@ -50,7 +50,9 @@ namespace CA_DataUploaderLib
         Out230Vac = 2,
         Pressure = 3,
         AirFlow = 4,
-        MotorSpeed = 5
+        LiquidFlow = 5, 
+        MotorSpeed = 6
+
     }
 
     public enum LogLevel
