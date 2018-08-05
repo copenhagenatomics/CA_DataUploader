@@ -63,5 +63,20 @@ namespace CA_DataUploaderLib
         {
             return new IOconf().GetTypes(IOTypes.Pressure);
         }
+
+        public static IEnumerable<List<string>> GetAirFlow()
+        {
+            return new IOconf().GetTypes(IOTypes.AirFlow);
+        }
+
+        public static IEnumerable<List<string>> GetLiquidFlow()
+        {
+            return new IOconf().GetTypes(IOTypes.LiquidFlow);
+        }
+
+        public static IEnumerable<List<string>> GetMotorSpeed()
+        {
+            return new IOconf().GetTypes(IOTypes.MotorSpeed);
+        }
     }
 }
