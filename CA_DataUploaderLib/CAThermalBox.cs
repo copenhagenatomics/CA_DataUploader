@@ -28,7 +28,7 @@ namespace CA_DataUploaderLib
             _maxNumberOfHubs = maxNumberOfHubs;
             _filterLength = filterLength;
             PortName = portname;
-            BaudRate = 57600;
+            BaudRate = 115200;
             Open();
             if(!IsOpen)
             {

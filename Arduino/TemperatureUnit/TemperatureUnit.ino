@@ -32,8 +32,8 @@ const  unsigned  char thermocoupleA0 = 9;  // Address 0
 const  unsigned  char thermocoupleA1 = 10;  // Address 1
 const  unsigned  char thermocoupleA2 = 11;  // Address 2
 const  unsigned  char thermocoupleA3 = 12;  // Address 3
-int SO[] = {4,5};
-int hubCount = 2;
+int SO[] = {4,5,6,7};
+int hubCount = 4;
 int ADD[] = {9, 10, 11, 12};
 unsigned long loopRestart;
 
@@ -43,7 +43,7 @@ MAX31855 MAX31855(SO, hubCount, ADD, thermocoupleCLK);
 
 void  setup()
 {
-  Serial.begin(57600);
+  Serial.begin(115200);
   loopRestart = millis();
 }
 
