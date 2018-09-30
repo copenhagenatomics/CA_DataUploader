@@ -5,12 +5,12 @@ using System.Linq;
 using System.Threading;
 using System.Globalization;
 using System.Collections.Concurrent;
-using CA_DataUploaderLib;
 
 namespace CA_DataUploaderLib
 {
-    public class CAThermalBox : SerialPort
+    public class CAThermalBox : IDisposable
     {
+        private SerialPort _serialPort;
         private const int TEMPERATURE_FAULT = 10000;
         private bool _running = true;
         private int _maxNumberOfHubs;
@@ -27,10 +27,9 @@ namespace CA_DataUploaderLib
             Initialized = false;
             _maxNumberOfHubs = maxNumberOfHubs;
             _filterLength = filterLength;
-            PortName = portname;
-            BaudRate = 57600;
-            Open();
-            if(!IsOpen)
+            _serialPort = new SerialPort(portname, 115200);
+            _serialPort.Open();
+            if(!_serialPort.IsOpen)
             {
                 throw new Exception("Unable to open Serial port");
             }
@@ -38,7 +37,7 @@ namespace CA_DataUploaderLib
             if (IOconf.GetOutputLevel() == LogLevel.Normal)
             {
                 for (int i = 0; i < 2; i++)
-                    Console.WriteLine(ReadLine());
+                    Console.WriteLine(_serialPort.ReadLine());
             }
 
             if(IOconf.GetOutputLevel() == LogLevel.Debug)
@@ -80,7 +79,7 @@ namespace CA_DataUploaderLib
                 var logLevel = IOconf.GetOutputLevel();
                 while(_running)
                 {
-                    row = ReadLine();
+                    row = _serialPort.ReadLine();
                     if (logLevel == LogLevel.Debug)
                         Console.WriteLine(row);
 
@@ -98,7 +97,7 @@ namespace CA_DataUploaderLib
                 Console.WriteLine(ex.ToString());
             }
 
-            Close();
+            _serialPort.Close();
         }
 
         private void ProcessLine(List<double> numbers)
@@ -176,15 +175,15 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected override void Dispose(bool disposing)
+        public void Dispose()
         {
             _running = false;
-            for(int i=0; i<100; i++)
+            for (int i = 0; i < 100; i++)
             {
-                if (IsOpen) Thread.Sleep(10);
+                if (_serialPort.IsOpen) Thread.Sleep(10);
             }
 
-            base.Dispose(disposing);
+            ((IDisposable)_serialPort).Dispose();
         }
     }
 }
