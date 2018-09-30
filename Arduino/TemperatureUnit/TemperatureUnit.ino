@@ -21,39 +21,29 @@
 // ***** INCLUDES *****
 #include  "MAX31855.h"
 
-#define ERROR_MEMORY 200 // almost one minute. 
+// #define ERROR_MEMORY 200 // almost one minute. 
 
 // ***** PIN DEFINITIONS *****
-const  unsigned  char thermocoupleSO_0 = 0; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_1 = 1; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_2 = 2; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_3 = 3; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_4 = 4; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_5 = 5; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_6 = 6; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_7 = 7; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_8 = 8; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_9 = 13; // DB-9 pin 3
-const  unsigned  char thermocoupleA0 = 12;  // DB-9 pin 6  Address 0
-const  unsigned  char thermocoupleA1 = 11;  // DB-9 pin 7  Address 1
-const  unsigned  char thermocoupleA2 = 10;  // DB-9 pin 8  Address 2
-const  unsigned  char thermocoupleA3 = 9;  // DB-9 pin 9  Address 3
-int SO[] = {2,3,4,5,6,7,8,13};
-int hubCount = 8;
-int ADD[] = {12, 11, 10, 9};
+const  unsigned  char thermocoupleSO_0 = 4; // DB-9 pin 3
+const  unsigned  char thermocoupleSO_1 = 5; // DB-9 pin 3
+const  unsigned  char thermocoupleSO_2 = 6; // DB-9 pin 3
+const  unsigned  char thermocoupleSO_3 = 7; // DB-9 pin 3
+const  unsigned  char thermocoupleA0 = 9;  // Address 0
+const  unsigned  char thermocoupleA1 = 10;  // Address 1
+const  unsigned  char thermocoupleA2 = 11;  // Address 2
+const  unsigned  char thermocoupleA3 = 12;  // Address 3
+int SO[] = {4,5,6,7};
+int hubCount = 4;
+int ADD[] = {9, 10, 11, 12};
 unsigned long loopRestart;
 
-const  unsigned  char thermocoupleCLK = 15;  // DB-9 pin 2  (A1 = 15)
-const  unsigned  char thermocoupleE1 = 14;  // DB-9 pin 4  Address E1
+const  unsigned  char thermocoupleCLK = 8;  
 
 MAX31855 MAX31855(SO, hubCount, ADD, thermocoupleCLK); 
 
 void  setup()
 {
-  pinMode(thermocoupleE1, OUTPUT);
-  digitalWrite(thermocoupleE1, LOW);
-
-  Serial.begin(57600);
+  Serial.begin(115200);
   loopRestart = millis();
 }
 
