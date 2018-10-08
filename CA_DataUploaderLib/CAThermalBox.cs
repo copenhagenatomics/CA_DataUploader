@@ -73,6 +73,7 @@ namespace CA_DataUploaderLib
             List<double> numbers = new List<double>();
             List<string> values = new List<string>();
             string row = string.Empty;
+            int badRow = 0;
 
             try
             {
@@ -83,10 +84,19 @@ namespace CA_DataUploaderLib
                     if (logLevel == LogLevel.Debug)
                         Console.WriteLine(row);
 
-                    values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                    numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
-                    ProcessLine(numbers);
-                    Initialized = true;
+                    if (row.Contains("?"))
+                    {
+                        badRow++;
+                        if (badRow > 10) throw new Exception("Not able to process rows: " + row);
+                    }
+                    else
+                    {
+                        values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                        numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
+                        ProcessLine(numbers);
+                        badRow = 0;
+                        Initialized = true;
+                    }
                 }
             }
             catch (Exception ex)
