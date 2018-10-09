@@ -16,12 +16,16 @@
 * Revision  Description
 * ========  ===========
 * 1.00      Initial public release.
+* 2.00      Copenhagen Atomics Temperature sensor 4xRJ45 board. 
 *
 *******************************************************************************/
 // ***** INCLUDES *****
 #include  "MAX31855.h"
 
-// #define ERROR_MEMORY 200 // almost one minute. 
+const String serialNumber = "AD8Kr0ft";
+const String boardFamily = "Temperature 4xRJ45";
+const String boardVersion = "1";
+const String boardSoftware = "2018-10-09 15:37";
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char thermocoupleSO_0 = 4; // DB-9 pin 3
@@ -36,6 +40,7 @@ int SO[] = {4,5,6,7};
 int hubCount = 4;
 int ADD[] = {9, 10, 11, 12};
 unsigned long loopRestart;
+String inString = "";    // string to hold user input
 
 const  unsigned  char thermocoupleCLK = 8;  
 
@@ -44,6 +49,7 @@ MAX31855 MAX31855(SO, hubCount, ADD, thermocoupleCLK);
 void  setup()
 {
   Serial.begin(115200);
+  printSerial();
   loopRestart = millis();
 }
 
@@ -57,6 +63,8 @@ void PrintDouble(double value)
 
 void  loop()
 { 
+  GetInput();
+  
   double value[17]; 
   while(millis() < loopRestart)
   { 
@@ -100,4 +108,36 @@ void  loop()
 
 
 
+double GetInput()
+{
+  char inChar = Serial.read();
+  if (inChar == 'S' || inChar == 'e' || inChar == 'r' || inChar == 'i' || inChar == 'a' || inChar == 'l') 
+  {
+      // convert the incoming byte to a char and add it to the string:
+      inString += inChar;
+  }
+  else if (inChar != -1) 
+  {
+      if(inString == "Serial")
+      {
+        printSerial();
+      }
 
+      inString = "";  
+      return -1.0;
+  }  
+
+  return -1.0;
+}
+
+void printSerial()
+{
+  Serial.print("Serial Number: ");
+  Serial.println(serialNumber);
+  Serial.print("Board Family: ");
+  Serial.println(boardFamily);
+  Serial.print("Board Version: ");
+  Serial.println(boardVersion);
+  Serial.print("Board Software: ");
+  Serial.println(boardSoftware);
+}
