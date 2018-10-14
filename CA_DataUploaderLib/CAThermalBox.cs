@@ -75,36 +75,36 @@ namespace CA_DataUploaderLib
             string row = string.Empty;
             int badRow = 0;
 
-            try
+            var logLevel = IOconf.GetOutputLevel();
+            while (_running)
             {
-                var logLevel = IOconf.GetOutputLevel();
-                while(_running)
+                try
                 {
                     row = _serialPort.ReadLine();
                     if (logLevel == LogLevel.Debug)
                         Console.WriteLine(row);
 
-                    if (row.Contains("?"))
-                    {
-                        badRow++;
-                        if (badRow > 10) throw new Exception("Not able to process rows: " + row);
-                    }
-                    else
-                    {
-                        values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                        numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
-                        ProcessLine(numbers);
-                        badRow = 0;
-                        Initialized = true;
-                    }
+                    values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                    numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
+                    ProcessLine(numbers);
+                    badRow = 0;
+                    Initialized = true;
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Exception at: " + row);
-                values.ForEach(x => Console.WriteLine(x));
-                numbers.ForEach(x => Console.WriteLine(x));
-                Console.WriteLine(ex.ToString());
+                catch (Exception ex)
+                {
+                    if (logLevel == LogLevel.Debug)
+                    {
+                        Console.WriteLine("Exception at: " + row);
+                        values.ForEach(x => Console.WriteLine(x));
+                        numbers.ForEach(x => Console.WriteLine(x));
+                        Console.WriteLine(ex.ToString());
+                    }
+
+                    Console.WriteLine();
+                    badRow++;
+                    if (badRow > 10)
+                        _running = false;
+                }
             }
 
             _serialPort.Close();

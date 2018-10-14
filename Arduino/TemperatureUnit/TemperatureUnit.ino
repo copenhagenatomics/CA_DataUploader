@@ -39,7 +39,6 @@ const  unsigned  char thermocoupleA3 = 12;  // Address 3
 int SO[] = {4,5,6,7};
 int hubCount = 4;
 int ADD[] = {9, 10, 11, 12};
-unsigned long loopRestart;
 String inString = "";    // string to hold user input
 
 const  unsigned  char thermocoupleCLK = 8;  
@@ -50,15 +49,6 @@ void  setup()
 {
   Serial.begin(115200);
   printSerial();
-  loopRestart = millis();
-}
-
-void PrintDouble(double value)
-{
-  char str[11];
-  dtostrf(value, 6,2, str);
-  strcat(str, ", \0");
-  Serial.print(str);
 }
 
 void  loop()
@@ -66,18 +56,12 @@ void  loop()
   GetInput();
   
   double value[17]; 
-  while(millis() < loopRestart)
-  { 
-    delay(5);  
-  }
-  
-  loopRestart += 150;  // restart loop every 100 ms. 
   MAX31855.ReadAllData(true);
 
   for(int j=0; j<hubCount; j++)
   {
     value[0] = MAX31855.GetAverageJunctionCelsius(j);
-    if(value[0] > 100 || value[0] == 0)
+    if(value[0] > 150 || value[0] == 0)
       continue;  // this hub is not connected, try next hub
 
     Serial.print(j); // print hub ID
@@ -103,10 +87,17 @@ void  loop()
     }
 
     Serial.println();
+    delay(20);
   }
 }
 
-
+void PrintDouble(double value)
+{
+  char str[11];
+  dtostrf(value, 6,2, str);
+  strcat(str, ", \0");
+  Serial.print(str);
+}
 
 double GetInput()
 {
