@@ -22,7 +22,7 @@
 // ***** INCLUDES *****
 #include  "MAX31855.h"
 
-const String serialNumber = "AD8Kr0ft";
+const String serialNumber = "AD8Kr0fb";
 const String boardFamily = "Temperature 4xRJ45";
 const String boardVersion = "1";
 const String boardSoftware = "2018-10-09 15:37";

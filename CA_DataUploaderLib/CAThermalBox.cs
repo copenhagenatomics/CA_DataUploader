@@ -59,7 +59,7 @@ namespace CA_DataUploaderLib
 
         public IEnumerable<TermoSensor> GetAllValidTemperatures()
         {
-            return _temperatures.Values.Where(x => _config.Any(y => y[2] == x.ID.ToString()));
+            return _temperatures.Values.Where(x => _config.Any(y => y[2] == x.ID.ToString())).OrderBy(x => x.ID);
         }
 
         public VectorDescription GetVectorDescription()
