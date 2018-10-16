@@ -18,7 +18,7 @@ namespace CA_DataUploaderLib
         private ConcurrentDictionary<string, TermoSensor> _temperatures = new ConcurrentDictionary<string, TermoSensor>();
         private Dictionary<string, Queue<double>> _filterQueue = new Dictionary<string, Queue<double>>();
 
-        private List<List<string>> _config = IOconf.GetInTypeK().Where(x => x[3] == "hub16").ToList();
+        private List<List<string>> _config = IOconf.GetInTypeK().Where(x => x[2] == "hub16").ToList();
 
         public bool Initialized { get; private set; }
 
@@ -46,15 +46,15 @@ namespace CA_DataUploaderLib
             new Thread(() => this.LoopForever()).Start();
         }
 
-        public TermoSensor GetValue(int sensorID)
+        public TermoSensor GetValue(string sensorID)
         {
-            if (!_config.Any(x => x[2] == sensorID.ToString()))
+            if (!_config.Any(x => x[3] == sensorID))
                 throw new Exception(sensorID + " sensorID not found in _config, count: " + _config.Count());
 
-            if (!_temperatures.Any(x => x.Value.ID == sensorID))
+            if (!_temperatures.ContainsKey(sensorID))
                 throw new Exception(sensorID + " sensorID not found in _temperatures, count: " + _temperatures.Count());
 
-            return _temperatures.First(x => x.Value.ID == sensorID).Value;
+            return _temperatures[sensorID];
         }
 
         public IEnumerable<TermoSensor> GetAllValidTemperatures()
@@ -129,7 +129,7 @@ namespace CA_DataUploaderLib
                     }
                     else
                     {
-                        _temperatures.TryAdd(key, new TermoSensor(row) { Temperature = value, TimeStamp = timestamp });
+                        _temperatures.TryAdd(key, new TermoSensor(_config.IndexOf(row), row[1]) { Temperature = value, TimeStamp = timestamp });
                         if (_filterLength > 1)
                         {
                             _filterQueue.Add(key, new Queue<double>());

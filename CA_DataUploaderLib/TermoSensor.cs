@@ -7,7 +7,6 @@ namespace CA_DataUploaderLib
     public class TermoSensor
     {
         public TermoSensor(int id, string name) { ID = id; Name = name; }
-        public TermoSensor(List<string> row) { ID = int.Parse(row[2]); Name = row[1]; }
         public int ID { get; private set; }   // temperature sensor ID
         public DateTime TimeStamp { get; set; }
 
