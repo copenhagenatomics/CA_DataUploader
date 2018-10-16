@@ -21,10 +21,6 @@ namespace CA_DataUploaderLib
             var groups = Table.GroupBy(x => x[0] + x[1]);
             foreach (var g in groups.Where(x => x.Count() > 1))
                 Console.WriteLine($"WARNING: Name: {g.First()[1]} occure {g.Count()} times in this group: {g.First()[0]}");
-
-            var indexs = Table.Where(x => x.Count() > 2).GroupBy(x => x[2]);
-            foreach (var g in indexs.Where(x => x.Count() > 1))
-                Console.WriteLine($"WARNING: vector index: {g.Key}, occure {g.Count()} times in IO.conf file");
         }
 
         public IEnumerable<List<string>> GetTypes(IOTypes type)

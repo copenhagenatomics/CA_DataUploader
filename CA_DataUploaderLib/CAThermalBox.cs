@@ -59,7 +59,7 @@ namespace CA_DataUploaderLib
 
         public IEnumerable<TermoSensor> GetAllValidTemperatures()
         {
-            return _temperatures.Values.Where(x => _config.Any(y => y[2] == x.ID.ToString())).OrderBy(x => x.ID);
+            return _temperatures.Values.OrderBy(x => x.ID);
         }
 
         public VectorDescription GetVectorDescription()
@@ -119,7 +119,7 @@ namespace CA_DataUploaderLib
             foreach (var value in numbers.Skip(1))
             {
                 string key = hubID.ToString() + "." + i++.ToString();
-                var row = _config.SingleOrDefault(x => x[4] == key);
+                var row = _config.SingleOrDefault(x => x[3] == key);
                 if (row != null)
                 {
                     if (_temperatures.ContainsKey(key))
