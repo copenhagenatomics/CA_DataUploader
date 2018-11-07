@@ -15,7 +15,7 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
+    <DebugType>portable</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
@@ -42,9 +42,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CAThermalBox.cs">
-      <SubType>Component</SubType>
-    </Compile>
+    <Compile Include="CAThermalBox.cs" />
     <Compile Include="DataVector.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="Extensions\LinqExtensions.cs" />
@@ -52,6 +50,7 @@
     <Compile Include="IOconf.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RpiVersion.cs" />
+    <Compile Include="SerialNumberMapper.cs" />
     <Compile Include="ServerUploader.cs" />
     <Compile Include="TermoSensor.cs" />
     <Compile Include="VectorDescription.cs" />

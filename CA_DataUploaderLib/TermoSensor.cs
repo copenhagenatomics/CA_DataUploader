@@ -8,6 +8,8 @@ namespace CA_DataUploaderLib
     {
         public TermoSensor(int id, string name) { ID = id; Name = name; }
         public int ID { get; private set; }   // temperature sensor ID
+
+        public string Key;
         public DateTime TimeStamp { get; set; }
 
         public string Name { get; private set; }
@@ -27,5 +29,8 @@ namespace CA_DataUploaderLib
                 _temperature = value;
             }
         }
+
+        public int Hub { get { return int.Parse(Key.Split('.')[0]); } }
+        public int Jack { get { return int.Parse(Key.Split('.')[1]); } }
     }
 }

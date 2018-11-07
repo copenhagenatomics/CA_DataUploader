@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CA_DataUploader", "CA_DataU
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CA_DataUploaderLib", "CA_DataUploaderLib\CA_DataUploaderLib.csproj", "{A5644A35-6961-4D03-B2C2-57710DA71C90}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CA_AverageTemperature", "CA_AverageTemperature\CA_AverageTemperature.csproj", "{C978284B-E108-4C6F-B5C8-AA2B52085B5E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{A5644A35-6961-4D03-B2C2-57710DA71C90}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A5644A35-6961-4D03-B2C2-57710DA71C90}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A5644A35-6961-4D03-B2C2-57710DA71C90}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C978284B-E108-4C6F-B5C8-AA2B52085B5E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C978284B-E108-4C6F-B5C8-AA2B52085B5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C978284B-E108-4C6F-B5C8-AA2B52085B5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C978284B-E108-4C6F-B5C8-AA2B52085B5E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -25,7 +25,7 @@
 const String serialNumber = "AD8Kr0fb";
 const String boardFamily = "Temperature 4xRJ45";
 const String boardVersion = "1";
-const String boardSoftware = "2018-10-09 15:37";
+const String boardSoftware = "2018-22-10 11:37";
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char thermocoupleSO_0 = 4; // DB-9 pin 3
@@ -38,10 +38,11 @@ const  unsigned  char thermocoupleA2 = 11;  // Address 2
 const  unsigned  char thermocoupleA3 = 12;  // Address 3
 int SO[] = {4,5,6,7};
 int hubCount = 4;
-int ADD[] = {9, 10, 11, 12};
+int ADD[] = {9, 10, 12, 11};
 String inString = "";    // string to hold user input
 
-const  unsigned  char thermocoupleCLK = 8;  
+const  unsigned  char thermocoupleCLK = 8; 
+unsigned long timeStamp; 
 
 MAX31855 MAX31855(SO, hubCount, ADD, thermocoupleCLK); 
 
@@ -53,6 +54,7 @@ void  setup()
 
 void  loop()
 { 
+  timeStamp = millis() + 95;
   GetInput();
   
   double value[17]; 
@@ -87,7 +89,10 @@ void  loop()
     }
 
     Serial.println();
-    delay(20);
+    while(millis() < timeStamp)
+    {
+      delay(1); // delay to match 100 miliseconds between read operations
+    }
   }
 }
 

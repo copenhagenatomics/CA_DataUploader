@@ -14,9 +14,11 @@ namespace CA_DataUploaderLib
         private const int TEMPERATURE_FAULT = 10000;
         private bool _running = true;
         private int _maxNumberOfHubs;
-        private int _filterLength;
+        public int FilterLength { get; set; }
+        public double Frequency { get; private set; }
         private ConcurrentDictionary<string, TermoSensor> _temperatures = new ConcurrentDictionary<string, TermoSensor>();
         private Dictionary<string, Queue<double>> _filterQueue = new Dictionary<string, Queue<double>>();
+        private Queue<double> _frequency = new Queue<double>();
 
         private List<List<string>> _config = IOconf.GetInTypeK().Where(x => x[2] == "hub16").ToList();
 
@@ -26,7 +28,7 @@ namespace CA_DataUploaderLib
         {
             Initialized = false;
             _maxNumberOfHubs = maxNumberOfHubs;
-            _filterLength = filterLength;
+            FilterLength = filterLength;
             _serialPort = new SerialPort(portname, 115200);
             _serialPort.Open();
             if(!_serialPort.IsOpen)
@@ -59,6 +61,10 @@ namespace CA_DataUploaderLib
 
         public IEnumerable<TermoSensor> GetAllValidTemperatures()
         {
+            var removeBefore = DateTime.UtcNow.AddSeconds(-2);
+            var list = _temperatures.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Key).ToList();
+            TermoSensor dummy;
+            list.ForEach(x => _temperatures.TryRemove(x, out dummy));
             return _temperatures.Values.OrderBy(x => x.ID);
         }
 
@@ -100,7 +106,7 @@ namespace CA_DataUploaderLib
                         Console.WriteLine(ex.ToString());
                     }
 
-                    Console.WriteLine();
+                    Console.Write('.');
                     badRow++;
                     if (badRow > 10)
                         _running = false;
@@ -124,13 +130,14 @@ namespace CA_DataUploaderLib
                 {
                     if (_temperatures.ContainsKey(key))
                     {
+                        Frequency = FrequencyLowPassFilter(timestamp.Subtract(_temperatures[key].TimeStamp));
                         _temperatures[key].TimeStamp = timestamp;
-                        _temperatures[key].Temperature = (_filterLength > 1)?LowPassFilter(value, key):value;
+                        _temperatures[key].Temperature = (FilterLength > 1)?LowPassFilter(value, key):value;
                     }
                     else
                     {
-                        _temperatures.TryAdd(key, new TermoSensor(_config.IndexOf(row), row[1]) { Temperature = value, TimeStamp = timestamp });
-                        if (_filterLength > 1)
+                        _temperatures.TryAdd(key, new TermoSensor(_config.IndexOf(row), row[1]) { Temperature = value, TimeStamp = timestamp, Key = key });
+                        if (FilterLength > 1)
                         {
                             _filterQueue.Add(key, new Queue<double>());
                             _filterQueue[key].Enqueue(value);
@@ -148,12 +155,24 @@ namespace CA_DataUploaderLib
             if (goodValues.Any())
                 result = goodValues.Average();
 
-            while (_filterQueue[key].Count() > _filterLength)
+            while (_filterQueue[key].Count() > FilterLength)
             {
                 _filterQueue[key].Dequeue();
             }
 
             return result;
+        }
+
+        private double FrequencyLowPassFilter(TimeSpan ts)
+        {
+            _frequency.Enqueue(1.0/ts.TotalSeconds);
+
+            while (_frequency.Count() > _temperatures.Count() * 10)
+            {
+                _frequency.Dequeue();
+            }
+
+            return _frequency.Average();
         }
 
         private int Validate(List<double> numbers)
