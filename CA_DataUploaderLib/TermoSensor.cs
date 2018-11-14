@@ -19,6 +19,7 @@ namespace CA_DataUploaderLib
         public bool MaxSlope;
 
         private double _temperature;
+        private double _junction;
         public double Temperature
         {
             get { return _temperature; }
@@ -28,6 +29,12 @@ namespace CA_DataUploaderLib
                 _active.Enqueue(value < 1500);
                 _temperature = value;
             }
+        }
+
+        public double Junction
+        {
+            get { return _junction; }
+            set { _junction = value; }
         }
 
         public int Hub { get { return int.Parse(Key.Split('.')[0]); } }

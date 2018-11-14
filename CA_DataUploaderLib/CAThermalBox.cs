@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Globalization;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace CA_DataUploaderLib
 {
@@ -13,6 +14,7 @@ namespace CA_DataUploaderLib
         private SerialPort _serialPort;
         private const int TEMPERATURE_FAULT = 10000;
         private bool _running = true;
+        private bool _junction = false;
         private int _maxNumberOfHubs;
         public int FilterLength { get; set; }
         public double Frequency { get; private set; }
@@ -24,10 +26,11 @@ namespace CA_DataUploaderLib
 
         public bool Initialized { get; private set; }
 
-        public CAThermalBox(string portname, int maxNumberOfHubs, int filterLength = 1)
+        public CAThermalBox(string portname, int maxNumberOfHubs, int filterLength = 1, bool junction = false)
         {
             Initialized = false;
             _maxNumberOfHubs = maxNumberOfHubs;
+            _junction = junction;
             FilterLength = filterLength;
             _serialPort = new SerialPort(portname, 115200);
             _serialPort.Open();
@@ -46,6 +49,10 @@ namespace CA_DataUploaderLib
                 ShowConfig();
 
             new Thread(() => this.LoopForever()).Start();
+
+            _serialPort.WriteLine("Serial");
+            Thread.Sleep(100);
+            _serialPort.WriteLine("");
         }
 
         public TermoSensor GetValue(string sensorID)
@@ -90,6 +97,8 @@ namespace CA_DataUploaderLib
                     if (logLevel == LogLevel.Debug)
                         Console.WriteLine(row);
 
+                    Debug.Print(row);
+
                     values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                     numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
                     ProcessLine(numbers);
@@ -124,27 +133,47 @@ namespace CA_DataUploaderLib
             int i = 0;
             foreach (var value in numbers.Skip(1))
             {
-                string key = hubID.ToString() + "." + i++.ToString();
-                var row = _config.SingleOrDefault(x => x[3] == key);
-                if (row != null)
+                var sensor = GetSensor(hubID, i);
+                if (sensor.row != null)
                 {
-                    if (_temperatures.ContainsKey(key))
+                    if (_temperatures.ContainsKey(sensor.key))
                     {
-                        Frequency = FrequencyLowPassFilter(timestamp.Subtract(_temperatures[key].TimeStamp));
-                        _temperatures[key].TimeStamp = timestamp;
-                        _temperatures[key].Temperature = (FilterLength > 1)?LowPassFilter(value, key):value;
+                        if (sensor.readJunction)
+                        {
+                            _temperatures[sensor.key].Junction = value;
+                        }
+                        else
+                        {
+                            Frequency = FrequencyLowPassFilter(timestamp.Subtract(_temperatures[sensor.key].TimeStamp));
+                            _temperatures[sensor.key].TimeStamp = timestamp;
+                            _temperatures[sensor.key].Temperature = (FilterLength > 1) ? LowPassFilter(value, sensor.key) : value;
+                        }
                     }
                     else
                     {
-                        _temperatures.TryAdd(key, new TermoSensor(_config.IndexOf(row), row[1]) { Temperature = value, TimeStamp = timestamp, Key = key });
+                        Debug.Assert(sensor.readJunction == false);
+                        _temperatures.TryAdd(sensor.key, new TermoSensor(_config.IndexOf(sensor.row), sensor.row[1]) { Temperature = value, TimeStamp = timestamp, Key = sensor.key });
                         if (FilterLength > 1)
                         {
-                            _filterQueue.Add(key, new Queue<double>());
-                            _filterQueue[key].Enqueue(value);
+                            _filterQueue.Add(sensor.key, new Queue<double>());
+                            _filterQueue[sensor.key].Enqueue(value);
                         }
                     }
                 }
+
+                i++;
             }
+        }
+
+        private (string key, List<string> row, bool readJunction) GetSensor(int hubID, int i)
+        {
+            string key = hubID.ToString() + "." + i.ToString();
+            if (_junction && i > 17)
+            {
+                key = hubID.ToString() + "." + (i % 10).ToString();
+            }
+
+            return (key, _config.SingleOrDefault(x => x[3] == key), i>17);
         }
 
         private double LowPassFilter(double value, string key)

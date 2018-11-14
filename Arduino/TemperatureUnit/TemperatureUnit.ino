@@ -39,7 +39,8 @@ const  unsigned  char thermocoupleA3 = 12;  // Address 3
 int SO[] = {4,5,6,7};
 int hubCount = 4;
 int ADD[] = {9, 10, 12, 11};
-String inString = "";    // string to hold user input
+bool junction = false;
+String inString = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";    // string to hold user input
 
 const  unsigned  char thermocoupleCLK = 8; 
 unsigned long timeStamp; 
@@ -49,6 +50,7 @@ MAX31855 MAX31855(SO, hubCount, ADD, thermocoupleCLK);
 void  setup()
 {
   Serial.begin(115200);
+  inString = "";
   printSerial();
 }
 
@@ -57,7 +59,7 @@ void  loop()
   timeStamp = millis() + 95;
   GetInput();
   
-  double value[17]; 
+  double value[33]; 
   MAX31855.ReadAllData(true);
 
   for(int j=0; j<hubCount; j++)
@@ -79,10 +81,20 @@ void  loop()
         valid++;
       }
     }
-    
-    if(valid)
+
+    int columns = 17;
+    if(junction)
     {
-      for(int i=1; i<17; i++)
+      columns = 33;
+      for(int i=17; i<33; i++)
+      {
+        value[i] = MAX31855.GetJunctionCelsius(j,i-1);
+      }
+    }
+    
+    if(valid || junction)
+    {
+      for(int i=1; i<columns; i++)
       {
         PrintDouble(value[i]);
       }
@@ -107,16 +119,20 @@ void PrintDouble(double value)
 double GetInput()
 {
   char inChar = Serial.read();
-  if (inChar == 'S' || inChar == 'e' || inChar == 'r' || inChar == 'i' || inChar == 'a' || inChar == 'l') 
+  if (inChar == 'S' || inChar == 'e' || inChar == 'r' || inChar == 'i' || inChar == 'a' || inChar == 'l' || inChar == 'J' ||inChar == 'u' ||inChar == 'n' || inChar == 'c' ||inChar == 't' || inChar == 'o' ) 
   {
       // convert the incoming byte to a char and add it to the string:
-      inString += inChar;
+      inString += (char)inChar;
   }
-  else if (inChar != -1) 
+  else if (inChar == 13) 
   {
       if(inString == "Serial")
       {
         printSerial();
+      }
+      else if(inString == "Junction")
+      {
+        junction = true;
       }
 
       inString = "";  

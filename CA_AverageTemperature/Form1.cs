@@ -14,6 +14,7 @@ namespace CA_AverageTemperature
         private CAThermalBox _hub;
         private Font _fontNormal;
         private Font _fontSmall;
+        private Bitmap _currentBmp;
         private StringFormat _format = new StringFormat();
 
         public Form1()
@@ -25,7 +26,7 @@ namespace CA_AverageTemperature
             if (dataLoggers.Any())
             {
                 timer1.Enabled = true;
-                _hub = new CAThermalBox(dataLoggers.First().portName, 4, 1);
+                _hub = new CAThermalBox(dataLoggers.First().portName, 4, 1, true);
             }
             else
             {
@@ -46,6 +47,14 @@ namespace CA_AverageTemperature
                 var boxRects = Draw4Boxes(g, pictureBox1.Width, pictureBox1.Height);
                 
             }
+
+            if (_currentBmp != null)
+            {
+                _currentBmp.Dispose();
+                _currentBmp = null;
+            }
+
+            _currentBmp = bmp;
             pictureBox1.Image = bmp;
         }
 
@@ -70,6 +79,9 @@ namespace CA_AverageTemperature
                 }
 
                 g.DrawRectangle(new Pen(Color.Black, 1), jack.Rect);
+
+                if(jack.TitlePos.X > 0)
+                    g.DrawString("Internal temperature", _fontSmall, Brushes.Black, jack.TitlePos, _format);
             }
 
             var pos = new Point(width / 2, height - 10);
@@ -80,7 +92,8 @@ namespace CA_AverageTemperature
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-            _hub.Dispose();
+            if(_hub != null)
+                _hub.Dispose();
             timer1.Enabled = false;
         }
 
