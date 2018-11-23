@@ -25,7 +25,7 @@
 const String serialNumber = "AD8Kr0fb";
 const String boardFamily = "Temperature 4xRJ45";
 const String boardVersion = "1";
-const String boardSoftware = "2018-22-10 11:37";
+const String boardSoftware = "2018-23-11 07:37";
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char thermocoupleSO_0 = 4; // DB-9 pin 3
