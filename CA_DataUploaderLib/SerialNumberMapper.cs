@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.IO.Ports;
 using System.Linq;
 
-namespace LoopComponents
+namespace CA_DataUploaderLib
 {
     public class MCUBoard
     {
