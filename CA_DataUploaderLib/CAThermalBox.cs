@@ -11,11 +11,10 @@ namespace CA_DataUploaderLib
 {
     public class CAThermalBox : IDisposable
     {
-        private SerialPort _serialPort;
+        private List<SerialPort> _serialPorts = new List<SerialPort>();
         private const int TEMPERATURE_FAULT = 10000;
         private bool _running = true;
         private bool _junction = false;
-        private int _maxNumberOfHubs;
         public int FilterLength { get; set; }
         public double Frequency { get; private set; }
         private ConcurrentDictionary<string, TermoSensor> _temperatures = new ConcurrentDictionary<string, TermoSensor>();
@@ -26,23 +25,26 @@ namespace CA_DataUploaderLib
 
         public bool Initialized { get; private set; }
 
-        public CAThermalBox(string portname, int maxNumberOfHubs, int filterLength = 1, bool junction = false)
+        public CAThermalBox(List<MCUBoard> boards, int filterLength = 1, bool junction = false)
         {
             Initialized = false;
-            _maxNumberOfHubs = maxNumberOfHubs;
             _junction = junction;
             FilterLength = filterLength;
-            _serialPort = new SerialPort(portname, 115200);
-            _serialPort.Open();
-            if(!_serialPort.IsOpen)
+            foreach (var board in boards)
             {
-                throw new Exception("Unable to open Serial port");
-            }
+                _serialPorts.Add(new SerialPort(board.portName, board.baudRate));
+                _serialPorts.Last().Open();
+                if (!_serialPorts.Last().IsOpen)
+                {
+                    throw new Exception($"Unable to open Serial port {board.portName}");
+                }
 
-            if (IOconf.GetOutputLevel() == LogLevel.Normal)
-            {
-                for (int i = 0; i < 2; i++)
-                    Console.WriteLine(_serialPort.ReadLine());
+
+                if (IOconf.GetOutputLevel() == LogLevel.Normal)
+                {
+                    for (int i = 0; i < 2; i++)
+                        Console.WriteLine(_serialPorts.Last().ReadLine());
+                }
             }
 
             if(IOconf.GetOutputLevel() == LogLevel.Debug)
@@ -50,9 +52,9 @@ namespace CA_DataUploaderLib
 
             new Thread(() => this.LoopForever()).Start();
 
-            _serialPort.WriteLine("Serial");
-            Thread.Sleep(100);
-            _serialPort.WriteLine("");
+            //_serialPort.WriteLine("Serial");
+            //Thread.Sleep(100);
+            //_serialPort.WriteLine("");
         }
 
         public TermoSensor GetValue(string sensorID)
@@ -93,15 +95,19 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    row = _serialPort.ReadLine();
-                    if (logLevel == LogLevel.Debug)
-                        Console.WriteLine(row);
+                    int hubID = 1;
+                    foreach (var port in _serialPorts)
+                    {
+                        row = port.ReadLine();
+                        if (logLevel == LogLevel.Debug)
+                            Console.WriteLine(row);
 
-                    Debug.Print(row);
+                        Debug.Print(row);
 
-                    values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                    numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
-                    ProcessLine(numbers);
+                        values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                        numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
+                        ProcessLine(numbers, hubID++);
+                    }
                     badRow = 0;
                     Initialized = true;
                 }
@@ -122,16 +128,16 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            _serialPort.Close();
+            foreach (var port in _serialPorts)
+                port.Close();
         }
 
-        private void ProcessLine(List<double> numbers)
+        private void ProcessLine(List<double> numbers, int hubID)
         {
             var timestamp = DateTime.UtcNow;
-            var hubID = Validate(numbers);
 
             int i = 0;
-            foreach (var value in numbers.Skip(1))
+            foreach (var value in numbers)
             {
                 var sensor = GetSensor(hubID, i);
                 if (sensor.row != null)
@@ -204,24 +210,6 @@ namespace CA_DataUploaderLib
             return _frequency.Average();
         }
 
-        private int Validate(List<double> numbers)
-        {
-            //if (numbers.Count != 19)
-            //    throw new ArgumentException("Arduino not sending right number of values. Expected 19, received " + numbers.Count);
-
-            int hubID = Convert.ToInt32(numbers.First());
-            if (hubID != numbers.First())
-                throw new Exception($"HubID was not a integer number: {hubID} != {numbers.First()}");
-
-            if (hubID < 0 || hubID >= _maxNumberOfHubs)
-                throw new Exception($"Expected hub number between 0 and {_maxNumberOfHubs}, but received {numbers.First()}");
-
-            if (numbers[1] < -10 || numbers[1] > 100)
-                throw new Exception($"Hub temperature was outside allowed range: {numbers[1]}");
-
-            return hubID;
-        }
-
         private void ShowConfig()
         {
             foreach (var x in _config)
@@ -238,10 +226,13 @@ namespace CA_DataUploaderLib
             _running = false;
             for (int i = 0; i < 100; i++)
             {
-                if (_serialPort.IsOpen) Thread.Sleep(10);
+                foreach(var port in _serialPorts)
+                    if (port.IsOpen)
+                            Thread.Sleep(10);
             }
 
-            ((IDisposable)_serialPort).Dispose();
+            foreach (var port in _serialPorts)
+                ((IDisposable)port).Dispose();
         }
     }
 }

@@ -17,35 +17,27 @@
 * ========  ===========
 * 1.00      Initial public release.
 * 2.00      Copenhagen Atomics Temperature sensor 4xRJ45 board. 
+* 3.00      Copenhagen Atomics Temperature sensor hubard16.
 *
 *******************************************************************************/
 // ***** INCLUDES *****
 #include  "MAX31855.h"
 
-const String serialNumber = "AD8Kr0fb";
-const String boardFamily = "Temperature 4xRJ45";
+const String serialNumber = "R5gKr3fb";
+const String boardFamily = "Temperature hubard16";
 const String boardVersion = "1";
-const String boardSoftware = "2018-23-11 07:37";
+const String boardSoftware = "2018-11-12 17:37";
 
 // ***** PIN DEFINITIONS *****
-const  unsigned  char thermocoupleSO_0 = 4; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_1 = 5; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_2 = 6; // DB-9 pin 3
-const  unsigned  char thermocoupleSO_3 = 7; // DB-9 pin 3
-const  unsigned  char thermocoupleA0 = 9;  // Address 0
-const  unsigned  char thermocoupleA1 = 10;  // Address 1
-const  unsigned  char thermocoupleA2 = 11;  // Address 2
-const  unsigned  char thermocoupleA3 = 12;  // Address 3
-int SO[] = {4,5,6,7};
-int hubCount = 4;
-int ADD[] = {9, 10, 12, 11};
+const  unsigned  char ChipSelect = 10; 
+const  unsigned  char ClockPin = 9; 
+int SO[] = {2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19};
 bool junction = false;
 String inString = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";    // string to hold user input
 
-const  unsigned  char thermocoupleCLK = 8; 
 unsigned long timeStamp; 
 
-MAX31855 MAX31855(SO, hubCount, ADD, thermocoupleCLK); 
+MAX31855 MAX31855(SO, ClockPin, ChipSelect); 
 
 void  setup()
 {
@@ -62,49 +54,47 @@ void  loop()
   double value[33]; 
   MAX31855.ReadAllData(true);
 
-  for(int j=0; j<hubCount; j++)
+  value[0] = MAX31855.GetAverageJunctionCelsius();
+  if(value[0] > 150 || value[0] == 0)
   {
-    value[0] = MAX31855.GetAverageJunctionCelsius(j);
-    if(value[0] > 150 || value[0] == 0)
-      continue;  // this hub is not connected, try next hub
+    Serial.println("Error: board junction temperature outside range");
+    return;  
+  }
 
-    Serial.print(j); // print hub ID
-    Serial.print(", ");
-    PrintDouble(value[0]);
+  PrintDouble(value[0]);
+
+  int valid = 0;
+  for(int i=1; i<17; i++)
+  {
+    value[i] = MAX31855.GetPortCelsius(i-1);
+    if(value[i] > -10 && value[i] < FAULT_OPEN && value[i] != 0)
+    {
+      valid++;
+    }
+  }
+
+  int columns = 17;
+  if(junction)
+  {
+    columns = 33;
+    for(int i=17; i<33; i++)
+    {
+      value[i] = MAX31855.GetJunctionCelsius(i-1);
+    }
+  }
   
-    int valid = 0;
-    for(int i=1; i<17; i++)
+  if(valid || junction)
+  {
+    for(int i=1; i<columns; i++)
     {
-      value[i] = MAX31855.GetThermocoupleCelsius(j,i-1);
-      if(value[i] > -10 && value[i] < FAULT_OPEN && value[i] != 0)
-      {
-        valid++;
-      }
+      PrintDouble(value[i]);
     }
+  }
 
-    int columns = 17;
-    if(junction)
-    {
-      columns = 33;
-      for(int i=17; i<33; i++)
-      {
-        value[i] = MAX31855.GetJunctionCelsius(j,i-1);
-      }
-    }
-    
-    if(valid || junction)
-    {
-      for(int i=1; i<columns; i++)
-      {
-        PrintDouble(value[i]);
-      }
-    }
-
-    Serial.println();
-    while(millis() < timeStamp)
-    {
-      delay(1); // delay to match 100 miliseconds between read operations
-    }
+  Serial.println();
+  while(millis() < timeStamp)
+  {
+    delay(1); // delay to match 100 miliseconds between read operations
   }
 }
 

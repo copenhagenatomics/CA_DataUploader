@@ -1,5 +1,4 @@
 ﻿using CA_DataUploaderLib;
-using LoopComponents;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -26,7 +25,7 @@ namespace CA_AverageTemperature
             if (dataLoggers.Any())
             {
                 timer1.Enabled = true;
-                _hub = new CAThermalBox(dataLoggers.First().portName, 4, 1, true);
+                _hub = new CAThermalBox(dataLoggers, 1, true);
             }
             else
             {

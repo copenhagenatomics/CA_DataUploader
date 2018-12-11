@@ -10,18 +10,20 @@ namespace CA_DataUploader
     {
         static void Main(string[] args)
         {
-            string com = "/dev/ttyUSB0";
-            com = "COM3";
-
             try
             {
-                if(args.Any())
-                    com = args[0];
+                var serial = new SerialNumberMapper(true);
+                var dataLoggers = serial.ByFamily("Temperature");
+                if (!dataLoggers.Any())
+                {
+                    Console.WriteLine("Tempearture sensors not initialized");
+                    return;
+                }
 
-                Console.WriteLine(RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud{Environment.NewLine}From port: {com}"));
+                Console.WriteLine(RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud{Environment.NewLine}From {dataLoggers.Count()} hubarg16 boards"));
 
                 int filterLen = (args.Count() > 1)?int.Parse(args[1]):10;
-                using (var usb = new CAThermalBox(com, 8, filterLen))
+                using (var usb = new CAThermalBox(dataLoggers, filterLen))
                 {
                     var cloud = new ServerUploader("http://www.theng.dk", usb.GetVectorDescription());
                     Console.WriteLine("Now connected to server");

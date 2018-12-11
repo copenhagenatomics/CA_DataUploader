@@ -13,81 +13,76 @@
 *******************************************************************************/
 #include	"MAX31855.h"
 
-MAX31855::MAX31855(int SO[], int hubCount, int ADD[], unsigned char SCK)
+MAX31855::MAX31855(int SO[], unsigned char SCK, unsigned char CS)
 {
 	_so = SO;
-  _hubCount = hubCount;
-  _add = ADD;
 	_sck = SCK;
+  _cs = CS;
 
 	// MAX31855 data pin
-  for(int i=0; i<_hubCount; i++)
+  for(int i=0; i<16; i++)
   {
 	  pinMode(_so[i], INPUT);
-  }
-
-  // MAX31855 address pin
-  for(int i=0; i<4; i++)
-  {
-    pinMode(_add[i], OUTPUT);
-    digitalWrite(_add[i], LOW);
   }
 
 	// MAX31855 clock input pin
 	pinMode(_sck, OUTPUT);
 	digitalWrite(_sck, LOW);
 	
-	// initialize data arrays;
-	for(int hubID=0; hubID<MAX_HUBS; hubID++)
-	for(int address=0; address<MAX_ADDRESSES; address++)
+	// MAX31855 chip select input pin
+  pinMode(_cs, OUTPUT);
+  digitalWrite(_cs, HIGH);
+
+  // initialize data arrays;
+	for(int port=0; port<16; port++)
 	{
-		_dataThermocouple[hubID][address] = INITIALIZED;
-		_dataJunction[hubID][address] = INITIALIZED; 
+		_dataThermocouple[port] = INITIALIZED;
+		_dataJunction[port] = INITIALIZED; 
 	}
 }
 
-double MAX31855::GetThermocoupleCelsius(unsigned char hubID, unsigned char address)
+double MAX31855::GetPortCelsius(unsigned char port)
 {
-	return _dataThermocouple[hubID][address];
+	return _dataThermocouple[port];
 }
 
-double MAX31855::GetJunctionCelsius(unsigned char hubID, unsigned char address)
+double MAX31855::GetJunctionCelsius(unsigned char port)
 {
-	return _dataJunction[hubID][address];
+	return _dataJunction[port];
 }
 
-double MAX31855::GetThermocoupleFahrenheit(unsigned char hubID, unsigned char address)
-{
-	// Convert Degree Celsius to Fahrenheit
-	return (_dataThermocouple[hubID][address] * 9.0/5.0)+ 32; 
-}
-
-double MAX31855::GetJunctionFahrenheit(unsigned char hubID, unsigned char address)
+double MAX31855::GetPortFahrenheit(unsigned char port)
 {
 	// Convert Degree Celsius to Fahrenheit
-	return (_dataJunction[hubID][address] * 9.0/5.0)+ 32; 
+	return (_dataThermocouple[port] * 9.0/5.0)+ 32; 
 }
 
-double MAX31855::GetAverageJunctionCelsius(unsigned char hubID)
+double MAX31855::GetJunctionFahrenheit(unsigned char port)
+{
+	// Convert Degree Celsius to Fahrenheit
+	return (_dataJunction[port] * 9.0/5.0)+ 32; 
+}
+
+double MAX31855::GetAverageJunctionCelsius()
 {
   double sum = 0;
   for(int i=0; i<16; i++)
   {
-    if(_dataJunction[hubID][i] < -10 || _dataJunction[hubID][i] > 100)
+    if(_dataJunction[i] < -10 || _dataJunction[i] > 100)
        return JUNCTION_TEMPERATURE_OUTSIDE_RANGE;
-    sum += _dataJunction[hubID][i];
+    sum += _dataJunction[i];
   }
   
   return sum/16.0;
 }
 
-double MAX31855::GetAverageJunctionFahrenheit(unsigned char hubID)
+double MAX31855::GetAverageJunctionFahrenheit()
 {
   // Convert Degree Celsius to Fahrenheit
-  return (GetAverageJunctionCelsius(hubID) * 9.0/5.0)+ 32; 
+  return (GetAverageJunctionCelsius() * 9.0/5.0)+ 32; 
 }
 
-double	MAX31855::GetThermocoupleCelsius(unsigned long data)
+double	MAX31855::ExtractPortCelsius(unsigned long data)
 {
 	double temperature = 0;
 	
@@ -142,7 +137,7 @@ double	MAX31855::GetThermocoupleCelsius(unsigned long data)
 	return (temperature);
 }
 
-double	MAX31855::GetJunctionCelsius(unsigned long data)
+double	MAX31855::ExtractJunctionCelsius(unsigned long data)
 {
 	double	temperature = 0;
 	
@@ -171,17 +166,18 @@ double	MAX31855::GetJunctionCelsius(unsigned long data)
 
 /*******************************************************************************
 * Name: readData
-* Description: Shift in 32-bit of data from MAX31855 chip. Minimum clock pulse
+* Description: Shift in 32-bit of data from all 16 MAX31855 chips. Minimum clock pulse
 *							 width is 100 ns. No delay is required in this case.
 *******************************************************************************/
-void MAX31855::ReadData(unsigned char address, bool overwrite)
+int MAX31855::ReadAllData(bool overwrite)
 {
-	unsigned long data[MAX_HUBS];
-	
+	unsigned long data[16];
+	digitalWrite(_cs, LOW); // select all chips
+ 
 	// Clear data 
-	for(int hubID=0; hubID<_hubCount; hubID++)
+	for(int port=0; port<16; port++)
 	{	
-		data[hubID] = 0;
+		data[port] = 0;
 	}
  
 	// Shift in 32-bit of data
@@ -189,12 +185,12 @@ void MAX31855::ReadData(unsigned char address, bool overwrite)
 	{
 		digitalWrite(_sck, HIGH);
 		
-		for(int hubID=0; hubID<_hubCount; hubID++)
+		for(int port=0; port<16; port++)
 		{
 			// If data bit is high
-			if (digitalRead(_so[hubID]))
+			if (digitalRead(_so[port]))
 			{
-				data[hubID] |= ((unsigned long)1 << bitCount); // Need to type cast data type to unsigned long, else compiler will truncate to 16-bit
+				data[port] |= ((unsigned long)1 << bitCount); // Need to type cast data type to unsigned long, else compiler will truncate to 16-bit
 			}				
 		}
 
@@ -205,38 +201,24 @@ void MAX31855::ReadData(unsigned char address, bool overwrite)
     digitalWrite(_sck, LOW);
     
 	}
-	
-	for(int hubID=0; hubID<_hubCount; hubID++)
+
+  digitalWrite(_cs, HIGH); // deselect all chips
+  
+	for(int port=0; port<16; port++)
 	{
-		_dataJunction[hubID][address] = GetJunctionCelsius(data[hubID]);
-		double temperature = GetThermocoupleCelsius(data[hubID]);
-		if(overwrite || temperature < FAULT_OPEN || _dataThermocouple[hubID][address] == INITIALIZED)
+		_dataJunction[port] = ExtractJunctionCelsius(data[port]);
+		double temperature = ExtractPortCelsius(data[port]);
+		if(overwrite || temperature < FAULT_OPEN || _dataThermocouple[port] == INITIALIZED)
 		{
-			_dataThermocouple[hubID][address] = temperature;
+			_dataThermocouple[port] = temperature;
 		}
 	}
-}
-
-int MAX31855::ReadAllData(bool overwrite)
-{
-  for(int i=0; i<MAX_ADDRESSES; i++)
-  {
-    // set address
-    digitalWrite(_add[0], HIGH && (i & B00000001));
-    digitalWrite(_add[1], HIGH && (i & B00000010));
-    digitalWrite(_add[2], HIGH && (i & B00000100));
-    digitalWrite(_add[3], HIGH && (i & B00001000));
-    ReadData(i, overwrite);
-  }
 
   int nOKvalues=0;
-  for(int hubID=0; hubID<MAX_HUBS; hubID++)
-  for(int address=0; address<MAX_ADDRESSES; address++)
+  for(int port=0; port<16; port++)
   {
-    if(_dataThermocouple[hubID][address] < FAULT_OPEN) nOKvalues++;
+    if(_dataThermocouple[port] < FAULT_OPEN) nOKvalues++;
   }
 
   return nOKvalues;
 }
-
-
