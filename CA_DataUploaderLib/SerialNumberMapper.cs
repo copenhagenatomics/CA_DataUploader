@@ -42,32 +42,14 @@ namespace CA_DataUploaderLib
             {
                 var port = new SerialPort(name, 115200);
                 try
-                {              
+                {
+                    var mcu = new MCUBoard { portName = name, baudRate = 115200, serialNumber = "unknown" + (_dictionary.Count() + 1) };
                     port.Open();
-                    port.WriteLine("Serial");
-                    var mcu = new MCUBoard { portName = name, baudRate = 115200, serialNumber = "unknown" + (_dictionary.Count()+1) };
-                    var stop = DateTime.Now.AddSeconds(2);
-                    while(DateTime.Now < stop && mcu.IsEmpty())
-                    {
-                        if (port.BytesToRead > 0)
-                        {
-                            var input = port.ReadLine();
-
-                            if (input.Contains(MCUBoard.serialNumberHeader))
-                                mcu.serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
-                            if (input.Contains(MCUBoard.boardFamilyHeader))
-                                mcu.boardFamily = input.Substring(input.IndexOf(MCUBoard.boardFamilyHeader) + MCUBoard.boardFamilyHeader.Length).Trim();
-                            if (input.Contains(MCUBoard.boardVersionHeader))
-                                mcu.boardVersion = input.Substring(input.IndexOf(MCUBoard.boardVersionHeader) + MCUBoard.boardVersionHeader.Length).Trim();
-                            if (input.Contains(MCUBoard.boardSoftwareHeader))
-                                mcu.boardSoftware = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
-                        }
-                    }
-
+                    GetBoardInformation(port, mcu);
                     port.Close();
                     _dictionary.Add(mcu.serialNumber, mcu);
 
-                    if(mcu.boardFamily is null)
+                    if (mcu.boardFamily is null)
                         mcu.boardFamily = GetStringFromDmesg(mcu.portName);
 
                     if (debug)
@@ -80,6 +62,32 @@ namespace CA_DataUploaderLib
                 }
             }
 
+        }
+
+        private static void GetBoardInformation(SerialPort port, MCUBoard mcu)
+        {
+            port.DiscardInBuffer();
+            port.DiscardOutBuffer();
+            port.WriteLine("Serial");
+            var stop = DateTime.Now.AddSeconds(2);
+            while (DateTime.Now < stop && mcu.IsEmpty())
+            {
+                if (port.BytesToRead > 0)
+                {
+                    var input = port.ReadLine();
+                    if (!input.Contains(" 10000.00"))
+                        Debug.Print(input);
+
+                    if (input.Contains(MCUBoard.serialNumberHeader))
+                        mcu.serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
+                    if (input.Contains(MCUBoard.boardFamilyHeader))
+                        mcu.boardFamily = input.Substring(input.IndexOf(MCUBoard.boardFamilyHeader) + MCUBoard.boardFamilyHeader.Length).Trim();
+                    if (input.Contains(MCUBoard.boardVersionHeader))
+                        mcu.boardVersion = input.Substring(input.IndexOf(MCUBoard.boardVersionHeader) + MCUBoard.boardVersionHeader.Length).Trim();
+                    if (input.Contains(MCUBoard.boardSoftwareHeader))
+                        mcu.boardSoftware = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
+                }
+            }
         }
 
         private string GetStringFromDmesg(string portName)

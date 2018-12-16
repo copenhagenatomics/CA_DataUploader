@@ -9,9 +9,26 @@ using System.Diagnostics;
 
 namespace CA_DataUploaderLib
 {
+    public class CAThermalPort
+    {
+        public SerialPort port;
+        public MCUBoard board;
+
+        public CAThermalPort(MCUBoard input)
+        {
+            board = input;
+            port = new SerialPort(board.portName, board.baudRate);
+            port.Open();
+        }
+        public string ReadLine()
+        {
+            return port.ReadLine();
+        }
+    }
+
     public class CAThermalBox : IDisposable
     {
-        private List<SerialPort> _serialPorts = new List<SerialPort>();
+        private List<CAThermalPort> _serialPorts = new List<CAThermalPort>();
         private const int TEMPERATURE_FAULT = 10000;
         private bool _running = true;
         private bool _junction = false;
@@ -32,13 +49,11 @@ namespace CA_DataUploaderLib
             FilterLength = filterLength;
             foreach (var board in boards)
             {
-                _serialPorts.Add(new SerialPort(board.portName, board.baudRate));
-                _serialPorts.Last().Open();
-                if (!_serialPorts.Last().IsOpen)
+                _serialPorts.Add(new CAThermalPort(board));
+                if (!_serialPorts.Last().port.IsOpen)
                 {
                     throw new Exception($"Unable to open Serial port {board.portName}");
                 }
-
 
                 if (IOconf.GetOutputLevel() == LogLevel.Normal)
                 {
@@ -106,7 +121,10 @@ namespace CA_DataUploaderLib
 
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
-                        ProcessLine(numbers, hubID++);
+                        if (numbers.Count == 18) // old model. 
+                            ProcessLine(numbers.Skip(1), (int)numbers[0], port.board);
+                        else
+                            ProcessLine(numbers, hubID++, port.board);
                     }
                     badRow = 0;
                     Initialized = true;
@@ -128,11 +146,11 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            foreach (var port in _serialPorts)
-                port.Close();
+            foreach (var board in _serialPorts)
+                board.port.Close();
         }
 
-        private void ProcessLine(List<double> numbers, int hubID)
+        private void ProcessLine(IEnumerable<double> numbers, int hubID, MCUBoard board)
         {
             var timestamp = DateTime.UtcNow;
 
@@ -158,7 +176,7 @@ namespace CA_DataUploaderLib
                     else
                     {
                         Debug.Assert(sensor.readJunction == false);
-                        _temperatures.TryAdd(sensor.key, new TermoSensor(_config.IndexOf(sensor.row), sensor.row[1]) { Temperature = value, TimeStamp = timestamp, Key = sensor.key });
+                        _temperatures.TryAdd(sensor.key, new TermoSensor(_config.IndexOf(sensor.row), sensor.row[1]) { Temperature = value, TimeStamp = timestamp, Key = sensor.key, board = board });
                         if (FilterLength > 1)
                         {
                             _filterQueue.Add(sensor.key, new Queue<double>());
@@ -226,13 +244,13 @@ namespace CA_DataUploaderLib
             _running = false;
             for (int i = 0; i < 100; i++)
             {
-                foreach(var port in _serialPorts)
-                    if (port.IsOpen)
+                foreach(var board in _serialPorts)
+                    if (board.port.IsOpen)
                             Thread.Sleep(10);
             }
 
-            foreach (var port in _serialPorts)
-                ((IDisposable)port).Dispose();
+            foreach (var board in _serialPorts)
+                ((IDisposable)board.port).Dispose();
         }
     }
 }

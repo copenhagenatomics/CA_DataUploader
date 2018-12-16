@@ -10,6 +10,7 @@ namespace CA_AverageTemperature
         public Rectangle Rect;
         public Point TextPos;
         public Point TitlePos;
+        public Point SerialPos;
 
         public JackRectangle(TermoSensor sensor, double width, double height)
         {
@@ -23,6 +24,9 @@ namespace CA_AverageTemperature
                 TitlePos = Rect.Location;
                 TitlePos.Y -= Rect.Height / 2;
                 TitlePos.X += Rect.Width / 2;
+                SerialPos = Rect.Location;
+                SerialPos.Y += (int)(Rect.Height * 1.5);
+                SerialPos.X += Rect.Width / 2;
             }
 
             TextPos = Rect.Location;

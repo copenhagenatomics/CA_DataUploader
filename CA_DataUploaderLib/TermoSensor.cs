@@ -11,6 +11,7 @@ namespace CA_DataUploaderLib
 
         public string Key;
         public DateTime TimeStamp { get; set; }
+        public MCUBoard board { get; set; }
 
         public string Name { get; private set; }
 

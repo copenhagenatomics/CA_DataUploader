@@ -79,8 +79,11 @@ namespace CA_AverageTemperature
 
                 g.DrawRectangle(new Pen(Color.Black, 1), jack.Rect);
 
-                if(jack.TitlePos.X > 0)
+                if (jack.TitlePos.X > 0)
+                {
                     g.DrawString("Internal temperature", _fontSmall, Brushes.Black, jack.TitlePos, _format);
+                    g.DrawString("Serial: " + jack.Sensor.board.serialNumber, _fontSmall, Brushes.Black, jack.SerialPos, _format);
+                }
             }
 
             var pos = new Point(width / 2, height - 10);

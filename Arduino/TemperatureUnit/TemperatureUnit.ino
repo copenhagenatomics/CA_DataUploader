@@ -23,15 +23,15 @@
 // ***** INCLUDES *****
 #include  "MAX31855.h"
 
-const String serialNumber = "R5gKr3fb";
+const String serialNumber = "R5gKr0fb";
 const String boardFamily = "Temperature hubard16";
 const String boardVersion = "1";
-const String boardSoftware = "2018-11-12 17:37";
+const String boardSoftware = "2018-12-16 22:37";
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char ChipSelect = 10; 
 const  unsigned  char ClockPin = 9; 
-int SO[] = {2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19};
+int SO[] = {12,11,2,4,6,7,8,18, 13,19,3,5,14,15,16,17};
 bool junction = false;
 String inString = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";    // string to hold user input
 
@@ -142,4 +142,5 @@ void printSerial()
   Serial.println(boardVersion);
   Serial.print("Board Software: ");
   Serial.println(boardSoftware);
+  delay(50);
 }
