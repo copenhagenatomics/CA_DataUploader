@@ -47,7 +47,7 @@ namespace CA_DataUploaderLib
             Initialized = false;
             _junction = junction;
             FilterLength = filterLength;
-            foreach (var board in boards)
+            foreach (var board in boards.OrderBy(x => x.serialNumber))
             {
                 _serialPorts.Add(new CAThermalPort(board));
                 if (!_serialPorts.Last().port.IsOpen)

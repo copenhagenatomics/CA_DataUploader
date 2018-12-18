@@ -4,10 +4,15 @@
 * Date: 26-12-2011
 * Company: Rocket Scream Electronics
 * Website: www.rocketscream.com
-*
+* 
+* Version: 2 - 3
+* Date: 26-08-2018
+* Company: Copenhagen Atomics
+* Website: www.copenhagenatomics.com
+* 
 * This is an example of using the MAX31855 library for Arduino to read 
 * temperature from a thermocouple and send the reading to serial interfacec. 
-* Please check our wiki (www.rocketscream.com/wiki) for more information on 
+* Please check our wiki (www.github.com/copenhagenatomics) for more information on 
 * using this piece of library.
 *
 * This example code is licensed under Creative Commons Attribution-ShareAlike 
@@ -26,7 +31,7 @@
 const String serialNumber = "R5gKr0fb";
 const String boardFamily = "Temperature hubard16";
 const String boardVersion = "1";
-const String boardSoftware = "2018-12-16 22:37";
+const String boardSoftware = "2018-12-18 07:37";
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char ChipSelect = 10; 
@@ -35,7 +40,7 @@ int SO[] = {12,11,2,4,6,7,8,18, 13,19,3,5,14,15,16,17};
 bool junction = false;
 String inString = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";    // string to hold user input
 
-unsigned long timeStamp; 
+unsigned long timeStamp = 0; 
 
 MAX31855 MAX31855(SO, ClockPin, ChipSelect); 
 
@@ -48,8 +53,10 @@ void  setup()
 
 void  loop()
 { 
-  timeStamp = millis() + 95;
-  GetInput();
+  if(millis() < timeStamp)
+    return;  // max 10 Hz
+    
+  timeStamp = millis() + 950;
   
   double value[33]; 
   MAX31855.ReadAllData(true);
@@ -92,10 +99,7 @@ void  loop()
   }
 
   Serial.println();
-  while(millis() < timeStamp)
-  {
-    delay(1); // delay to match 100 miliseconds between read operations
-  }
+  GetInput();
 }
 
 void PrintDouble(double value)
@@ -142,5 +146,4 @@ void printSerial()
   Serial.println(boardVersion);
   Serial.print("Board Software: ");
   Serial.println(boardSoftware);
-  delay(50);
 }
