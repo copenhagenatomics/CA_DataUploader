@@ -56,7 +56,7 @@ void  loop()
   if(millis() < timeStamp)
     return;  // max 10 Hz
     
-  timeStamp = millis() + 950;
+  timeStamp = millis() + 100;
   
   double value[33]; 
   MAX31855.ReadAllData(true);
@@ -116,9 +116,9 @@ double GetInput()
   if (inChar == 'S' || inChar == 'e' || inChar == 'r' || inChar == 'i' || inChar == 'a' || inChar == 'l' || inChar == 'J' ||inChar == 'u' ||inChar == 'n' || inChar == 'c' ||inChar == 't' || inChar == 'o' ) 
   {
       // convert the incoming byte to a char and add it to the string:
-      inString += (char)inChar;
+      inString += inChar;
   }
-  else if (inChar == 13) 
+  else if (inChar != -1) 
   {
       if(inString == "Serial")
       {

@@ -27,7 +27,12 @@ namespace CA_DataUploaderLib
 
         public override string ToString()
         {
-            return $"{serialNumberHeader}{serialNumber}{Environment.NewLine}{boardFamilyHeader}{boardFamily}{Environment.NewLine}{boardVersionHeader}{boardVersion}{Environment.NewLine}{boardSoftwareHeader}{boardSoftware}{Environment.NewLine}Baud rate: {baudRate}{Environment.NewLine}Port name: {portName}{Environment.NewLine}";
+            return ToString(Environment.NewLine);
+        }
+
+        public string ToString(string seperator)
+        {
+            return $"{serialNumberHeader}{serialNumber}{seperator}{boardFamilyHeader}{boardFamily}{seperator}{boardVersionHeader}{boardVersion}{seperator}{boardSoftwareHeader}{boardSoftware}{seperator}Baud rate: {baudRate}{seperator}Port name: {portName}{seperator}";
         }
     }
 
