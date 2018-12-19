@@ -86,10 +86,8 @@ namespace CA_DataUploaderLib
         public IEnumerable<TermoSensor> GetAllValidTemperatures()
         {
             var removeBefore = DateTime.UtcNow.AddSeconds(-2);
-            var list = _temperatures.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Key).ToList();
-            TermoSensor dummy;
-            list.ForEach(x => _temperatures.TryRemove(x, out dummy));
-            return _temperatures.Values.OrderBy(x => x.ID);
+            var list = _temperatures.Where(x => x.Value.TimeStamp > removeBefore).Select(x => x.Key).ToList();
+            return _temperatures.Where(x => list.Contains(x.Key)).Select(x => x.Value).OrderBy(x => x.ID);
         }
 
         public VectorDescription GetVectorDescription()
@@ -110,7 +108,7 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    int hubID = 1;
+                    int hubID = 0;
                     foreach (var port in _serialPorts)
                     {
                         row = port.ReadLine();
@@ -122,9 +120,12 @@ namespace CA_DataUploaderLib
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
                         if (numbers.Count == 18) // old model. 
-                            ProcessLine(numbers.Skip(1), (int)numbers[0], port.board);
+                        {
+                            hubID = (int)numbers[0];
+                            ProcessLine(numbers.Skip(1), hubID, port.board);
+                        }
                         else
-                            ProcessLine(numbers, hubID++, port.board);
+                            ProcessLine(numbers, ++hubID, port.board);
                     }
                     badRow = 0;
                     Initialized = true;

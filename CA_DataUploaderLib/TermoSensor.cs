@@ -40,5 +40,13 @@ namespace CA_DataUploaderLib
 
         public int Hub { get { return int.Parse(Key.Split('.')[0]); } }
         public int Jack { get { return int.Parse(Key.Split('.')[1]); } }
+
+        public override string ToString()
+        {
+            if (Temperature > 9000)
+                return "NC";
+
+            return $"{Temperature}";
+        }
     }
 }
