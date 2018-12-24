@@ -85,6 +85,9 @@ namespace CA_DataUploaderLib
 
         public IEnumerable<TermoSensor> GetAllValidTemperatures()
         {
+            if (IOconf.GetOutputLevel() == LogLevel.Debug)
+                Console.WriteLine("All temperatures: " + _temperatures.Count());
+
             var removeBefore = DateTime.UtcNow.AddSeconds(-2);
             var list = _temperatures.Where(x => x.Value.TimeStamp > removeBefore).Select(x => x.Key).ToList();
             return _temperatures.Where(x => list.Contains(x.Key)).Select(x => x.Value).OrderBy(x => x.ID);
