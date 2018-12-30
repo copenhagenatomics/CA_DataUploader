@@ -125,10 +125,10 @@ namespace CA_DataUploaderLib
                         if (numbers.Count == 18) // old model. 
                         {
                             hubID = (int)numbers[0];
-                            ProcessLine(numbers.Skip(1), hubID, port.board);
+                            ProcessLine(numbers.Skip(1), hubID++, port.board);
                         }
                         else
-                            ProcessLine(numbers, ++hubID, port.board);
+                            ProcessLine(numbers, hubID++, port.board);
                     }
                     badRow = 0;
                     Initialized = true;

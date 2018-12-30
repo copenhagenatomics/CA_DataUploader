@@ -15,7 +15,7 @@ namespace CA_AverageTemperature
         public JackRectangle(TermoSensor sensor, double width, double height)
         {
             Sensor = sensor;
-            int x = (int)(((sensor.Jack-1) % 8 + 0.5) * width);
+            int x = (int)(((16- sensor.Jack) % 8 + 0.5) * width);
             int y = (int)(((sensor.Hub) * 4 + ((sensor.Jack-1) / 8) + 1) * height);
             Rect = new Rectangle(x, y, (int)width, (int)height);
             if(sensor.Jack == 0)

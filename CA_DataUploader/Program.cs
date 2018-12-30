@@ -38,7 +38,7 @@ namespace CA_DataUploader
                             Console.Write($"\r {i++}");
                         }
 
-                        Thread.Sleep(1000);
+                        Thread.Sleep(100);
                     }
                 }
 
