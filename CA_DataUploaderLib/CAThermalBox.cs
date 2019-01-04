@@ -118,8 +118,6 @@ namespace CA_DataUploaderLib
                         if (logLevel == LogLevel.Debug)
                             Console.WriteLine(row);
 
-                        Debug.Print(row);
-
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
                         if (numbers.Count == 18) // old model. 
