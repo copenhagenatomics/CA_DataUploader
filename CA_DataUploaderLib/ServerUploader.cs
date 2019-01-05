@@ -126,6 +126,9 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
+                if (ex.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'" || ex.InnerException?.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'")
+                    throw new HttpRequestException("Check your internet connection", ex);
+
                 Console.WriteLine(ex.Message);
                 throw;
             }

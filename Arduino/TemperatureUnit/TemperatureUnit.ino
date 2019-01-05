@@ -26,10 +26,10 @@
 // ***** INCLUDES *****
 #include  "MAX31855.h"
 
-const String serialNumber = "AD8Kr0fb";
+const String serialNumber = "AffKr0fb";
 const String boardFamily = "Temperature 4xRJ45";
 const String boardVersion = "1";
-const String boardSoftware = "2018-12-19 06:37";
+const String boardSoftware = "2019-01-04 09:37";
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char thermocoupleSO_0 = 4; // DB-9 pin 3

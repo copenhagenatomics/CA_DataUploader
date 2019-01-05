@@ -9,26 +9,9 @@ using System.Diagnostics;
 
 namespace CA_DataUploaderLib
 {
-    public class CAThermalPort
-    {
-        public SerialPort port;
-        public MCUBoard board;
-
-        public CAThermalPort(MCUBoard input)
-        {
-            board = input;
-            port = new SerialPort(board.portName, board.baudRate);
-            port.Open();
-        }
-        public string ReadLine()
-        {
-            return port.ReadLine();
-        }
-    }
-
     public class CAThermalBox : IDisposable
     {
-        private List<CAThermalPort> _serialPorts = new List<CAThermalPort>();
+        private List<MCUBoard> _mcuBoards;
         private const int TEMPERATURE_FAULT = 10000;
         private bool _running = true;
         private bool _junction = false;
@@ -47,29 +30,12 @@ namespace CA_DataUploaderLib
             Initialized = false;
             _junction = junction;
             FilterLength = filterLength;
-            foreach (var board in boards.OrderBy(x => x.serialNumber))
-            {
-                _serialPorts.Add(new CAThermalPort(board));
-                if (!_serialPorts.Last().port.IsOpen)
-                {
-                    throw new Exception($"Unable to open Serial port {board.portName}");
-                }
-
-                if (IOconf.GetOutputLevel() == LogLevel.Normal)
-                {
-                    for (int i = 0; i < 2; i++)
-                        Console.WriteLine(_serialPorts.Last().ReadLine());
-                }
-            }
+            _mcuBoards = boards.OrderBy(x => x.serialNumber).ToList();
 
             if(IOconf.GetOutputLevel() == LogLevel.Debug)
                 ShowConfig();
 
             new Thread(() => this.LoopForever()).Start();
-
-            //_serialPort.WriteLine("Serial");
-            //Thread.Sleep(100);
-            //_serialPort.WriteLine("");
         }
 
         public TermoSensor GetValue(string sensorID)
@@ -111,9 +77,9 @@ namespace CA_DataUploaderLib
                 try
                 {
                     int hubID = 1;
-                    foreach (var port in _serialPorts)
+                    foreach (var board in _mcuBoards)
                     {
-                        row = port.ReadLine();
+                        row = board.ReadLine();
                         if (logLevel == LogLevel.Debug)
                             Console.WriteLine(row);
 
@@ -122,9 +88,9 @@ namespace CA_DataUploaderLib
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
                         if (numbers.Count == 18) // old model. 
-                            ProcessLine(numbers.Skip(1), (int)numbers[0], port.board);
+                            ProcessLine(numbers.Skip(1), (int)numbers[0], board);
                         else
-                            ProcessLine(numbers, hubID++, port.board);
+                            ProcessLine(numbers, hubID++, board);
                     }
                     badRow = 0;
                     Initialized = true;
@@ -146,8 +112,8 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            foreach (var board in _serialPorts)
-                board.port.Close();
+            foreach (var board in _mcuBoards)
+                board.Close();
         }
 
         private void ProcessLine(IEnumerable<double> numbers, int hubID, MCUBoard board)
@@ -244,13 +210,13 @@ namespace CA_DataUploaderLib
             _running = false;
             for (int i = 0; i < 100; i++)
             {
-                foreach(var board in _serialPorts)
-                    if (board.port.IsOpen)
+                foreach(var board in _mcuBoards)
+                    if (board.IsOpen)
                             Thread.Sleep(10);
             }
 
-            foreach (var board in _serialPorts)
-                ((IDisposable)board.port).Dispose();
+            foreach (var board in _mcuBoards)
+                ((IDisposable)board).Dispose();
         }
     }
 }
