@@ -76,7 +76,7 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    int hubID = 1;
+                    int hubID = 0;
                     foreach (var board in _mcuBoards)
                     {
                         row = board.ReadLine();

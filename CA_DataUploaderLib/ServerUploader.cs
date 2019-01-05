@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -21,12 +22,14 @@ namespace CA_DataUploaderLib
         private int _vectorLen;
         private string _keyFilename = "keyBlob.bin";
         private string _loopName;
+        private string _loginToken;
 
-        public ServerUploader(string server, VectorDescription vectorDescription)
+        public ServerUploader(VectorDescription vectorDescription)
         {
             try
             {
-                _client.BaseAddress = new Uri(server + "/api/");
+                string server = ConfigurationManager.AppSettings["server"];
+                _client.BaseAddress = new Uri(server);
                 _client.DefaultRequestHeaders.Accept.Clear();
                 _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 _loopName = IOconf.GetLoopName();
@@ -36,6 +39,8 @@ namespace CA_DataUploaderLib
                     _rsaWriter.ImportCspBlob(File.ReadAllBytes(_keyFilename));
                 else
                     File.WriteAllBytes(_keyFilename, _rsaWriter.ExportCspBlob(true));
+
+                GetLoginToken();
 
                 _plotID = GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription)).Result;
                 _vectorLen = vectorDescription.Length;
@@ -119,7 +124,7 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                string query = $"LoopApi?LoopName={_loopName}&Ticks={DateTime.Now.Ticks}";
+                string query = $"api/LoopApi?LoopName={_loopName}&ticks={DateTime.Now.Ticks}&loginToken={_loginToken}";
                 HttpResponseMessage response = await _client.PutAsJsonAsync(query, publicKey.Concat(vectorDescription));
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsAsync<int>();
@@ -129,7 +134,10 @@ namespace CA_DataUploaderLib
                 if (ex.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'" || ex.InnerException?.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'")
                     throw new HttpRequestException("Check your internet connection", ex);
 
-                Console.WriteLine(ex.Message);
+                if (ex.InnerException == null)
+                    Console.WriteLine(ex.Message);
+                else
+                    Console.WriteLine(ex.InnerException.Message);
                 throw;
             }
         }
@@ -139,14 +147,17 @@ namespace CA_DataUploaderLib
             try
             {
                 var buffer = GetBytes(dv.vector);
-                string query = $"LoopApi?plotnameID={_plotID}&Ticks={dv.timestamp.Ticks}";
+                string query = $"api/LoopApi?plotnameID={_plotID}&Ticks={dv.timestamp.Ticks}&loginToken={_loginToken}";
                 HttpResponseMessage response = await _client.PutAsJsonAsync(query, buffer);
                 response.EnsureSuccessStatusCode();
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Unable to upload vector to server: " + dv.timestamp.ToString("HH:mm:ss"));
-                Console.WriteLine(ex.Message);
+                if (ex.InnerException == null)
+                    Console.WriteLine(ex.Message);
+                else
+                    Console.WriteLine(ex.InnerException.Message);
             }
         }
 
@@ -154,13 +165,61 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                string query = $"LoopApi?plotnameID={_plotID}";
+                string query = $"api/LoopApi?plotnameID={_plotID}";
                 HttpResponseMessage response = await _client.PutAsJsonAsync(query, SignedMessage(newDescription));
                 response.EnsureSuccessStatusCode();
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                if (ex.InnerException == null)
+                    Console.WriteLine(ex.Message);
+                else
+                    Console.WriteLine(ex.InnerException.Message);
+                throw;
+            }
+        }
+
+        private void GetLoginToken(bool recursive = false)
+        {
+            try
+            {
+                string query = $"Login?email={ConfigurationManager.AppSettings["email"]}&password={ConfigurationManager.AppSettings["password"]}";
+                Task<string> response = _client.GetStringAsync(query);
+                _loginToken = response.Result;
+            }
+            catch (Exception ex)
+            {
+                if(ex.InnerException == null)
+                    Console.WriteLine(ex.Message);
+                else
+                    Console.WriteLine(ex.InnerException.Message);
+
+                if(!recursive)
+                    CreateAccount();
+
+                throw;
+            }
+
+        }
+
+        private void CreateAccount()
+        {
+            try
+            {
+                string query = $"Login/CreateAccount?email={ConfigurationManager.AppSettings["email"]}&password={ConfigurationManager.AppSettings["password"]}&fullname={ConfigurationManager.AppSettings["fullname"]}";
+                Task<string> response = _client.GetStringAsync(query);
+                if ("OK" == response.Result)
+                {
+                    GetLoginToken(true);
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ex.InnerException == null)
+                    Console.WriteLine(ex.Message);
+                else
+                    Console.WriteLine(ex.InnerException.Message);
+
                 throw;
             }
         }

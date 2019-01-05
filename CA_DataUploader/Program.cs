@@ -25,7 +25,7 @@ namespace CA_DataUploader
                 int filterLen = (args.Count() > 1)?int.Parse(args[1]):10;
                 using (var usb = new CAThermalBox(dataLoggers, filterLen))
                 {
-                    var cloud = new ServerUploader("http://www.theng.dk", usb.GetVectorDescription());
+                    var cloud = new ServerUploader(usb.GetVectorDescription());
                     Console.WriteLine("Now connected to server");
 
                     int i = 0;
