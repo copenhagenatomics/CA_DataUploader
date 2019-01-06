@@ -50,6 +50,8 @@ namespace CA_DataUploader
                 Console.WriteLine();
                 Console.WriteLine(ex.StackTrace.ToString());
             }
+
+            Console.ReadKey();
         }
 
 

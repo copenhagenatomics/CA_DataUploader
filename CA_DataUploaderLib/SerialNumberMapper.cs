@@ -10,52 +10,64 @@ namespace CA_DataUploaderLib
 {
     public class MCUBoard : SerialPort
     {
-        public string serialNumber;
+        public string serialNumber = null;
         public const string serialNumberHeader = "Serial Number: ";
-        public string boardFamily;
+        public string boardFamily = null;
         public const string boardFamilyHeader = "Board Family: ";
-        public string boardVersion;
+        public string boardVersion = null;
         public const string boardVersionHeader = "Board Version: ";
-        public string boardSoftware;
+        public string boardSoftware = null;
         public const string boardSoftwareHeader = "Board Software: ";
 
         public DateTime PortOpenTimeStamp;
 
         public MCUBoard(string name, int baudrate)
         {
-            BaudRate = baudrate;
-            PortName = name;
 
-            Open();
-
-            PortOpenTimeStamp = DateTime.UtcNow;
-            DiscardInBuffer();
-            DiscardOutBuffer();
-            WriteLine("Serial");
-            var stop = DateTime.Now.AddSeconds(2);
-            while (DateTime.Now < stop && IsEmpty())
+            try
             {
-                if (BytesToRead > 0)
-                {
-                    var input = ReadLine();
-                    if (!input.Contains(" 10000.00"))
-                        Debug.Print(input);
+                BaudRate = baudrate;
+                PortName = name;
+                Open();
 
-                    if (input.Contains(MCUBoard.serialNumberHeader))
-                        serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
-                    if (input.Contains(MCUBoard.boardFamilyHeader))
-                        boardFamily = input.Substring(input.IndexOf(MCUBoard.boardFamilyHeader) + MCUBoard.boardFamilyHeader.Length).Trim();
-                    if (input.Contains(MCUBoard.boardVersionHeader))
-                        boardVersion = input.Substring(input.IndexOf(MCUBoard.boardVersionHeader) + MCUBoard.boardVersionHeader.Length).Trim();
-                    if (input.Contains(MCUBoard.boardSoftwareHeader))
-                        boardSoftware = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
+                PortOpenTimeStamp = DateTime.UtcNow;
+                DiscardInBuffer();
+                DiscardOutBuffer();
+                WriteLine("Serial");
+                var stop = DateTime.Now.AddSeconds(2);
+                while (IsEmpty() && DateTime.Now < stop)
+                {
+
+                    if (BytesToRead > 0)
+                    {
+                        var input = ReadLine();
+                        if (!input.Contains(" 10000.00"))
+                            Debug.Print("input: " + input);
+
+                        if (input.Contains(MCUBoard.serialNumberHeader))
+                            serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
+                        if (input.Contains(MCUBoard.boardFamilyHeader))
+                            boardFamily = input.Substring(input.IndexOf(MCUBoard.boardFamilyHeader) + MCUBoard.boardFamilyHeader.Length).Trim();
+                        if (input.Contains(MCUBoard.boardVersionHeader))
+                            boardVersion = input.Substring(input.IndexOf(MCUBoard.boardVersionHeader) + MCUBoard.boardVersionHeader.Length).Trim();
+                        if (input.Contains(MCUBoard.boardSoftwareHeader))
+                            boardSoftware = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("fejl: " + ex.ToString());
+                throw;
             }
         }
 
         public bool IsEmpty()
         {
-            return (serialNumber is null) || (boardFamily is null) || (boardVersion is null) || (boardSoftware is null);
+            return serialNumber.IsNullOrEmpty() || 
+                    boardFamily.IsNullOrEmpty() || 
+                    boardVersion.IsNullOrEmpty() || 
+                    boardSoftware.IsNullOrEmpty();
         }
 
         public override string ToString()
@@ -82,10 +94,7 @@ namespace CA_DataUploaderLib
                 try
                 {
                     var mcu = new MCUBoard(name, 115200);
-
-                    if (mcu.serialNumber.IsNullOrEmpty())
-                        mcu.serialNumber = "unknown" + (McuBoards.Count(x => x.serialNumber.StartsWith("unknown")) + 1);
-
+                    SetUnknownSerialNumber(mcu);
                     McuBoards.Add(mcu);
 
                     if (mcu.boardFamily is null)
@@ -96,10 +105,21 @@ namespace CA_DataUploaderLib
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Unable to open {name}, Exception: {ex.Message}");
+                    Console.WriteLine($"Unable to open {name}, Exception: {ex.ToString()}");
+                    Console.WriteLine();
                 }
             }
 
+        }
+
+        private void SetUnknownSerialNumber(MCUBoard mcu)
+        {
+            if (mcu.serialNumber.IsNullOrEmpty())
+            {
+                mcu.serialNumber = "unknown1";
+                if (McuBoards.Any())
+                    mcu.serialNumber = "unknown" + (McuBoards.Count(x => x.serialNumber.StartsWith("unknown")) + 1);
+            }
         }
 
         private string GetStringFromDmesg(string portName)
@@ -121,7 +141,10 @@ namespace CA_DataUploaderLib
             var p = Process.Start(info);
             p.WaitForExit(1000);
             var result = p.StandardOutput.ReadToEnd().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-            var line = result.First(x => x.EndsWith(portName));
+            var line = result.FirstOrDefault(x => x.EndsWith(portName));
+            if (line == null)
+                return null;
+
             return line.StringBetween(": ", " to ttyUSB");
         }
 
