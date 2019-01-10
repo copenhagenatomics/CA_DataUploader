@@ -8,21 +8,23 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
 
 namespace CA_DataUploaderLib
 {
-    public class ServerUploader
+    public class ServerUploader : IDisposable
     {
         private HttpClient _client = new HttpClient();
         private RSACryptoServiceProvider _rsaWriter = new RSACryptoServiceProvider(1024);
         private Queue<DataVector> _queue = new Queue<DataVector>();
         private int _plotID;
         private int _vectorLen;
-        private string _keyFilename = "keyBlob.bin";
+        private string _keyFilename;
         private string _loopName;
         private string _loginToken;
+        private bool _running;
 
         public ServerUploader(VectorDescription vectorDescription)
         {
@@ -33,6 +35,7 @@ namespace CA_DataUploaderLib
                 _client.DefaultRequestHeaders.Accept.Clear();
                 _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 _loopName = IOconf.GetLoopName();
+                _keyFilename = "Key" + _loopName + ".bin";
                 Console.WriteLine(_loopName);
 
                 if (File.Exists(_keyFilename))
@@ -44,6 +47,7 @@ namespace CA_DataUploaderLib
 
                 _plotID = GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription)).Result;
                 _vectorLen = vectorDescription.Length;
+                new Thread(() => this.LoopForever()).Start();
             }
             catch (Exception ex)
             {
@@ -57,7 +61,7 @@ namespace CA_DataUploaderLib
             if (vector.Count() != _vectorLen)
                 throw new ArgumentException($"wrong vector length: {vector.Count()} <> {_vectorLen}");
 
-            if (_queue.Count < 100)  // if problems then drop packages. 
+            if (_queue.Count < 1000)  // if problems then drop packages. 
             {
                 _queue.Enqueue(new DataVector
                 {
@@ -65,28 +69,49 @@ namespace CA_DataUploaderLib
                     vector = vector
                 });
             }
-
-            Task.Run(() => {
-                while (_queue.Any())
-                {
-                    PostVectorAsync(_queue.Dequeue());
-                }
-            });
         }
 
-        private byte[] GetBytes(List<double> vector)
+        private void LoopForever()
         {
-            var raw = new byte[vector.Count() * sizeof(double)];
-            Buffer.BlockCopy(vector.ToArray(), 0, raw, 0, raw.Length);
+            _running = true;
+            while (_running)
+            {
+                try
+                {
+                    List<DataVector> list = new List<DataVector>();
+                    while (_queue.Any())  // dequeue all. 
+                    {
+                        list.Add(_queue.Dequeue());
+                    }
+
+                    if (list.Any())
+                    {
+                        byte[] listLen = BitConverter.GetBytes((ushort)list.Count());
+                        var theData = list.SelectMany(a => a.buffer).ToArray();
+                        var buffer = Compress(listLen.Concat(theData).ToArray());
+                        PostVectorAsync(buffer, list.First().timestamp);
+                    }
+
+                    Thread.Sleep(900);  // only send approx. one time per second. 
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("ServerUploader.LoopForever() exception: " + ex.Message);
+                }
+            }
+        }
+
+        private byte[] Compress(byte[] buffer)
+        {
             using (var memory = new MemoryStream())
             {
                 using (var gzip = new GZipStream(memory, CompressionMode.Compress))
                 {
-                    gzip.Write(raw, 0, raw.Length);
+                    gzip.Write(buffer, 0, buffer.Length);
                 }
 
                 // create and prepend the signature. 
-                byte[] signature = _rsaWriter.SignData(raw, new SHA1CryptoServiceProvider());
+                byte[] signature = _rsaWriter.SignData(buffer, new SHA1CryptoServiceProvider());
                 return signature.Concat(memory.ToArray()).ToArray();
             }
         }
@@ -142,18 +167,17 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private async void PostVectorAsync(DataVector dv)
+        private async void PostVectorAsync(byte[] buffer, DateTime timestamp)
         {
             try
             {
-                var buffer = GetBytes(dv.vector);
-                string query = $"api/LoopApi?plotnameID={_plotID}&Ticks={dv.timestamp.Ticks}&loginToken={_loginToken}";
+                string query = $"api/LoopApi?plotnameID={_plotID}&Ticks={timestamp.Ticks}&loginToken={_loginToken}";
                 HttpResponseMessage response = await _client.PutAsJsonAsync(query, buffer);
                 response.EnsureSuccessStatusCode();
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Unable to upload vector to server: " + dv.timestamp.ToString("HH:mm:ss"));
+                Console.WriteLine("Unable to upload vector to server: " + timestamp.ToString("HH:mm:ss"));
                 if (ex.InnerException == null)
                     Console.WriteLine(ex.Message);
                 else
@@ -223,5 +247,32 @@ namespace CA_DataUploaderLib
                 throw;
             }
         }
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    _running = false;
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
+                // TODO: set large fields to null.
+
+                disposedValue = true;
+            }
+        }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+        }
+        #endregion
     }
 }
