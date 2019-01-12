@@ -28,10 +28,10 @@
 // ***** INCLUDES *****
 #include  "MAX31855.h"
 
-const String serialNumber = "R5gKr0fb";
+const String serialNumber = "R5gLL0fb";
 const String boardFamily = "Temperature hubard16";
 const String boardVersion = "1";
-const String boardSoftware = "2018-12-18 07:37";
+const String boardSoftware = "2019-01-10 17:37";
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char ChipSelect = 10; 
@@ -64,7 +64,9 @@ void  loop()
   value[0] = MAX31855.GetAverageJunctionCelsius();
   if(value[0] > 150 || value[0] == 0)
   {
-    Serial.println("Error: board junction temperature outside range");
+    Serial.print("Error: board junction temperature outside range ");
+    PrintDouble(value[0]);
+    Serial.println();
     return;  
   }
 

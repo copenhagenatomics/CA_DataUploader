@@ -24,8 +24,9 @@ namespace CA_DataUploader
 
                 int filterLen = (args.Count() > 1)?int.Parse(args[1]):10;
                 using (var usb = new CAThermalBox(dataLoggers, filterLen))
+                using(var cloud = new ServerUploader(usb.GetVectorDescription()))
                 {
-                    var cloud = new ServerUploader(usb.GetVectorDescription());
+
                     Console.WriteLine("Now connected to server");
 
                     int i = 0;
@@ -35,7 +36,8 @@ namespace CA_DataUploader
                         if (allSensors.Any())
                         {
                             cloud.SendVector(allSensors.Select(x => x.Temperature).ToList(), AverageSensorTimestamp(allSensors));
-                            Console.Write($"\r {i++}");
+                            Console.Write($"\r {i}");
+                            i += 10;
                         }
 
                         Thread.Sleep(100);
