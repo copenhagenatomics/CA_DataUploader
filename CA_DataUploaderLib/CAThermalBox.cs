@@ -49,6 +49,18 @@ namespace CA_DataUploaderLib
             return _temperatures[sensorID];
         }
 
+        public TermoSensor GetValueByTitle(string title)
+        {
+            if (!_config.Any(x => x[1] == title))
+                throw new Exception(title + " not found in _config, count: " + _config.Count());
+
+            var temp = _temperatures.Values.SingleOrDefault(x => x.Name == title);
+            if (temp == null)
+                throw new Exception(title + " not found in _temperatures, count: " + _temperatures.Count());
+
+            return temp;
+        }
+
         public IEnumerable<TermoSensor> GetAllValidTemperatures()
         {
             var removeBefore = DateTime.UtcNow.AddSeconds(-2);
