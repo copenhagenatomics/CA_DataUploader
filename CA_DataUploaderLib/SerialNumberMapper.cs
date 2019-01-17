@@ -31,6 +31,8 @@ namespace CA_DataUploaderLib
                 Open();
 
                 PortOpenTimeStamp = DateTime.UtcNow;
+                ReadTimeout = 2000;
+                WriteTimeout = 2000;
                 // DiscardInBuffer();
                 // DiscardOutBuffer();
                 WriteLine("Serial");
