@@ -36,6 +36,8 @@ namespace CA_DataUploaderLib
                 ShowConfig();
 
             new Thread(() => this.LoopForever()).Start();
+
+            Thread.Sleep(1000);
         }
 
         public TermoSensor GetValue(string sensorID)
