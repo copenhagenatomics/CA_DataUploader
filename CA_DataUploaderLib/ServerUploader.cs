@@ -1,5 +1,4 @@
-﻿using LoopComponents;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.IO;
@@ -37,7 +36,7 @@ namespace CA_DataUploaderLib
                 _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 _loopName = IOconf.GetLoopName();
                 _keyFilename = "Key" + _loopName + ".bin";
-                Console.WriteLine(_loopName);
+                CALog.LogInfoAndConsoleLn(LogID.A, _loopName);
 
                 if (File.Exists(_keyFilename))
                     _rsaWriter.ImportCspBlob(File.ReadAllBytes(_keyFilename));
@@ -52,7 +51,11 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                if (ex.InnerException == null)
+                    CALog.LogErrorAndConsole(LogID.A, ex.Message);
+                else
+                    CALog.LogErrorAndConsole(LogID.A, ex.InnerException.Message);
+
                 throw;
             }
         }
@@ -97,7 +100,7 @@ namespace CA_DataUploaderLib
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("ServerUploader.LoopForever() exception: " + ex.Message);
+                    CALog.LogErrorAndConsole(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message);
                 }
             }
         }
@@ -161,9 +164,9 @@ namespace CA_DataUploaderLib
                     throw new HttpRequestException("Check your internet connection", ex);
 
                 if (ex.InnerException == null)
-                    Console.WriteLine(ex.Message);
+                    CALog.LogErrorAndConsole(LogID.A, ex.Message);
                 else
-                    Console.WriteLine(ex.InnerException.Message);
+                    CALog.LogErrorAndConsole(LogID.A, ex.InnerException.Message);
                 throw;
             }
         }
@@ -178,11 +181,11 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Unable to upload vector to server: " + timestamp.ToString("HH:mm:ss"));
+                CALog.LogInfoAndConsoleLn(LogID.A, "Unable to upload vector to server: " + timestamp.ToString("HH:mm:ss"));
                 if (ex.InnerException == null)
-                    Console.WriteLine(ex.Message);
+                    CALog.LogErrorAndConsole(LogID.A, ex.Message);
                 else
-                    Console.WriteLine(ex.InnerException.Message);
+                    CALog.LogErrorAndConsole(LogID.A, ex.InnerException.Message);
             }
         }
 
@@ -197,56 +200,68 @@ namespace CA_DataUploaderLib
             catch (Exception ex)
             {
                 if (ex.InnerException == null)
-                    Console.WriteLine(ex.Message);
+                    CALog.LogErrorAndConsole(LogID.A, ex.Message);
                 else
-                    Console.WriteLine(ex.InnerException.Message);
+                    CALog.LogErrorAndConsole(LogID.A, ex.InnerException.Message);
                 throw;
             }
         }
 
-        private void GetLoginToken(bool recursive = false)
+        private void GetLoginToken()
         {
-            try
+            var values = new Dictionary<string, string>
             {
-                string query = $"Login?email={ConfigurationManager.AppSettings["email"]}&password={ConfigurationManager.AppSettings["password"]}";
-                Task<string> response = _client.GetStringAsync(query);
-                _loginToken = response.Result;
-            }
-            catch (Exception ex)
-            {
-                if(ex.InnerException == null)
-                    Console.WriteLine(ex.Message);
-                else
-                    Console.WriteLine(ex.InnerException.Message);
+                { "email", ConfigurationManager.AppSettings["email"] },
+                { "password", ConfigurationManager.AppSettings["password"] }
+            };
 
-                if(!recursive)
+            var content = new FormUrlEncodedContent(values);
+            var response = _client.PostAsync("Login", content);
+            if (response.Result.StatusCode == System.Net.HttpStatusCode.OK && response.Result.Content != null)
+            {
+                var dic = response.Result.Content.ReadAsAsync<Dictionary<string, string>>().Result;
+                if (dic["status"] == "success")
+                {
+                    _loginToken = dic["message"];
+                    return;
+                }
+
+                if (dic["message"] == "email or password does not match")
+                {
                     CreateAccount();
+                    return;
+                }
 
-                throw;
+                throw new Exception(dic["message"]);
             }
 
+            throw new Exception(response.Result.ReasonPhrase);                
         }
 
         private void CreateAccount()
         {
-            try
+            var values = new Dictionary<string, string>
             {
-                string query = $"Login/CreateAccount?email={ConfigurationManager.AppSettings["email"]}&password={ConfigurationManager.AppSettings["password"]}&fullname={ConfigurationManager.AppSettings["fullname"]}";
-                Task<string> response = _client.GetStringAsync(query);
-                if ("OK" == response.Result)
-                {
-                    GetLoginToken(true);
-                }
-            }
-            catch (Exception ex)
-            {
-                if (ex.InnerException == null)
-                    Console.WriteLine(ex.Message);
-                else
-                    Console.WriteLine(ex.InnerException.Message);
+                { "email", ConfigurationManager.AppSettings["email"] },
+                { "password", ConfigurationManager.AppSettings["password"] },
+                { "fullname", ConfigurationManager.AppSettings["fullname"] }
+            };
 
-                throw;
+            var content = new FormUrlEncodedContent(values);
+            var response = _client.PostAsync("Login/CreateAccount", content);
+            if (response.Result.StatusCode == System.Net.HttpStatusCode.OK && response.Result.Content != null)
+            {
+                var dic = response.Result.Content.ReadAsAsync<Dictionary<string, string>>().Result;
+                if (dic["status"] == "success")
+                {
+                    _loginToken = dic["message"];
+                    return;
+                }
+
+                throw new Exception(dic["message"]);
             }
+           
+            throw new Exception(response.Result.ReasonPhrase);
         }
 
         #region IDisposable Support

@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace LoopComponents
+namespace CA_DataUploaderLib
 {
     public enum LogID
     {

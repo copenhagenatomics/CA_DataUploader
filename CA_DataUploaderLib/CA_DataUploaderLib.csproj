@@ -52,11 +52,12 @@
     <Compile Include="Extensions\StringExtensions.cs" />
     <Compile Include="IOconf.cs" />
     <Compile Include="CALog.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RpiVersion.cs" />
-    <Compile Include="SerialNumberMapper.cs">
+    <Compile Include="MCUBoard.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RpiVersion.cs" />
+    <Compile Include="SerialNumberMapper.cs" />
     <Compile Include="SerialPortWatcher.cs" />
     <Compile Include="ServerUploader.cs" />
     <Compile Include="TermoSensor.cs" />
