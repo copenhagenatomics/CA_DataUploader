@@ -44,7 +44,7 @@ namespace CA_DataUploader
                     }
                 }
 
-                Console.WriteLine(Environment.NewLine + "Bye...");
+                Console.WriteLine(Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
             }
             catch (Exception ex)
             {
