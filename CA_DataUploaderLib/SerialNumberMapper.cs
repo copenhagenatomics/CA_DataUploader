@@ -1,4 +1,5 @@
 ﻿using CA_DataUploaderLib.Extensions;
+using LoopComponents;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -103,12 +104,15 @@ namespace CA_DataUploaderLib
                         mcu.boardFamily = GetStringFromDmesg(mcu.PortName);
 
                     if (debug)
-                        Console.WriteLine(mcu.ToString());
+                        CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToString());
+                }
+                catch(UnauthorizedAccessException ex)
+                {
+                    CALog.LogErrorAndConsole(LogID.A, $"Unable to open {name}, Exception: {ex.Message}" + Environment.NewLine);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Unable to open {name}, Exception: {ex.ToString()}");
-                    Console.WriteLine();
+                    CALog.LogErrorAndConsole(LogID.A, $"Unable to open {name}, Exception: {ex.ToString()}" + Environment.NewLine);
                 }
             }
 
