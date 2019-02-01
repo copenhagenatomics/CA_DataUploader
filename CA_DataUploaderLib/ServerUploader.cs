@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CA_DataUploaderLib.Extensions;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.IO;
@@ -51,11 +52,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                if (ex.InnerException == null)
-                    CALog.LogErrorAndConsole(LogID.A, ex.Message);
-                else
-                    CALog.LogErrorAndConsole(LogID.A, ex.InnerException.Message);
-
+                LogHttpException(ex);
                 throw;
             }
         }
@@ -72,6 +69,39 @@ namespace CA_DataUploaderLib
                     timestamp = timestamp,
                     vector = vector
                 });
+            }
+        }
+
+        public async void UploadSensorMatch(string newDescription)
+        {
+            try
+            {
+                string query = $"api/LoopApi?plotnameID={_plotID}";
+                HttpResponseMessage response = await _client.PutAsJsonAsync(query, SignedMessage(newDescription));
+                response.EnsureSuccessStatusCode();
+            }
+            catch (Exception ex)
+            {
+                LogHttpException(ex);
+                throw;
+            }
+        }
+
+        public Dictionary<string, string> ListMyPlots()
+        {
+            try
+            {
+                string query = $"plots/ListMyPlots?token={_loginToken}";
+                var result = _client.GetStringAsync(query).Result;
+                result = result.Substring(1, result.Length - 2); // remove squar brackets. 
+                var list = result.Split("{".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).ToList();
+
+                return list.ToDictionary(x => x.StringBetween("\"PlotName\":", "\",\""), x => x.Substring(0, x.Length-2));
+            }
+            catch (Exception ex)
+            {
+                LogHttpException(ex);
+                throw;
             }
         }
 
@@ -162,13 +192,17 @@ namespace CA_DataUploaderLib
             {
                 if (ex.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'" || ex.InnerException?.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'")
                     throw new HttpRequestException("Check your internet connection", ex);
-
-                if (ex.InnerException == null)
-                    CALog.LogErrorAndConsole(LogID.A, ex.Message);
-                else
-                    CALog.LogErrorAndConsole(LogID.A, ex.InnerException.Message);
+                LogHttpException(ex);
                 throw;
             }
+        }
+
+        private static void LogHttpException(Exception ex)
+        {
+            if (ex.InnerException == null)
+                CALog.LogErrorAndConsole(LogID.A, ex.Message);
+            else
+                CALog.LogErrorAndConsole(LogID.A, ex.InnerException.Message);
         }
 
         private async void PostVectorAsync(byte[] buffer, DateTime timestamp)
@@ -182,28 +216,7 @@ namespace CA_DataUploaderLib
             catch (Exception ex)
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, "Unable to upload vector to server: " + timestamp.ToString("HH:mm:ss"));
-                if (ex.InnerException == null)
-                    CALog.LogErrorAndConsole(LogID.A, ex.Message);
-                else
-                    CALog.LogErrorAndConsole(LogID.A, ex.InnerException.Message);
-            }
-        }
-
-        public async void UploadSensorMatch(string newDescription)
-        {
-            try
-            {
-                string query = $"api/LoopApi?plotnameID={_plotID}";
-                HttpResponseMessage response = await _client.PutAsJsonAsync(query, SignedMessage(newDescription));
-                response.EnsureSuccessStatusCode();
-            }
-            catch (Exception ex)
-            {
-                if (ex.InnerException == null)
-                    CALog.LogErrorAndConsole(LogID.A, ex.Message);
-                else
-                    CALog.LogErrorAndConsole(LogID.A, ex.InnerException.Message);
-                throw;
+                LogHttpException(ex);
             }
         }
 

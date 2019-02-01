@@ -28,6 +28,8 @@ namespace CA_DataUploader
                 {
 
                     Console.WriteLine("Now connected to server");
+                    foreach (var x in cloud.ListMyPlots())
+                        Console.WriteLine(x.Value);
 
                     int i = 0;
                     while (!UserPressedEscape())
