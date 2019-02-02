@@ -87,6 +87,16 @@ namespace CA_DataUploaderLib
             }
         }
 
+        public string PrintMyPlots()
+        {
+            var sb = new StringBuilder(Environment.NewLine);
+            foreach (var x in ListMyPlots())
+                sb.AppendLine(x.Value);
+
+            sb.AppendLine();
+            return sb.ToString();
+        }
+
         public Dictionary<string, string> ListMyPlots()
         {
             try
@@ -94,15 +104,37 @@ namespace CA_DataUploaderLib
                 string query = $"plots/ListMyPlots?token={_loginToken}";
                 var result = _client.GetStringAsync(query).Result;
                 result = result.Substring(1, result.Length - 2); // remove squar brackets. 
-                var list = result.Split("{".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).ToList();
-
-                return list.ToDictionary(x => x.StringBetween("\"PlotName\":", "\",\""), x => x.Substring(0, x.Length-2));
+                List<string> list = FormatPlotList(result);
+                return list.ToDictionary(x => x.StringBetween("\"PlotName\":", "\",\""), x => x);
             }
             catch (Exception ex)
             {
                 LogHttpException(ex);
                 throw;
             }
+        }
+
+        private static List<string> FormatPlotList(string result)
+        {
+            var list = result.Split("{".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).ToList();
+            var maxPos = list.Max(x => x.IndexOf("PlotName"));
+            list = list.Select(x => FormatPlotList(x, maxPos, "\"PlotName")).ToList();
+            maxPos = list.Max(x => x.IndexOf("VectorLength"));
+            list = list.Select(x => FormatPlotList(x, maxPos, "\"VectorLength")).ToList();
+            return list;
+        }
+
+        private static string FormatPlotList(string str, int maxPos, string padBefore)
+        {
+            if (str.EndsWith("},"))
+                str = str.Substring(0, str.Length - 2);
+            if(str.EndsWith("}"))
+                str = str.Substring(0, str.Length - 1);
+
+            while (str.IndexOf(padBefore) < maxPos)
+                str = str.Replace(padBefore, " " + padBefore);
+
+            return str;
         }
 
         private void LoopForever()
