@@ -17,6 +17,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ScreenShots", "ScreenShots"
 		ScreenShots\CA_DataUploader.exe.png = ScreenShots\CA_DataUploader.exe.png
 		ScreenShots\IO.conf.png = ScreenShots\IO.conf.png
 		ScreenShots\OnlineChart.png = ScreenShots\OnlineChart.png
+		ScreenShots\putty.exe.png = ScreenShots\putty.exe.png
 	EndProjectSection
 EndProject
 Global
