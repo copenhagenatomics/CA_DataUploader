@@ -1,7 +1,6 @@
 ﻿using CA_DataUploaderLib.Extensions;
 using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -20,6 +19,7 @@ namespace CA_DataUploaderLib
         private HttpClient _client = new HttpClient();
         private RSACryptoServiceProvider _rsaWriter = new RSACryptoServiceProvider(1024);
         private Queue<DataVector> _queue = new Queue<DataVector>();
+        private FormUrlEncodedContent _accountInfo;
         private int _plotID;
         private int _vectorLen;
         private string _keyFilename;
@@ -33,8 +33,17 @@ namespace CA_DataUploaderLib
         {
             try
             {
+                var connectionInfo = IOconf.GetConnectionInfo();
+                var values = new Dictionary<string, string>
+                {
+                    { "email", connectionInfo.email },
+                    { "password", connectionInfo.password },
+                    { "fullname", connectionInfo.Fullname }
+                };
+
+                _accountInfo = new FormUrlEncodedContent(values);
                 MillisecondsBetweenUpload = 900;
-                string server = ConfigurationManager.AppSettings["server"];
+                string server = connectionInfo.Server;
                 _client.BaseAddress = new Uri(server);
                 _client.DefaultRequestHeaders.Accept.Clear();
                 _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -257,14 +266,7 @@ namespace CA_DataUploaderLib
 
         private void GetLoginToken()
         {
-            var values = new Dictionary<string, string>
-            {
-                { "email", ConfigurationManager.AppSettings["email"] },
-                { "password", ConfigurationManager.AppSettings["password"] }
-            };
-
-            var content = new FormUrlEncodedContent(values);
-            var response = _client.PostAsync("Login", content);
+            var response = _client.PostAsync("Login", _accountInfo);
             if (response.Result.StatusCode == System.Net.HttpStatusCode.OK && response.Result.Content != null)
             {
                 var dic = response.Result.Content.ReadAsAsync<Dictionary<string, string>>().Result;
@@ -288,15 +290,7 @@ namespace CA_DataUploaderLib
 
         private void CreateAccount()
         {
-            var values = new Dictionary<string, string>
-            {
-                { "email", ConfigurationManager.AppSettings["email"] },
-                { "password", ConfigurationManager.AppSettings["password"] },
-                { "fullname", ConfigurationManager.AppSettings["fullname"] }
-            };
-
-            var content = new FormUrlEncodedContent(values);
-            var response = _client.PostAsync("Login/CreateAccount", content);
+            var response = _client.PostAsync("Login/CreateAccount", _accountInfo);
             if (response.Result.StatusCode == System.Net.HttpStatusCode.OK && response.Result.Content != null)
             {
                 var dic = response.Result.Content.ReadAsAsync<Dictionary<string, string>>().Result;

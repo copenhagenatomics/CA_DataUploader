@@ -5,6 +5,15 @@ using System.Linq;
 
 namespace CA_DataUploaderLib
 {
+    public class ConnectionInfo
+    {
+        public string LoopName;
+        public string Server;
+        public string Fullname;
+        public string email;
+        public string password;
+    }
+
     public class IOconf
     {
         public List<List<string>> Table { get; private set; }
@@ -33,6 +42,19 @@ namespace CA_DataUploaderLib
         public static string GetLoopName()
         {
             return new IOconf().Table.Single(x => x.First() == "LoopName")[1];
+        }
+
+        public static ConnectionInfo GetConnectionInfo()
+        {
+            var table = new IOconf().Table;
+            return new ConnectionInfo
+            {
+                LoopName = table.Single(x => x.First() == "LoopName")[1],
+                Server = table.Single(x => x.First() == "LoopName")[3],
+                Fullname = table.Single(x => x.First() == "Account")[1],
+                email = table.Single(x => x.First() == "Account")[2],
+                password = table.Single(x => x.First() == "Account")[3],
+            };
         }
 
         public static LogLevel GetOutputLevel()
