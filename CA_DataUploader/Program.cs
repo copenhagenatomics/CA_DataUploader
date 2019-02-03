@@ -26,7 +26,6 @@ namespace CA_DataUploader
                 using (var usb = new CAThermalBox(dataLoggers, filterLen))
                 using(var cloud = new ServerUploader(usb.GetVectorDescription()))
                 {
-
                     Console.WriteLine("Now connected to server");
                     Console.WriteLine(cloud.PrintMyPlots());
 

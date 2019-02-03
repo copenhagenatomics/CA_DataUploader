@@ -27,10 +27,13 @@ namespace CA_DataUploaderLib
         private string _loginToken;
         private bool _running;
 
+        public int MillisecondsBetweenUpload { get; set; }
+
         public ServerUploader(VectorDescription vectorDescription)
         {
             try
             {
+                MillisecondsBetweenUpload = 900;
                 string server = ConfigurationManager.AppSettings["server"];
                 _client.BaseAddress = new Uri(server);
                 _client.DefaultRequestHeaders.Accept.Clear();
@@ -158,7 +161,7 @@ namespace CA_DataUploaderLib
                         PostVectorAsync(buffer, list.First().timestamp);
                     }
 
-                    Thread.Sleep(900);  // only send approx. one time per second. 
+                    Thread.Sleep(MillisecondsBetweenUpload);  // only send approx. one time per second. 
                 }
                 catch (Exception ex)
                 {
