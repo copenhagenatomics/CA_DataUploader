@@ -49,11 +49,11 @@ namespace CA_DataUploaderLib
             var table = new IOconf().Table;
             return new ConnectionInfo
             {
-                LoopName = table.Single(x => x.First() == "LoopName")[1],
-                Server = table.Single(x => x.First() == "LoopName")[3],
-                Fullname = table.Single(x => x.First() == "Account")[1],
-                email = table.Single(x => x.First() == "Account")[2],
-                password = table.Single(x => x.First() == "Account")[3],
+                LoopName = table.Single(x => x.First() == "LoopName")[1].Trim(),
+                Server = table.Single(x => x.First() == "LoopName")[3].Trim(),
+                Fullname = table.Single(x => x.First() == "Account")[1].Trim(),
+                email = table.Single(x => x.First() == "Account")[2].Trim(),
+                password = table.Single(x => x.First() == "Account")[3].Trim(),
             };
         }
 

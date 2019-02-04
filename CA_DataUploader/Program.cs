@@ -27,7 +27,6 @@ namespace CA_DataUploader
                 using(var cloud = new ServerUploader(usb.GetVectorDescription()))
                 {
                     Console.WriteLine("Now connected to server");
-                    Console.WriteLine(cloud.PrintMyPlots());
 
                     int i = 0;
                     while (!UserPressedEscape())
@@ -41,6 +40,7 @@ namespace CA_DataUploader
                         }
 
                         Thread.Sleep(100);
+                        if (i==20) Console.WriteLine(cloud.PrintMyPlots());
                     }
                 }
 

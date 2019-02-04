@@ -22,6 +22,7 @@ namespace CA_DataUploaderLib
         private FormUrlEncodedContent _accountInfo;
         private int _plotID;
         private int _vectorLen;
+        private DateTime _lastTimestamp;
         private string _keyFilename;
         private string _loopName;
         private string _loginToken;
@@ -76,11 +77,16 @@ namespace CA_DataUploaderLib
 
             if (_queue.Count < 1000)  // if problems then drop packages. 
             {
-                _queue.Enqueue(new DataVector
+                if (_lastTimestamp < timestamp)
                 {
-                    timestamp = timestamp,
-                    vector = vector
-                });
+                    _queue.Enqueue(new DataVector
+                    {
+                        timestamp = timestamp,
+                        vector = vector
+                    });
+
+                    _lastTimestamp = timestamp;
+                }
             }
         }
 
@@ -115,7 +121,9 @@ namespace CA_DataUploaderLib
             {
                 string query = $"plots/ListMyPlots?token={_loginToken}";
                 var result = _client.GetStringAsync(query).Result;
-                result = result.Substring(1, result.Length - 2); // remove squar brackets. 
+                var startPos = result.IndexOf("Table\":[{") + 9;
+                result = result.Substring(startPos); // remove LoggedIn + Table "header"
+                result = result.Substring(0, result.Length - 2); // remove squar brackets. 
                 List<string> list = FormatPlotList(result);
                 return list.ToDictionary(x => x.StringBetween("\"PlotName\":", "\",\""), x => x);
             }
