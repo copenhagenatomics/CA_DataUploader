@@ -45,3 +45,35 @@ Then I run
 After this you can download the release zip file here form github or FTP it to your RaspberryPi and run it with this command:
 
 > sudo mono --debug CA_AverageTemperature.exe
+
+![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/CA_AverageTemperature.exe.png)
+
+or
+
+![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/CA_DataUploader.exe.png)
+
+## How to Debug your system. 
+
+First make sure the hardware is connected correctly. 
+
+To do this open Putty.exe or some other terminal program 
+https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html
+
+![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/putty.exe.png)
+
+Next make sure you have setup your IO.conf file correctly. You need something like this, but with another name in the first line 
+Put something other than JoeScottTest1 (e.g. BenBrownTest1)
+
+![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/IO.conf.png)
+
+You also need to put your own name, email and a password of your choice in the next line
+
+When you have started CA_DataUploader.exe and it say: "Now connected to server", then you need to visit
+
+www.copenhagenatomics.com/plots to login and see your plot. Your login with the same email and password as you entered in IO.conf 
+
+![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/OnlineChart.png)
+
+
+
+
