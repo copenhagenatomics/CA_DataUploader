@@ -36,7 +36,7 @@ namespace CA_DataUploader
                         {
                             cloud.SendVector(allSensors.Select(x => x.Temperature).ToList(), AverageSensorTimestamp(allSensors));
                             Console.Write($"\r {i}");
-                            i += 10;
+                            i += 1;
                         }
 
                         Thread.Sleep(100);
