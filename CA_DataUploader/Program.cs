@@ -16,17 +16,17 @@ namespace CA_DataUploader
                 var dataLoggers = serial.ByFamily("Temperature");
                 if (!dataLoggers.Any())
                 {
-                    Console.WriteLine("Tempearture sensors not initialized");
+                    CALog.LogInfoAndConsoleLn(LogID.A, "Tempearture sensors not initialized");
                     return;
                 }
 
-                Console.WriteLine(RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud{Environment.NewLine}From {dataLoggers.Count()} hubarg16 boards"));
+                CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud{Environment.NewLine}From {dataLoggers.Count()} hubarg16 boards"));
 
                 int filterLen = (args.Count() > 1)?int.Parse(args[1]):10;
                 using (var usb = new CAThermalBox(dataLoggers, filterLen))
                 using(var cloud = new ServerUploader(usb.GetVectorDescription()))
                 {
-                    Console.WriteLine("Now connected to server");
+                    CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server");
 
                     int i = 0;
                     while (!UserPressedEscape())
@@ -35,22 +35,20 @@ namespace CA_DataUploader
                         if (allSensors.Any())
                         {
                             cloud.SendVector(allSensors.Select(x => x.Temperature).ToList(), AverageSensorTimestamp(allSensors));
-                            Console.Write($"\r {i}");
+                            CALog.LogInfoAndConsole(LogID.A, $"\r {i}");
                             i += 1;
                         }
 
                         Thread.Sleep(100);
-                        if (i==20) Console.WriteLine(cloud.PrintMyPlots());
+                        if (i==20) CALog.LogInfoAndConsoleLn(LogID.A, cloud.PrintMyPlots());
                     }
                 }
 
-                Console.WriteLine(Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
+                CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.ToString());
-                Console.WriteLine();
-                Console.WriteLine(ex.StackTrace.ToString());
+                CALog.LogException(LogID.A, ex);
             }
 
             Console.ReadKey();

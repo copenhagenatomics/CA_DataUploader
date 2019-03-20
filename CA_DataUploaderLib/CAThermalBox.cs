@@ -95,7 +95,7 @@ namespace CA_DataUploaderLib
                     {
                         row = board.ReadLine();
                         if (logLevel == LogLevel.Debug)
-                            Console.WriteLine(row);
+                            CALog.LogInfoAndConsoleLn(LogID.A, row);
 
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
@@ -114,16 +114,20 @@ namespace CA_DataUploaderLib
                 {
                     if (logLevel == LogLevel.Debug)
                     {
-                        Console.WriteLine("Exception at: " + row);
-                        values.ForEach(x => Console.WriteLine(x));
-                        numbers.ForEach(x => Console.WriteLine(x));
-                        Console.WriteLine(ex.ToString());
+                        CALog.LogInfoAndConsoleLn(LogID.A, "Exception at: " + row);
+                        values.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x));
+                        numbers.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x.ToString()));
+                        CALog.LogException(LogID.A, ex);
                     }
 
-                    Console.Write('.');
+                    CALog.LogInfoAndConsoleLn(LogID.A, ".");
                     badRow++;
                     if (badRow > 10)
+                    {
+                        CALog.LogInfoAndConsoleLn(LogID.A, "Too many bad rows from termocoupler ports.. shutting down.");
+                        CALog.LogException(LogID.A, ex);
                         _running = false;
+                    }
                 }
             }
 
@@ -214,9 +218,9 @@ namespace CA_DataUploaderLib
             foreach (var x in _config)
             {
                 foreach (var y in x)
-                    Console.Write(y + ",");
+                    CALog.LogInfoAndConsole(LogID.A, y + ",");
 
-                Console.WriteLine();
+                CALog.LogInfoAndConsoleLn(LogID.A, "");
             }
         }
 

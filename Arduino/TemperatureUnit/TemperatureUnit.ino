@@ -28,10 +28,10 @@
 // ***** INCLUDES *****
 #include  "MAX31855.h"
 
-const String serialNumber = "R5gLL0fb";
+const String serialNumber = "R5gLp0fb";
 const String boardFamily = "Temperature hubard16";
 const String boardVersion = "1";
-const String boardSoftware = "2019-01-10 17:37";
+const String boardSoftware = "2019-03-19 21:37";
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char ChipSelect = 10; 
