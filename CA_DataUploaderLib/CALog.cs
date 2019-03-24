@@ -97,7 +97,7 @@ namespace CA_DataUploaderLib
             _nextSizeCheck.Add(LogID.B, DateTime.Now);
             _nextSizeCheck.Add(LogID.C, DateTime.Now);
             _nextSizeCheck.Add(LogID.D, DateTime.Now);
-            _nextSizeCheck.Add(LogID.D, DateTime.Now);
+            _nextSizeCheck.Add(LogID.E, DateTime.Now);
             _nextSizeCheck.Add(LogID.F, DateTime.Now);
             _nextSizeCheck.Add(LogID.G, DateTime.Now);
             _nextSizeCheck.Add(LogID.H, DateTime.Now);
