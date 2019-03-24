@@ -12,7 +12,7 @@ namespace CA_DataUploaderLib
 
     public static class CALog
     {
-        private static Dictionary<LogID, DateTime> _nextSizeCheck = new Dictionary<LogID, DateTime>();
+        private static Dictionary<LogID, DateTime> _nextSizeCheck;
         private static string _logDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
         public static int MaxLogSizeMB = 100;
 
@@ -75,6 +75,9 @@ namespace CA_DataUploaderLib
 
         private static string GetFilename(LogID logID)
         {
+            if (_nextSizeCheck == null)
+                InitDictionary();
+
             var filepath = Path.Combine(_logDir, logID.ToString() + ".log");
             if (DateTime.Now > _nextSizeCheck[logID] && File.Exists(filepath))
             {
@@ -85,6 +88,19 @@ namespace CA_DataUploaderLib
             }
 
             return filepath;
+        }
+
+        private static void InitDictionary()
+        {
+            _nextSizeCheck = new Dictionary<LogID, DateTime>();
+            _nextSizeCheck.Add(LogID.A, DateTime.Now);
+            _nextSizeCheck.Add(LogID.B, DateTime.Now);
+            _nextSizeCheck.Add(LogID.C, DateTime.Now);
+            _nextSizeCheck.Add(LogID.D, DateTime.Now);
+            _nextSizeCheck.Add(LogID.D, DateTime.Now);
+            _nextSizeCheck.Add(LogID.F, DateTime.Now);
+            _nextSizeCheck.Add(LogID.G, DateTime.Now);
+            _nextSizeCheck.Add(LogID.H, DateTime.Now);
         }
     }
 }
