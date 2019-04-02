@@ -21,6 +21,9 @@ namespace CA_DataUploaderLib
                 try
                 {
                     var mcu = new MCUBoard(name, 115200);
+                    if(mcu.UnableToRead)
+                        mcu = new MCUBoard(name, 9600);
+
                     SetUnknownSerialNumber(mcu);
                     McuBoards.Add(mcu);
 
@@ -46,9 +49,17 @@ namespace CA_DataUploaderLib
         {
             if (mcu.serialNumber.IsNullOrEmpty())
             {
-                mcu.serialNumber = "unknown1";
-                if (McuBoards.Any())
+                var line = mcu.ReadLine();
+                if (line.StartsWith("+") || line.StartsWith("-"))
+                    mcu.serialNumber = "scale1";
+                else
+                    mcu.serialNumber = "unknown1";
+
+                if (McuBoards.Any(x => x.serialNumber.StartsWith("unknown")))
                     mcu.serialNumber = "unknown" + (McuBoards.Count(x => x.serialNumber.StartsWith("unknown")) + 1);
+
+                if (McuBoards.Any(x => x.serialNumber.StartsWith("scale")))
+                    mcu.serialNumber = "scale" + (McuBoards.Count(x => x.serialNumber.StartsWith("scale")) + 1);
             }
         }
 

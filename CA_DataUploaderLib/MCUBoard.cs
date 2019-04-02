@@ -15,6 +15,7 @@ namespace CA_DataUploaderLib
         public const string boardVersionHeader = "Board Version: ";
         public string boardSoftware = null;
         public const string boardSoftwareHeader = "Board Software: ";
+        public bool UnableToRead = true;
 
         public DateTime PortOpenTimeStamp;
 
@@ -43,6 +44,7 @@ namespace CA_DataUploaderLib
                         if (!input.Contains(" 10000.00"))
                             Debug.Print("input: " + input);
 
+                        UnableToRead = false;
                         if (input.Contains(MCUBoard.serialNumberHeader))
                             serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
                         if (input.Contains(MCUBoard.boardFamilyHeader))
@@ -56,9 +58,11 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                Console.WriteLine("fejl: " + ex.ToString());
-                throw;
+                CALog.LogException(LogID.A, ex);
             }
+
+            if (UnableToRead)
+                Close();
         }
 
         public bool IsEmpty()
