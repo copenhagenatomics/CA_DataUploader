@@ -73,7 +73,7 @@ namespace CA_DataUploaderLib
         public void SendVector(List<double> vector, DateTime timestamp)
         {
             if (vector.Count() != _vectorLen)
-                throw new ArgumentException($"wrong vector length: {vector.Count()} <> {_vectorLen}");
+                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count()} <> {_vectorLen}");
 
             if (_queue.Count < 1000)  // if problems then drop packages. 
             {

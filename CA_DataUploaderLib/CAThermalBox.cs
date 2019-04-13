@@ -67,9 +67,8 @@ namespace CA_DataUploaderLib
         public IEnumerable<TermoSensor> GetAllValidTemperatures()
         {
             var removeBefore = DateTime.UtcNow.AddSeconds(-2);
-            var list = _temperatures.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Key).ToList();
-            TermoSensor dummy;
-            list.ForEach(x => _temperatures.TryRemove(x, out dummy));
+            var list = _temperatures.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Value).ToList();
+            list.ForEach(x => x.Temperature = x.Temperature < 10000? 10009:x.Temperature); // this means invalid temperature by timeout
             return _temperatures.Values.OrderBy(x => x.ID);
         }
 
@@ -125,7 +124,7 @@ namespace CA_DataUploaderLib
                     badRow++;
                     if (badRow > 10)
                     {
-                        CALog.LogInfoAndConsoleLn(LogID.A, "Too many bad rows from termocoupler ports.. shutting down.");
+                        CALog.LogInfoAndConsoleLn(LogID.A, "Too many bad rows from thermocouple ports.. shutting down.");
                         CALog.LogException(LogID.A, ex);
                         _running = false;
                     }
