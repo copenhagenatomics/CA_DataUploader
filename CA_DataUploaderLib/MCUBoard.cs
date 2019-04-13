@@ -64,10 +64,10 @@ namespace CA_DataUploaderLib
 
         public string ToString(string seperator)
         {
-            return $"Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}Port open timestamp: {PortOpenTimeStamp}{seperator}{serialNumberHeader}{serialNumber}{seperator}{boardFamilyHeader}{boardFamily}{seperator}{boardVersionHeader}{boardVersion}{seperator}{boardSoftwareHeader}{boardSoftware}{seperator}";
+            return $"Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}Port open timestamp (UTC): {PortOpenTimeStamp}{seperator}{serialNumberHeader}{serialNumber}{seperator}{boardFamilyHeader}{boardFamily}{seperator}{boardVersionHeader}{boardVersion}{seperator}{boardSoftwareHeader}{boardSoftware}{seperator}";
         }
 
-        public void ReadSerialNumber()
+        private void ReadSerialNumber()
         {
             // CALog.LogColor(LogID.A, ConsoleColor.Green, Environment.NewLine + "Sending Serial request");
             WriteLine("Serial");

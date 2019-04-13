@@ -24,20 +24,14 @@ namespace CA_DataUploaderLib
                     if(mcu.UnableToRead)
                         mcu = new MCUBoard(name, 9600);
 
-                    if (!mcu.UnableToRead)
-                    {
-                        SetUnknownSerialNumber(mcu);
-                        McuBoards.Add(mcu);
+                    SetUnknownSerialNumber(mcu);
+                    McuBoards.Add(mcu);
 
-                        if (mcu.boardFamily is null)
-                            mcu.ReadSerialNumber();  // I am not sure this is needed any more. 
+                    if (mcu.boardFamily is null)
+                        mcu.boardFamily = GetStringFromDmesg(mcu.PortName);
 
-                        if (mcu.boardFamily is null)
-                            mcu.boardFamily = GetStringFromDmesg(mcu.PortName);
-
-                        if (debug)
-                            CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToString());
-                    }
+                    if (debug)
+                        CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToString());
                 }
                 catch(UnauthorizedAccessException ex)
                 {

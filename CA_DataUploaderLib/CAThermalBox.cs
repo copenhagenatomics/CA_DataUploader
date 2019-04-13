@@ -35,9 +35,10 @@ namespace CA_DataUploaderLib
             if (IOconf.GetOutputLevel() == LogLevel.Debug)
                 ShowConfig();
 
-            new Thread(() => this.LoopForever()).Start();
-
-            Thread.Sleep(1000);
+            if (_config.Any())
+                new Thread(() => this.LoopForever()).Start();
+            else
+                CALog.LogErrorAndConsole(LogID.A, "Type K thermocouple config information is missing in IO.conf");
         }
 
         public TermoSensor GetValue(string sensorID)
