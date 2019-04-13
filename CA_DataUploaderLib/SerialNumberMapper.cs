@@ -24,14 +24,20 @@ namespace CA_DataUploaderLib
                     if(mcu.UnableToRead)
                         mcu = new MCUBoard(name, 9600);
 
-                    SetUnknownSerialNumber(mcu);
-                    McuBoards.Add(mcu);
+                    if (!mcu.UnableToRead)
+                    {
+                        SetUnknownSerialNumber(mcu);
+                        McuBoards.Add(mcu);
 
-                    if (mcu.boardFamily is null)
-                        mcu.boardFamily = GetStringFromDmesg(mcu.PortName);
+                        if (mcu.boardFamily is null)
+                            mcu.ReadSerialNumber();  // I am not sure this is needed any more. 
 
-                    if (debug)
-                        CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToString());
+                        if (mcu.boardFamily is null)
+                            mcu.boardFamily = GetStringFromDmesg(mcu.PortName);
+
+                        if (debug)
+                            CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToString());
+                    }
                 }
                 catch(UnauthorizedAccessException ex)
                 {
@@ -49,18 +55,29 @@ namespace CA_DataUploaderLib
         {
             if (mcu.serialNumber.IsNullOrEmpty())
             {
-                var line = mcu.ReadLine();
-                if (line.StartsWith("+") || line.StartsWith("-"))
-                    mcu.serialNumber = "Scale1";
-                else
+                if (!IsAscale(mcu))
+                {
                     mcu.serialNumber = "unknown1";
 
-                if (McuBoards.Any(x => x.serialNumber.StartsWith("unknown")))
-                    mcu.serialNumber = "unknown" + (McuBoards.Count(x => x.serialNumber.StartsWith("unknown")) + 1);
-
-                if (McuBoards.Any(x => x.serialNumber.StartsWith("Scale")))
-                    mcu.serialNumber = "Scale" + (McuBoards.Count(x => x.serialNumber.StartsWith("Scale")) + 1);
+                    if (McuBoards.Any(x => x.serialNumber.StartsWith("unknown")))
+                        mcu.serialNumber = "unknown" + (McuBoards.Count(x => x.serialNumber.StartsWith("unknown")) + 1);
+                }
             }
+        }
+
+        private bool IsAscale(MCUBoard mcu)
+        {
+            if (!mcu.IsOpen)
+                return false;
+
+            var line = mcu.ReadLine();
+            if (line.StartsWith("+0") || line.StartsWith("-0"))
+                mcu.serialNumber = "Scale1";
+
+            if (McuBoards.Any(x => x.serialNumber.StartsWith("Scale")))
+                mcu.serialNumber = "Scale" + (McuBoards.Count(x => x.serialNumber.StartsWith("Scale")) + 1);
+
+            return mcu.serialNumber.StartsWith("Scale");
         }
 
         private string GetStringFromDmesg(string portName)
@@ -89,6 +106,11 @@ namespace CA_DataUploaderLib
             return line.StringBetween(": ", " to ttyUSB");
         }
 
+        /// <summary>
+        /// Return a list of MCU boards where boardFamily contains the input string. 
+        /// </summary>
+        /// <param name="family">type of boards to look for. (Case sensitive)</param>
+        /// <returns></returns>
         public List<MCUBoard> ByFamily(string family)
         {
             return McuBoards.Where(x => x.boardFamily != null && x.boardFamily.Contains(family)).ToList();
