@@ -14,7 +14,6 @@ namespace CA_DataUploaderLib
         private List<MCUBoard> _mcuBoards;
         private const int TEMPERATURE_FAULT = 10000;
         private bool _running = true;
-        private bool _junction = false;
         public int FilterLength { get; set; }
         public double Frequency { get; private set; }
         private ConcurrentDictionary<string, TermoSensor> _temperatures = new ConcurrentDictionary<string, TermoSensor>();
@@ -25,10 +24,14 @@ namespace CA_DataUploaderLib
 
         public bool Initialized { get; private set; }
 
-        public CAThermalBox(List<MCUBoard> boards, int filterLength = 1, bool junction = false)
+        /// <summary>
+        /// Constructor: 
+        /// </summary>
+        /// <param name="boards">Input a number of boards with temperature sensors </param>
+        /// <param name="filterLength">1 = not filtering, larger than 1 = filtering and removing 10000 errors. </param>
+        public CAThermalBox(List<MCUBoard> boards, int filterLength = 1)
         {
             Initialized = false;
-            _junction = junction;
             FilterLength = filterLength;
             _mcuBoards = boards.OrderBy(x => x.serialNumber).ToList();
 
@@ -177,11 +180,6 @@ namespace CA_DataUploaderLib
         private (string key, List<string> row, bool readJunction) GetSensor(int hubID, int i)
         {
             string key = hubID.ToString() + "." + i.ToString();
-            if (_junction && i > 17)
-            {
-                key = hubID.ToString() + "." + (i % 10).ToString();
-            }
-
             return (key, _config.SingleOrDefault(x => x[3] == key), i>17);
         }
 

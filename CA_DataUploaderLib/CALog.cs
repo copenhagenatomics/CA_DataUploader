@@ -23,6 +23,10 @@ namespace CA_DataUploaderLib
 
         public static void LogException(LogID logID, Exception ex)
         {
+            var temp = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(ex.ToString() + Environment.NewLine);
+            Console.ForegroundColor = temp;
             WriteToFile(logID, ex.ToString() + Environment.NewLine);
         }
 
