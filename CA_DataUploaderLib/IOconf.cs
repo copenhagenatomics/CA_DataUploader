@@ -46,15 +46,22 @@ namespace CA_DataUploaderLib
 
         public static ConnectionInfo GetConnectionInfo()
         {
-            var table = new IOconf().Table;
-            return new ConnectionInfo
+            try
             {
-                LoopName = table.Single(x => x.First() == "LoopName")[1].Trim(),
-                Server = table.Single(x => x.First() == "LoopName")[3].Trim(),
-                Fullname = table.Single(x => x.First() == "Account")[1].Trim(),
-                email = table.Single(x => x.First() == "Account")[2].Trim(),
-                password = table.Single(x => x.First() == "Account")[3].Trim(),
-            };
+                var table = new IOconf().Table;
+                return new ConnectionInfo
+                {
+                    LoopName = table.Single(x => x.First() == "LoopName")[1].Trim(),
+                    Server = table.Single(x => x.First() == "LoopName")[3].Trim(),
+                    Fullname = table.Single(x => x.First() == "Account")[1].Trim(),
+                    email = table.Single(x => x.First() == "Account")[2].Trim(),
+                    password = table.Single(x => x.First() == "Account")[3].Trim(),
+                };
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Did you forgot to include login information in top of IO.conf ?", ex);
+            }
         }
 
         public static LogLevel GetOutputLevel()

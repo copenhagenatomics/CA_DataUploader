@@ -235,7 +235,7 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                string query = $"api/LoopApi?LoopName={_loopName}&ticks={DateTime.Now.Ticks}&loginToken={_loginToken}";
+                string query = $"api/LoopApi?LoopName={_loopName}&ticks={DateTime.UtcNow.Ticks}&loginToken={_loginToken}";
                 HttpResponseMessage response = await _client.PutAsJsonAsync(query, publicKey.Concat(vectorDescription));
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsAsync<int>();
