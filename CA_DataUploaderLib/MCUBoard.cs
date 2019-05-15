@@ -1,5 +1,6 @@
 ﻿using CA_DataUploaderLib.Extensions;
 using System;
+using System.IO;
 using System.Diagnostics;
 using System.Threading;
 using System.IO.Ports;
@@ -25,16 +26,30 @@ namespace CA_DataUploaderLib
 
             try
             {
+                if(IsOpen)
+                {
+                    throw new Exception($"Something is wrong, port {name} is already open. You may need to reboot!");
+                }
+
+                BaudRate = 1;
+                DtrEnable = true;
+                RtsEnable = true;
                 BaudRate = baudrate;
                 PortName = name;
                 PortOpenTimeStamp = DateTime.UtcNow;
                 ReadTimeout = 2000;
                 WriteTimeout = 2000;
-                // DiscardInBuffer();
-                // DiscardOutBuffer();
                 Open();
 
                 ReadSerialNumber();
+            }
+            catch (IOException ex)
+            {
+                CALog.LogException(LogID.A, ex);
+                DiscardInBuffer();
+                DiscardOutBuffer();
+                BaudRate = 1;
+                Close();
             }
             catch (Exception ex)
             {
