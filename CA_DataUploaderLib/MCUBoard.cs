@@ -1,7 +1,5 @@
 ﻿using CA_DataUploaderLib.Extensions;
 using System;
-using System.IO;
-using System.Diagnostics;
 using System.Threading;
 using System.IO.Ports;
 
@@ -21,7 +19,7 @@ namespace CA_DataUploaderLib
 
         public DateTime PortOpenTimeStamp;
 
-        public MCUBoard(string name, int baudrate)
+        public MCUBoard(string name, int baudrate) // : base(name, baudrate, 0, 8, 1, 0)
         {
 
             try
@@ -42,14 +40,6 @@ namespace CA_DataUploaderLib
                 Open();
 
                 ReadSerialNumber();
-            }
-            catch (IOException ex)
-            {
-                CALog.LogException(LogID.A, ex);
-                DiscardInBuffer();
-                DiscardOutBuffer();
-                BaudRate = 1;
-                Close();
             }
             catch (Exception ex)
             {
