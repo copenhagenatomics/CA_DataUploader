@@ -1,6 +1,5 @@
 ﻿using CA_DataUploaderLib.Extensions;
 using System;
-using System.Diagnostics;
 using System.Threading;
 using System.IO.Ports;
 
@@ -20,18 +19,24 @@ namespace CA_DataUploaderLib
 
         public DateTime PortOpenTimeStamp;
 
-        public MCUBoard(string name, int baudrate)
+        public MCUBoard(string name, int baudrate) // : base(name, baudrate, 0, 8, 1, 0)
         {
 
             try
             {
+                if(IsOpen)
+                {
+                    throw new Exception($"Something is wrong, port {name} is already open. You may need to reboot!");
+                }
+
+                BaudRate = 1;
+                DtrEnable = true;
+                RtsEnable = true;
                 BaudRate = baudrate;
                 PortName = name;
                 PortOpenTimeStamp = DateTime.UtcNow;
                 ReadTimeout = 2000;
                 WriteTimeout = 2000;
-                // DiscardInBuffer();
-                // DiscardOutBuffer();
                 Open();
 
                 ReadSerialNumber();

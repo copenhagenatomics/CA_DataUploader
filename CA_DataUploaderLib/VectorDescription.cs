@@ -18,6 +18,16 @@ namespace CA_DataUploaderLib
         public string GetVectorItemTypes() { return string.Join(Environment.NewLine, _items.Select(x => x.DataType)); }
         public string GetVectorInputOutput() { return string.Join(Environment.NewLine, _items.Select(x => x.DirectionType.ToString())); }
 
+        public override string ToString()
+        {
+            string msg = string.Empty;
+            int i = 1;
+            foreach (var item in _items)
+                msg += $"{Environment.NewLine}{i++} {item.Descriptor}";
+
+            return msg;
+        }
+
     }
 
     [Serializable]

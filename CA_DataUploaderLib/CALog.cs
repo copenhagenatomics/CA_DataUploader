@@ -66,7 +66,7 @@ namespace CA_DataUploaderLib
             {
                 lock (_logDir)
                 {
-                    File.AppendAllText(GetFilename(logID), msg);
+                    File.AppendAllText(GetFilename(logID), DateTime.UtcNow.ToString("HH:mm:ss.fff - ") + msg);
                 }
             }
             catch (Exception ex)
