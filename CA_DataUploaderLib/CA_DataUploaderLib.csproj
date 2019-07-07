@@ -67,10 +67,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CAThermalBox.cs" />
+    <Compile Include="CommandHandler.cs" />
     <Compile Include="DataVector.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="Extensions\LinqExtensions.cs" />
     <Compile Include="Extensions\StringExtensions.cs" />
+    <Compile Include="HeatingController.cs" />
+    <Compile Include="HeatingElement.cs" />
     <Compile Include="IOconf.cs" />
     <Compile Include="CALog.cs" />
     <Compile Include="MCUBoard.cs">

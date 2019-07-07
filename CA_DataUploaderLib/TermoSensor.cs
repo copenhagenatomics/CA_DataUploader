@@ -6,12 +6,14 @@ namespace CA_DataUploaderLib
 {
     public class TermoSensor
     {
-        public TermoSensor(int id, string name) { ID = id; Name = name; }
+        public TermoSensor(int id, string name, HeaterElement heater) { ID = id; Name = name; Heater = heater; if(heater != null) heater.sensors.Add(this); }
         public int ID { get; private set; }   // temperature sensor ID
 
         public string Key;
         public DateTime TimeStamp { get; set; }
-        public MCUBoard board { get; set; }
+        public MCUBoard Board { get; set; }
+
+        public HeaterElement Heater { get; set; }  // if the IO.conf specify a heating element, else it is null
 
         public string Name { get; private set; }
 

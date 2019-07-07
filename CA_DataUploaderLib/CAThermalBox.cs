@@ -19,6 +19,7 @@ namespace CA_DataUploaderLib
         private ConcurrentDictionary<string, TermoSensor> _temperatures = new ConcurrentDictionary<string, TermoSensor>();
         private Dictionary<string, Queue<double>> _filterQueue = new Dictionary<string, Queue<double>>();
         private Queue<double> _frequency = new Queue<double>();
+        private List<HeaterElement> heaters = new List<HeaterElement>();
 
         private List<List<string>> _config = IOconf.GetInTypeK().Where(x => x[2] == "hub16").ToList();
 
@@ -71,7 +72,7 @@ namespace CA_DataUploaderLib
         {
             var removeBefore = DateTime.UtcNow.AddSeconds(-2);
             var list = _temperatures.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Value).ToList();
-            list.ForEach(x => x.Temperature = x.Temperature < 10000? 10009:x.Temperature); // this means invalid temperature by timeout
+            list.ForEach(x => x.Temperature = x.Temperature < 10000 ? 10009 : x.Temperature); // this means invalid temperature by timeout
             return _temperatures.Values.OrderBy(x => x.ID);
         }
 
@@ -164,7 +165,7 @@ namespace CA_DataUploaderLib
                     else
                     {
                         Debug.Assert(sensor.readJunction == false);
-                        _temperatures.TryAdd(sensor.key, new TermoSensor(_config.IndexOf(sensor.row), sensor.row[1]) { Temperature = value, TimeStamp = timestamp, Key = sensor.key, board = board });
+                        _temperatures.TryAdd(sensor.key, new TermoSensor(_config.IndexOf(sensor.row), sensor.row[1], GetHeater(sensor.row)) { Temperature = value, TimeStamp = timestamp, Key = sensor.key, Board = board });
                         if (FilterLength > 1)
                         {
                             _filterQueue.Add(sensor.key, new Queue<double>());
@@ -175,6 +176,29 @@ namespace CA_DataUploaderLib
 
                 i++;
             }
+        }
+
+        private HeaterElement GetHeater(List<string> row)
+        {
+            if (row.Count <= 4)
+                return null;
+
+            var list = row[4].Split(".".ToCharArray()).ToList();
+            int port;
+            if (!int.TryParse(list[1], out port))
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Unable to parse heating element info in IO.conf ({string.Join(",", row)})");
+                return null;
+            }
+
+            var he = heaters.SingleOrDefault(x => x.SwitchBoard == list[0] && x.port == port);
+            if (he == null)
+            {
+                he = new HeaterElement { SwitchBoard = list[0], port = port };
+                heaters.Add(he);
+            }
+
+            return he;
         }
 
         private (string key, List<string> row, bool readJunction) GetSensor(int hubID, int i)
