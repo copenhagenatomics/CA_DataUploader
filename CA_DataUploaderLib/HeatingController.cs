@@ -12,23 +12,30 @@ namespace CA_DataUploaderLib
         public List<TermoSensor> ValidHatSensors { get; private set; }
         private int _maxHeaterTemperature;
         private bool _running = true;
-        private List<HeaterElement> _heaters;
+        private List<HeaterElement> _heaters = new List<HeaterElement>();
         private List<MCUBoard> _switchBoxes;
+        private CAThermalBox _caThermalBox;
 
         public HeatingController(CAThermalBox caThermalBox, List<MCUBoard> switchBoxes, int maxHeaterTemperature)
         {
-            var sensors = caThermalBox.GetAllValidTemperatures();
-            _heaters = sensors.Select(x => x.Heater).Distinct().ToList();
-            VerifyHeatingElementAndThermocouplerMatch(_heaters, switchBoxes);
+            _caThermalBox = caThermalBox;
             _maxHeaterTemperature = maxHeaterTemperature;
             _switchBoxes = switchBoxes;
             TargetTemperature = 0;
 
             new Thread(() => this.LoopForever()).Start();
+
+            for (int i = 0; i < 20; i++)
+            {
+                Thread.Sleep(200); // waiting for temperature date to arrive, this ensure only valid heating elements are created. 
+                if (_heaters.Any())
+                    break; // exit the for loop
+            }
         }
 
         private void LoopForever()
         {
+            int i = 0;
             var logLevel = IOconf.GetOutputLevel();
             while (_running)
             {
@@ -54,6 +61,13 @@ namespace CA_DataUploaderLib
                     }
 
                     Thread.Sleep(1000);
+                    if (i++ % 10 == 0)   // check for new termocouplers every 10 seconds. 
+                        CheckForNewThermocouplers();
+                }
+                catch (ArgumentException ex)
+                {
+                    CALog.LogErrorAndConsole(LogID.A, ex.ToString());
+                    _running = false;
                 }
                 catch (Exception ex)
                 {
@@ -84,6 +98,29 @@ namespace CA_DataUploaderLib
             box.WriteLine($"p{heater.port} on");
         }
 
+        private void CheckForNewThermocouplers()
+        {
+            var sensors = _caThermalBox.GetAllValidTemperatures();
+            var list = sensors.Select(x => x.Heater).Where(x => x != null).ToList();
+            // add new heaters
+            foreach(var heater in list)
+            {
+                if (!_heaters.Any(x => x.Name() == heater.Name()))
+                    _heaters.Add(heater);
+            }
+
+            foreach(var heater in _heaters)
+            {
+                if (!list.Any(x => x.Name() == heater.Name()))
+                {
+                    HeaterOff(heater);
+                    heater.LastOff = DateTime.Now.AddMinutes(2); // wait 2 minutes before we turn it on again. It will only turn on if it has updated thermocoupler data. 
+                }
+            }
+
+            VerifyHeatingElementAndThermocouplerMatch(_heaters, _switchBoxes);
+        }
+
         private void VerifyHeatingElementAndThermocouplerMatch(List<HeaterElement> heaters, List<MCUBoard> switchBoxes)
         {
             foreach (var h in heaters)
@@ -95,7 +132,7 @@ namespace CA_DataUploaderLib
 
         public List<double> GetStates()
         {
-            return _heaters.Select(x => x.IsOn ? 1.0:0.0).ToList();
+            return _heaters.Select(x => x.IsOn ? 1.0 : 0.0).ToList();
         }
 
         public bool HandleCommand()
@@ -137,7 +174,7 @@ namespace CA_DataUploaderLib
                     if (topTemp < 900 && bottomTemp < 900)
                     {
                         TargetTemperature = topTemp;
-                        _heaters.Where(x => x.Name().ToLower().Contains("bottom")).ToList().ForEach(x => x.ExtendMaxTemperature = bottomTemp - topTemp);
+                        _heaters.Where(x => x.Name().ToLower().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
                         commandOK = true;
                     }
                 }

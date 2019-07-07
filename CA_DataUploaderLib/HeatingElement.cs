@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib
         public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public double onTemperature = 10000;
         public bool IsOn;
-        public int ExtendMaxTemperature = 0;
+        public int OffsetSetTemperature = 0;
 
         public bool CanTurnOn(int maxTemperature)
         {
@@ -24,7 +24,7 @@ namespace CA_DataUploaderLib
             if (!validSensors.Any())
                 return false;  // no valid sensors 
 
-            if (validSensors.Any(x => x.Temperature > (maxTemperature + ExtendMaxTemperature)))
+            if (validSensors.Any(x => x.Temperature > (maxTemperature + OffsetSetTemperature)))
                 return false;  // at least one of the temperature sensors value is valid and above maxTemperature.  
 
             onTemperature = validSensors.Max(x => x.Temperature);
@@ -40,7 +40,7 @@ namespace CA_DataUploaderLib
             if (onTemperature < 10000 && validSensors.Max(x => x.Temperature) > onTemperature + 20)
                 return true; // If hottest sensor is 50C higher than the temperature last time we turned on, then turn off. 
 
-            return validSensors.Any(x => x.Temperature > (maxTemperature + ExtendMaxTemperature)); // turn off, if we reached maxTemperature. 
+            return validSensors.Any(x => x.Temperature > (maxTemperature + OffsetSetTemperature)); // turn off, if we reached maxTemperature. 
         }
 
         public string Name()
