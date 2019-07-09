@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib
         private int _maxHeaterTemperature;
         private bool _running = true;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
-        private List<MCUBoard> _switchBoxes;
+        protected List<MCUBoard> _switchBoxes;
         private CAThermalBox _caThermalBox;
 
         public HeatingController(CAThermalBox caThermalBox, List<MCUBoard> switchBoxes, int maxHeaterTemperature)
@@ -84,18 +84,20 @@ namespace CA_DataUploaderLib
         {
             foreach (var box in _switchBoxes)
                 box.WriteLine("off");
+
+            CALog.LogInfoAndConsoleLn(LogID.A, "All heaters are off");
         }
 
-        private void HeaterOff(HeaterElement heater)
+        protected virtual void HeaterOff(HeaterElement heater)
         {
             var box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
             box.WriteLine($"p{heater.port} off");
         }
 
-        private void HeaterOn(HeaterElement heater, int sec)
+        protected virtual void HeaterOn(HeaterElement heater, int seconds)
         {
             var box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
-            box.WriteLine($"p{heater.port} on {sec}");
+            box.WriteLine($"p{heater.port} on {seconds}");
         }
 
         private void CheckForNewThermocouplers()
