@@ -107,7 +107,7 @@ namespace CA_DataUploaderLib
             // add new heaters
             foreach(var heater in list)
             {
-                if (!_heaters.Any(x => x.Name() == heater.Name()))
+                if (!_heaters.Any(x => x.Name() == heater.Name()) && _switchBoxes.Any(x => x.serialNumber == heater.SwitchBoard))
                     _heaters.Add(heater);
             }
 
@@ -118,17 +118,6 @@ namespace CA_DataUploaderLib
                     HeaterOff(heater);
                     heater.LastOff = DateTime.Now.AddMinutes(2); // wait 2 minutes before we turn it on again. It will only turn on if it has updated thermocoupler data. 
                 }
-            }
-
-            VerifyHeatingElementAndThermocouplerMatch(_heaters, _switchBoxes);
-        }
-
-        private void VerifyHeatingElementAndThermocouplerMatch(List<HeaterElement> heaters, List<MCUBoard> switchBoxes)
-        {
-            foreach (var h in heaters)
-            {
-                if (!switchBoxes.Any(x => x.serialNumber == h.SwitchBoard))
-                    throw new ArgumentException($"match for {h.SwitchBoard} in IO.conf not found");
             }
         }
 
