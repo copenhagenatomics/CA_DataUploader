@@ -18,7 +18,7 @@ namespace CA_DataUploaderLib
         public bool CanTurnOn(int maxTemperature)
         {
             if (LastOff > DateTime.UtcNow.AddSeconds(-10))
-                return false;  // has been turned off for less than 20 seconds. 
+                return false;  // has been turned off for less than 10 seconds. 
 
             var validSensors = sensors.Where(x => x.TimeStamp > DateTime.UtcNow.AddSeconds(-2) && x.Temperature < 6000);
             if (!validSensors.Any())
@@ -54,7 +54,7 @@ namespace CA_DataUploaderLib
             foreach (var s in sensors)
                 msg += s.Temperature.ToString("N0") + ", ";
 
-            return $"{SwitchBoard}.{port} is {(LastOn > LastOff ? "ON" : "OFF")}, {msg} {onTemperature.ToString("N0")};   ";
+            return $"{SwitchBoard}.{port} is {(LastOn > LastOff ? "ON" : "OFF")}, {msg} {(LastOn > LastOff ? "": onTemperature.ToString("N0"))}";
         }
     }
 }

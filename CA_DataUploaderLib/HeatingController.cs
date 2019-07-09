@@ -53,7 +53,7 @@ namespace CA_DataUploaderLib
                         }
                         else if (!heater.IsOn && heater.CanTurnOn(maxTemperature))
                         {
-                            HeaterOn(heater);
+                            HeaterOn(heater, 60);
                             heater.LastOn = DateTime.UtcNow;
                             heater.IsOn = true;
                             CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
@@ -92,10 +92,10 @@ namespace CA_DataUploaderLib
             box.WriteLine($"p{heater.port} off");
         }
 
-        private void HeaterOn(HeaterElement heater)
+        private void HeaterOn(HeaterElement heater, int sec)
         {
             var box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
-            box.WriteLine($"p{heater.port} on");
+            box.WriteLine($"p{heater.port} on {sec}");
         }
 
         private void CheckForNewThermocouplers()
@@ -143,6 +143,7 @@ namespace CA_DataUploaderLib
 
             if (cmd.Any())
             {
+                inputCommand = string.Empty;
                 switch (cmd.First().ToLower())
                 {
                     case "escape":
@@ -158,12 +159,6 @@ namespace CA_DataUploaderLib
 
                 //if (_cmdParser.TryExecute(cmd))
                 //    return true;
-
-                if (cmd.Count() == 1)
-                {
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {inputCommand.Replace(Environment.NewLine, "")} - bad command");
-                    return true;
-                }
 
                 bool commandOK = false;
                 if (cmd.First().ToLower() == "oven")
