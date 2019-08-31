@@ -19,7 +19,7 @@ namespace CA_DataUploaderLib
         private HttpClient _client = new HttpClient();
         private RSACryptoServiceProvider _rsaWriter = new RSACryptoServiceProvider(1024);
         private Queue<DataVector> _queue = new Queue<DataVector>();
-        private FormUrlEncodedContent _accountInfo;
+        private Dictionary<string, string> _accountInfo;
         private int _plotID;
         private int _vectorLen;
         private DateTime _lastTimestamp;
@@ -35,14 +35,13 @@ namespace CA_DataUploaderLib
             try
             {
                 var connectionInfo = IOconf.GetConnectionInfo();
-                var values = new Dictionary<string, string>
+                _accountInfo = new Dictionary<string, string>
                 {
                     { "email", connectionInfo.email },
                     { "password", connectionInfo.password },
                     { "fullname", connectionInfo.Fullname }
                 };
 
-                _accountInfo = new FormUrlEncodedContent(values);
                 MillisecondsBetweenUpload = 900;
                 string server = connectionInfo.Server;
                 _client.BaseAddress = new Uri(server);
@@ -274,7 +273,7 @@ namespace CA_DataUploaderLib
 
         private void GetLoginToken()
         {
-            var response = _client.PostAsync("Login", _accountInfo);
+            var response = _client.PostAsync("Login", new FormUrlEncodedContent(_accountInfo));
             if (response.Result.StatusCode == System.Net.HttpStatusCode.OK && response.Result.Content != null)
             {
                 var dic = response.Result.Content.ReadAsAsync<Dictionary<string, string>>().Result;
@@ -298,7 +297,7 @@ namespace CA_DataUploaderLib
 
         private void CreateAccount()
         {
-            var response = _client.PostAsync("Login/CreateAccount", _accountInfo);
+            var response = _client.PostAsync("Login/CreateAccount", new FormUrlEncodedContent(_accountInfo));
             if (response.Result.StatusCode == System.Net.HttpStatusCode.OK && response.Result.Content != null)
             {
                 var dic = response.Result.Content.ReadAsAsync<Dictionary<string, string>>().Result;
