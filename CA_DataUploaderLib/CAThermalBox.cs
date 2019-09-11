@@ -210,7 +210,7 @@ namespace CA_DataUploaderLib
         {
             double result = value;
             _filterQueue[key].Enqueue(value);
-            var goodValues = _filterQueue[key].Where(x => x < 10000);
+            var goodValues = _filterQueue[key].Where(x => x < 10000 && x != 0);
             if (goodValues.Any())
                 result = goodValues.Average();
 
