@@ -36,6 +36,7 @@ namespace CA_DataUploaderLib
         private void LoopForever()
         {
             int i = 0;
+            DateTime start = DateTime.Now;
             var logLevel = IOconf.GetOutputLevel();
             while (_running)
             {
@@ -69,13 +70,18 @@ namespace CA_DataUploaderLib
                     CALog.LogErrorAndConsole(LogID.A, ex.ToString());
                     _running = false;
                 }
+                catch (TimeoutException ex)
+                {
+                    CALog.LogErrorAndConsole(LogID.A, ex.ToString());
+                    _heaters.Clear();
+                }
                 catch (Exception ex)
                 {
                     CALog.LogErrorAndConsole(LogID.A, ex.ToString());
                 }
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting LoopHatController.LoopForever()");
+            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting LoopHatController.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
             foreach (var heater in _heaters)
                 HeaterOff(heater);
         }
@@ -90,14 +96,35 @@ namespace CA_DataUploaderLib
 
         protected virtual void HeaterOff(HeaterElement heater)
         {
-            var box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
-            box.WriteLine($"p{heater.port} off");
+            MCUBoard box = null;
+            try
+            {
+                box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
+                box.WriteLine($"p{heater.port} off");
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException($"Unable to write to {box.serialNumber} {box.boardFamily}");
+            }
         }
 
         protected virtual void HeaterOn(HeaterElement heater, int seconds)
         {
-            var box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
-            box.WriteLine($"p{heater.port} on {seconds}");
+            MCUBoard box = null;
+            try
+            {
+                box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
+                box.WriteLine($"p{heater.port} on {seconds}");
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException($"Unable to write to {box.serialNumber} {box.boardFamily}");
+            }
+        }
+
+        protected virtual void Light(bool on)
+        {
+            // do nothing, you can override. 
         }
 
         private void CheckForNewThermocouplers()
@@ -161,8 +188,15 @@ namespace CA_DataUploaderLib
                     {
                         TargetTemperature = topTemp;
                         _heaters.Where(x => x.Name().ToLower().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
+                        Light(TargetTemperature > 0);
                         commandOK = true;
                     }
+                }
+
+                if(cmd.First().ToLower() == "light")
+                {
+                    if (cmd[1] == "on") { Light(true); commandOK = true; }
+                    if (cmd[1] == "off") { Light(false); commandOK = true; }
                 }
 
                 if (commandOK)
