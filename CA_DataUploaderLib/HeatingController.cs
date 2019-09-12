@@ -122,6 +122,11 @@ namespace CA_DataUploaderLib
             }
         }
 
+        protected virtual void Light(bool on)
+        {
+            // do nothing, you can override. 
+        }
+
         private void CheckForNewThermocouplers()
         {
             var sensors = _caThermalBox.GetAllValidTemperatures();
@@ -183,8 +188,15 @@ namespace CA_DataUploaderLib
                     {
                         TargetTemperature = topTemp;
                         _heaters.Where(x => x.Name().ToLower().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
+                        Light(TargetTemperature > 0);
                         commandOK = true;
                     }
+                }
+
+                if(cmd.First().ToLower() == "light")
+                {
+                    if (cmd[1] == "on") { Light(true); commandOK = true; }
+                    if (cmd[1] == "off") { Light(false); commandOK = true; }
                 }
 
                 if (commandOK)
