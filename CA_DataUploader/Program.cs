@@ -35,7 +35,7 @@ namespace CA_DataUploader
                         if (allSensors.Any())
                         {
                             cloud.SendVector(allSensors.Select(x => x.Temperature).ToList(), AverageSensorTimestamp(allSensors));
-                            CALog.LogInfoAndConsole(LogID.A, $"\r {i}");
+                            Console.WriteLine($"\r {i}"); // we don't want this in the log file. 
                             i += 1;
                         }
 

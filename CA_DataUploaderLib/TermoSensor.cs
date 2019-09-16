@@ -17,8 +17,6 @@ namespace CA_DataUploaderLib
 
         public string Name { get; private set; }
 
-        private Queue<bool> _active = new Queue<bool>();
-
         public bool MaxSlope;
 
         private double _temperature;
@@ -26,12 +24,7 @@ namespace CA_DataUploaderLib
         public double Temperature
         {
             get { return _temperature; }
-            set
-            {
-                while (_active.Count > 10) _active.Dequeue();
-                _active.Enqueue(value < 1500);
-                _temperature = value;
-            }
+            set { _temperature = value; }
         }
 
         public double Junction

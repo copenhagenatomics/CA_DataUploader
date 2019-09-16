@@ -70,8 +70,8 @@ namespace CA_DataUploaderLib
         public IEnumerable<TermoSensor> GetAllValidTemperatures()
         {
             var removeBefore = DateTime.UtcNow.AddSeconds(-2);
-            var list = _temperatures.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Value).ToList();
-            list.ForEach(x => x.Temperature = x.Temperature < 10000 ? 10009 : x.Temperature); // this means invalid temperature by timeout
+            var timedOutSensors = _temperatures.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Value).ToList();
+            timedOutSensors.ForEach(x => x.Temperature = (x.Temperature < 10000 ? 10009 : x.Temperature)); // 10009 means timedout
             return _temperatures.Values.OrderBy(x => x.ID);
         }
 
