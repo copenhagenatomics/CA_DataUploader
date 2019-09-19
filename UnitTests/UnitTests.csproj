@@ -51,6 +51,7 @@
     <Compile Include="CALogTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ServerUploaderTests.cs" />
+    <Compile Include="SerialPortTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="IO.conf">

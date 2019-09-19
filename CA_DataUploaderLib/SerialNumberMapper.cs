@@ -66,7 +66,10 @@ namespace CA_DataUploaderLib
 
             var line = mcu.ReadLine();
             if (line.StartsWith("+0") || line.StartsWith("-0"))
+            {
                 mcu.serialNumber = "Scale1";
+                mcu.boardFamily = "Scale";
+            }
 
             if (McuBoards.Any(x => x.serialNumber.StartsWith("Scale")))
                 mcu.serialNumber = "Scale" + (McuBoards.Count(x => x.serialNumber.StartsWith("Scale")) + 1);
