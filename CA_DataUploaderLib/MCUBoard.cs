@@ -9,12 +9,25 @@ namespace CA_DataUploaderLib
     {
         public string serialNumber = null;
         public const string serialNumberHeader = "Serial Number: ";
-        public string boardFamily = null;
+
+        public string productType = null;
         public const string boardFamilyHeader = "Board Family: ";
-        public string boardVersion = null;
-        public const string boardVersionHeader = "Board Version: ";
-        public string boardSoftware = null;
+        public const string productTypeHeader = "Product Type: ";
+
+        public string softwareVersion = null;
+        public const string softwareVersionHeader = "Software Version: ";
         public const string boardSoftwareHeader = "Board Software: ";
+
+        public string softwareCompileDate = null;
+        public const string softwareCompileDateHeader = "Software Compile Date: ";
+
+        public string pcbVersion = null;
+        public const string pcbVersionHeader = "PCB Version: ";
+        public const string boardVersionHeader = "Board Version: ";
+
+        public string mcuFamily = null;
+        public const string mcuFamilyHeader = "MCU Family: ";
+
         public bool UnableToRead = true;
 
         public DateTime PortOpenTimeStamp;
@@ -57,9 +70,9 @@ namespace CA_DataUploaderLib
         public bool IsEmpty()
         {
             return serialNumber.IsNullOrEmpty() ||
-                    boardFamily.IsNullOrEmpty() ||
-                    boardVersion.IsNullOrEmpty() ||
-                    boardSoftware.IsNullOrEmpty();
+                    productType.IsNullOrEmpty() ||
+                    pcbVersion.IsNullOrEmpty() ||
+                    softwareVersion.IsNullOrEmpty();
         }
 
         public override string ToString()
@@ -69,7 +82,7 @@ namespace CA_DataUploaderLib
 
         public string ToString(string seperator)
         {
-            return $"Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}Port open timestamp (UTC): {PortOpenTimeStamp}{seperator}{serialNumberHeader}{serialNumber}{seperator}{boardFamilyHeader}{boardFamily}{seperator}{boardVersionHeader}{boardVersion}{seperator}{boardSoftwareHeader}{boardSoftware}{seperator}";
+            return $"Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}Port open timestamp (UTC): {PortOpenTimeStamp}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
         }
 
         private void ReadSerialNumber()
@@ -88,12 +101,29 @@ namespace CA_DataUploaderLib
                     UnableToRead = false;
                     if (input.Contains(MCUBoard.serialNumberHeader))
                         serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
+
                     if (input.Contains(MCUBoard.boardFamilyHeader))
-                        boardFamily = input.Substring(input.IndexOf(MCUBoard.boardFamilyHeader) + MCUBoard.boardFamilyHeader.Length).Trim();
+                        productType = input.Substring(input.IndexOf(MCUBoard.boardFamilyHeader) + MCUBoard.boardFamilyHeader.Length).Trim();
+                    if (input.Contains(MCUBoard.productTypeHeader))
+                        productType = input.Substring(input.IndexOf(MCUBoard.productTypeHeader) + MCUBoard.productTypeHeader.Length).Trim();
+
                     if (input.Contains(MCUBoard.boardVersionHeader))
-                        boardVersion = input.Substring(input.IndexOf(MCUBoard.boardVersionHeader) + MCUBoard.boardVersionHeader.Length).Trim();
+                        pcbVersion = input.Substring(input.IndexOf(MCUBoard.boardVersionHeader) + MCUBoard.boardVersionHeader.Length).Trim();
+                    if (input.Contains(MCUBoard.pcbVersionHeader))
+                        pcbVersion = input.Substring(input.IndexOf(MCUBoard.pcbVersionHeader) + MCUBoard.pcbVersionHeader.Length).Trim();
+
                     if (input.Contains(MCUBoard.boardSoftwareHeader))
-                        boardSoftware = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
+                        softwareCompileDate = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
+                    if (input.Contains(MCUBoard.softwareCompileDateHeader))
+                        softwareCompileDate = input.Substring(input.IndexOf(MCUBoard.softwareCompileDateHeader) + MCUBoard.softwareCompileDateHeader.Length).Trim();
+
+                    if (input.Contains(MCUBoard.boardSoftwareHeader))
+                        softwareVersion = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
+
+                    if (input.Contains(MCUBoard.mcuFamilyHeader))
+                        mcuFamily = input.Substring(input.IndexOf(MCUBoard.mcuFamilyHeader) + MCUBoard.mcuFamilyHeader.Length).Trim();
+
+                    
                 }
             }
         }

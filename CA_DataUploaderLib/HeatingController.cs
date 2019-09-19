@@ -104,7 +104,7 @@ namespace CA_DataUploaderLib
             }
             catch (TimeoutException)
             {
-                throw new TimeoutException($"Unable to write to {box.serialNumber} {box.boardFamily}");
+                throw new TimeoutException($"Unable to write to {box.serialNumber} {box.productType}");
             }
         }
 
@@ -118,7 +118,7 @@ namespace CA_DataUploaderLib
             }
             catch (TimeoutException)
             {
-                throw new TimeoutException($"Unable to write to {box.serialNumber} {box.boardFamily}");
+                throw new TimeoutException($"Unable to write to {box.serialNumber} {box.productType}");
             }
         }
 
@@ -130,17 +130,19 @@ namespace CA_DataUploaderLib
         private void CheckForNewThermocouplers()
         {
             var sensors = _caThermalBox.GetAllValidTemperatures();
-            var list = sensors.Select(x => x.Heater).Where(x => x != null).ToList();
+            var sensorsAttachedHeaters = sensors.Select(x => x.Heater).Where(x => x != null).ToList();
+            
             // add new heaters
-            foreach(var heater in list)
+            foreach(var heater in sensorsAttachedHeaters)
             {
                 if (!_heaters.Any(x => x.Name() == heater.Name()) && _switchBoxes.Any(x => x.serialNumber == heater.SwitchBoard))
                     _heaters.Add(heater);
             }
 
+            // turn heaters off for 2 minutes, if temperature is invalid. 
             foreach(var heater in _heaters)
             {
-                if (!list.Any(x => x.Name() == heater.Name()))
+                if (!sensorsAttachedHeaters.Any(x => x.Name() == heater.Name()))
                 {
                     HeaterOff(heater);
                     heater.LastOff = DateTime.Now.AddMinutes(2); // wait 2 minutes before we turn it on again. It will only turn on if it has updated thermocoupler data. 

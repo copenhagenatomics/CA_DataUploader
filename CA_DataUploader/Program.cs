@@ -13,7 +13,7 @@ namespace CA_DataUploader
             try
             {
                 var serial = new SerialNumberMapper(true);
-                var dataLoggers = serial.ByFamily("Temperature");
+                var dataLoggers = serial.ByProductType("Temperature");
                 if (!dataLoggers.Any())
                 {
                     CALog.LogInfoAndConsoleLn(LogID.A, "Tempearture sensors not initialized");
