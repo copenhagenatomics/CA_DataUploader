@@ -2,6 +2,7 @@
 using System;
 using System.Threading;
 using System.IO.Ports;
+using System.Diagnostics;
 
 namespace CA_DataUploaderLib
 {
@@ -71,7 +72,6 @@ namespace CA_DataUploaderLib
         {
             return serialNumber.IsNullOrEmpty() ||
                     productType.IsNullOrEmpty() ||
-                    pcbVersion.IsNullOrEmpty() ||
                     softwareVersion.IsNullOrEmpty();
         }
 
@@ -96,7 +96,11 @@ namespace CA_DataUploaderLib
                 if (BytesToRead > 0)
                 {
                     var input = ReadLine();
-                    // CALog.LogColor(LogID.A, ConsoleColor.Green, input);
+                    if (Debugger.IsAttached && input.Length > 0)
+                    {
+                        stop = DateTime.Now.AddMinutes(1);
+                        CALog.LogColor(LogID.A, ConsoleColor.Green, input);
+                    }
 
                     UnableToRead = false;
                     if (input.Contains(MCUBoard.serialNumberHeader))
@@ -119,6 +123,8 @@ namespace CA_DataUploaderLib
 
                     if (input.Contains(MCUBoard.boardSoftwareHeader))
                         softwareVersion = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
+                    if (input.Contains(MCUBoard.softwareVersionHeader))
+                        softwareVersion = input.Substring(input.IndexOf(MCUBoard.softwareVersionHeader) + MCUBoard.softwareVersionHeader.Length).Trim();
 
                     if (input.Contains(MCUBoard.mcuFamilyHeader))
                         mcuFamily = input.Substring(input.IndexOf(MCUBoard.mcuFamilyHeader) + MCUBoard.mcuFamilyHeader.Length).Trim();
