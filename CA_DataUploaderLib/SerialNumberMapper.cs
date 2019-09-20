@@ -68,7 +68,7 @@ namespace CA_DataUploaderLib
             if (line.StartsWith("+0") || line.StartsWith("-0"))
             {
                 mcu.serialNumber = "Scale1";
-                mcu.boardFamily = "Scale";
+                mcu.productType = "Scale";
             }
 
             if (McuBoards.Any(x => x.serialNumber.StartsWith("Scale")))
