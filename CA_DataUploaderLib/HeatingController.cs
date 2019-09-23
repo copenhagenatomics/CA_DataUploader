@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace CA_DataUploaderLib
@@ -10,6 +12,8 @@ namespace CA_DataUploaderLib
         public int TargetTemperature { get; set; }
 
         public List<TermoSensor> ValidHatSensors { get; private set; }
+        public double Voltage = 230;
+        public int HeaterOnTimeout = 60;
         private int _maxHeaterTemperature;
         private bool _running = true;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
@@ -54,15 +58,17 @@ namespace CA_DataUploaderLib
                         }
                         else if (!heater.IsOn && heater.CanTurnOn(maxTemperature))
                         {
-                            HeaterOn(heater, 60);
+                            HeaterOn(heater);
                             heater.LastOn = DateTime.UtcNow;
                             heater.IsOn = true;
                             CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
                         }
                     }
 
-                    Thread.Sleep(1000);
-                    if (i++ % 10 == 0)   // check for new termocouplers every 10 seconds. 
+                    ReadInputFromSwitchBoxes();
+
+                    Thread.Sleep(500);
+                    if (i++ % 20 == 0)   // check for new termocouplers every 10 seconds. 
                         CheckForNewThermocouplers();
                 }
                 catch (ArgumentException ex)
@@ -84,6 +90,39 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, "Exiting LoopHatController.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
             foreach (var heater in _heaters)
                 HeaterOff(heater);
+        }
+
+        private const string _SwitchBoxPattern = "P1=(\\d\\.\\d\\d)A; P2=(\\d\\.\\d\\d)A; P3=(\\d\\.\\d\\d)A; P4=(\\d\\.\\d\\d)A;";
+
+        private void ReadInputFromSwitchBoxes()
+        {
+            foreach (var box in _switchBoxes)
+            {
+                var line = box.ReadExisting();
+                var match = Regex.Match(line, _SwitchBoxPattern);
+                if (match.Success)
+                {
+                    GetCurrentValues(box.serialNumber, match);
+                }
+            }
+        }
+
+        private void GetCurrentValues(string serialNumber, Match match)
+        {
+            double dummy;
+            var values = match.Groups.Cast<Group>().Skip(1)
+                .Where(x => double.TryParse(x.Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out dummy))
+                .Select(x => double.Parse(x.Value, CultureInfo.InvariantCulture)).ToArray();
+
+            if (values.Count() == 4)
+            {
+                foreach (var heater in _heaters.Where(x => x.SwitchBoard == serialNumber))
+                {
+                    heater.Current = values[heater.port - 1];
+                    if (heater.Current == 0 && heater.IsOn) HeaterOn(heater);
+                    if (heater.Current > 0 && !heater.IsOn) HeaterOff(heater);
+                }
+            }
         }
 
         private void AllOff()
@@ -108,13 +147,13 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected virtual void HeaterOn(HeaterElement heater, int seconds)
+        protected virtual void HeaterOn(HeaterElement heater)
         {
             MCUBoard box = null;
             try
             {
                 box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
-                box.WriteLine($"p{heater.port} on {seconds}");
+                box.WriteLine($"p{heater.port} on {HeaterOnTimeout}");
             }
             catch (TimeoutException)
             {
@@ -153,6 +192,11 @@ namespace CA_DataUploaderLib
         public List<double> GetStates()
         {
             return _heaters.Select(x => x.IsOn ? 1.0 : 0.0).ToList();
+        }
+
+        public List<double> GetPower()
+        {
+            return _heaters.Select(x => x.Current*Voltage).ToList();
         }
 
         public bool HandleCommand()
@@ -239,7 +283,8 @@ namespace CA_DataUploaderLib
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
-            return _heaters.Select(x => new VectorDescriptionItem("double", x.sensors.First().Name, DataTypeEnum.Output)).ToList();
+            return _heaters.Select(x => new VectorDescriptionItem("double", x.sensors.First().Name+"_Power", DataTypeEnum.Input)).
+                Concat(_heaters.Select(x => new VectorDescriptionItem("double", x.sensors.First().Name, DataTypeEnum.Output))).ToList();
         }
 
         #region IDisposable Support

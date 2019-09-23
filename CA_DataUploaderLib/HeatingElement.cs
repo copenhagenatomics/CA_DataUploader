@@ -13,6 +13,7 @@ namespace CA_DataUploaderLib
         public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public double onTemperature = 10000;
         public bool IsOn;
+        public double Current;  // Amps per element. 
         public int OffsetSetTemperature = 0;
 
         public bool CanTurnOn(int maxTemperature)
