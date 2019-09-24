@@ -65,7 +65,7 @@ namespace CA_DataUploaderLib
                         }
                     }
 
-                    ReadInputFromSwitchBoxes();
+                    // ReadInputFromSwitchBoxes();
 
                     Thread.Sleep(500);
                     if (i++ % 20 == 0)   // check for new termocouplers every 10 seconds. 
@@ -92,18 +92,26 @@ namespace CA_DataUploaderLib
                 HeaterOff(heater);
         }
 
-        private const string _SwitchBoxPattern = "P1=(\\d\\.\\d\\d)A; P2=(\\d\\.\\d\\d)A; P3=(\\d\\.\\d\\d)A; P4=(\\d\\.\\d\\d)A;";
+        private const string _SwitchBoxPattern = "P1=(\\d\\.\\d\\d)A P2=(\\d\\.\\d\\d)A P3=(\\d\\.\\d\\d)A P4=(\\d\\.\\d\\d)A";
 
         private void ReadInputFromSwitchBoxes()
         {
             foreach (var box in _switchBoxes)
             {
-                var line = box.ReadExisting();
-                var match = Regex.Match(line, _SwitchBoxPattern);
-                if (match.Success)
+                try
                 {
-                    GetCurrentValues(box.serialNumber, match);
+                    var lines = box.ReadExisting();
+                    var match = Regex.Match(lines, _SwitchBoxPattern);
+                    if (match.Success)
+                    {
+                        GetCurrentValues(box.serialNumber, match);
+                    }
+                    else // this is only used for debugging. 
+                    {
+                        Console.WriteLine(box.serialNumber + ": " + lines);
+                    }
                 }
+                catch {  }
             }
         }
 
@@ -119,8 +127,8 @@ namespace CA_DataUploaderLib
                 foreach (var heater in _heaters.Where(x => x.SwitchBoard == serialNumber))
                 {
                     heater.Current = values[heater.port - 1];
-                    if (heater.Current == 0 && heater.IsOn) HeaterOn(heater);
-                    if (heater.Current > 0 && !heater.IsOn) HeaterOff(heater);
+                    //if (heater.Current == 0 && heater.IsOn) HeaterOn(heater);
+                    //if (heater.Current > 0 && !heater.IsOn) HeaterOff(heater);
                 }
             }
         }

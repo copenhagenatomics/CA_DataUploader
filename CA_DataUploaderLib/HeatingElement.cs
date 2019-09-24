@@ -55,7 +55,7 @@ namespace CA_DataUploaderLib
             foreach (var s in sensors)
                 msg += s.Temperature.ToString("N0") + ", ";
 
-            return $"{Name().PadRight(15)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg} {(LastOn > LastOff ? "": onTemperature.ToString("N0"))}";
+            return $"{Name().PadRight(15)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg} {(LastOn > LastOff ? "": onTemperature.ToString("N0"))} {Current}Amp";
         }
     }
 }
