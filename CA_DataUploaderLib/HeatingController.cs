@@ -65,9 +65,9 @@ namespace CA_DataUploaderLib
                         }
                     }
 
-                    // ReadInputFromSwitchBoxes();
+                    ReadInputFromSwitchBoxes();
 
-                    Thread.Sleep(500);
+                    Thread.Sleep(100);
                     if (i++ % 20 == 0)   // check for new termocouplers every 10 seconds. 
                         CheckForNewThermocouplers();
                 }
@@ -96,20 +96,13 @@ namespace CA_DataUploaderLib
 
         private void ReadInputFromSwitchBoxes()
         {
-            foreach (var box in _switchBoxes)
+            foreach (var box in _switchBoxes.Where(x => x.productType.StartsWith("SwitchBoard") || x.productType.StartsWith("Relay")))
             {
                 try
                 {
                     var lines = box.ReadExisting();
                     var match = Regex.Match(lines, _SwitchBoxPattern);
-                    if (match.Success)
-                    {
-                        GetCurrentValues(box.serialNumber, match);
-                    }
-                    else // this is only used for debugging. 
-                    {
-                        Console.WriteLine(box.serialNumber + ": " + lines);
-                    }
+                    if (match.Success) GetCurrentValues(box.serialNumber, match);
                 }
                 catch {  }
             }
@@ -127,8 +120,8 @@ namespace CA_DataUploaderLib
                 foreach (var heater in _heaters.Where(x => x.SwitchBoard == serialNumber))
                 {
                     heater.Current = values[heater.port - 1];
-                    //if (heater.Current == 0 && heater.IsOn) HeaterOn(heater);
-                    //if (heater.Current > 0 && !heater.IsOn) HeaterOff(heater);
+                    if (heater.Current == 0 && heater.IsOn) HeaterOn(heater);
+                    if (heater.Current > 0 && !heater.IsOn) HeaterOff(heater);
                 }
             }
         }
@@ -204,7 +197,7 @@ namespace CA_DataUploaderLib
 
         public List<double> GetPower()
         {
-            return _heaters.Select(x => x.Current*Voltage).ToList();
+            return _heaters.Select(x => x.Current).ToList();
         }
 
         public bool HandleCommand()

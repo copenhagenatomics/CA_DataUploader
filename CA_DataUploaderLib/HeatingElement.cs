@@ -53,9 +53,9 @@ namespace CA_DataUploaderLib
         {
             string msg = string.Empty;
             foreach (var s in sensors)
-                msg += s.Temperature.ToString("N0") + ", ";
+                msg += s.Temperature.ToString("N0") + ", " + (LastOn > LastOff ? "" : onTemperature.ToString("N0"));
 
-            return $"{Name().PadRight(15)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg} {(LastOn > LastOff ? "": onTemperature.ToString("N0"))} {Current}Amp";
+            return $"{Name().PadRight(10)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg.PadRight(12)} {Current.ToString("N1").PadRight(5)} Amp";
         }
     }
 }
