@@ -48,6 +48,7 @@ namespace CA_DataUploaderLib
                 RtsEnable = true;
                 BaudRate = baudrate;
                 PortName = name;
+                productType = "NA";
                 PortOpenTimeStamp = DateTime.UtcNow;
                 ReadTimeout = 2000;
                 WriteTimeout = 2000;
