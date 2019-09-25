@@ -19,6 +19,7 @@ namespace CA_DataUploaderLib
         private List<HeaterElement> _heaters = new List<HeaterElement>();
         protected List<MCUBoard> _switchBoxes;
         private CAThermalBox _caThermalBox;
+        private int _sendCount = 0;
 
         public HeatingController(CAThermalBox caThermalBox, List<MCUBoard> switchBoxes, int maxHeaterTemperature)
         {
@@ -51,23 +52,21 @@ namespace CA_DataUploaderLib
                     {
                         if (heater.IsOn && heater.MustTurnOff(maxTemperature))
                         {
-                            HeaterOff(heater);
                             heater.LastOff = DateTime.UtcNow;
                             heater.IsOn = false;
-                            CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
+                            HeaterOff(heater);
                         }
                         else if (!heater.IsOn && heater.CanTurnOn(maxTemperature))
                         {
-                            HeaterOn(heater);
                             heater.LastOn = DateTime.UtcNow;
                             heater.IsOn = true;
-                            CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
+                            HeaterOn(heater);
                         }
                     }
 
                     ReadInputFromSwitchBoxes();
 
-                    Thread.Sleep(100);
+                    Thread.Sleep(300);
                     if (i++ % 20 == 0)   // check for new termocouplers every 10 seconds. 
                         CheckForNewThermocouplers();
                 }
@@ -120,8 +119,22 @@ namespace CA_DataUploaderLib
                 foreach (var heater in _heaters.Where(x => x.SwitchBoard == serialNumber))
                 {
                     heater.Current = values[heater.port - 1];
-                    if (heater.Current == 0 && heater.IsOn) HeaterOn(heater);
-                    if (heater.Current > 0 && !heater.IsOn) HeaterOff(heater);
+
+                    if (_sendCount++ == 10)
+                    {
+                        _sendCount = 0;
+                        if (heater.Current == 0 && heater.IsOn)
+                        {
+                            CALog.LogInfoAndConsole(LogID.B, "_");
+                            HeaterOn(heater);
+                        }
+
+                        if (heater.Current > 0 && !heater.IsOn)
+                        {
+                            CALog.LogInfoAndConsole(LogID.B, "_");
+                            HeaterOff(heater);
+                        }
+                    }
                 }
             }
         }
@@ -141,6 +154,7 @@ namespace CA_DataUploaderLib
             {
                 box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
                 box.WriteLine($"p{heater.port} off");
+                CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
             {
@@ -155,6 +169,7 @@ namespace CA_DataUploaderLib
             {
                 box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
                 box.WriteLine($"p{heater.port} on {HeaterOnTimeout}");
+                CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
             {
