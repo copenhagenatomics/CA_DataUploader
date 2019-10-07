@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace CA_DataUploaderLib
 {
-    public class HeatingController : CommandHandler, IDisposable
+    public class HeatingController : IDisposable
     {
         public int TargetTemperature { get; set; }
 
@@ -21,7 +21,7 @@ namespace CA_DataUploaderLib
         private CAThermalBox _caThermalBox;
         private int _sendCount = 0;
 
-        public HeatingController(CAThermalBox caThermalBox, List<MCUBoard> switchBoxes, int maxHeaterTemperature)
+        public HeatingController(CAThermalBox caThermalBox, List<MCUBoard> switchBoxes, CommandHandler cmd, int maxHeaterTemperature)
         {
             _caThermalBox = caThermalBox;
             _maxHeaterTemperature = maxHeaterTemperature;
@@ -29,6 +29,9 @@ namespace CA_DataUploaderLib
             TargetTemperature = 0;
 
             new Thread(() => this.LoopForever()).Start();
+            cmd.AddCommand("escape", Stop);
+            cmd.AddCommand("help", HelpMenu);
+            cmd.AddCommand("oven", Oven);
 
             for (int i = 0; i < 20; i++)
             {
@@ -36,6 +39,37 @@ namespace CA_DataUploaderLib
                 if (_heaters.Any())
                     break; // exit the for loop
             }
+        }
+
+        private bool HelpMenu(List<string> args)
+        {
+            CALog.LogInfoAndConsoleLn(LogID.A, $"oven [0 - 800] [0 - 800]  - where the integer value is the oven temperature top and bottom region");
+            return true;
+        }
+
+        private bool Stop(List<string> args)
+        {
+            _running = false;
+            return true;
+        }
+
+        private bool Oven(List<string> args)
+        {
+            int topTemp = CommandHandler.GetCmdParam(args, 1, 300);
+            int bottomTemp = CommandHandler.GetCmdParam(args, 2, topTemp);
+
+            if (topTemp < 900 && bottomTemp < 900)
+            {
+                TargetTemperature = topTemp;
+                _heaters.Where(x => x.Name().ToLower().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
+                if (TargetTemperature > 0)
+                    Light(new List<string> { "light", "on" });
+                else
+                    Light(new List<string> { "light", "off" });
+                return true;
+            }
+
+            return false;
         }
 
         private void LoopForever()
@@ -86,9 +120,8 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting LoopHatController.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
-            foreach (var heater in _heaters)
-                HeaterOff(heater);
+            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting HeatingController.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
+            AllOff();
         }
 
         private const string _SwitchBoxPattern = "P1=(\\d\\.\\d\\d)A P2=(\\d\\.\\d\\d)A P3=(\\d\\.\\d\\d)A P4=(\\d\\.\\d\\d)A";
@@ -177,9 +210,10 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected virtual void Light(bool on)
+        protected virtual bool Light(List<string> cmd)
         {
-            // do nothing, you can override. 
+            // do nothing, you can override.
+            return false;
         }
 
         private void CheckForNewThermocouplers()
@@ -215,91 +249,9 @@ namespace CA_DataUploaderLib
             return _heaters.Select(x => x.Current).ToList();
         }
 
-        public bool HandleCommand()
-        {
-            var cmd = GetCommand();
-            if (cmd == null)
-                return true;
-
-            if (cmd.Any())
-            {
-                inputCommand = string.Empty;
-                switch (cmd.First().ToLower())
-                {
-                    case "escape":
-                        AllOff();
-                        return false;
-                    case "stop":
-                        AllOff();
-                        return true;
-                    case "help":
-                        HelpMenu();
-                        return true;
-                }
-
-                //if (_cmdParser.TryExecute(cmd))
-                //    return true;
-
-                bool commandOK = false;
-                if (cmd.First().ToLower() == "oven")
-                {
-                    int topTemp = GetCmdParam(cmd, 1, 300);
-                    int bottomTemp = GetCmdParam(cmd, 2, topTemp);
-
-                    if (topTemp < 900 && bottomTemp < 900)
-                    {
-                        TargetTemperature = topTemp;
-                        _heaters.Where(x => x.Name().ToLower().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
-                        Light(TargetTemperature > 0);
-                        commandOK = true;
-                    }
-                }
-
-                if(cmd.First().ToLower() == "light")
-                {
-                    if (cmd[1] == "on") { Light(true); commandOK = true; }
-                    if (cmd[1] == "off") { Light(false); commandOK = true; }
-                }
-
-                if (commandOK)
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - command accepted");
-                else
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - bad command");
-            }
-            else
-            {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {inputCommand.Replace(Environment.NewLine, "")} - bad command");
-            }
-
-            inputCommand = string.Empty;
-            return true;
-        }
-
-        private void HelpMenu()
-        {
-            CALog.LogInfoAndConsoleLn(LogID.A, "Commands: ");
-            CALog.LogInfoAndConsoleLn(LogID.A, $"oven [0 - 800] [0 - 800]  - where the integer value is the oven temperature top and bottom region");
-            CALog.LogInfoAndConsoleLn(LogID.A, $"stop                      - stop the pump and power supply and turn off all power");
-            CALog.LogInfoAndConsoleLn(LogID.A, $"help                      - print the full list of available commands");
-
-            inputCommand = string.Empty;
-        }
-
-        private int GetCmdParam(List<string> cmd, int index, int defaultValue)
-        {
-            if (cmd.Count() > index)
-            {
-                int value;
-                if (int.TryParse(cmd[index], out value))
-                    return value;
-            }
-
-            return defaultValue;
-        }
-
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
-            return _heaters.Select(x => new VectorDescriptionItem("double", x.sensors.First().Name+"_Power", DataTypeEnum.Input)).
+            return _heaters.Select(x => new VectorDescriptionItem("double", x.sensors.First().Name + "_Power", DataTypeEnum.Input)).
                 Concat(_heaters.Select(x => new VectorDescriptionItem("double", x.sensors.First().Name, DataTypeEnum.Output))).ToList();
         }
 
