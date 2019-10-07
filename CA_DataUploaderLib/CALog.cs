@@ -17,7 +17,7 @@ namespace CA_DataUploaderLib
         public static int MaxLogSizeMB = 100;
         private static bool _prependTimeStamp;
 
-        public static void LogData1(LogID logID, string msg)
+        public static void LogData(LogID logID, string msg)
         {
             WriteToFile(logID, msg);            
         }

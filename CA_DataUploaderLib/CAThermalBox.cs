@@ -97,9 +97,6 @@ namespace CA_DataUploaderLib
                     foreach (var board in _mcuBoards)
                     {
                         row = board.ReadLine();
-                        if (logLevel == LogLevel.Debug)
-                            CALog.LogInfoAndConsoleLn(LogID.A, row);
-
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
                         if (numbers.Count == 18) // old model. 
@@ -109,6 +106,9 @@ namespace CA_DataUploaderLib
                         }
                         else
                             ProcessLine(numbers, hubID++, board);
+
+                        if (logLevel == LogLevel.Debug)
+                            CALog.LogData(LogID.A, MakeDebugString(row) + Environment.NewLine);
                     }
                     badRow = 0;
                     Initialized = true;
@@ -234,6 +234,12 @@ namespace CA_DataUploaderLib
             return _frequency.Average();
         }
 
+        private string MakeDebugString(string row)
+        {
+            string filteredValues = string.Join(", ", GetAllValidTemperatures().Select(x => x.Temperature.ToString("N2").PadLeft(8)));
+            return row.Replace("\n", "").PadRight(120).Replace("\r", "Freq=" + Frequency.ToString("N1")) + filteredValues;
+        }
+
         private void ShowConfig()
         {
             foreach (var x in _config)
@@ -243,6 +249,8 @@ namespace CA_DataUploaderLib
 
                 CALog.LogInfoAndConsoleLn(LogID.A, "");
             }
+
+            CALog.LogInfoAndConsoleLn(LogID.A, FilterLength.ToString());
         }
 
         public void Dispose()
