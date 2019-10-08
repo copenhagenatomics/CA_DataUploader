@@ -52,7 +52,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting LoopHatController.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
+            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
         }
 
         private void HandleCommand(bool logDebug)
@@ -95,7 +95,7 @@ namespace CA_DataUploaderLib
         private List<string> GetCommand()
         {
             var info = Console.ReadKey(true);
-            while (info.Key != ConsoleKey.Enter && info.Key != ConsoleKey.Escape)
+            while (info.Key != ConsoleKey.Enter && info.Key != ConsoleKey.Escape && _running)
             {
                 Console.Write(info.KeyChar);
                 inputCommand.Append(info.KeyChar);

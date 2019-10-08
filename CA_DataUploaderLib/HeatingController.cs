@@ -251,8 +251,10 @@ namespace CA_DataUploaderLib
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
-            return _heaters.Select(x => new VectorDescriptionItem("double", x.sensors.First().Name + "_Power", DataTypeEnum.Input)).
+            var list = _heaters.Select(x => new VectorDescriptionItem("double", x.sensors.First().Name + "_Power", DataTypeEnum.Input)).
                 Concat(_heaters.Select(x => new VectorDescriptionItem("double", x.sensors.First().Name, DataTypeEnum.Output))).ToList();
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from HeatingController");
+            return list;
         }
 
         #region IDisposable Support

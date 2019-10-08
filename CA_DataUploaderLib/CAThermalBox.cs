@@ -15,12 +15,14 @@ namespace CA_DataUploaderLib
         protected bool _running = true;
         public int FilterLength { get; set; }
         public double Frequency { get; private set; }
+
+        protected string _title = "CAThermalBox"; 
         protected ConcurrentDictionary<string, TermoSensor> _temperatures = new ConcurrentDictionary<string, TermoSensor>();
         private Dictionary<string, Queue<double>> _filterQueue = new Dictionary<string, Queue<double>>();
         private Queue<double> _frequency = new Queue<double>();
         private List<HeaterElement> heaters = new List<HeaterElement>();
 
-        protected List<List<string>> _config = IOconf.GetInTypeK().Where(x => x[2] == "hub16").ToList();
+        protected List<List<string>> _config;
 
         public bool Initialized { get; protected set; }
 
@@ -36,6 +38,7 @@ namespace CA_DataUploaderLib
             Initialized = false;
             FilterLength = filterLength;
             _mcuBoards = boards.OrderBy(x => x.serialNumber).ToList();
+            _config = IOconf.GetInTypeK().ToList();
 
             if (IOconf.GetOutputLevel() == LogLevel.Debug)
                 ShowConfig();
@@ -82,6 +85,7 @@ namespace CA_DataUploaderLib
         public VectorDescription GetVectorDescription()
         {
             var list = _config.Select(x => new VectorDescriptionItem("double", x[1], DataTypeEnum.Input)).ToList();
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {_title}");
             return new VectorDescription(list, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
         }
 
@@ -89,6 +93,7 @@ namespace CA_DataUploaderLib
         {
             List<double> numbers = new List<double>();
             List<string> values = new List<string>();
+            DateTime start = DateTime.Now;
             string row = string.Empty;
             int badRow = 0;
 
@@ -140,6 +145,8 @@ namespace CA_DataUploaderLib
 
             foreach (var board in _mcuBoards)
                 board.Close();
+
+            CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {_title}.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
         }
 
         private void ProcessLine(IEnumerable<double> numbers, int hubID, MCUBoard board)
