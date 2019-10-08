@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27004.2005
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29306.81
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CA_DataUploader", "CA_DataUploader\CA_DataUploader.csproj", "{25FEC8A7-811E-4CA2-9AC4-EDA524DFA729}"
 EndProject
@@ -23,6 +23,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShowAvailableMCUboards", "ShowAvailableMCUboards\ShowAvailableMCUboards.csproj", "{023C7444-B273-4386-8F11-2AADA18739BA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTests", "UnitTests\UnitTests.csproj", "{C74C4DFC-74A1-40D4-A8DB-A0546ED810FD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommandHandlerTester", "CommandHandlerTester\CommandHandlerTester.csproj", "{1DDB4198-46EB-4DB7-AB68-AC73D232A834}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -54,6 +56,10 @@ Global
 		{C74C4DFC-74A1-40D4-A8DB-A0546ED810FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C74C4DFC-74A1-40D4-A8DB-A0546ED810FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C74C4DFC-74A1-40D4-A8DB-A0546ED810FD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1DDB4198-46EB-4DB7-AB68-AC73D232A834}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1DDB4198-46EB-4DB7-AB68-AC73D232A834}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1DDB4198-46EB-4DB7-AB68-AC73D232A834}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1DDB4198-46EB-4DB7-AB68-AC73D232A834}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

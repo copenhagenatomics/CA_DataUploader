@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 
 namespace CA_DataUploaderLib
@@ -9,7 +10,7 @@ namespace CA_DataUploaderLib
     {
 
         private bool _running = true;
-        private string inputCommand = string.Empty;
+        private StringBuilder inputCommand = new StringBuilder();
         private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
 
         public bool IsRunning { get { return _running; } }
@@ -44,8 +45,6 @@ namespace CA_DataUploaderLib
                 try
                 {
                     HandleCommand(logLevel == LogLevel.Debug);
-
-                    Thread.Sleep(100);
                 }
                 catch (Exception ex)
                 {
@@ -70,11 +69,11 @@ namespace CA_DataUploaderLib
                 if(logDebug)
                     CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {inputCommand.Replace(Environment.NewLine, "")} - bad command");
 
-                inputCommand = string.Empty;
+                inputCommand.Clear();
                 return;
             }
 
-            inputCommand = string.Empty;
+            inputCommand.Clear();
             if (_commands.ContainsKey(cmd.First().ToLower()))
             {
                 foreach (var func in _commands[cmd.First().ToLower()])
@@ -95,18 +94,23 @@ namespace CA_DataUploaderLib
 
         private List<string> GetCommand()
         {
-            while (Console.KeyAvailable)
-                inputCommand += (char)Console.Read();
+            var info = Console.ReadKey(true);
+            while (info.Key != ConsoleKey.Enter && info.Key != ConsoleKey.Escape)
+            {
+                Console.Write(info.KeyChar);
+                inputCommand.Append(info.KeyChar);
+                info = Console.ReadKey(true);
+            }
 
-            if (inputCommand.Length > 0 && inputCommand[inputCommand.Length - 1] == (char)ConsoleKey.Escape)
+            if (info.Key == ConsoleKey.Escape)
             {
                 return new List<string> { "escape" };
             }
 
-            if (!inputCommand.Contains(Environment.NewLine))
+            if (info.Key != ConsoleKey.Enter)
                 return null;
 
-            return inputCommand.Split(' ').Select(x => x.Trim()).ToList();
+            return inputCommand.ToString().Split(' ').Select(x => x.Trim()).ToList();
         }
 
         public static int GetCmdParam(List<string> cmd, int index, int defaultValue)
@@ -123,9 +127,10 @@ namespace CA_DataUploaderLib
 
         private bool HelpMenu(List<string> args)
         {
+            CALog.LogInfoAndConsoleLn(LogID.A, "");
             CALog.LogInfoAndConsoleLn(LogID.A, "Commands: ");
-            CALog.LogInfoAndConsoleLn(LogID.A, "press Esc to shut down");
-            CALog.LogInfoAndConsoleLn(LogID.A, $"help                      - print the full list of available commands");
+            CALog.LogInfoAndConsoleLn(LogID.A, "Esc                       - press Esc key to shut down");
+            CALog.LogInfoAndConsoleLn(LogID.A, "help                      - print the full list of available commands");
             return true;
         }
 

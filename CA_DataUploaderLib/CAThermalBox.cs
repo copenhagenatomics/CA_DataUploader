@@ -10,19 +10,21 @@ namespace CA_DataUploaderLib
 {
     public class CAThermalBox : IDisposable
     {
-        private List<MCUBoard> _mcuBoards;
+        protected List<MCUBoard> _mcuBoards;
         private const int TEMPERATURE_FAULT = 10000;
-        private bool _running = true;
+        protected bool _running = true;
         public int FilterLength { get; set; }
         public double Frequency { get; private set; }
-        private ConcurrentDictionary<string, TermoSensor> _temperatures = new ConcurrentDictionary<string, TermoSensor>();
+        protected ConcurrentDictionary<string, TermoSensor> _temperatures = new ConcurrentDictionary<string, TermoSensor>();
         private Dictionary<string, Queue<double>> _filterQueue = new Dictionary<string, Queue<double>>();
         private Queue<double> _frequency = new Queue<double>();
         private List<HeaterElement> heaters = new List<HeaterElement>();
 
-        private List<List<string>> _config = IOconf.GetInTypeK().Where(x => x[2] == "hub16").ToList();
+        protected List<List<string>> _config = IOconf.GetInTypeK().Where(x => x[2] == "hub16").ToList();
 
-        public bool Initialized { get; private set; }
+        public bool Initialized { get; protected set; }
+
+        public CAThermalBox() { }
 
         /// <summary>
         /// Constructor: 
@@ -71,7 +73,9 @@ namespace CA_DataUploaderLib
         {
             var removeBefore = DateTime.UtcNow.AddSeconds(-2);
             var timedOutSensors = _temperatures.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Value).ToList();
-            timedOutSensors.ForEach(x => x.Temperature = (x.Temperature < 10000 ? 10009 : x.Temperature)); // 10009 means timedout
+            if(!Debugger.IsAttached)
+                timedOutSensors.ForEach(x => x.Temperature = (x.Temperature < 10000 ? 10009 : x.Temperature)); // 10009 means timedout
+
             return _temperatures.Values.OrderBy(x => x.ID);
         }
 
@@ -81,7 +85,7 @@ namespace CA_DataUploaderLib
             return new VectorDescription(list, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
         }
 
-        private void LoopForever()
+        protected void LoopForever()
         {
             List<double> numbers = new List<double>();
             List<string> values = new List<string>();
@@ -240,7 +244,7 @@ namespace CA_DataUploaderLib
             return row.Replace("\n", "").PadRight(120).Replace("\r", "Freq=" + Frequency.ToString("N1")) + filteredValues;
         }
 
-        private void ShowConfig()
+        protected void ShowConfig()
         {
             foreach (var x in _config)
             {
