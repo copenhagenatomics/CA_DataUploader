@@ -12,6 +12,7 @@ namespace CA_DataUploaderLib
         private bool _running = true;
         private StringBuilder inputCommand = new StringBuilder();
         private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
+        private LogLevel _logLevel = IOconf.GetOutputLevel();
 
         public bool IsRunning { get { return _running; } }
 
@@ -30,6 +31,12 @@ namespace CA_DataUploaderLib
                 _commands.Add(name.ToLower(), new List<Func<List<string>, bool>>{func});
         }
 
+        public void Execute(string command)
+        {
+            var cmd = command.Split(' ').Select(x => x.Trim()).ToList();
+            HandleCommand(cmd);
+        }
+
         private bool Stop(List<string> args)
         {
             _running = false;
@@ -39,12 +46,12 @@ namespace CA_DataUploaderLib
         private void LoopForever()
         {
             DateTime start = DateTime.Now;
-            var logLevel = IOconf.GetOutputLevel();
             while (_running)
             {
                 try
                 {
-                    HandleCommand(logLevel == LogLevel.Debug);
+                    var cmd = GetCommand();
+                    HandleCommand(cmd);
                 }
                 catch (Exception ex)
                 {
@@ -55,18 +62,18 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
         }
 
-        private void HandleCommand(bool logDebug)
+        private void HandleCommand(List<string> cmd)
         {
-            var cmd = GetCommand();
             if (cmd == null)  // no NewLine
             {
                 // echo to console here
                 return;
             }
 
+            CALog.LogInfoAndConsoleLn(LogID.A, ""); // this ensures that next command start on a new line. 
             if (!cmd.Any())
             {
-                if(logDebug)
+                if(_logLevel == LogLevel.Debug)
                     CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {inputCommand.Replace(Environment.NewLine, "")} - bad command");
 
                 inputCommand.Clear();
@@ -78,17 +85,27 @@ namespace CA_DataUploaderLib
             {
                 foreach (var func in _commands[cmd.First().ToLower()])
                 {
-                    if (func.Invoke(cmd))
+                    try
                     {
-                        if(logDebug)
-                            CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - command accepted");
+                        if (func.Invoke(cmd))
+                        {
+                            if(_logLevel == LogLevel.Debug)
+                                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - command accepted");
+                        }
+                        else
+                        {
+                            if(_logLevel == LogLevel.Debug)
+                                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - bad command");
+                        }
                     }
-                    else
+                    catch (ArgumentException ex)
                     {
-                        if(logDebug)
-                            CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - bad command");
+                        CALog.LogInfoAndConsoleLn(LogID.A, ex.Message);
                     }
                 }
+
+                if (cmd.First().ToLower() == "help")
+                    CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");  // end help menu divider
             }
         }
 
@@ -127,6 +144,7 @@ namespace CA_DataUploaderLib
 
         private bool HelpMenu(List<string> args)
         {
+            CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");
             CALog.LogInfoAndConsoleLn(LogID.A, "");
             CALog.LogInfoAndConsoleLn(LogID.A, "Commands: ");
             CALog.LogInfoAndConsoleLn(LogID.A, "Esc                       - press Esc key to shut down");
