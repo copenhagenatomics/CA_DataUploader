@@ -10,19 +10,23 @@ namespace CA_DataUploaderLib
 {
     public class CAThermalBox : IDisposable
     {
-        private List<MCUBoard> _mcuBoards;
+        protected List<MCUBoard> _mcuBoards;
         private const int TEMPERATURE_FAULT = 10000;
-        private bool _running = true;
+        protected bool _running = true;
         public int FilterLength { get; set; }
         public double Frequency { get; private set; }
-        private ConcurrentDictionary<string, TermoSensor> _temperatures = new ConcurrentDictionary<string, TermoSensor>();
+
+        protected string _title = "CAThermalBox"; 
+        protected ConcurrentDictionary<string, TermoSensor> _temperatures = new ConcurrentDictionary<string, TermoSensor>();
         private Dictionary<string, Queue<double>> _filterQueue = new Dictionary<string, Queue<double>>();
         private Queue<double> _frequency = new Queue<double>();
         private List<HeaterElement> heaters = new List<HeaterElement>();
 
-        private List<List<string>> _config = IOconf.GetInTypeK().Where(x => x[2] == "hub16").ToList();
+        protected List<List<string>> _config;
 
-        public bool Initialized { get; private set; }
+        public bool Initialized { get; protected set; }
+
+        public CAThermalBox() { }
 
         /// <summary>
         /// Constructor: 
@@ -34,6 +38,7 @@ namespace CA_DataUploaderLib
             Initialized = false;
             FilterLength = filterLength;
             _mcuBoards = boards.OrderBy(x => x.serialNumber).ToList();
+            _config = IOconf.GetInTypeK().ToList();
 
             if (IOconf.GetOutputLevel() == LogLevel.Debug)
                 ShowConfig();
@@ -70,21 +75,25 @@ namespace CA_DataUploaderLib
         public IEnumerable<TermoSensor> GetAllValidTemperatures()
         {
             var removeBefore = DateTime.UtcNow.AddSeconds(-2);
-            var list = _temperatures.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Value).ToList();
-            list.ForEach(x => x.Temperature = x.Temperature < 10000 ? 10009 : x.Temperature); // this means invalid temperature by timeout
+            var timedOutSensors = _temperatures.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Value).ToList();
+            if(!Debugger.IsAttached)
+                timedOutSensors.ForEach(x => x.Temperature = (x.Temperature < 10000 ? 10009 : x.Temperature)); // 10009 means timedout
+
             return _temperatures.Values.OrderBy(x => x.ID);
         }
 
         public VectorDescription GetVectorDescription()
         {
             var list = _config.Select(x => new VectorDescriptionItem("double", x[1], DataTypeEnum.Input)).ToList();
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {_title}");
             return new VectorDescription(list, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
         }
 
-        private void LoopForever()
+        protected void LoopForever()
         {
             List<double> numbers = new List<double>();
             List<string> values = new List<string>();
+            DateTime start = DateTime.Now;
             string row = string.Empty;
             int badRow = 0;
 
@@ -97,9 +106,6 @@ namespace CA_DataUploaderLib
                     foreach (var board in _mcuBoards)
                     {
                         row = board.ReadLine();
-                        if (logLevel == LogLevel.Debug)
-                            CALog.LogInfoAndConsoleLn(LogID.A, row);
-
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
                         if (numbers.Count == 18) // old model. 
@@ -109,6 +115,9 @@ namespace CA_DataUploaderLib
                         }
                         else
                             ProcessLine(numbers, hubID++, board);
+
+                        if (logLevel == LogLevel.Debug)
+                            CALog.LogData(LogID.A, MakeDebugString(row) + Environment.NewLine);
                     }
                     badRow = 0;
                     Initialized = true;
@@ -136,6 +145,8 @@ namespace CA_DataUploaderLib
 
             foreach (var board in _mcuBoards)
                 board.Close();
+
+            CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {_title}.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
         }
 
         private void ProcessLine(IEnumerable<double> numbers, int hubID, MCUBoard board)
@@ -234,7 +245,13 @@ namespace CA_DataUploaderLib
             return _frequency.Average();
         }
 
-        private void ShowConfig()
+        private string MakeDebugString(string row)
+        {
+            string filteredValues = string.Join(", ", GetAllValidTemperatures().Select(x => x.Temperature.ToString("N2").PadLeft(8)));
+            return row.Replace("\n", "").PadRight(120).Replace("\r", "Freq=" + Frequency.ToString("N1")) + filteredValues;
+        }
+
+        protected void ShowConfig()
         {
             foreach (var x in _config)
             {
@@ -243,6 +260,8 @@ namespace CA_DataUploaderLib
 
                 CALog.LogInfoAndConsoleLn(LogID.A, "");
             }
+
+            CALog.LogInfoAndConsoleLn(LogID.A, FilterLength.ToString());
         }
 
         public void Dispose()

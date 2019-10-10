@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
@@ -51,8 +47,8 @@ namespace CA_DataUploaderLib
         Pressure = 3,
         AirFlow = 4,
         LiquidFlow = 5, 
-        MotorSpeed = 6
-
+        MotorSpeed = 6,
+        Weight = 7
     }
 
     public enum LogLevel

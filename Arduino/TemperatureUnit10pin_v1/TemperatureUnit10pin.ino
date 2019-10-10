@@ -1,8 +1,7 @@
 /*******************************************************************************
-* Thermocouple to serial for MAX31855 example */
-#define softwareVersion "1.1"
-
-/* Date: 26-12-2011
+* Thermocouple to serial for MAX31855 example 
+* Version: 1.00
+* Date: 26-12-2011
 * Company: Rocket Scream Electronics
 * Website: www.rocketscream.com
 * 
@@ -27,25 +26,18 @@
 * 4.00      10 K-type connectors
 *
 *******************************************************************************/
-
-
 // ***** INCLUDES *****
 #include  "MAX31855.h"
-#include "readEEPROM.h"
 
-
-
-
-const String serialNumber = "11152b8";
+const String serialNumber = "1kki2b8";
 const String boardFamily = "Temperature hubard10";
 const String boardVersion = "1.0";
-const String boardSoftware = "2019-04-05 19:37";
+const String boardSoftware = "2019-08-31 14:37";
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char ChipSelect = 10; 
 const  unsigned  char ClockPin = 9; 
-// int SO[] = {12,11,2,4,6,7,8,18, 13,19,3,5,14,15,16,17}; //18 port
-int SO[] = {12,11,2,4,6,7,8,3,13,5};
+int SO[] = {12,11,2,4,6,7,8,18,13,19};
 bool junction = false;
 String inString = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";    // string to hold user input
 
@@ -147,8 +139,6 @@ double GetInput()
   return -1.0;
 }
 
-
-/*
 void printSerial()
 {
   Serial.print("Serial Number: ");
@@ -159,4 +149,4 @@ void printSerial()
   Serial.println(boardVersion);
   Serial.print("Board Software: ");
   Serial.println(boardSoftware);
-}*/
+}

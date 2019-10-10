@@ -12,17 +12,20 @@ namespace CA_DataUploader
         {
             try
             {
+                CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
+
                 var serial = new SerialNumberMapper(true);
-                var dataLoggers = serial.ByFamily("Temperature");
+                var dataLoggers = serial.ByProductType("Temperature");
                 if (!dataLoggers.Any())
                 {
                     CALog.LogInfoAndConsoleLn(LogID.A, "Tempearture sensors not initialized");
                     return;
                 }
 
-                CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud{Environment.NewLine}From {dataLoggers.Count()} hubarg16 boards"));
+                // close all ports which are not temperature sensors. 
+                serial.McuBoards.ToList().ForEach(x => { if (x.productType.StartsWith("Switch") || x.productType.StartsWith("Relay")) x.Close(); });
 
-                int filterLen = (args.Count() > 1)?int.Parse(args[1]):10;
+                int filterLen = (args.Length > 0)?int.Parse(args[0]):10;
                 using (var usb = new CAThermalBox(dataLoggers, filterLen))
                 using(var cloud = new ServerUploader(usb.GetVectorDescription()))
                 {
@@ -35,7 +38,7 @@ namespace CA_DataUploader
                         if (allSensors.Any())
                         {
                             cloud.SendVector(allSensors.Select(x => x.Temperature).ToList(), AverageSensorTimestamp(allSensors));
-                            CALog.LogInfoAndConsole(LogID.A, $"\r {i}");
+                            Console.Write($"\r {i}"); // we don't want this in the log file. 
                             i += 1;
                         }
 

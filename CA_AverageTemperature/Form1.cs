@@ -21,7 +21,7 @@ namespace CA_AverageTemperature
             InitializeComponent();
 
             var serial = new SerialNumberMapper(true);
-            var dataLoggers = serial.ByFamily("Temperature");
+            var dataLoggers = serial.ByProductType("Temperature");
             if (dataLoggers.Any())
             {
                 timer1.Enabled = true;

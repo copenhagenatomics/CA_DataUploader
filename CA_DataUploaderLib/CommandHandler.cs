@@ -1,28 +1,177 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Threading;
 
 namespace CA_DataUploaderLib
 {
-    public class CommandHandler
+    public class CommandHandler : IDisposable
     {
-        protected string inputCommand = string.Empty;
-        // protected CommandParser _cmdParser = new CommandParser();
 
-        public string InputCommand { get { return inputCommand; } }
+        private bool _running = true;
+        private StringBuilder inputCommand = new StringBuilder();
+        private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
+        private LogLevel _logLevel = IOconf.GetOutputLevel();
 
-        public List<string> GetCommand()
+        public bool IsRunning { get { return _running; } }
+
+        public CommandHandler()
         {
-            while (Console.KeyAvailable)
-                inputCommand += (char)Console.Read();
+            new Thread(() => this.LoopForever()).Start();
+            AddCommand("escape", Stop);
+            AddCommand("help", HelpMenu);
+        }
 
-            if (inputCommand.Length > 0 && inputCommand[inputCommand.Length - 1] == (char)ConsoleKey.Escape)
-                return new List<string> { "Escape" };
+        public void AddCommand(string name, Func<List<string>, bool> func)
+        {
+            if (_commands.ContainsKey(name))
+                _commands[name].Add(func);
+            else
+                _commands.Add(name.ToLower(), new List<Func<List<string>, bool>>{func});
+        }
 
-            if (!inputCommand.Contains(Environment.NewLine))
+        public void Execute(string command)
+        {
+            var cmd = command.Split(' ').Select(x => x.Trim()).ToList();
+            HandleCommand(cmd);
+        }
+
+        private bool Stop(List<string> args)
+        {
+            _running = false;
+            return true;
+        }
+        
+        private void LoopForever()
+        {
+            DateTime start = DateTime.Now;
+            while (_running)
+            {
+                try
+                {
+                    var cmd = GetCommand();
+                    HandleCommand(cmd);
+                }
+                catch (Exception ex)
+                {
+                    CALog.LogErrorAndConsole(LogID.A, ex.ToString());
+                }
+            }
+
+            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
+        }
+
+        private void HandleCommand(List<string> cmd)
+        {
+            if (cmd == null)  // no NewLine
+            {
+                // echo to console here
+                return;
+            }
+
+            CALog.LogInfoAndConsoleLn(LogID.A, ""); // this ensures that next command start on a new line. 
+            if (!cmd.Any())
+            {
+                if(_logLevel == LogLevel.Debug)
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {inputCommand.Replace(Environment.NewLine, "")} - bad command");
+
+                inputCommand.Clear();
+                return;
+            }
+
+            inputCommand.Clear();
+            if (_commands.ContainsKey(cmd.First().ToLower()))
+            {
+                foreach (var func in _commands[cmd.First().ToLower()])
+                {
+                    try
+                    {
+                        if (func.Invoke(cmd))
+                        {
+                            if(_logLevel == LogLevel.Debug)
+                                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - command accepted");
+                        }
+                        else
+                        {
+                            if(_logLevel == LogLevel.Debug)
+                                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - bad command");
+                        }
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        CALog.LogInfoAndConsoleLn(LogID.A, ex.Message);
+                    }
+                }
+
+                if (cmd.First().ToLower() == "help")
+                    CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");  // end help menu divider
+            }
+        }
+
+        private List<string> GetCommand()
+        {
+            var info = Console.ReadKey(true);
+            while (info.Key != ConsoleKey.Enter && info.Key != ConsoleKey.Escape && _running)
+            {
+                Console.Write(info.KeyChar);
+                inputCommand.Append(info.KeyChar);
+                info = Console.ReadKey(true);
+            }
+
+            if (info.Key == ConsoleKey.Escape)
+            {
+                return new List<string> { "escape" };
+            }
+
+            if (info.Key != ConsoleKey.Enter)
                 return null;
 
-            return inputCommand.Split(' ').Select(x => x.Trim()).ToList();
+            return inputCommand.ToString().Split(' ').Select(x => x.Trim()).ToList();
         }
+
+        public static int GetCmdParam(List<string> cmd, int index, int defaultValue)
+        {
+            if (cmd.Count() > index)
+            {
+                int value;
+                if (int.TryParse(cmd[index], out value))
+                    return value;
+            }
+
+            return defaultValue;
+        }
+
+        private bool HelpMenu(List<string> args)
+        {
+            CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");
+            CALog.LogInfoAndConsoleLn(LogID.A, "");
+            CALog.LogInfoAndConsoleLn(LogID.A, "Commands: ");
+            CALog.LogInfoAndConsoleLn(LogID.A, "Esc                       - press Esc key to shut down");
+            CALog.LogInfoAndConsoleLn(LogID.A, "help                      - print the full list of available commands");
+            return true;
+        }
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            _running = false;
+            if (!disposedValue)
+            {
+                disposedValue = true;
+            }
+        }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+        }
+
+        #endregion
+
     }
 }

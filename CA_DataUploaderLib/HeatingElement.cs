@@ -13,6 +13,7 @@ namespace CA_DataUploaderLib
         public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public double onTemperature = 10000;
         public bool IsOn;
+        public double Current;  // Amps per element. 
         public int OffsetSetTemperature = 0;
 
         public bool CanTurnOn(int maxTemperature)
@@ -52,9 +53,9 @@ namespace CA_DataUploaderLib
         {
             string msg = string.Empty;
             foreach (var s in sensors)
-                msg += s.Temperature.ToString("N0") + ", ";
+                msg += s.Temperature.ToString("N0") + ", " + (LastOn > LastOff ? "" : onTemperature.ToString("N0"));
 
-            return $"{SwitchBoard}.{port} is {(LastOn > LastOff ? "ON" : "OFF")}, {msg} {(LastOn > LastOff ? "": onTemperature.ToString("N0"))}";
+            return $"{Name().PadRight(10)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg.PadRight(12)} {Current.ToString("N1").PadRight(5)} Amp";
         }
     }
 }

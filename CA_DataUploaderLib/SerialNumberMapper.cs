@@ -27,8 +27,8 @@ namespace CA_DataUploaderLib
                     SetUnknownSerialNumber(mcu);
                     McuBoards.Add(mcu);
 
-                    if (mcu.boardFamily is null)
-                        mcu.boardFamily = GetStringFromDmesg(mcu.PortName);
+                    if (mcu.productType is null)
+                        mcu.productType = GetStringFromDmesg(mcu.PortName);
 
                     if (debug)
                         CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToString());
@@ -68,7 +68,7 @@ namespace CA_DataUploaderLib
             if (line.StartsWith("+0") || line.StartsWith("-0"))
             {
                 mcu.serialNumber = "Scale1";
-                mcu.boardFamily = "Scale";
+                mcu.productType = "Scale";
             }
 
             if (McuBoards.Any(x => x.serialNumber.StartsWith("Scale")))
@@ -104,13 +104,13 @@ namespace CA_DataUploaderLib
         }
 
         /// <summary>
-        /// Return a list of MCU boards where boardFamily contains the input string. 
+        /// Return a list of MCU boards where productType contains the input string. 
         /// </summary>
-        /// <param name="family">type of boards to look for. (Case sensitive)</param>
+        /// <param name="productType">type of boards to look for. (Case sensitive)</param>
         /// <returns></returns>
-        public List<MCUBoard> ByFamily(string family)
+        public List<MCUBoard> ByProductType(string productType)
         {
-            return McuBoards.Where(x => x.boardFamily != null && x.boardFamily.Contains(family)).ToList();
+            return McuBoards.Where(x => x.productType != null && x.productType.Contains(productType)).ToList();
         }
     }
 }
