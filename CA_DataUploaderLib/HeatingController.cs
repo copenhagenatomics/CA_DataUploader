@@ -19,6 +19,7 @@ namespace CA_DataUploaderLib
         private List<HeaterElement> _heaters = new List<HeaterElement>();
         protected List<MCUBoard> _switchBoxes;
         private CAThermalBox _caThermalBox;
+        private CommandHandler _cmd;
         private int _sendCount = 0;
 
         public HeatingController(CAThermalBox caThermalBox, List<MCUBoard> switchBoxes, CommandHandler cmd, int maxHeaterTemperature)
@@ -26,12 +27,14 @@ namespace CA_DataUploaderLib
             _caThermalBox = caThermalBox;
             _maxHeaterTemperature = maxHeaterTemperature;
             _switchBoxes = switchBoxes;
+            _cmd = cmd;
             TargetTemperature = 0;
 
             new Thread(() => this.LoopForever()).Start();
             cmd.AddCommand("escape", Stop);
             cmd.AddCommand("help", HelpMenu);
             cmd.AddCommand("oven", Oven);
+            cmd.AddCommand("heater", Heater);
 
             for (int i = 0; i < 20; i++)
             {
@@ -44,6 +47,7 @@ namespace CA_DataUploaderLib
         private bool HelpMenu(List<string> args)
         {
             CALog.LogInfoAndConsoleLn(LogID.A, $"oven [0 - 800] [0 - 800]  - where the integer value is the oven temperature top and bottom region");
+            CALog.LogInfoAndConsoleLn(LogID.A, $"heater [name] on/off      - turn the heater with the given name in IO.conf on and off");
             return true;
         }
 
@@ -63,13 +67,24 @@ namespace CA_DataUploaderLib
                 TargetTemperature = topTemp;
                 _heaters.Where(x => x.Name().ToLower().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
                 if (TargetTemperature > 0)
-                    Light(new List<string> { "light", "on" });
+                    _cmd.Execute("light on");
                 else
-                    Light(new List<string> { "light", "off" });
+                    _cmd.Execute("light off");
                 return true;
             }
 
             return false;
+        }
+
+        public bool Heater(List<string> args)
+        {
+            var heater = _heaters.Single(x => x.Name().ToLower() == args[1].ToLower());
+            if (args[2].ToLower() == "on")
+                HeaterOn(heater);
+            else
+                HeaterOff(heater);
+
+            return true;
         }
 
         private void LoopForever()
@@ -208,12 +223,6 @@ namespace CA_DataUploaderLib
             {
                 throw new TimeoutException($"Unable to write to {box.serialNumber} {box.productType}");
             }
-        }
-
-        protected virtual bool Light(List<string> cmd)
-        {
-            // do nothing, you can override.
-            return false;
         }
 
         private void CheckForNewThermocouplers()
