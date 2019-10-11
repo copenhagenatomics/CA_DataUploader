@@ -46,8 +46,8 @@ namespace CA_DataUploaderLib
 
         private bool HelpMenu(List<string> args)
         {
-            CALog.LogInfoAndConsoleLn(LogID.A, $"oven [0 - 800] [0 - 800]  - where the integer value is the oven temperature top and bottom region");
             CALog.LogInfoAndConsoleLn(LogID.A, $"heater [name] on/off      - turn the heater with the given name in IO.conf on and off");
+            CALog.LogInfoAndConsoleLn(LogID.A, $"oven [0 - 800] [0 - 800]  - where the integer value is the oven temperature top and bottom region");
             return true;
         }
 
@@ -78,7 +78,10 @@ namespace CA_DataUploaderLib
 
         public bool Heater(List<string> args)
         {
-            var heater = _heaters.Single(x => x.Name().ToLower() == args[1].ToLower());
+            var heater = _heaters.SingleOrDefault(x => x.Name().ToLower() == args[1].ToLower());
+            if (heater == null)
+                return false;
+
             if (args[2].ToLower() == "on")
                 HeaterOn(heater);
             else
@@ -190,7 +193,7 @@ namespace CA_DataUploaderLib
         private void AllOff()
         {
             foreach (var box in _switchBoxes)
-                box.WriteLine("off");
+                box.SafeWriteLine("off");
 
             CALog.LogInfoAndConsoleLn(LogID.A, "All heaters are off");
         }
@@ -201,7 +204,7 @@ namespace CA_DataUploaderLib
             try
             {
                 box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
-                box.WriteLine($"p{heater.port} off");
+                box.SafeWriteLine($"p{heater.port} off");
                 CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
@@ -216,7 +219,7 @@ namespace CA_DataUploaderLib
             try
             {
                 box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
-                box.WriteLine($"p{heater.port} on {HeaterOnTimeout}");
+                box.SafeWriteLine($"p{heater.port} on {HeaterOnTimeout}");
                 CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
             }
             catch (TimeoutException)

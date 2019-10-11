@@ -8,6 +8,8 @@ namespace CA_DataUploaderLib
 {
     public class MCUBoard : SerialPort
     {
+        private int _safeLimit = 100;
+
         public string serialNumber = null;
         public const string serialNumberHeader = "Serial Number: ";
 
@@ -79,6 +81,60 @@ namespace CA_DataUploaderLib
         public override string ToString()
         {
             return ToString(Environment.NewLine);
+        }
+
+        public string SafeReadLine()
+        {
+            try
+            {
+                if (IsOpen)
+                return ReadLine();
+
+                Thread.Sleep(100);
+                Open();
+
+                if (IsOpen)
+                    return ReadLine();
+
+            }
+            catch (Exception)
+            {
+                CALog.LogErrorAndConsole(LogID.A, $"Unable to write to serial port: {PortName}");
+                if (_safeLimit-- == 0) throw;
+            }
+            return string.Empty;
+        }
+
+        public void SafeWriteLine(string msg)
+        {
+            try
+            { 
+                if (IsOpen)
+                {
+                    WriteLine(msg);
+                    return;
+                }
+
+                Thread.Sleep(100);
+                Open();
+
+                if (IsOpen)
+                {
+                    WriteLine(msg);
+                    return;
+                }
+            }
+            catch (Exception)
+            {
+                CALog.LogErrorAndConsole(LogID.A, $"Unable to write to serial port: {PortName} {mcuFamily} {serialNumber}");
+                if (_safeLimit-- == 0) throw;
+            };
+        }
+
+        public void SafeClose()
+        {
+            if (IsOpen)
+                Close();
         }
 
         public string ToString(string seperator)

@@ -40,7 +40,7 @@ namespace ShowAvailableComPorts
             while (_running)
             {
                 if (_selectedBoard != null && _selectedBoard.IsOpen)
-                    SetText(_selectedBoard.ReadLine());
+                    SetText(_selectedBoard.SafeReadLine());
 
                 Thread.Sleep(50);
             }
@@ -63,7 +63,7 @@ namespace ShowAvailableComPorts
         {
             _running = false;
             foreach (var port in _ports.McuBoards)
-                port.Close();
+                port.SafeClose();
         }
 
         private void textBox1_KeyPress(object sender, KeyPressEventArgs e)

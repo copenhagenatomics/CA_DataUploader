@@ -64,7 +64,7 @@ namespace CA_DataUploaderLib
             if (!mcu.IsOpen)
                 return false;
 
-            var line = mcu.ReadLine();
+            var line = mcu.SafeReadLine();
             if (line.StartsWith("+0") || line.StartsWith("-0"))
             {
                 mcu.serialNumber = "Scale1";

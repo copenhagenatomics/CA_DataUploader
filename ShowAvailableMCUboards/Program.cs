@@ -14,11 +14,8 @@ namespace ShowAvailableMCUboards
                 Console.WriteLine("--------------------------------------------");
                 Console.WriteLine(board.ToString(Environment.NewLine));
 
-                if(board.IsOpen)
-                {
-                    for(int i=0; i<4; i++)
-                        Console.WriteLine(board.ReadLine());
-                }
+                for(int i=0; i<4; i++)
+                    Console.WriteLine(board.SafeReadLine());
             }
         }
     }

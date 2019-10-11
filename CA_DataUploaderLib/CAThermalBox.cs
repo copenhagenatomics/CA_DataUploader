@@ -105,7 +105,7 @@ namespace CA_DataUploaderLib
                     int hubID = 0;
                     foreach (var board in _mcuBoards)
                     {
-                        row = board.ReadLine();
+                        row = board.SafeReadLine();
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
                         if (numbers.Count == 18) // old model. 
@@ -144,7 +144,7 @@ namespace CA_DataUploaderLib
             }
 
             foreach (var board in _mcuBoards)
-                board.Close();
+                board.SafeClose();
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {_title}.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
         }
