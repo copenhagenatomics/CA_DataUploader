@@ -23,7 +23,7 @@ namespace CA_DataUploader
                 }
 
                 // close all ports which are not temperature sensors. 
-                serial.McuBoards.ToList().ForEach(x => { if (x.productType.StartsWith("Switch") || x.productType.StartsWith("Relay")) x.Close(); });
+                serial.McuBoards.ToList().ForEach(x => { if (x.productType.StartsWith("Switch") || x.productType.StartsWith("Relay")) x.SafeClose(); });
 
                 int filterLen = (args.Length > 0)?int.Parse(args[0]):10;
                 using (var cmd = new CommandHandler())

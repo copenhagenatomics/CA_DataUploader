@@ -22,7 +22,7 @@ namespace UnitTests
                 string str = string.Empty;
                 foreach(var scale in list)
                 {
-                    str += scale.ReadLine().Replace("\r", "      ");
+                    str += scale.SafeReadLine().Replace("\r", "      ");
                 }
 
                 Debug.Print(str);
