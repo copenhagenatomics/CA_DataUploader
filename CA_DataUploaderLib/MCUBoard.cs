@@ -99,7 +99,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception)
             {
-                CALog.LogErrorAndConsole(LogID.A, $"Unable to write to serial port: {PortName}");
+                CALog.LogErrorAndConsole(LogID.A, $"Unable to read from serial port: {PortName} {productType} {serialNumber}");
                 if (_safeLimit-- == 0) throw;
             }
             return string.Empty;
@@ -126,7 +126,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception)
             {
-                CALog.LogErrorAndConsole(LogID.A, $"Unable to write to serial port: {PortName} {mcuFamily} {serialNumber}");
+                CALog.LogErrorAndConsole(LogID.A, $"Unable to write to serial port: {PortName} {productType} {serialNumber}");
                 if (_safeLimit-- == 0) throw;
             };
         }
@@ -140,6 +140,11 @@ namespace CA_DataUploaderLib
         public string ToString(string seperator)
         {
             return $"Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}Port open timestamp (UTC): {PortOpenTimeStamp}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
+        }
+
+        public string ToStringSimple(string seperator)
+        {
+            return $"{PortName}{seperator}{serialNumber}{seperator}{productType}";
         }
 
         private void ReadSerialNumber()

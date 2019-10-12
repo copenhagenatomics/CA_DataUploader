@@ -5,18 +5,24 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO.Ports;
 using System.Linq;
+using System.Management;
 
 namespace CA_DataUploaderLib
 {
-    public class SerialNumberMapper
+    public class SerialNumberMapper : IDisposable
     {
-        public ObservableCollection<MCUBoard> McuBoards = new ObservableCollection<MCUBoard>();
-        // private SerialPortWatcher _watcher = new SerialPortWatcher();
+        public List<MCUBoard> McuBoards = new List<MCUBoard>();
+        private static string[] _serialPorts = SerialPort.GetPortNames();
+
+        private static ManagementEventWatcher arrival;
+
+        private static ManagementEventWatcher removal;
+
+        public event EventHandler<PortsChangedArgs> PortsChanged;
 
         public SerialNumberMapper(bool debug)
         {
-            string[] ports = SerialPort.GetPortNames();
-            foreach (string name in ports)
+            foreach (string name in _serialPorts)
             {
                 try
                 {
@@ -32,6 +38,8 @@ namespace CA_DataUploaderLib
 
                     if (debug)
                         CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToString());
+
+                    MonitorDeviceChanges();
                 }
                 catch(UnauthorizedAccessException ex)
                 {
@@ -43,8 +51,9 @@ namespace CA_DataUploaderLib
                 }
             }
 
+            
         }
-
+        
         private void SetUnknownSerialNumber(MCUBoard mcu)
         {
             if (mcu.serialNumber.IsNullOrEmpty())
@@ -111,6 +120,95 @@ namespace CA_DataUploaderLib
         public List<MCUBoard> ByProductType(string productType)
         {
             return McuBoards.Where(x => x.productType != null && x.productType.Contains(productType)).ToList();
+        }
+
+        private void MonitorDeviceChanges()
+        {
+            try
+            {
+                var deviceArrivalQuery = new WqlEventQuery("SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 2");
+                var deviceRemovalQuery = new WqlEventQuery("SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 3");
+
+                arrival = new ManagementEventWatcher(deviceArrivalQuery);
+                removal = new ManagementEventWatcher(deviceRemovalQuery);
+
+                arrival.EventArrived += (o, args) => RaisePortsChangedIfNecessary(EventType.Insertion);
+                removal.EventArrived += (sender, eventArgs) => RaisePortsChangedIfNecessary(EventType.Removal);
+
+                // Start listening for events
+                arrival.Start();
+                removal.Start();
+            }
+            catch (ManagementException err)
+            {
+
+            }
+        }
+
+        private void RaisePortsChangedIfNecessary(EventType eventType)
+        {
+            try
+            {
+                lock (_serialPorts)
+                {
+                    var availableSerialPorts = SerialPort.GetPortNames();
+                    var newPorts = availableSerialPorts.Except(_serialPorts);
+                    var removedPorts = _serialPorts.Except(availableSerialPorts);
+                    if (!_serialPorts.SequenceEqual(availableSerialPorts))
+                    {
+                        _serialPorts = availableSerialPorts;
+                        if(newPorts.Any())
+                            PortsChanged?.Invoke(this, new PortsChangedArgs(eventType, McuBoards.Where(x => newPorts.Contains(x.PortName))));
+                        else
+                            PortsChanged?.Invoke(this, new PortsChangedArgs(eventType, McuBoards.Where(x => removedPorts.Contains(x.PortName))));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Serial port error: " + ex.ToString());
+            }
+        }
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            arrival.Stop();
+            removal.Stop();
+            if (!disposedValue)
+            {
+                disposedValue = true;
+            }
+        }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+        }
+
+        #endregion
+    }
+
+    public enum EventType
+    {
+        Insertion,
+        Removal,
+    }
+
+    public class PortsChangedArgs : EventArgs
+    {
+        public EventType EventType { get; private set; }
+
+        public List<MCUBoard> MCUBoards { get; private set; }
+
+        public PortsChangedArgs(EventType eventType, IEnumerable<MCUBoard> mcuBoards)
+        {
+            EventType = eventType;
+            MCUBoards = mcuBoards.ToList();
         }
     }
 }

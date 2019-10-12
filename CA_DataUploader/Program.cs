@@ -14,40 +14,42 @@ namespace CA_DataUploader
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
 
-                var serial = new SerialNumberMapper(true);
-                var dataLoggers = serial.ByProductType("Temperature");
-                if (!dataLoggers.Any())
+                using (var serial = new SerialNumberMapper(true))
                 {
-                    CALog.LogInfoAndConsoleLn(LogID.A, "Tempearture sensors not initialized");
-                    return;
-                }
-
-                // close all ports which are not temperature sensors. 
-                serial.McuBoards.ToList().ForEach(x => { if (x.productType.StartsWith("Switch") || x.productType.StartsWith("Relay")) x.SafeClose(); });
-
-                int filterLen = (args.Length > 0)?int.Parse(args[0]):10;
-                using (var cmd = new CommandHandler())
-                using (var usb = new CAThermalBox(dataLoggers, cmd, filterLen))
-                using(var cloud = new ServerUploader(usb.GetVectorDescription()))
-                {
-                    CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server");
-
-                    int i = 0;
-                    while (cmd.IsRunning)
+                    var dataLoggers = serial.ByProductType("Temperature");
+                    if (!dataLoggers.Any())
                     {
-                        var allSensors = usb.GetAllValidTemperatures().OrderBy(x => x.ID).ToList();
-                        if (allSensors.Any())
-                        {
-                            cloud.SendVector(allSensors.Select(x => x.Temperature).ToList(), AverageSensorTimestamp(allSensors));
-                            Console.Write($"\r {i}"); // we don't want this in the log file. 
-                            i += 1;
-                        }
+                        CALog.LogInfoAndConsoleLn(LogID.A, "Tempearture sensors not initialized");
+                        return;
+                    }
+                    serial.PortsChanged += Serial_PortsChanged;
 
-                        Thread.Sleep(100);
-                        if (i==20) CALog.LogInfoAndConsoleLn(LogID.A, cloud.PrintMyPlots());
+                    // close all ports which are not temperature sensors. 
+                    serial.McuBoards.ToList().ForEach(x => { if (x.productType.StartsWith("Switch") || x.productType.StartsWith("Relay")) x.SafeClose(); });
+
+                    int filterLen = (args.Length > 0) ? int.Parse(args[0]) : 10;
+                    using (var cmd = new CommandHandler())
+                    using (var usb = new CAThermalBox(dataLoggers, cmd, filterLen))
+                    using (var cloud = new ServerUploader(usb.GetVectorDescription()))
+                    {
+                        CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server");
+
+                        int i = 0;
+                        while (cmd.IsRunning)
+                        {
+                            var allSensors = usb.GetAllValidTemperatures().OrderBy(x => x.ID).ToList();
+                            if (allSensors.Any())
+                            {
+                                cloud.SendVector(allSensors.Select(x => x.Temperature).ToList(), AverageSensorTimestamp(allSensors));
+                                Console.Write($"\r {i}"); // we don't want this in the log file. 
+                                i += 1;
+                            }
+
+                            Thread.Sleep(100);
+                            if (i == 20) CALog.LogInfoAndConsoleLn(LogID.A, cloud.PrintMyPlots());
+                        }
                     }
                 }
-
                 CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
             }
             catch (Exception ex)
@@ -56,6 +58,12 @@ namespace CA_DataUploader
             }
 
             Console.ReadKey();
+        }
+
+        private static void Serial_PortsChanged(object sender, PortsChangedArgs e)
+        {
+            foreach (var p in e.MCUBoards)
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Serial port {(e.EventType == EventType.Insertion?"inserted":"removed")}: {p.ToStringSimple(" ")}");
         }
 
         private static DateTime AverageSensorTimestamp(IEnumerable<TermoSensor> allTermoSensors)
