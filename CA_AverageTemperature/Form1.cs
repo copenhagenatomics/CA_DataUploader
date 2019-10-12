@@ -10,7 +10,7 @@ namespace CA_AverageTemperature
 {
     public partial class Form1 : Form
     {
-        private CAThermalBox _hub;
+        private BaseSensorBox _hub;
         private Font _fontNormal;
         private Font _fontSmall;
         private Bitmap _currentBmp;
@@ -25,7 +25,7 @@ namespace CA_AverageTemperature
             if (dataLoggers.Any())
             {
                 timer1.Enabled = true;
-                _hub = new CAThermalBox(dataLoggers);
+                _hub = new BaseSensorBox(dataLoggers);
             }
             else
             {
@@ -66,7 +66,7 @@ namespace CA_AverageTemperature
             g.FillRectangle(Brushes.LightGray, 0, 0, width, height);
             foreach(var jack in list)
             {
-                if (jack.Sensor.Temperature < 1000)
+                if (jack.Sensor.Value < 1000)
                 {
                     g.FillRectangle(Brushes.LightGreen, jack.Rect);
                     g.DrawString(jack.Text, _fontNormal, Brushes.Black, jack.TextPos, _format);

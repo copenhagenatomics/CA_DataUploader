@@ -29,7 +29,7 @@ namespace CA_DataUploader
 
                     int filterLen = (args.Length > 0) ? int.Parse(args[0]) : 10;
                     using (var cmd = new CommandHandler())
-                    using (var usb = new CAThermalBox(dataLoggers, cmd, filterLen))
+                    using (var usb = new BaseSensorBox(dataLoggers, cmd, filterLen))
                     using (var cloud = new ServerUploader(usb.GetVectorDescription()))
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server");
@@ -40,7 +40,7 @@ namespace CA_DataUploader
                             var allSensors = usb.GetAllValidTemperatures().OrderBy(x => x.ID).ToList();
                             if (allSensors.Any())
                             {
-                                cloud.SendVector(allSensors.Select(x => x.Temperature).ToList(), AverageSensorTimestamp(allSensors));
+                                cloud.SendVector(allSensors.Select(x => x.Value).ToList(), AverageSensorTimestamp(allSensors));
                                 Console.Write($"\r {i}"); // we don't want this in the log file. 
                                 i += 1;
                             }
@@ -66,7 +66,7 @@ namespace CA_DataUploader
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Serial port {(e.EventType == EventType.Insertion?"inserted":"removed")}: {p.ToStringSimple(" ")}");
         }
 
-        private static DateTime AverageSensorTimestamp(IEnumerable<TermoSensor> allTermoSensors)
+        private static DateTime AverageSensorTimestamp(IEnumerable<SensorSample> allTermoSensors)
         {
             return new DateTime((long)allTermoSensors.Average(x => (double)x.TimeStamp.Ticks));
         }
