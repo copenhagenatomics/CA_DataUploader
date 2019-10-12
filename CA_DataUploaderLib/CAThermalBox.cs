@@ -5,6 +5,7 @@ using System.Threading;
 using System.Globalization;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Text;
 
 namespace CA_DataUploaderLib
 {
@@ -99,17 +100,15 @@ namespace CA_DataUploaderLib
 
         private bool ShowQueue(List<string> args)
         {
-            foreach (var t in _temperatures.Values)
+            var sb = new StringBuilder();
+            foreach (var t in _temperatures.OrderBy(x => x.Key).Select(x => x.Value))
             {
-                CALog.LogInfoAndConsole(LogID.A, $"{t.Name}={t.Temperature.ToString("N2").PadLeft(6)}  ");
-                foreach (var val in _filterQueue)
-                {
-                    _filterQueue[t.Key].ToList().ForEach(x => CALog.LogInfoAndConsole(LogID.A, ", " + x.ToString("N2").PadLeft(6)));
-                }
-
-                CALog.LogInfoAndConsoleLn(LogID.A, "");
+                sb.Append($"{t.Name.PadRight(22)}={t.Temperature.ToString("N2").PadLeft(9)}  ");
+                _filterQueue[t.Key].ToList().ForEach(x => sb.Append(", " + x.ToString("N2").PadLeft(9)));
+                sb.Append(Environment.NewLine);
             }
 
+            CALog.LogInfoAndConsoleLn(LogID.A, sb.ToString());
             return true;
         }
 
