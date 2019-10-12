@@ -33,12 +33,14 @@ namespace CA_DataUploaderLib
         /// </summary>
         /// <param name="boards">Input a number of boards with temperature sensors </param>
         /// <param name="filterLength">1 = not filtering, larger than 1 = filtering and removing 10000 errors. </param>
-        public CAThermalBox(List<MCUBoard> boards, int filterLength = 1)
+        public CAThermalBox(List<MCUBoard> boards, CommandHandler cmd = null, int filterLength = 1)
         {
             Initialized = false;
             FilterLength = filterLength;
             _mcuBoards = boards.OrderBy(x => x.serialNumber).ToList();
             _config = IOconf.GetInTypeK().ToList();
+            cmd.AddCommand("Temperatures", ShowQueue);
+            cmd.AddCommand("help", HelpMenu);
 
             if (IOconf.GetOutputLevel() == LogLevel.Debug)
                 ShowConfig();
@@ -87,6 +89,28 @@ namespace CA_DataUploaderLib
             var list = _config.Select(x => new VectorDescriptionItem("double", x[1], DataTypeEnum.Input)).ToList();
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {_title}");
             return new VectorDescription(list, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
+        }
+
+        private bool HelpMenu(List<string> args)
+        {
+            CALog.LogInfoAndConsoleLn(LogID.A, $"temperatures              - show all temperatures in input queue");
+            return true;
+        }
+
+        private bool ShowQueue(List<string> args)
+        {
+            foreach (var t in _temperatures.Values)
+            {
+                CALog.LogInfoAndConsole(LogID.A, $"{t.Name}={t.Temperature.ToString("N2").PadLeft(6)}  ");
+                foreach (var val in _filterQueue)
+                {
+                    _filterQueue[t.Key].ToList().ForEach(x => CALog.LogInfoAndConsole(LogID.A, ", " + x.ToString("N2").PadLeft(6)));
+                }
+
+                CALog.LogInfoAndConsoleLn(LogID.A, "");
+            }
+
+            return true;
         }
 
         protected void LoopForever()

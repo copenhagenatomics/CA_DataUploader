@@ -25,7 +25,7 @@ namespace CA_AverageTemperature
             if (dataLoggers.Any())
             {
                 timer1.Enabled = true;
-                _hub = new CAThermalBox(dataLoggers, 1);
+                _hub = new CAThermalBox(dataLoggers);
             }
             else
             {

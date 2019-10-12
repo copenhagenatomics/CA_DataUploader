@@ -26,13 +26,14 @@ namespace CA_DataUploader
                 serial.McuBoards.ToList().ForEach(x => { if (x.productType.StartsWith("Switch") || x.productType.StartsWith("Relay")) x.Close(); });
 
                 int filterLen = (args.Length > 0)?int.Parse(args[0]):10;
-                using (var usb = new CAThermalBox(dataLoggers, filterLen))
+                using (var cmd = new CommandHandler())
+                using (var usb = new CAThermalBox(dataLoggers, cmd, filterLen))
                 using(var cloud = new ServerUploader(usb.GetVectorDescription()))
                 {
                     CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server");
 
                     int i = 0;
-                    while (!UserPressedEscape())
+                    while (cmd.IsRunning)
                     {
                         var allSensors = usb.GetAllValidTemperatures().OrderBy(x => x.ID).ToList();
                         if (allSensors.Any())
@@ -55,16 +56,6 @@ namespace CA_DataUploader
             }
 
             Console.ReadKey();
-        }
-
-
-
-        private static bool UserPressedEscape()
-        {
-            if (!Console.KeyAvailable)
-                return false;
-
-            return Console.ReadKey(true).Key == ConsoleKey.Escape;
         }
 
         private static DateTime AverageSensorTimestamp(IEnumerable<TermoSensor> allTermoSensors)
