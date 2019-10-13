@@ -169,7 +169,7 @@ namespace CA_DataUploaderLib
             return output;
         }
 
-        private static bool IsWindows()
+        public static bool IsWindows()
         {
             return _OS.Platform.ToString().StartsWith("Win");
         }
