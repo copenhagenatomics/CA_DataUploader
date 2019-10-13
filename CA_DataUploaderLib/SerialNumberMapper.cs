@@ -124,6 +124,9 @@ namespace CA_DataUploaderLib
 
         private void MonitorDeviceChanges()
         {
+            if (!RpiVersion.IsWindows())
+                return;
+
             try
             {
                 var deviceArrivalQuery = new WqlEventQuery("SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 2");

@@ -66,7 +66,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CAThermalBox.cs" />
+    <Compile Include="BaseSensorBox.cs" />
     <Compile Include="CommandHandler.cs" />
     <Compile Include="DataVector.cs" />
     <Compile Include="Enums.cs" />
@@ -84,7 +84,7 @@
     <Compile Include="SerialNumberMapper.cs" />
     <Compile Include="SerialPortWatcher.cs" />
     <Compile Include="ServerUploader.cs" />
-    <Compile Include="TermoSensor.cs" />
+    <Compile Include="SensorSample.cs" />
     <Compile Include="VectorDescription.cs" />
   </ItemGroup>
   <ItemGroup>

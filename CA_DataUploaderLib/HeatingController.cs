@@ -11,18 +11,18 @@ namespace CA_DataUploaderLib
     {
         public int TargetTemperature { get; set; }
 
-        public List<TermoSensor> ValidHatSensors { get; private set; }
+        public List<SensorSample> ValidHatSensors { get; private set; }
         public double Voltage = 230;
         public int HeaterOnTimeout = 60;
         private int _maxHeaterTemperature;
         private bool _running = true;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
         protected List<MCUBoard> _switchBoxes;
-        private CAThermalBox _caThermalBox;
+        private BaseSensorBox _caThermalBox;
         private CommandHandler _cmd;
         private int _sendCount = 0;
 
-        public HeatingController(CAThermalBox caThermalBox, List<MCUBoard> switchBoxes, CommandHandler cmd, int maxHeaterTemperature)
+        public HeatingController(BaseSensorBox caThermalBox, List<MCUBoard> switchBoxes, CommandHandler cmd, int maxHeaterTemperature)
         {
             _caThermalBox = caThermalBox;
             _maxHeaterTemperature = maxHeaterTemperature;

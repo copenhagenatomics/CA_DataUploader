@@ -6,13 +6,13 @@ namespace CA_AverageTemperature
 {
     public class JackRectangle
     {
-        public TermoSensor Sensor;
+        public SensorSample Sensor;
         public Rectangle Rect;
         public Point TextPos;
         public Point TitlePos;
         public Point SerialPos;
 
-        public JackRectangle(TermoSensor sensor, double width, double height)
+        public JackRectangle(SensorSample sensor, double width, double height)
         {
             Sensor = sensor;
             int x = (int)(((16- sensor.Jack) % 8 + 0.5) * width);
@@ -34,7 +34,7 @@ namespace CA_AverageTemperature
             TextPos.Y += Rect.Height / 2;
         }
 
-        public string Text { get { return Sensor.Temperature<1000?Sensor.Temperature.ToString("N1"): Sensor.Temperature.ToString("N0");  } }
+        public string Text { get { return Sensor.Value < 1000?Sensor.Value.ToString("N1"): Sensor.Value.ToString("N0");  } }
 
         public override string ToString()
         {

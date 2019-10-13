@@ -9,7 +9,7 @@ using System.Text;
 
 namespace CA_DataUploaderLib
 {
-    public class CAThermalBox : IDisposable
+    public class BaseSensorBox : IDisposable
     {
         protected List<MCUBoard> _mcuBoards;
         private const int TEMPERATURE_FAULT = 10000;
@@ -18,7 +18,7 @@ namespace CA_DataUploaderLib
         public double Frequency { get; private set; }
 
         protected string _title = "CAThermalBox"; 
-        protected ConcurrentDictionary<string, TermoSensor> _temperatures = new ConcurrentDictionary<string, TermoSensor>();
+        protected ConcurrentDictionary<string, SensorSample> _values = new ConcurrentDictionary<string, SensorSample>();
         private Dictionary<string, Queue<double>> _filterQueue = new Dictionary<string, Queue<double>>();
         private Queue<double> _frequency = new Queue<double>();
         private List<HeaterElement> heaters = new List<HeaterElement>();
@@ -27,14 +27,14 @@ namespace CA_DataUploaderLib
 
         public bool Initialized { get; protected set; }
 
-        public CAThermalBox() { }
+        public BaseSensorBox() { }
 
         /// <summary>
         /// Constructor: 
         /// </summary>
         /// <param name="boards">Input a number of boards with temperature sensors </param>
         /// <param name="filterLength">1 = not filtering, larger than 1 = filtering and removing 10000 errors. </param>
-        public CAThermalBox(List<MCUBoard> boards, CommandHandler cmd = null, int filterLength = 1)
+        public BaseSensorBox(List<MCUBoard> boards, CommandHandler cmd = null, int filterLength = 1)
         {
             Initialized = false;
             FilterLength = filterLength;
@@ -52,37 +52,37 @@ namespace CA_DataUploaderLib
                 CALog.LogErrorAndConsole(LogID.A, "Type K thermocouple config information is missing in IO.conf");
         }
 
-        public TermoSensor GetValue(string sensorID)
+        public SensorSample GetValue(string sensorID)
         {
             if (!_config.Any(x => x[3] == sensorID))
                 throw new Exception(sensorID + " sensorID not found in _config, count: " + _config.Count());
 
-            if (!_temperatures.ContainsKey(sensorID))
-                throw new Exception(sensorID + " sensorID not found in _temperatures, count: " + _temperatures.Count());
+            if (!_values.ContainsKey(sensorID))
+                throw new Exception(sensorID + " sensorID not found in _temperatures, count: " + _values.Count());
 
-            return _temperatures[sensorID];
+            return _values[sensorID];
         }
 
-        public TermoSensor GetValueByTitle(string title)
+        public SensorSample GetValueByTitle(string title)
         {
             if (!_config.Any(x => x[1] == title))
                 throw new Exception(title + " not found in _config, count: " + _config.Count());
 
-            var temp = _temperatures.Values.SingleOrDefault(x => x.Name == title);
+            var temp = _values.Values.SingleOrDefault(x => x.Name == title);
             if (temp == null)
-                throw new Exception(title + " not found in _temperatures, count: " + _temperatures.Count());
+                throw new Exception(title + " not found in _temperatures, count: " + _values.Count());
 
             return temp;
         }
 
-        public IEnumerable<TermoSensor> GetAllValidTemperatures()
+        public IEnumerable<SensorSample> GetAllValidTemperatures()
         {
             var removeBefore = DateTime.UtcNow.AddSeconds(-2);
-            var timedOutSensors = _temperatures.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Value).ToList();
+            var timedOutSensors = _values.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Value).ToList();
             if(!Debugger.IsAttached)
-                timedOutSensors.ForEach(x => x.Temperature = (x.Temperature < 10000 ? 10009 : x.Temperature)); // 10009 means timedout
+                timedOutSensors.ForEach(x => x.Value = (x.Value < 10000 ? 10009 : x.Value)); // 10009 means timedout
 
-            return _temperatures.Values.OrderBy(x => x.ID);
+            return _values.Values.OrderBy(x => x.ID);
         }
 
         public VectorDescription GetVectorDescription()
@@ -101,9 +101,9 @@ namespace CA_DataUploaderLib
         protected bool ShowQueue(List<string> args)
         {
             var sb = new StringBuilder();
-            foreach (var t in _temperatures.OrderBy(x => x.Key).Select(x => x.Value))
+            foreach (var t in _values.OrderBy(x => x.Key).Select(x => x.Value))
             {
-                sb.Append($"{t.Name.PadRight(22)}={t.Temperature.ToString("N2").PadLeft(9)}  ");
+                sb.Append($"{t.Name.PadRight(22)}={t.Value.ToString("N2").PadLeft(9)}  ");
                 if(_filterQueue.ContainsKey(t.Key))
                     _filterQueue[t.Key].ToList().ForEach(x => sb.Append(", " + x.ToString("N2").PadLeft(9)));
                 sb.Append(Environment.NewLine);
@@ -183,23 +183,23 @@ namespace CA_DataUploaderLib
                 var sensor = GetSensor(hubID, i);
                 if (sensor.row != null)
                 {
-                    if (_temperatures.ContainsKey(sensor.key))
+                    if (_values.ContainsKey(sensor.key))
                     {
                         if (sensor.readJunction)
                         {
-                            _temperatures[sensor.key].Junction = value;
+                            _values[sensor.key].Reference = value;
                         }
                         else
                         {
-                            Frequency = FrequencyLowPassFilter(timestamp.Subtract(_temperatures[sensor.key].TimeStamp));
-                            _temperatures[sensor.key].TimeStamp = timestamp;
-                            _temperatures[sensor.key].Temperature = (FilterLength > 1) ? LowPassFilter(value, sensor.key) : value;
+                            Frequency = FrequencyLowPassFilter(timestamp.Subtract(_values[sensor.key].TimeStamp));
+                            _values[sensor.key].TimeStamp = timestamp;
+                            _values[sensor.key].Value = (FilterLength > 1) ? LowPassFilter(value, sensor.key) : value;
                         }
                     }
                     else
                     {
                         Debug.Assert(sensor.readJunction == false);
-                        _temperatures.TryAdd(sensor.key, new TermoSensor(_config.IndexOf(sensor.row), sensor.row[1], GetHeater(sensor.row)) { Temperature = value, TimeStamp = timestamp, Key = sensor.key, Board = board });
+                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.row), sensor.row[1], GetHeater(sensor.row)) { Value = value, TimeStamp = timestamp, Key = sensor.key, Board = board });
                         if (FilterLength > 1)
                         {
                             _filterQueue.Add(sensor.key, new Queue<double>());
@@ -261,7 +261,7 @@ namespace CA_DataUploaderLib
         {
             _frequency.Enqueue(1.0/ts.TotalSeconds);
 
-            while (_frequency.Count() > _temperatures.Count() * 10)
+            while (_frequency.Count() > _values.Count() * 10)
             {
                 _frequency.Dequeue();
             }
@@ -271,7 +271,7 @@ namespace CA_DataUploaderLib
 
         private string MakeDebugString(string row)
         {
-            string filteredValues = string.Join(", ", GetAllValidTemperatures().Select(x => x.Temperature.ToString("N2").PadLeft(8)));
+            string filteredValues = string.Join(", ", GetAllValidTemperatures().Select(x => x.Value.ToString("N2").PadLeft(8)));
             return row.Replace("\n", "").PadRight(120).Replace("\r", "Freq=" + Frequency.ToString("N1")) + filteredValues;
         }
 
