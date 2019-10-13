@@ -98,13 +98,14 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private bool ShowQueue(List<string> args)
+        protected bool ShowQueue(List<string> args)
         {
             var sb = new StringBuilder();
             foreach (var t in _temperatures.OrderBy(x => x.Key).Select(x => x.Value))
             {
                 sb.Append($"{t.Name.PadRight(22)}={t.Temperature.ToString("N2").PadLeft(9)}  ");
-                _filterQueue[t.Key].ToList().ForEach(x => sb.Append(", " + x.ToString("N2").PadLeft(9)));
+                if(_filterQueue.ContainsKey(t.Key))
+                    _filterQueue[t.Key].ToList().ForEach(x => sb.Append(", " + x.ToString("N2").PadLeft(9)));
                 sb.Append(Environment.NewLine);
             }
 
