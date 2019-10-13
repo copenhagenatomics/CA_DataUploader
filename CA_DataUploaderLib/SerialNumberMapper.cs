@@ -122,6 +122,8 @@ namespace CA_DataUploaderLib
             return McuBoards.Where(x => x.productType != null && x.productType.Contains(productType)).ToList();
         }
 
+        // Mono: Exception: System.NotImplementedException: The method or operation is not implemented.
+        // Mono: /build/mono-5.18.0.268/mcs/class/System.Management/System.Management/EventQuery.cs:38
         private void MonitorDeviceChanges()
         {
             if (!RpiVersion.IsWindows())
@@ -178,8 +180,8 @@ namespace CA_DataUploaderLib
 
         protected virtual void Dispose(bool disposing)
         {
-            arrival.Stop();
-            removal.Stop();
+            if(arrival != null) arrival.Stop();
+            if(removal != null) removal.Stop();
             if (!disposedValue)
             {
                 disposedValue = true;
