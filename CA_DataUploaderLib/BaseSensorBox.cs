@@ -103,7 +103,6 @@ namespace CA_DataUploaderLib
 
         protected bool ShowQueue(List<string> args)
         {
-            _cmdHandler.AssertArgs(args, 1);
             var sb = new StringBuilder();
             foreach (var t in _values.OrderBy(x => x.Key).Select(x => x.Value))
             {

@@ -19,7 +19,7 @@ namespace CA_DataUploaderLib
         private List<HeaterElement> _heaters = new List<HeaterElement>();
         protected List<MCUBoard> _switchBoxes;
         private BaseSensorBox _caThermalBox;
-        private CommandHandler _cmd;
+        protected CommandHandler _cmdHandler;
         private int _sendCount = 0;
 
         public HeatingController(BaseSensorBox caThermalBox, List<MCUBoard> switchBoxes, CommandHandler cmd, int maxHeaterTemperature)
@@ -27,7 +27,7 @@ namespace CA_DataUploaderLib
             _caThermalBox = caThermalBox;
             _maxHeaterTemperature = maxHeaterTemperature;
             _switchBoxes = switchBoxes;
-            _cmd = cmd;
+            _cmdHandler = cmd;
             TargetTemperature = 0;
 
             new Thread(() => this.LoopForever()).Start();
@@ -59,7 +59,7 @@ namespace CA_DataUploaderLib
 
         private bool Oven(List<string> args)
         {
-            _cmd.AssertArgs(args, 2);
+            _cmdHandler.AssertArgs(args, 2);
             int topTemp = CommandHandler.GetCmdParam(args, 1, 300);
             int bottomTemp = CommandHandler.GetCmdParam(args, 2, topTemp);
 
@@ -68,9 +68,9 @@ namespace CA_DataUploaderLib
                 TargetTemperature = topTemp;
                 _heaters.Where(x => x.Name().ToLower().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
                 if (TargetTemperature > 0)
-                    _cmd.Execute("light on");
+                    _cmdHandler.Execute("light on");
                 else
-                    _cmd.Execute("light off");
+                    _cmdHandler.Execute("light off");
                 return true;
             }
 
