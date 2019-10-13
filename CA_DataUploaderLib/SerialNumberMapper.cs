@@ -124,6 +124,7 @@ namespace CA_DataUploaderLib
 
         // Mono: Exception: System.NotImplementedException: The method or operation is not implemented.
         // Mono: /build/mono-5.18.0.268/mcs/class/System.Management/System.Management/EventQuery.cs:38
+        // Mono: https://github.com/mono/mono/blob/master/mcs/class/System.Management/System.Management/WqlEventQuery.cs
         private void MonitorDeviceChanges()
         {
             if (!RpiVersion.IsWindows())

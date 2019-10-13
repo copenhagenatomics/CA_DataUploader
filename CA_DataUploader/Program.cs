@@ -37,7 +37,7 @@ namespace CA_DataUploader
                         int i = 0;
                         while (cmd.IsRunning)
                         {
-                            var allSensors = usb.GetAllValidTemperatures().OrderBy(x => x.ID).ToList();
+                            var allSensors = usb.GetAllValidDatapoints().OrderBy(x => x.ID).ToList();
                             if (allSensors.Any())
                             {
                                 cloud.SendVector(allSensors.Select(x => x.Value).ToList(), AverageSensorTimestamp(allSensors));

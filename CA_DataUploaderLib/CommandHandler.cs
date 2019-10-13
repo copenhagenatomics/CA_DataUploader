@@ -12,7 +12,7 @@ namespace CA_DataUploaderLib
         private bool _running = true;
         private StringBuilder inputCommand = new StringBuilder();
         private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
-        private LogLevel _logLevel = IOconf.GetOutputLevel();
+        private CALogLevel _logLevel = IOconf.GetOutputLevel();
 
         public bool IsRunning { get { return _running; } }
 
@@ -73,7 +73,7 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, ""); // this ensures that next command start on a new line. 
             if (!cmd.Any())
             {
-                if(_logLevel == LogLevel.Debug)
+                if(_logLevel == CALogLevel.Debug)
                     CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {inputCommand.Replace(Environment.NewLine, "")} - bad command");
 
                 inputCommand.Clear();
@@ -89,12 +89,12 @@ namespace CA_DataUploaderLib
                     {
                         if (func.Invoke(cmd))
                         {
-                            if(_logLevel == LogLevel.Debug)
+                            if(_logLevel == CALogLevel.Debug)
                                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - command accepted");
                         }
                         else
                         {
-                            if(_logLevel == LogLevel.Debug)
+                            if(_logLevel == CALogLevel.Debug)
                                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - bad command");
                         }
                     }

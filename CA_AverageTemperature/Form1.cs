@@ -62,7 +62,7 @@ namespace CA_AverageTemperature
             double lineHeight = height / 16.0;
             double colWidth = width / 10.5;
 
-            var list = _hub.GetAllValidTemperatures().OrderBy(x => x.Hub).Select(x => new JackRectangle(x, colWidth, lineHeight)).ToList();
+            var list = _hub.GetAllValidDatapoints().OrderBy(x => x.Hub).Select(x => new JackRectangle(x, colWidth, lineHeight)).ToList();
             g.FillRectangle(Brushes.LightGray, 0, 0, width, height);
             foreach(var jack in list)
             {

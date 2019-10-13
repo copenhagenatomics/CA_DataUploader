@@ -64,14 +64,14 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public static LogLevel GetOutputLevel()
+        public static CALogLevel GetOutputLevel()
         {
-            LogLevel logLevel;
+            CALogLevel logLevel;
             var loop = new IOconf().Table.Single(x => x.First() == "LoopName");
             if (Enum.TryParse(loop[2], true, out logLevel))
                 return logLevel;
 
-            return LogLevel.Normal;
+            return CALogLevel.Normal;
         }
 
         public static IEnumerable<List<string>> GetInTypeK()

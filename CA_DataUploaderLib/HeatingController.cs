@@ -230,7 +230,7 @@ namespace CA_DataUploaderLib
 
         private void CheckForNewThermocouplers()
         {
-            var sensors = _caThermalBox.GetAllValidTemperatures();
+            var sensors = _caThermalBox.GetAllValidDatapoints();
             var sensorsAttachedHeaters = sensors.Select(x => x.Heater).Where(x => x != null).ToList();
             
             // add new heaters

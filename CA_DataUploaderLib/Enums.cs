@@ -51,7 +51,7 @@ namespace CA_DataUploaderLib
         Weight = 7
     }
 
-    public enum LogLevel
+    public enum CALogLevel     // see also Syste.LogLevel
     {
         None = 0,   // silent
         Normal = 1,  // Default output

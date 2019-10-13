@@ -17,7 +17,8 @@ namespace CA_DataUploaderLib
         public int FilterLength { get; set; }
         public double Frequency { get; private set; }
 
-        protected string _title = "CAThermalBox"; 
+        protected string _title = "CAThermalBox";
+        protected CALogLevel _logLevel = IOconf.GetOutputLevel();
         protected ConcurrentDictionary<string, SensorSample> _values = new ConcurrentDictionary<string, SensorSample>();
         private Dictionary<string, Queue<double>> _filterQueue = new Dictionary<string, Queue<double>>();
         private Queue<double> _frequency = new Queue<double>();
@@ -43,7 +44,7 @@ namespace CA_DataUploaderLib
             cmd.AddCommand("Temperatures", ShowQueue);
             cmd.AddCommand("help", HelpMenu);
 
-            if (IOconf.GetOutputLevel() == LogLevel.Debug)
+            if (_logLevel == CALogLevel.Debug)
                 ShowConfig();
 
             if (_config.Any())
@@ -75,7 +76,7 @@ namespace CA_DataUploaderLib
             return temp;
         }
 
-        public IEnumerable<SensorSample> GetAllValidTemperatures()
+        public IEnumerable<SensorSample> GetAllValidDatapoints()
         {
             var removeBefore = DateTime.UtcNow.AddSeconds(-2);
             var timedOutSensors = _values.Where(x => x.Value.TimeStamp < removeBefore).Select(x => x.Value).ToList();
@@ -121,7 +122,6 @@ namespace CA_DataUploaderLib
             string row = string.Empty;
             int badRow = 0;
 
-            var logLevel = IOconf.GetOutputLevel();
             while (_running)
             {
                 try
@@ -132,6 +132,7 @@ namespace CA_DataUploaderLib
                         row = board.SafeReadLine();
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
+
                         if (numbers.Count == 18) // old model. 
                         {
                             hubID = (int)numbers[0];
@@ -140,15 +141,16 @@ namespace CA_DataUploaderLib
                         else
                             ProcessLine(numbers, hubID++, board);
 
-                        if (logLevel == LogLevel.Debug)
+                        if (_logLevel == CALogLevel.Debug)
                             CALog.LogData(LogID.A, MakeDebugString(row) + Environment.NewLine);
+
                     }
-                    badRow = 0;
+                    
                     Initialized = true;
                 }
                 catch (Exception ex)
                 {
-                    if (logLevel == LogLevel.Debug)
+                    if (_logLevel == CALogLevel.Debug)
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, "Exception at: " + row);
                         values.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x));
@@ -178,6 +180,9 @@ namespace CA_DataUploaderLib
             var timestamp = DateTime.UtcNow;
 
             int i = 0;
+            if (_logLevel == CALogLevel.Debug)
+                Console.WriteLine($"numbers: " + _values  + string.Join(", ", numbers));
+
             foreach (var value in numbers)
             {
                 var sensor = GetSensor(hubID, i);
@@ -271,7 +276,7 @@ namespace CA_DataUploaderLib
 
         private string MakeDebugString(string row)
         {
-            string filteredValues = string.Join(", ", GetAllValidTemperatures().Select(x => x.Value.ToString("N2").PadLeft(8)));
+            string filteredValues = string.Join(", ", GetAllValidDatapoints().Select(x => x.Value.ToString("N2").PadLeft(8)));
             return row.Replace("\n", "").PadRight(120).Replace("\r", "Freq=" + Frequency.ToString("N1")) + filteredValues;
         }
 
