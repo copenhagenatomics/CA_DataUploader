@@ -59,6 +59,7 @@ namespace CA_DataUploaderLib
 
         private bool Oven(List<string> args)
         {
+            _cmd.AssertArgs(args, 2);
             int topTemp = CommandHandler.GetCmdParam(args, 1, 300);
             int bottomTemp = CommandHandler.GetCmdParam(args, 2, topTemp);
 

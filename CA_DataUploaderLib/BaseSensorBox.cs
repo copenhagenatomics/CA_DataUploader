@@ -19,6 +19,7 @@ namespace CA_DataUploaderLib
 
         protected string _title = "CAThermalBox";
         protected CALogLevel _logLevel = IOconf.GetOutputLevel();
+        protected CommandHandler _cmdHandler;
         protected ConcurrentDictionary<string, SensorSample> _values = new ConcurrentDictionary<string, SensorSample>();
         private Dictionary<string, Queue<double>> _filterQueue = new Dictionary<string, Queue<double>>();
         private Queue<double> _frequency = new Queue<double>();
@@ -41,6 +42,7 @@ namespace CA_DataUploaderLib
             FilterLength = filterLength;
             _mcuBoards = boards.OrderBy(x => x.serialNumber).ToList();
             _config = IOconf.GetInTypeK().ToList();
+            _cmdHandler = cmd;
             cmd.AddCommand("Temperatures", ShowQueue);
             cmd.AddCommand("help", HelpMenu);
 
@@ -101,6 +103,7 @@ namespace CA_DataUploaderLib
 
         protected bool ShowQueue(List<string> args)
         {
+            _cmdHandler.AssertArgs(args, 1);
             var sb = new StringBuilder();
             foreach (var t in _values.OrderBy(x => x.Key).Select(x => x.Value))
             {
@@ -180,9 +183,6 @@ namespace CA_DataUploaderLib
             var timestamp = DateTime.UtcNow;
 
             int i = 0;
-            if (_logLevel == CALogLevel.Debug)
-                Console.WriteLine($"numbers: " + _values  + string.Join(", ", numbers));
-
             foreach (var value in numbers)
             {
                 var sensor = GetSensor(hubID, i);
@@ -211,6 +211,10 @@ namespace CA_DataUploaderLib
                             _filterQueue[sensor.key].Enqueue(value);
                         }
                     }
+                }
+                else
+                {
+                    CALog.LogData(LogID.A, sensor.key + " not found IO.conf file" + Environment.NewLine);
                 }
 
                 i++;

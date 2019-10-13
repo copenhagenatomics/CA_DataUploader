@@ -37,6 +37,15 @@ namespace CA_DataUploaderLib
             HandleCommand(cmd);
         }
 
+        public void AssertArgs(List<string> args, int minimumLen)
+        {
+            if (args.Count() < minimumLen)
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, "Too few arguments for this command");
+                Execute("help");
+            }
+        }
+
         private bool Stop(List<string> args)
         {
             _running = false;
