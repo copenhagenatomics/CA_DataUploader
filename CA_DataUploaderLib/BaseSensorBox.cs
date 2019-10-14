@@ -69,11 +69,11 @@ namespace CA_DataUploaderLib
         public SensorSample GetValueByTitle(string title)
         {
             if (!_config.Any(x => x[1] == title))
-                throw new Exception(title + " not found in _config, count: " + _config.Count());
+                throw new Exception(title + " not found in _config. Known names: " + string.Join(", ", _config.Select(x => x[1])));
 
             var temp = _values.Values.SingleOrDefault(x => x.Name == title);
             if (temp == null)
-                throw new Exception(title + " not found in _temperatures, count: " + _values.Count());
+                throw new Exception(title + " not found in _values, count: " + _values.Count());
 
             return temp;
         }
