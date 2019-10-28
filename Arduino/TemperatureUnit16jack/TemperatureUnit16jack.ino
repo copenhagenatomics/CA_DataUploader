@@ -31,7 +31,7 @@
 const String serialNumber = "11152b8";
 const String boardFamily = "Temperature hubard16";
 const String boardVersion = "1.0";
-const String boardSoftware = "2019-04-05 19:37";
+const String boardSoftware = "2019-10-28 11:37";
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char ChipSelect = 10; 

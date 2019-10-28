@@ -160,7 +160,7 @@ namespace CA_DataUploaderLib
                     var input = ReadLine();
                     if (Debugger.IsAttached && input.Length > 0)
                     {
-                        stop = DateTime.Now.AddMinutes(1);
+                        //stop = DateTime.Now.AddMinutes(1);
                         CALog.LogColor(LogID.A, ConsoleColor.Green, input);
                     }
 
