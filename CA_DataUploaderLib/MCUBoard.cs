@@ -157,41 +157,47 @@ namespace CA_DataUploaderLib
 
                 if (BytesToRead > 0)
                 {
-                    var input = ReadLine();
-                    if (Debugger.IsAttached && input.Length > 0)
+                    try
                     {
-                        //stop = DateTime.Now.AddMinutes(1);
-                        CALog.LogColor(LogID.A, ConsoleColor.Green, input);
+                        var input = ReadLine();
+                        if (Debugger.IsAttached && input.Length > 0)
+                        {
+                            //stop = DateTime.Now.AddMinutes(1);
+                            CALog.LogColor(LogID.A, ConsoleColor.Green, input);
+                        }
+
+                        UnableToRead = false;
+                        if (input.Contains(MCUBoard.serialNumberHeader))
+                            serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
+
+                        if (input.Contains(MCUBoard.boardFamilyHeader))
+                            productType = input.Substring(input.IndexOf(MCUBoard.boardFamilyHeader) + MCUBoard.boardFamilyHeader.Length).Trim();
+                        if (input.Contains(MCUBoard.productTypeHeader))
+                            productType = input.Substring(input.IndexOf(MCUBoard.productTypeHeader) + MCUBoard.productTypeHeader.Length).Trim();
+
+                        if (input.Contains(MCUBoard.boardVersionHeader))
+                            pcbVersion = input.Substring(input.IndexOf(MCUBoard.boardVersionHeader) + MCUBoard.boardVersionHeader.Length).Trim();
+                        if (input.Contains(MCUBoard.pcbVersionHeader))
+                            pcbVersion = input.Substring(input.IndexOf(MCUBoard.pcbVersionHeader) + MCUBoard.pcbVersionHeader.Length).Trim();
+
+                        if (input.Contains(MCUBoard.boardSoftwareHeader))
+                            softwareCompileDate = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
+                        if (input.Contains(MCUBoard.softwareCompileDateHeader))
+                            softwareCompileDate = input.Substring(input.IndexOf(MCUBoard.softwareCompileDateHeader) + MCUBoard.softwareCompileDateHeader.Length).Trim();
+
+                        if (input.Contains(MCUBoard.boardSoftwareHeader))
+                            softwareVersion = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
+                        if (input.Contains(MCUBoard.softwareVersionHeader))
+                            softwareVersion = input.Substring(input.IndexOf(MCUBoard.softwareVersionHeader) + MCUBoard.softwareVersionHeader.Length).Trim();
+
+                        if (input.Contains(MCUBoard.mcuFamilyHeader))
+                            mcuFamily = input.Substring(input.IndexOf(MCUBoard.mcuFamilyHeader) + MCUBoard.mcuFamilyHeader.Length).Trim();
+                    }
+                    catch (Exception ex)
+                    {
+                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName}: " + ex.Message);
                     }
 
-                    UnableToRead = false;
-                    if (input.Contains(MCUBoard.serialNumberHeader))
-                        serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
-
-                    if (input.Contains(MCUBoard.boardFamilyHeader))
-                        productType = input.Substring(input.IndexOf(MCUBoard.boardFamilyHeader) + MCUBoard.boardFamilyHeader.Length).Trim();
-                    if (input.Contains(MCUBoard.productTypeHeader))
-                        productType = input.Substring(input.IndexOf(MCUBoard.productTypeHeader) + MCUBoard.productTypeHeader.Length).Trim();
-
-                    if (input.Contains(MCUBoard.boardVersionHeader))
-                        pcbVersion = input.Substring(input.IndexOf(MCUBoard.boardVersionHeader) + MCUBoard.boardVersionHeader.Length).Trim();
-                    if (input.Contains(MCUBoard.pcbVersionHeader))
-                        pcbVersion = input.Substring(input.IndexOf(MCUBoard.pcbVersionHeader) + MCUBoard.pcbVersionHeader.Length).Trim();
-
-                    if (input.Contains(MCUBoard.boardSoftwareHeader))
-                        softwareCompileDate = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
-                    if (input.Contains(MCUBoard.softwareCompileDateHeader))
-                        softwareCompileDate = input.Substring(input.IndexOf(MCUBoard.softwareCompileDateHeader) + MCUBoard.softwareCompileDateHeader.Length).Trim();
-
-                    if (input.Contains(MCUBoard.boardSoftwareHeader))
-                        softwareVersion = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
-                    if (input.Contains(MCUBoard.softwareVersionHeader))
-                        softwareVersion = input.Substring(input.IndexOf(MCUBoard.softwareVersionHeader) + MCUBoard.softwareVersionHeader.Length).Trim();
-
-                    if (input.Contains(MCUBoard.mcuFamilyHeader))
-                        mcuFamily = input.Substring(input.IndexOf(MCUBoard.mcuFamilyHeader) + MCUBoard.mcuFamilyHeader.Length).Trim();
-
-                    
                 }
             }
         }
