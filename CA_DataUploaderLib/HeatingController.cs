@@ -131,7 +131,8 @@ namespace CA_DataUploaderLib
                 catch (TimeoutException ex)
                 {
                     CALog.LogErrorAndConsole(LogID.A, ex.ToString());
-                    _heaters.Clear();
+                    AllOff();
+                    _heaters.Clear(); 
                 }
                 catch (Exception ex)
                 {

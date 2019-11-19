@@ -43,8 +43,11 @@ namespace CA_DataUploaderLib
             _mcuBoards = boards.OrderBy(x => x.serialNumber).ToList();
             _config = IOconf.GetInTypeK().ToList();
             _cmdHandler = cmd;
-            cmd.AddCommand("Temperatures", ShowQueue);
-            cmd.AddCommand("help", HelpMenu);
+            if (cmd != null)
+            {
+                cmd.AddCommand("Temperatures", ShowQueue);
+                cmd.AddCommand("help", HelpMenu);
+            }
 
             if (_logLevel == CALogLevel.Debug)
                 ShowConfig();
@@ -135,7 +138,7 @@ namespace CA_DataUploaderLib
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
 
-                        if (numbers.Count == 18) // old model. 
+                        if (numbers.Count == 18 && board.productType.StartsWith("Temperature")) // old model. 
                         {
                             hubID = (int)numbers[0];
                             ProcessLine(numbers.Skip(1), hubID++, board);
