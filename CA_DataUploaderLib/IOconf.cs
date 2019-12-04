@@ -22,20 +22,35 @@ namespace CA_DataUploaderLib
         {
             var lines = File.ReadAllLines("IO.conf").ToList();
             lines = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
-            Table = lines.Select(x => x.Split(",".ToCharArray()).ToList()).ToList();
+            Table = lines.Select(x => x.Split(";".ToCharArray()).ToList()).ToList();
+            CheckRules(lines);
+        }
 
+        private void CheckRules(List<string> lines)
+        {
+            // all rows in IO.conf file must have at least 3 params. (type;name;other)
             foreach (var row in Table.Where(x => x.Count() < 3))
-                Console.WriteLine($"ERROR: too few parameters in: {lines[Table.IndexOf(row)]}");
+                CALog.LogErrorAndConsole(LogID.A, $"ERROR: too few parameters in: {lines[Table.IndexOf(row)]}{Environment.NewLine}");
 
+            // no two rows can have the same type,name combination. 
             var groups = Table.GroupBy(x => x[0] + x[1]);
             foreach (var g in groups.Where(x => x.Count() > 1))
-                Console.WriteLine($"WARNING: Name: {g.First()[1]} occure {g.Count()} times in this group: {g.First()[0]}");
+                CALog.LogErrorAndConsole(LogID.A, $"ERROR: Name: {g.First()[1]} occure {g.Count()} times in this group: {g.First()[0]}{Environment.NewLine}");
+
+            // all rows of type input/output must have a group which are listed in the map table. 
+            var InputOutput = Enum.GetValues(typeof(IOTypes)).Cast<IOTypes>().Skip(3).Select(x => x.ToString()).ToList();
+            var MapNames = GetTypes(IOTypes.Map).Select(x => x[2]).ToList();
+            foreach (var row in Table.Where(x => InputOutput.Contains(x[0])))
+            {
+                if(!MapNames.Contains(row[2]))
+                    CALog.LogErrorAndConsole(LogID.A, $"ERROR: name of port or box used in row, which was not found in map: {lines[Table.IndexOf(row)]}{Environment.NewLine}");
+            }
         }
 
         public IEnumerable<List<string>> GetTypes(IOTypes type)
         {
             var list = Table.Where(x => x.First() == type.ToString()).ToList();
-            Console.WriteLine($"read {list.Count} {type} rows from IO.config");
+            CALog.LogErrorAndConsole(LogID.A, $"read {list.Count} {type} rows from IO.config{Environment.NewLine}");
             return list;
         }
 
@@ -74,6 +89,11 @@ namespace CA_DataUploaderLib
             return CALogLevel.Normal;
         }
 
+        public static IEnumerable<List<string>> GetMap()
+        {
+            return new IOconf().GetTypes(IOTypes.Map);
+        }
+
         public static IEnumerable<List<string>> GetInTypeK()
         {
             return new IOconf().GetTypes(IOTypes.InTypeK);
@@ -99,9 +119,14 @@ namespace CA_DataUploaderLib
             return new IOconf().GetTypes(IOTypes.LiquidFlow);
         }
 
-        public static IEnumerable<List<string>> GetMotorSpeed()
+        public static IEnumerable<List<string>> GetMotor()
         {
-            return new IOconf().GetTypes(IOTypes.MotorSpeed);
+            return new IOconf().GetTypes(IOTypes.Motor);
+        }
+
+        public static IEnumerable<List<string>> GetScale()
+        {
+            return new IOconf().GetTypes(IOTypes.Scale);
         }
     }
 }

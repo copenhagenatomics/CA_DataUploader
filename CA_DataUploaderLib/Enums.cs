@@ -42,13 +42,15 @@ namespace CA_DataUploaderLib
     public enum IOTypes
     {
         LoopName = 0,
-        InTypeK = 1,
-        Out230Vac = 2,
-        Pressure = 3,
-        AirFlow = 4,
-        LiquidFlow = 5, 
-        MotorSpeed = 6,
-        Weight = 7
+        Account = 1,
+        Map = 2,
+        InTypeK = 3,
+        Out230Vac = 4,
+        Pressure = 5,
+        AirFlow = 6,
+        LiquidFlow = 7, 
+        Motor = 8,
+        Scale = 9
     }
 
     public enum CALogLevel     // see also Syste.LogLevel
