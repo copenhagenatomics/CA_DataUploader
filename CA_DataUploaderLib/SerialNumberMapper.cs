@@ -11,7 +11,7 @@ namespace CA_DataUploaderLib
     public class SerialNumberMapper : IDisposable
     {
         public List<MCUBoard> McuBoards = new List<MCUBoard>();
-        private static string[] _serialPorts = SerialPort.GetPortNames();
+        private static string[] _serialPorts = RpiVersion.GetUSBports();
 
         private static ManagementEventWatcher arrival;
 

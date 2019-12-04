@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Ports;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -57,6 +58,14 @@ namespace CA_DataUploaderLib
                 return dic[key];
 
             return "Unknown hardware";
+        }
+
+        public static string[] GetUSBports()
+        {
+            if (_OS.Platform == PlatformID.Unix)
+                return ExecuteShellCommand("ls -1a /dev/USB*").Split("\n".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).Select(x => x.Replace("\r", "").Trim()).ToArray();
+
+            return SerialPort.GetPortNames();
         }
                 
         private static Dictionary<string, string> GetVersions()

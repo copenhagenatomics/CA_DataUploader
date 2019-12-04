@@ -1,5 +1,6 @@
 ﻿using CA_DataUploaderLib.Extensions;
 using System;
+using System.Linq;
 using System.Threading;
 using System.IO.Ports;
 using System.Diagnostics;
@@ -9,6 +10,9 @@ namespace CA_DataUploaderLib
     public class MCUBoard : SerialPort
     {
         private int _safeLimit = 100;
+
+        public string IOconfName = null;
+        public const string IOconfNameHeader = "IOconf.Map Name: ";
 
         public string serialNumber = null;
         public const string serialNumberHeader = "Serial Number: ";
@@ -55,6 +59,10 @@ namespace CA_DataUploaderLib
                 ReadTimeout = 2000;
                 WriteTimeout = 2000;
                 Open();
+
+                var map = IOconf.GetMap().SingleOrDefault(x => name.EndsWith(x[1]));
+                if (map != null)
+                    IOconfName = map[2];
 
                 ReadSerialNumber();
             }
@@ -139,7 +147,7 @@ namespace CA_DataUploaderLib
 
         public string ToString(string seperator)
         {
-            return $"Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}Port open timestamp (UTC): {PortOpenTimeStamp}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
+            return $"{IOconfNameHeader}{IOconfName}{seperator}Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}Port open timestamp (UTC): {PortOpenTimeStamp}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
         }
 
         public string ToStringSimple(string seperator)

@@ -50,7 +50,7 @@ namespace CA_DataUploaderLib
         public IEnumerable<List<string>> GetTypes(IOTypes type)
         {
             var list = Table.Where(x => x.First() == type.ToString()).ToList();
-            CALog.LogErrorAndConsole(LogID.A, $"read {list.Count} {type} rows from IO.config{Environment.NewLine}");
+            CALog.LogData(LogID.A, $"read {list.Count} {type} rows from IO.config{Environment.NewLine}");
             return list;
         }
 
