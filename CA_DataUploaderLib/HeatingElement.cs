@@ -7,8 +7,8 @@ namespace CA_DataUploaderLib
     public class HeaterElement
     {
         public List<SensorSample> sensors = new List<SensorSample>();
-        public string SwitchBoard;  // the serial number of the Switch box. 
-        public int port; // the port number of the switch box.
+        public string USBPort;  // the USB port name
+        public int PortNumber; // the port number of the switch box. 
         public DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public double onTemperature = 10000;

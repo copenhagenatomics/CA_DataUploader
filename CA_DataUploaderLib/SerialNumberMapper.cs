@@ -144,7 +144,7 @@ namespace CA_DataUploaderLib
                 arrival.Start();
                 removal.Start();
             }
-            catch (ManagementException err)
+            catch (ManagementException)
             {
 
             }

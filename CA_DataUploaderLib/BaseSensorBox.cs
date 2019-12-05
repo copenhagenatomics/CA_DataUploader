@@ -17,7 +17,7 @@ namespace CA_DataUploaderLib
         public int FilterLength { get; set; }
         public double Frequency { get; private set; }
 
-        protected string _title = "CAThermalBox";
+        protected string _title = "Thermocouples";
         protected CALogLevel _logLevel = IOconf.GetOutputLevel();
         protected CommandHandler _cmdHandler;
         protected ConcurrentDictionary<string, SensorSample> _values = new ConcurrentDictionary<string, SensorSample>();
@@ -41,7 +41,7 @@ namespace CA_DataUploaderLib
             Initialized = false;
             FilterLength = filterLength;
             _mcuBoards = boards.OrderBy(x => x.serialNumber).ToList();
-            _config = IOconf.GetInTypeK().ToList();
+            _config = IOconf.GetTypeK().ToList();
             _cmdHandler = cmd;
             if (cmd != null)
             {
@@ -228,18 +228,11 @@ namespace CA_DataUploaderLib
             if (row.Count <= 4)
                 return null;
 
-            var list = row[4].Split(".".ToCharArray()).ToList();
-            int port;
-            if (!int.TryParse(list[1], out port))
-            {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Unable to parse heating element info in IO.conf ({string.Join(",", row)})");
-                return null;
-            }
-
-            var he = heaters.SingleOrDefault(x => x.SwitchBoard == list[0] && x.port == port);
+            var relay = IOconf.GetOut230Vac(row[4]);
+            var he = heaters.SingleOrDefault(x => x.USBPort == relay.USBPort && x.PortNumber == relay.PortNumber);
             if (he == null)
             {
-                he = new HeaterElement { SwitchBoard = list[0], port = port };
+                he = new HeaterElement { USBPort = relay.USBPort, PortNumber = relay.PortNumber };
                 heaters.Add(he);
             }
 

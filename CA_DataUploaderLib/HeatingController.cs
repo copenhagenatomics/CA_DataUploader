@@ -154,13 +154,13 @@ namespace CA_DataUploaderLib
                 {
                     var lines = box.ReadExisting();
                     var match = Regex.Match(lines, _SwitchBoxPattern);
-                    if (match.Success) GetCurrentValues(box.serialNumber, match);
+                    if (match.Success) GetCurrentValues(box.PortName, match);
                 }
                 catch {  }
             }
         }
 
-        private void GetCurrentValues(string serialNumber, Match match)
+        private void GetCurrentValues(string USBPort, Match match)
         {
             double dummy;
             var values = match.Groups.Cast<Group>().Skip(1)
@@ -169,9 +169,9 @@ namespace CA_DataUploaderLib
 
             if (values.Count() == 4)
             {
-                foreach (var heater in _heaters.Where(x => x.SwitchBoard == serialNumber))
+                foreach (var heater in _heaters.Where(x => x.USBPort == USBPort))
                 {
-                    heater.Current = values[heater.port - 1];
+                    heater.Current = values[heater.PortNumber - 1];
 
                     if (_sendCount++ == 10)
                     {
@@ -205,13 +205,13 @@ namespace CA_DataUploaderLib
             MCUBoard box = null;
             try
             {
-                box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
-                box.SafeWriteLine($"p{heater.port} off");
+                box = _switchBoxes.Single(x => x.PortName == heater.USBPort);
+                box.SafeWriteLine($"p{heater.PortNumber} off");
                 CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
             {
-                throw new TimeoutException($"Unable to write to {box.serialNumber} {box.productType}");
+                throw new TimeoutException($"Unable to write to {box.PortName} {box.productType}");
             }
         }
 
@@ -220,13 +220,13 @@ namespace CA_DataUploaderLib
             MCUBoard box = null;
             try
             {
-                box = _switchBoxes.Single(x => x.serialNumber == heater.SwitchBoard);
-                box.SafeWriteLine($"p{heater.port} on {HeaterOnTimeout}");
+                box = _switchBoxes.Single(x => x.PortName == heater.USBPort);
+                box.SafeWriteLine($"p{heater.PortNumber} on {HeaterOnTimeout}");
                 CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
             {
-                throw new TimeoutException($"Unable to write to {box.serialNumber} {box.productType}");
+                throw new TimeoutException($"Unable to write to {box.PortName} {box.productType}");
             }
         }
 
@@ -238,7 +238,7 @@ namespace CA_DataUploaderLib
             // add new heaters
             foreach(var heater in sensorsAttachedHeaters)
             {
-                if (!_heaters.Any(x => x.Name() == heater.Name()) && _switchBoxes.Any(x => x.serialNumber == heater.SwitchBoard))
+                if (!_heaters.Any(x => x.Name() == heater.Name()) && _switchBoxes.Any(x => x.PortName == heater.USBPort))
                     _heaters.Add(heater);
             }
 

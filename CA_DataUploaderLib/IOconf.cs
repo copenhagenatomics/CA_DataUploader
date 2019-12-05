@@ -14,6 +14,15 @@ namespace CA_DataUploaderLib
         public string password;
     }
 
+    public class Out230VacInfo
+    {
+        public string Name;
+        public string USBPort;
+        public int PortNumber;
+        public List<string> row;
+        public IOTypes Type;
+    }
+
     public class IOconf
     {
         public List<List<string>> Table { get; private set; }
@@ -94,14 +103,35 @@ namespace CA_DataUploaderLib
             return new IOconf().GetTypes(IOTypes.Map);
         }
 
-        public static IEnumerable<List<string>> GetInTypeK()
+        public static IEnumerable<List<string>> GetTypeK()
         {
-            return new IOconf().GetTypes(IOTypes.InTypeK);
+            return new IOconf().GetTypes(IOTypes.TypeK);
         }
 
         public static IEnumerable<List<string>> GetOut230Vac()
         {
             return new IOconf().GetTypes(IOTypes.Out230Vac);
+        }
+
+        public static Out230VacInfo GetOut230Vac(string name)
+        {
+            var ioconf = new IOconf();
+            var list = ioconf.GetTypes(IOTypes.Out230Vac).Concat(ioconf.GetTypes(IOTypes.Heater)).Concat(ioconf.GetTypes(IOTypes.Valve)).ToList();
+            var out230 = list.SingleOrDefault(x => x[1] == name);
+            if (out230 == null)
+                throw new Exception($"IOConf: unable to find {name}");
+
+            var map = ioconf.GetTypes(IOTypes.Map).Single(x => x[2] == out230[2]);
+            var port = RpiVersion.IsWindows() ? map[1] : "/dev/" + map[1];
+
+            return new Out230VacInfo
+            {
+                Name = name,
+                PortNumber = int.Parse(out230[3]),
+                USBPort = port,
+                row = out230,
+                Type = (IOTypes)Enum.Parse(typeof(IOTypes), out230[0])
+            };
         }
 
         public static IEnumerable<List<string>> GetPressure()
@@ -127,6 +157,16 @@ namespace CA_DataUploaderLib
         public static IEnumerable<List<string>> GetScale()
         {
             return new IOconf().GetTypes(IOTypes.Scale);
+        }
+
+        public static IEnumerable<List<string>> GetValve()
+        {
+            return new IOconf().GetTypes(IOTypes.Valve);
+        }
+
+        public static IEnumerable<List<string>> GetHeater()
+        {
+            return new IOconf().GetTypes(IOTypes.Heater);
         }
     }
 }
