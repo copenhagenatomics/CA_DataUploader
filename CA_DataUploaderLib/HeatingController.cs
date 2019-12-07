@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace CA_DataUploaderLib
@@ -117,7 +115,11 @@ namespace CA_DataUploaderLib
                         }
                     }
 
-                    ReadInputFromSwitchBoxes();
+                    foreach (var box in _switchBoxes)
+                    {
+                        var values = SwitchBoardBase.ReadInputFromSwitchBoxes(box);
+                        GetCurrentValues(box.PortName, values);
+                    }
 
                     Thread.Sleep(300);
                     if (i++ % 20 == 0)   // check for new termocouplers every 10 seconds. 
@@ -144,30 +146,9 @@ namespace CA_DataUploaderLib
             AllOff();
         }
 
-        private const string _SwitchBoxPattern = "P1=(\\d\\.\\d\\d)A P2=(\\d\\.\\d\\d)A P3=(\\d\\.\\d\\d)A P4=(\\d\\.\\d\\d)A";
-
-        private void ReadInputFromSwitchBoxes()
+        private void GetCurrentValues(string USBPort, List<double> values)
         {
-            foreach (var box in _switchBoxes.Where(x => x.productType.StartsWith("SwitchBoard") || x.productType.StartsWith("Relay")))
-            {
-                try
-                {
-                    var lines = box.ReadExisting();
-                    var match = Regex.Match(lines, _SwitchBoxPattern);
-                    if (match.Success) GetCurrentValues(box.PortName, match);
-                }
-                catch {  }
-            }
-        }
-
-        private void GetCurrentValues(string USBPort, Match match)
-        {
-            double dummy;
-            var values = match.Groups.Cast<Group>().Skip(1)
-                .Where(x => double.TryParse(x.Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out dummy))
-                .Select(x => double.Parse(x.Value, CultureInfo.InvariantCulture)).ToArray();
-
-            if (values.Count() == 4)
+            if (values.Count() > 0)
             {
                 foreach (var heater in _heaters.Where(x => x.USBPort == USBPort))
                 {

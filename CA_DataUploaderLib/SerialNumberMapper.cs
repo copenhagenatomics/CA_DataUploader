@@ -121,6 +121,16 @@ namespace CA_DataUploaderLib
             return McuBoards.Where(x => x.productType != null && x.productType.Contains(productType)).ToList();
         }
 
+        /// <summary>
+        /// Return a list of MCU boards where IOconfName contains the input string. 
+        /// </summary>
+        /// <param name="productType">type of boards to look for. (Case sensitive)</param>
+        /// <returns></returns>
+        public List<MCUBoard> ByIOconfName(string ioconfName)
+        {
+            return McuBoards.Where(x => x.IOconfName != null && x.IOconfName.Contains(ioconfName)).ToList();
+        }
+
         // Mono: Exception: System.NotImplementedException: The method or operation is not implemented.
         // Mono: /build/mono-5.18.0.268/mcs/class/System.Management/System.Management/EventQuery.cs:38
         // Mono: https://github.com/mono/mono/blob/master/mcs/class/System.Management/System.Management/WqlEventQuery.cs

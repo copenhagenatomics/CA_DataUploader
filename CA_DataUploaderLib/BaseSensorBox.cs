@@ -131,7 +131,6 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    int hubID = 0;
                     foreach (var board in _mcuBoards)
                     {
                         row = board.SafeReadLine();
@@ -140,11 +139,11 @@ namespace CA_DataUploaderLib
 
                         if (numbers.Count == 18 && board.productType.StartsWith("Temperature")) // old model. 
                         {
-                            hubID = (int)numbers[0];
-                            ProcessLine(numbers.Skip(1), hubID++, board);
+                            int hubID = (int)numbers[0];
+                            ProcessLine(numbers.Skip(1), hubID.ToString(), board);
                         }
                         else
-                            ProcessLine(numbers, hubID++, board);
+                            ProcessLine(numbers, board.IOconfName, board);
 
                         if (_logLevel == CALogLevel.Debug)
                             CALog.LogData(LogID.A, MakeDebugString(row) + Environment.NewLine);
@@ -180,14 +179,14 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {_title}.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
         }
 
-        private void ProcessLine(IEnumerable<double> numbers, int hubID, MCUBoard board)
+        private void ProcessLine(IEnumerable<double> numbers, string IOconfName, MCUBoard board)
         {
             var timestamp = DateTime.UtcNow;
 
             int i = 0;
             foreach (var value in numbers)
             {
-                var sensor = GetSensor(hubID, i);
+                var sensor = GetSensor(IOconfName, i);
                 if (sensor.row != null)
                 {
                     if (_values.ContainsKey(sensor.key))
@@ -206,7 +205,7 @@ namespace CA_DataUploaderLib
                     else
                     {
                         Debug.Assert(sensor.readJunction == false);
-                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.row), sensor.row[1], GetHeater(sensor.row)) { Value = value, TimeStamp = timestamp, Key = sensor.key, Board = board });
+                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.row), sensor.key, sensor.row[1], board, GetHeater(sensor.row)) { Value = value, TimeStamp = timestamp, hubID = GetHubID(sensor.row[2]) });
                         if (FilterLength > 1)
                         {
                             _filterQueue.Add(sensor.key, new Queue<double>());
@@ -221,6 +220,11 @@ namespace CA_DataUploaderLib
 
                 i++;
             }
+        }
+
+        private int GetHubID(string ioconfName)
+        {
+            return _config.GroupBy(x => x[2]).Select(x => x.Key).ToList().IndexOf(ioconfName);
         }
 
         private HeaterElement GetHeater(List<string> row)
@@ -239,10 +243,10 @@ namespace CA_DataUploaderLib
             return he;
         }
 
-        private (string key, List<string> row, bool readJunction) GetSensor(int hubID, int i)
+        private (string key, List<string> row, bool readJunction) GetSensor(string IOconfName, int i)
         {
-            string key = hubID.ToString() + "." + i.ToString();
-            return (key, _config.SingleOrDefault(x => x[3] == key), i>17);
+            string key = IOconfName + "." + i.ToString();
+            return (key, _config.SingleOrDefault(x => x[2] == IOconfName && x[3] == i.ToString()), i>17);
         }
 
         private double LowPassFilter(double value, string key)

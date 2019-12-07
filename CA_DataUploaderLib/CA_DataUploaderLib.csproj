@@ -85,6 +85,7 @@
     <Compile Include="SerialPortWatcher.cs" />
     <Compile Include="ServerUploader.cs" />
     <Compile Include="SensorSample.cs" />
+    <Compile Include="SwitchBoardBase.cs" />
     <Compile Include="VectorDescription.cs" />
   </ItemGroup>
   <ItemGroup>
