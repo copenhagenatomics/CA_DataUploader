@@ -12,12 +12,11 @@ namespace CA_DataUploaderLib
     public class BaseSensorBox : IDisposable
     {
         protected List<MCUBoard> _mcuBoards;
-        private const int TEMPERATURE_FAULT = 10000;
         protected bool _running = true;
         public int FilterLength { get; set; }
         public double Frequency { get; private set; }
+        public string Title { get; protected set; }
 
-        protected string _title = "Thermocouples";
         protected CALogLevel _logLevel = IOconf.GetOutputLevel();
         protected CommandHandler _cmdHandler;
         protected ConcurrentDictionary<string, SensorSample> _values = new ConcurrentDictionary<string, SensorSample>();
@@ -38,6 +37,7 @@ namespace CA_DataUploaderLib
         /// <param name="filterLength">1 = not filtering, larger than 1 = filtering and removing 10000 errors. </param>
         public BaseSensorBox(List<MCUBoard> boards, CommandHandler cmd = null, int filterLength = 1)
         {
+            Title = "Thermocouples";
             Initialized = false;
             FilterLength = filterLength;
             _mcuBoards = boards.OrderBy(x => x.serialNumber).ToList();
@@ -91,11 +91,9 @@ namespace CA_DataUploaderLib
             return _values.Values.OrderBy(x => x.ID);
         }
 
-        public VectorDescription GetVectorDescription()
+        public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
-            var list = _config.Select(x => new VectorDescriptionItem("double", x[1], DataTypeEnum.Input)).ToList();
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {_title}");
-            return new VectorDescription(list, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
+            return _config.Select(x => new VectorDescriptionItem("double", x[1], DataTypeEnum.Input)).ToList();
         }
 
         private bool HelpMenu(List<string> args)
@@ -176,7 +174,7 @@ namespace CA_DataUploaderLib
             foreach (var board in _mcuBoards)
                 board.SafeClose();
 
-            CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {_title}.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
+            CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
         }
 
         private void ProcessLine(IEnumerable<double> numbers, string IOconfName, MCUBoard board)

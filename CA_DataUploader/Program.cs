@@ -30,7 +30,7 @@ namespace CA_DataUploader
                     int filterLen = (args.Length > 0) ? int.Parse(args[0]) : 10;
                     using (var cmd = new CommandHandler())
                     using (var usb = new BaseSensorBox(dataLoggers, cmd, filterLen))
-                    using (var cloud = new ServerUploader(usb.GetVectorDescription()))
+                    using (var cloud = new ServerUploader(GetVectorDescription(usb)))
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server");
 
@@ -58,6 +58,13 @@ namespace CA_DataUploader
             }
 
             Console.ReadKey();
+        }
+
+        private static VectorDescription GetVectorDescription(BaseSensorBox usb)
+        {
+            var list = usb.GetVectorDescriptionItems();
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {usb.Title}");
+            return new VectorDescription(list, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
         }
 
         private static void Serial_PortsChanged(object sender, PortsChangedArgs e)
