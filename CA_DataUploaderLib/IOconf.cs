@@ -29,10 +29,13 @@ namespace CA_DataUploaderLib
 
         public IOconf()
         {
-            var lines = File.ReadAllLines("IO.conf").ToList();
-            lines = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
-            Table = lines.Select(x => x.Split(";".ToCharArray()).ToList()).ToList();
-            CheckRules(lines);
+            if (File.Exists("IO.conf"))
+            {
+                var lines = File.ReadAllLines("IO.conf").ToList();
+                lines = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
+                Table = lines.Select(x => x.Split(";".ToCharArray()).ToList()).ToList();
+                CheckRules(lines);
+            }
         }
 
         private void CheckRules(List<string> lines)
@@ -58,6 +61,8 @@ namespace CA_DataUploaderLib
 
         public IEnumerable<List<string>> GetTypes(IOTypes type)
         {
+            if (Table == null) return new List<List<string>>();
+
             var list = Table.Where(x => x.First() == type.ToString()).ToList();
             CALog.LogData(LogID.A, $"read {list.Count} {type} rows from IO.config{Environment.NewLine}");
             return list;
