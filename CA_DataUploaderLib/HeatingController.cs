@@ -64,7 +64,7 @@ namespace CA_DataUploaderLib
             if (topTemp < 900 && bottomTemp < 900)
             {
                 TargetTemperature = topTemp;
-                _heaters.Where(x => x.Name().ToLower().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
+                _heaters.Where(x => x.Name.ToLower().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
                 if (TargetTemperature > 0)
                     _cmdHandler.Execute("light on");
                 else
@@ -77,14 +77,20 @@ namespace CA_DataUploaderLib
 
         public bool Heater(List<string> args)
         {
-            var heater = _heaters.SingleOrDefault(x => x.Name().ToLower() == args[1].ToLower());
+            var heater = _heaters.SingleOrDefault(x => x.Name.ToLower() == args[1].ToLower());
             if (heater == null)
                 return false;
 
             if (args[2].ToLower() == "on")
+            {
                 HeaterOn(heater);
+                heater.ManualMode = true;
+            }
             else
+            {
                 HeaterOff(heater);
+                heater.ManualMode = false;
+            }
 
             return true;
         }
@@ -219,14 +225,14 @@ namespace CA_DataUploaderLib
             // add new heaters
             foreach(var heater in sensorsAttachedHeaters)
             {
-                if (!_heaters.Any(x => x.Name() == heater.Name()) && _switchBoxes.Any(x => x.PortName == heater.USBPort))
+                if (!_heaters.Any(x => x.Name == heater.Name) && _switchBoxes.Any(x => x.PortName == heater.USBPort))
                     _heaters.Add(heater);
             }
 
             // turn heaters off for 2 minutes, if temperature is invalid. 
             foreach(var heater in _heaters)
             {
-                if (!sensorsAttachedHeaters.Any(x => x.Name() == heater.Name()))
+                if (!sensorsAttachedHeaters.Any(x => x.Name == heater.Name))
                 {
                     HeaterOff(heater);
                     heater.LastOff = DateTime.Now.AddMinutes(2); // wait 2 minutes before we turn it on again. It will only turn on if it has updated thermocoupler data. 

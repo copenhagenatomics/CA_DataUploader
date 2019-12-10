@@ -8,16 +8,21 @@ namespace CA_DataUploaderLib
     {
         public List<SensorSample> sensors = new List<SensorSample>();
         public string USBPort;  // the USB port name
-        public int PortNumber; // the port number of the switch box. 
+        public int PortNumber; // the port number of the switch box.
+        public string Name;  // IOconfName
         public DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public double onTemperature = 10000;
         public bool IsOn;
+        public bool ManualMode;
         public double Current;  // Amps per element. 
         public int OffsetSetTemperature = 0;
 
         public bool CanTurnOn(int maxTemperature)
         {
+            if (ManualMode)
+                return false;
+
             if (LastOff > DateTime.UtcNow.AddSeconds(-10))
                 return false;  // has been turned off for less than 10 seconds. 
 
@@ -34,6 +39,9 @@ namespace CA_DataUploaderLib
 
         public bool MustTurnOff(int maxTemperature)
         {
+            if (maxTemperature == 0 && OffsetSetTemperature == 0 && ManualMode)
+                return false;
+
             var validSensors = sensors.Where(x => x.TimeStamp > DateTime.UtcNow.AddSeconds(-2) && x.Value < 6000);
             if (!validSensors.Any())
                 return true; // no valid sensors
@@ -44,18 +52,13 @@ namespace CA_DataUploaderLib
             return validSensors.Any(x => x.Value > (maxTemperature + OffsetSetTemperature)); // turn off, if we reached maxTemperature. 
         }
 
-        public string Name()
-        {
-            return sensors.First().Name;
-        }
-
         public override string ToString()
         {
             string msg = string.Empty;
             foreach (var s in sensors)
                 msg += s.Value.ToString("N0") + ", " + (LastOn > LastOff ? "" : onTemperature.ToString("N0"));
 
-            return $"{Name().PadRight(10)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg.PadRight(12)} {Current.ToString("N1").PadRight(5)} Amp";
+            return $"{Name.PadRight(10)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg.PadRight(12)} {Current.ToString("N1").PadRight(5)} Amp";
         }
     }
 }
