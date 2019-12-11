@@ -39,12 +39,12 @@ namespace CA_DataUploaderLib
 
         public bool MustTurnOff(int maxTemperature)
         {
-            if (maxTemperature == 0 && OffsetSetTemperature == 0 && ManualMode)
-                return false;
-
             var validSensors = sensors.Where(x => x.TimeStamp > DateTime.UtcNow.AddSeconds(-2) && x.Value < 6000);
             if (!validSensors.Any())
                 return true; // no valid sensors
+
+            if (maxTemperature == 0 && OffsetSetTemperature == 0 && ManualMode)
+                return false;
 
             if (onTemperature < 10000 && validSensors.Max(x => x.Value) > onTemperature + 20)
                 return true; // If hottest sensor is 50C higher than the temperature last time we turned on, then turn off. 

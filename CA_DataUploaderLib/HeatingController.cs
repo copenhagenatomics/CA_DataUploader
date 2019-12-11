@@ -83,13 +83,17 @@ namespace CA_DataUploaderLib
 
             if (args[2].ToLower() == "on")
             {
-                HeaterOn(heater);
+                heater.IsOn = true;
+                heater.LastOn = DateTime.UtcNow;
                 heater.ManualMode = true;
+                HeaterOn(heater);
             }
             else
             {
-                HeaterOff(heater);
+                heater.IsOn = false;
+                heater.LastOff = DateTime.UtcNow;
                 heater.ManualMode = false;
+                HeaterOff(heater);
             }
 
             return true;
