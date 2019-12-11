@@ -131,6 +131,8 @@ namespace CA_DataUploaderLib
                 {
                     foreach (var board in _mcuBoards)
                     {
+                        values.Clear();
+                        numbers.Clear();
                         row = board.SafeReadLine();
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
@@ -155,6 +157,7 @@ namespace CA_DataUploaderLib
                     if (_logLevel == CALogLevel.Debug)
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, "Exception at: " + row);
+                        CALog.LogInfoAndConsole(LogID.A, "Values: ");
                         values.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x));
                         numbers.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x.ToString()));
                         CALog.LogException(LogID.A, ex);
@@ -166,6 +169,7 @@ namespace CA_DataUploaderLib
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, "Too many bad rows from thermocouple ports.. shutting down.");
                         CALog.LogException(LogID.A, ex);
+                        _cmdHandler.Execute("escape");
                         _running = false;
                     }
                 }
@@ -210,10 +214,6 @@ namespace CA_DataUploaderLib
                             _filterQueue[sensor.key].Enqueue(value);
                         }
                     }
-                }
-                else
-                {
-                    CALog.LogData(LogID.A, sensor.key + " not found IO.conf file" + Environment.NewLine);
                 }
 
                 i++;

@@ -164,6 +164,7 @@ namespace CA_DataUploaderLib
                 {
                     heater.Current = values[heater.PortNumber - 1];
 
+                    // this is a hot fix to make sure heaters are on/off. 
                     if (_sendCount++ == 10)
                     {
                         _sendCount = 0;
