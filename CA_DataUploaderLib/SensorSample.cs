@@ -33,6 +33,8 @@ namespace CA_DataUploaderLib
         public double Reference { get; set; }
 
         public int Hub { get { return hubID; } }
+
+        public string NumberOfPorts { get; set; }
         public int Jack { get { return int.Parse(Key.Split('.')[1]); } }
 
         public override string ToString()

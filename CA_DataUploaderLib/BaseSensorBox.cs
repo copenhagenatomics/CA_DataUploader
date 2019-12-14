@@ -207,7 +207,8 @@ namespace CA_DataUploaderLib
                     else
                     {
                         Debug.Assert(sensor.readJunction == false);
-                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.row), sensor.key, sensor.row[1], board, GetHeater(sensor.row)) { Value = value, TimeStamp = timestamp, hubID = GetHubID(sensor.row[2]) });
+                        var numberOfPorts = numbers.Count() == 11? "1x10":"2x8";
+                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.row), sensor.key, sensor.row[1], board, GetHeater(sensor.row)) { Value = value, TimeStamp = timestamp, hubID = GetHubID(sensor.row[2]), NumberOfPorts= numberOfPorts });
                         if (FilterLength > 1)
                         {
                             _filterQueue.Add(sensor.key, new Queue<double>());

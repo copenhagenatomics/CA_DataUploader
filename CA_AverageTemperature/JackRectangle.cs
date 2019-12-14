@@ -15,8 +15,19 @@ namespace CA_AverageTemperature
         public JackRectangle(SensorSample sensor, double width, double height)
         {
             Sensor = sensor;
-            int x = (int)(((16- sensor.Jack) % 8 + 0.5) * width);
-            int y = (int)(((sensor.Hub) * 4 + ((sensor.Jack-1) / 8) + 1) * height);
+            int x = 0, y = 0;
+            switch (sensor.NumberOfPorts)
+            {
+                case "2x8":
+                    x = (int)(((16 - sensor.Jack) % 8 + 0.5) * width);
+                    y = (int)(((sensor.Hub) * 4 + ((sensor.Jack - 1) / 8) + 1) * height);
+                    break;
+                default:
+                case "1x10":
+                    x = (int)(((10 - sensor.Jack) + 0.5) * width); 
+                    y = (int)((sensor.Hub) * 4 + height);   // Wynand please fix. 
+                    break;
+            }
             Rect = new Rectangle(x, y, (int)width, (int)height);
             if(sensor.Jack == 0)
             {
