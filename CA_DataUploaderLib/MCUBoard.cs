@@ -60,11 +60,11 @@ namespace CA_DataUploaderLib
                 WriteTimeout = 2000;
                 Open();
 
-                var map = IOconf.GetMap().SingleOrDefault(x => name.EndsWith(x[1]));
+                ReadSerialNumber();
+
+                var map = IOconf.GetMap().SingleOrDefault(x => name.EndsWith(x[1]) || serialNumber == x[1]);
                 if (map != null)
                     IOconfName = map[2];
-
-                ReadSerialNumber();
             }
             catch (Exception ex)
             {
