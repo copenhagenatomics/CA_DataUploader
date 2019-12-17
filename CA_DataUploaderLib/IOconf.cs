@@ -26,6 +26,7 @@ namespace CA_DataUploaderLib
     public class IOconf
     {
         public List<List<string>> Table { get; private set; }
+        public static List<MCUBoard> _mcuBoards;
 
         public IOconf()
         {
@@ -127,7 +128,15 @@ namespace CA_DataUploaderLib
                 throw new Exception($"IOConf: unable to find {name}");
 
             var map = ioconf.GetTypes(IOTypes.Map).Single(x => x[2] == out230[2]);
-            var port = RpiVersion.IsWindows() ? map[1] : "/dev/" + map[1];
+            string port = "unknown";
+            if (map[1].StartsWith("COM") || map[1].StartsWith("USB"))
+                port = RpiVersion.IsWindows() ? map[1] : "/dev/" + map[1];
+            else if(_mcuBoards != null)
+            {
+                var board = _mcuBoards.SingleOrDefault(x => x.serialNumber == map[1]);
+                if(board != null)
+                    port = board.PortName;
+            }
 
             return new Out230VacInfo
             {

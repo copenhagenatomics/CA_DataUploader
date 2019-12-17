@@ -233,7 +233,7 @@ namespace CA_DataUploaderLib
 
             var relay = IOconf.GetOut230Vac(row[4]);
             var he = heaters.SingleOrDefault(x => x.USBPort == relay.USBPort && x.PortNumber == relay.PortNumber);
-            if (he == null)
+            if (he == null && relay.USBPort != "unknown")
             {
                 he = new HeaterElement { USBPort = relay.USBPort, PortNumber = relay.PortNumber, Name = relay.Name };
                 heaters.Add(he);

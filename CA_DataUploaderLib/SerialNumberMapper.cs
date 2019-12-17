@@ -50,7 +50,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            
+            IOconf._mcuBoards = McuBoards;  // this allow the IOconf.GetOut230Vac("name") function to return the correct COM port when mapped by serialNumber. 
         }
         
         private void SetUnknownSerialNumber(MCUBoard mcu)
