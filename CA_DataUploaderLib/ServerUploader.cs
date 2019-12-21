@@ -1,4 +1,5 @@
 ﻿using CA_DataUploaderLib.Extensions;
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -34,7 +35,7 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                var connectionInfo = IOconf.GetConnectionInfo();
+                var connectionInfo = IOconfFile.GetConnectionInfo();
                 _accountInfo = new Dictionary<string, string>
                 {
                     { "email", connectionInfo.email },
@@ -47,7 +48,7 @@ namespace CA_DataUploaderLib
                 _client.BaseAddress = new Uri(server);
                 _client.DefaultRequestHeaders.Accept.Clear();
                 _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                _loopName = IOconf.GetLoopName();
+                _loopName = IOconfFile.GetLoopName();
                 _keyFilename = "Key" + _loopName + ".bin";
                 CALog.LogInfoAndConsoleLn(LogID.A, _loopName);
 

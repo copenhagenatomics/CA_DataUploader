@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.IO.Ports;
 using System.Diagnostics;
+using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
 {
@@ -60,9 +61,9 @@ namespace CA_DataUploaderLib
                 WriteTimeout = 2000;
                 Open();
 
-                var map = IOconf.GetMap().SingleOrDefault(x => name.EndsWith(x[1]));
+                var map = IOconfFile.GetMap().SingleOrDefault(x => name.EndsWith(x.USBPort));
                 if (map != null)
-                    IOconfName = map[2];
+                    IOconfName = map.BoxName;
 
                 ReadSerialNumber();
             }

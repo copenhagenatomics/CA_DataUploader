@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CA_DataUploaderLib.IOconf;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,7 +13,7 @@ namespace CA_DataUploaderLib
         private bool _running = true;
         private StringBuilder inputCommand = new StringBuilder();
         private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
-        private CALogLevel _logLevel = IOconf.GetOutputLevel();
+        private CALogLevel _logLevel = IOconfFile.GetOutputLevel();
 
         public bool IsRunning { get { return _running; } }
 

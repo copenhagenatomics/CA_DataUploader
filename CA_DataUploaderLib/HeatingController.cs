@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CA_DataUploaderLib.IOconf;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -103,7 +104,7 @@ namespace CA_DataUploaderLib
         {
             int i = 0;
             DateTime start = DateTime.Now;
-            var logLevel = IOconf.GetOutputLevel();
+            var logLevel = IOconfFile.GetOutputLevel();
             while (_running)
             {
                 try

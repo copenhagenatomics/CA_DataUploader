@@ -39,23 +39,6 @@ namespace CA_DataUploaderLib
         OnlyRecordSensorValues = 5
     }
 
-    public enum IOTypes
-    {
-        LoopName = 0,
-        Account = 1,
-        Map = 2,
-        TypeK = 3,
-        Out230Vac = 4,
-        Pressure = 5,
-        AirFlow = 6,
-        LiquidFlow = 7, 
-        Motor = 8,
-        Scale = 9,
-        Light = 10,
-        Valve = 11, 
-        Heater = 12
-    }
-
     public enum CALogLevel     // see also Syste.LogLevel
     {
         None = 0,   // silent

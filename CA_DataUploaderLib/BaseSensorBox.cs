@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
 {
@@ -17,14 +18,14 @@ namespace CA_DataUploaderLib
         public double Frequency { get; private set; }
         public string Title { get; protected set; }
 
-        protected CALogLevel _logLevel = IOconf.GetOutputLevel();
+        protected CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         protected CommandHandler _cmdHandler;
         protected ConcurrentDictionary<string, SensorSample> _values = new ConcurrentDictionary<string, SensorSample>();
         private Dictionary<string, Queue<double>> _filterQueue = new Dictionary<string, Queue<double>>();
         private Queue<double> _frequency = new Queue<double>();
         private List<HeaterElement> heaters = new List<HeaterElement>();
 
-        protected List<List<string>> _config;
+        protected List<IOconfInput> _config;
 
         public bool Initialized { get; protected set; }
 
@@ -41,7 +42,7 @@ namespace CA_DataUploaderLib
             Initialized = false;
             FilterLength = filterLength;
             _mcuBoards = boards.OrderBy(x => x.serialNumber).ToList();
-            _config = IOconf.GetTypeK().ToList();
+            _config = IOconfFile.GetTypeK().Cast<IOconfInput>().ToList();
             _cmdHandler = cmd;
             if (cmd != null)
             {
@@ -49,30 +50,27 @@ namespace CA_DataUploaderLib
                 cmd.AddCommand("help", HelpMenu);
             }
 
-            if (_logLevel == CALogLevel.Debug)
-                ShowConfig();
-
             if (_config.Any())
                 new Thread(() => this.LoopForever()).Start();
             else
                 CALog.LogErrorAndConsole(LogID.A, "Type K thermocouple config information is missing in IO.conf");
         }
 
-        public SensorSample GetValue(string sensorID)
+        public SensorSample GetValue(int sensorID)
         {
-            if (!_config.Any(x => x[3] == sensorID))
+            if (!_config.Any(x => x.PortNumber == sensorID))
                 throw new Exception(sensorID + " sensorID not found in _config, count: " + _config.Count());
 
-            if (!_values.ContainsKey(sensorID))
+            if (!_values.ContainsKey(sensorID.ToString()))
                 throw new Exception(sensorID + " sensorID not found in _temperatures, count: " + _values.Count());
 
-            return _values[sensorID];
+            return _values[sensorID.ToString()];
         }
 
         public SensorSample GetValueByTitle(string title)
         {
-            if (!_config.Any(x => x[1] == title))
-                throw new Exception(title + " not found in _config. Known names: " + string.Join(", ", _config.Select(x => x[1])));
+            if (!_config.Any(x => x.Name == title))
+                throw new Exception(title + " not found in _config. Known names: " + string.Join(", ", _config.Select(x => x.Name)));
 
             var temp = _values.Values.SingleOrDefault(x => x.Name == title);
             if (temp == null)
@@ -93,7 +91,7 @@ namespace CA_DataUploaderLib
 
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
-            return _config.Select(x => new VectorDescriptionItem("double", x[1], DataTypeEnum.Input)).ToList();
+            return _config.Select(x => new VectorDescriptionItem("double", x.Name, DataTypeEnum.Input)).ToList();
         }
 
         private bool HelpMenu(List<string> args)
@@ -189,7 +187,7 @@ namespace CA_DataUploaderLib
             foreach (var value in numbers)
             {
                 var sensor = GetSensor(IOconfName, i);
-                if (sensor.row != null)
+                if (sensor.input != null)
                 {
                     if (_values.ContainsKey(sensor.key))
                     {
@@ -207,7 +205,7 @@ namespace CA_DataUploaderLib
                     else
                     {
                         Debug.Assert(sensor.readJunction == false);
-                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.row), sensor.key, sensor.row[1], board, GetHeater(sensor.row)) { Value = value, TimeStamp = timestamp, hubID = GetHubID(sensor.row[2]) });
+                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.input), sensor.key, sensor.input.Name, board, GetHeater(sensor.input)) { Value = value, TimeStamp = timestamp, hubID = GetHubID(sensor.input.BoxName) });
                         if (FilterLength > 1)
                         {
                             _filterQueue.Add(sensor.key, new Queue<double>());
@@ -222,29 +220,33 @@ namespace CA_DataUploaderLib
 
         private int GetHubID(string ioconfName)
         {
-            return _config.GroupBy(x => x[2]).Select(x => x.Key).ToList().IndexOf(ioconfName);
+            return _config.GroupBy(x => x.BoxName).Select(x => x.Key).ToList().IndexOf(ioconfName);
         }
 
-        private HeaterElement GetHeater(List<string> row)
+        private HeaterElement GetHeater(IOconfInput input)
         {
-            if (row.Count <= 4)
+            if (input.GetType() != typeof(IOconfTypeK))
                 return null;
 
-            var relay = IOconf.GetOut230Vac(row[4]);
-            var he = heaters.SingleOrDefault(x => x.USBPort == relay.USBPort && x.PortNumber == relay.PortNumber);
+            IOconfTypeK typeK = (IOconfTypeK)input;
+            if (typeK.HeaterName == null)
+                return null;
+
+            var relay = IOconfFile.GetHeater().Single(x => x.Name == typeK.HeaterName);
+            var he = heaters.SingleOrDefault(x => x.USBPort == relay.Map.USBPort && x.PortNumber == relay.PortNumber);
             if (he == null)
             {
-                he = new HeaterElement { USBPort = relay.USBPort, PortNumber = relay.PortNumber, Name = relay.Name };
+                he = new HeaterElement { USBPort = relay.Map.USBPort, PortNumber = relay.PortNumber, Name = relay.Name };
                 heaters.Add(he);
             }
 
             return he;
         }
 
-        private (string key, List<string> row, bool readJunction) GetSensor(string IOconfName, int i)
+        private (string key, IOconfInput input, bool readJunction) GetSensor(string IOconfName, int i)
         {
             string key = IOconfName + "." + i.ToString();
-            return (key, _config.SingleOrDefault(x => x[2] == IOconfName && x[3] == i.ToString()), i>17);
+            return (key, _config.Single(x => x.BoxName == IOconfName && x.PortNumber == i), i>17);
         }
 
         private double LowPassFilter(double value, string key)
@@ -279,19 +281,6 @@ namespace CA_DataUploaderLib
         {
             string filteredValues = string.Join(", ", GetAllValidDatapoints().Select(x => x.Value.ToString("N2").PadLeft(8)));
             return row.Replace("\n", "").PadRight(120).Replace("\r", "Freq=" + Frequency.ToString("N1")) + filteredValues;
-        }
-
-        protected void ShowConfig()
-        {
-            foreach (var x in _config)
-            {
-                foreach (var y in x)
-                    CALog.LogInfoAndConsole(LogID.A, y + ",");
-
-                CALog.LogInfoAndConsoleLn(LogID.A, "");
-            }
-
-            CALog.LogInfoAndConsoleLn(LogID.A, FilterLength.ToString());
         }
 
         public void Dispose()

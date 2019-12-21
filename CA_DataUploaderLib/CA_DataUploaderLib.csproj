@@ -74,8 +74,29 @@
     <Compile Include="Extensions\StringExtensions.cs" />
     <Compile Include="HeatingController.cs" />
     <Compile Include="HeatingElement.cs" />
-    <Compile Include="IOconf.cs" />
+    <Compile Include="IOconf\ConnectionInfo.cs" />
+    <Compile Include="IOconf\IOconfDriver.cs" />
+    <Compile Include="IOconf\IOconfFile.cs" />
     <Compile Include="CALog.cs" />
+    <Compile Include="IOconf\IOconfAccount.cs" />
+    <Compile Include="IOconf\IOconfAirFlow.cs" />
+    <Compile Include="IOconf\IOconfHeater.cs" />
+    <Compile Include="IOconf\IOconfInput.cs" />
+    <Compile Include="IOconf\IOconfLight.cs" />
+    <Compile Include="IOconf\IOconfLiquidFlow.cs" />
+    <Compile Include="IOconf\IOconfLoopName.cs" />
+    <Compile Include="IOconf\IOconfMotor.cs" />
+    <Compile Include="IOconf\IOconfOutput.cs" />
+    <Compile Include="IOconf\IOconfOven.cs" />
+    <Compile Include="IOconf\IOConfPressure.cs" />
+    <Compile Include="IOconf\IOconfRow.cs" />
+    <Compile Include="IOconf\IOconfScale.cs" />
+    <Compile Include="IOconf\IOconfState.cs" />
+    <Compile Include="IOconf\IOconfTank.cs" />
+    <Compile Include="IOconf\IOconfTypeK.cs" />
+    <Compile Include="IOconf\IOconfMap.cs" />
+    <Compile Include="IOconf\IOconfValve.cs" />
+    <Compile Include="IOconf\IOconfOut230Vac.cs" />
     <Compile Include="MCUBoard.cs">
       <SubType>Component</SubType>
     </Compile>
