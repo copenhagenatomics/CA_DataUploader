@@ -65,12 +65,12 @@ namespace CA_DataUploaderLib
             return $"{ioconf.Name.PadRight(10)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg.PadRight(12)} {Current.ToString("N1").PadRight(5)} Amp";
         }
 
-        internal string name()
+        public string name()
         {
             return ioconf.Name.ToLower();
         }
 
-        internal MCUBoard Board()
+        public MCUBoard Board()
         {
             return ioconf.Map.Board;
         }

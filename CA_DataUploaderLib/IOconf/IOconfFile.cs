@@ -129,5 +129,10 @@ namespace CA_DataUploaderLib.IOconf
         {
             return Table.Where(x => x.GetType() == typeof(IOconfHeater)).Cast<IOconfHeater>();
         }
+
+        public static IEnumerable<IOconfLight> GetLight()
+        {
+            return Table.Where(x => x.GetType() == typeof(IOconfLight)).Cast<IOconfLight>();
+        }
     }
 }

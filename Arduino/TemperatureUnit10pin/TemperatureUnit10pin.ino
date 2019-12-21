@@ -28,18 +28,16 @@
 *
 *******************************************************************************/
 
+#define softwareVersion "6.1"
+//#define _serialNumber "Alwk32vv"
+//#define _productType "SwitchBoard4x8A"
+//#define _mcuFamily "Arduino Nano 3.0 Ali"
 
 // ***** INCLUDES *****
 #include  "MAX31855.h"
 #include "readEEPROM.h"
 
 
-
-
-const String serialNumber = "11152b8";
-const String boardFamily = "Temperature hubard10";
-const String boardVersion = "1.0";
-const String boardSoftware = "2019-04-05 19:37";
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char ChipSelect = 10; 
