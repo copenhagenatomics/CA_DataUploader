@@ -141,7 +141,7 @@ namespace CA_DataUploaderLib
                             ProcessLine(numbers.Skip(1), hubID.ToString(), board);
                         }
                         else
-                            ProcessLine(numbers, board.IOconfName, board);
+                            ProcessLine(numbers, board.BoxName, board);
 
                         if (_logLevel == CALogLevel.Debug)
                             CALog.LogData(LogID.A, MakeDebugString(row) + Environment.NewLine);
@@ -233,11 +233,11 @@ namespace CA_DataUploaderLib
             if (typeK.HeaterName == null)
                 return null;
 
-            var relay = IOconfFile.GetHeater().Single(x => x.Name == typeK.HeaterName);
-            var he = heaters.SingleOrDefault(x => x.USBPort == relay.Map.USBPort && x.PortNumber == relay.PortNumber);
-            if (he == null && relay.USBPort != "unknown")
+            var ioconfHeater = IOconfFile.GetHeater().Single(x => x.Name == typeK.HeaterName);
+            var he = heaters.SingleOrDefault(x => x.ioconf == ioconfHeater);
+            if (he == null && ioconfHeater != null)
             {
-                he = new HeaterElement { USBPort = relay.Map.USBPort, PortNumber = relay.PortNumber, Name = relay.Name };
+                he = new HeaterElement(ioconfHeater);
                 heaters.Add(he);
             }
 

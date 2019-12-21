@@ -1,4 +1,5 @@
 ﻿using CA_DataUploaderLib.Extensions;
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -49,8 +50,6 @@ namespace CA_DataUploaderLib
                     CALog.LogErrorAndConsole(LogID.A, $"Unable to open {name}, Exception: {ex.ToString()}" + Environment.NewLine);
                 }
             }
-
-            IOconf._mcuBoards = McuBoards;  // this allow the IOconf.GetOut230Vac("name") function to return the correct COM port when mapped by serialNumber. 
         }
         
         private void SetUnknownSerialNumber(MCUBoard mcu)
@@ -124,11 +123,11 @@ namespace CA_DataUploaderLib
         /// <summary>
         /// Return a list of MCU boards where IOconfName contains the input string. 
         /// </summary>
-        /// <param name="productType">type of boards to look for. (Case sensitive)</param>
+        /// <param name="boxname">then name of boards to look for. (Case sensitive)</param>
         /// <returns></returns>
-        public List<MCUBoard> ByIOconfName(string ioconfName)
+        public List<MCUBoard> ByIOconfName(string boxname)
         {
-            return McuBoards.Where(x => x.IOconfName != null && x.IOconfName.Contains(ioconfName)).ToList();
+            return McuBoards.Where(x => x.BoxName != null && x.BoxName.Contains(boxname)).ToList();
         }
 
         // Mono: Exception: System.NotImplementedException: The method or operation is not implemented.

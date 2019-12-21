@@ -16,16 +16,14 @@ namespace CA_DataUploaderLib
         private int _maxHeaterTemperature;
         private bool _running = true;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
-        protected List<MCUBoard> _switchBoxes;
         private BaseSensorBox _caThermalBox;
         protected CommandHandler _cmdHandler;
         private int _sendCount = 0;
 
-        public HeatingController(BaseSensorBox caThermalBox, List<MCUBoard> switchBoxes, CommandHandler cmd, int maxHeaterTemperature)
+        public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd, int maxHeaterTemperature)
         {
             _caThermalBox = caThermalBox;
             _maxHeaterTemperature = maxHeaterTemperature;
-            _switchBoxes = switchBoxes;
             _cmdHandler = cmd;
             TargetTemperature = 0;
 
@@ -65,7 +63,7 @@ namespace CA_DataUploaderLib
             if (topTemp < 900 && bottomTemp < 900)
             {
                 TargetTemperature = topTemp;
-                _heaters.Where(x => x.Name.ToLower().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
+                _heaters.Where(x => x.name().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
                 if (TargetTemperature > 0)
                     _cmdHandler.Execute("light on");
                 else
@@ -78,7 +76,7 @@ namespace CA_DataUploaderLib
 
         public bool Heater(List<string> args)
         {
-            var heater = _heaters.SingleOrDefault(x => x.Name.ToLower() == args[1].ToLower());
+            var heater = _heaters.SingleOrDefault(x => x.name() == args[1].ToLower());
             if (heater == null)
                 return false;
 
@@ -126,10 +124,10 @@ namespace CA_DataUploaderLib
                         }
                     }
 
-                    foreach (var box in _switchBoxes)
+                    foreach (var box in _heaters.Select(x => x.Board()).Distinct())
                     {
                         var values = SwitchBoardBase.ReadInputFromSwitchBoxes(box);
-                        GetCurrentValues(box.PortName, values);
+                        GetCurrentValues(box, values);
                     }
 
                     Thread.Sleep(300);
@@ -157,13 +155,13 @@ namespace CA_DataUploaderLib
             AllOff();
         }
 
-        private void GetCurrentValues(string USBPort, List<double> values)
+        private void GetCurrentValues(MCUBoard board, List<double> values)
         {
             if (values.Count() > 0)
             {
-                foreach (var heater in _heaters.Where(x => x.USBPort == USBPort))
+                foreach (var heater in _heaters.Where(x => x.Board() == board))
                 {
-                    heater.Current = values[heater.PortNumber - 1];
+                    heater.Current = values[heater.ioconf.PortNumber - 1];
 
                     // this is a hot fix to make sure heaters are on/off. 
                     if (_sendCount++ == 10)
@@ -187,7 +185,7 @@ namespace CA_DataUploaderLib
 
         private void AllOff()
         {
-            foreach (var box in _switchBoxes)
+            foreach (var box in _heaters.Select(x => x.Board()).Distinct())
                 box.SafeWriteLine("off");
 
             CALog.LogInfoAndConsoleLn(LogID.A, "All heaters are off");
@@ -195,31 +193,27 @@ namespace CA_DataUploaderLib
 
         protected virtual void HeaterOff(HeaterElement heater)
         {
-            MCUBoard box = null;
             try
             {
-                box = _switchBoxes.Single(x => x.PortName == heater.USBPort);
-                box.SafeWriteLine($"p{heater.PortNumber} off");
+                heater.Board().SafeWriteLine($"p{heater.ioconf.PortNumber} off");
                 CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
             {
-                throw new TimeoutException($"Unable to write to {box.PortName} {box.productType}");
+                throw new TimeoutException($"Unable to write to {heater.Board().BoxName}");
             }
         }
 
         protected virtual void HeaterOn(HeaterElement heater)
         {
-            MCUBoard box = null;
             try
             {
-                box = _switchBoxes.Single(x => x.PortName == heater.USBPort);
-                box.SafeWriteLine($"p{heater.PortNumber} on {HeaterOnTimeout}");
+                heater.Board().SafeWriteLine($"p{heater.ioconf.PortNumber} on {HeaterOnTimeout}");
                 CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
             {
-                throw new TimeoutException($"Unable to write to {box.PortName} {box.productType}");
+                throw new TimeoutException($"Unable to write to {heater.Board().BoxName}");
             }
         }
 
@@ -229,16 +223,16 @@ namespace CA_DataUploaderLib
             var sensorsAttachedHeaters = sensors.Select(x => x.Heater).Where(x => x != null).ToList();
             
             // add new heaters
-            foreach(var heater in sensorsAttachedHeaters)
+            foreach(var heatingElement in sensorsAttachedHeaters)
             {
-                if (!_heaters.Any(x => x.Name == heater.Name) && _switchBoxes.Any(x => x.PortName == heater.USBPort))
-                    _heaters.Add(heater);
+                if (!_heaters.Any(x => x.ioconf == heatingElement.ioconf))
+                    _heaters.Add(heatingElement);
             }
 
             // turn heaters off for 2 minutes, if temperature is invalid. 
             foreach(var heater in _heaters)
             {
-                if (!sensorsAttachedHeaters.Any(x => x.Name == heater.Name))
+                if (!sensorsAttachedHeaters.Any(x => x.name() == heater.name()))
                 {
                     HeaterOff(heater);
                     heater.LastOff = DateTime.Now.AddMinutes(2); // wait 2 minutes before we turn it on again. It will only turn on if it has updated thermocoupler data. 

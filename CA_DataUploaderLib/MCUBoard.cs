@@ -12,8 +12,8 @@ namespace CA_DataUploaderLib
     {
         private int _safeLimit = 100;
 
-        public string IOconfName = null;
-        public const string IOconfNameHeader = "IOconf.Map Name: ";
+        public string BoxName = null;
+        public const string BoxNameHeader = "IOconf.Map BoxName: ";
 
         public string serialNumber = null;
         public const string serialNumberHeader = "Serial Number: ";
@@ -62,11 +62,12 @@ namespace CA_DataUploaderLib
                 Open();
 
                 ReadSerialNumber();
-                var map = IOconfFile.GetMap().SingleOrDefault(x => name.EndsWith(x.USBPort));
-                if (map != null)
-                    IOconfName = map.BoxName;
 
-                
+                foreach(var ioconfMap in IOconfFile.GetMap())
+                {
+                    if (ioconfMap.SetMCUboard(this))
+                        BoxName = ioconfMap.BoxName;
+                }
             }
             catch (Exception ex)
             {
@@ -149,7 +150,7 @@ namespace CA_DataUploaderLib
 
         public string ToString(string seperator)
         {
-            return $"{IOconfNameHeader}{IOconfName}{seperator}Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}Port open timestamp (UTC): {PortOpenTimeStamp}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
+            return $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}Port open timestamp (UTC): {PortOpenTimeStamp}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
         }
 
         public string ToStringSimple(string seperator)

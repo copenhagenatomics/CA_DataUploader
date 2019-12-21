@@ -30,9 +30,21 @@ namespace CA_DataUploaderLib.IOconf
                 BaudRate = 115200; // default baud rate. 
         }
 
-        public string USBPort { get; set; }
-        public string SerialNumber { get; set; }
+        public bool SetMCUboard(MCUBoard board)
+        {
+            if (board.serialNumber == SerialNumber || board.PortName == USBPort)
+            {
+                Board = board;
+                return true;
+            }
+
+            return false;
+        }
+
+        private string USBPort { get; set; }
+        private string SerialNumber { get; set; }
         public string BoxName { get; set; }
         public int BaudRate;
+        public MCUBoard Board;
     }
 }
