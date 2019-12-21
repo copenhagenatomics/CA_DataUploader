@@ -205,7 +205,8 @@ namespace CA_DataUploaderLib
                     else
                     {
                         Debug.Assert(sensor.readJunction == false);
-                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.input), sensor.key, sensor.input.Name, board, GetHeater(sensor.input)) { Value = value, TimeStamp = timestamp, hubID = GetHubID(sensor.input.BoxName) });
+                        var numberOfPorts = numbers.Count() == 11 ? "1x10" : "2x8";
+                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.input), sensor.key, sensor.input.Name, board, GetHeater(sensor.input)) { Value = value, TimeStamp = timestamp, hubID = GetHubID(sensor.input.BoxName), NumberOfPorts = numberOfPorts });
                         if (FilterLength > 1)
                         {
                             _filterQueue.Add(sensor.key, new Queue<double>());
@@ -234,7 +235,7 @@ namespace CA_DataUploaderLib
 
             var relay = IOconfFile.GetHeater().Single(x => x.Name == typeK.HeaterName);
             var he = heaters.SingleOrDefault(x => x.USBPort == relay.Map.USBPort && x.PortNumber == relay.PortNumber);
-            if (he == null)
+            if (he == null && relay.USBPort != "unknown")
             {
                 he = new HeaterElement { USBPort = relay.Map.USBPort, PortNumber = relay.PortNumber, Name = relay.Name };
                 heaters.Add(he);

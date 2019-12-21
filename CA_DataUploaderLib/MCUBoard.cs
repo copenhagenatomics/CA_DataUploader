@@ -61,11 +61,12 @@ namespace CA_DataUploaderLib
                 WriteTimeout = 2000;
                 Open();
 
+                ReadSerialNumber();
                 var map = IOconfFile.GetMap().SingleOrDefault(x => name.EndsWith(x.USBPort));
                 if (map != null)
                     IOconfName = map.BoxName;
 
-                ReadSerialNumber();
+                
             }
             catch (Exception ex)
             {
