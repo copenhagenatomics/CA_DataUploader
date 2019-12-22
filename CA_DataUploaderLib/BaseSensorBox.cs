@@ -220,7 +220,7 @@ namespace CA_DataUploaderLib
         private (string key, IOconfInput input, bool readJunction) GetSensor(string IOconfName, int i)
         {
             string key = IOconfName + "." + i.ToString();
-            return (key, _config.Single(x => x.BoxName == IOconfName && x.PortNumber == i), i>17);
+            return (key, _config.SingleOrDefault(x => x.BoxName == IOconfName && x.PortNumber == i), i>17);
         }
 
         private double LowPassFilter(double value, string key)
