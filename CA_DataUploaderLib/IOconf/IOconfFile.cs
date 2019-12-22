@@ -37,6 +37,7 @@ namespace CA_DataUploaderLib.IOconf
             if (row.StartsWith("Scale")) return new IOconfScale(row, GetMap());
             if (row.StartsWith("Tank")) return new IOconfTank(row, GetMap());
             if (row.StartsWith("Valve")) return new IOconfValve(row, GetMap());
+            if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row, GetMap());
 
             return new IOconfRow(row, "Unknown");
         }

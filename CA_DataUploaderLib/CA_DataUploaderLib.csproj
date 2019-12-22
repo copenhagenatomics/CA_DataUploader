@@ -95,6 +95,7 @@
     <Compile Include="IOconf\IOconfTank.cs" />
     <Compile Include="IOconf\IOconfTypeK.cs" />
     <Compile Include="IOconf\IOconfMap.cs" />
+    <Compile Include="IOconf\IOconfVacuumPump.cs" />
     <Compile Include="IOconf\IOconfValve.cs" />
     <Compile Include="IOconf\IOconfOut230Vac.cs" />
     <Compile Include="MCUBoard.cs">
