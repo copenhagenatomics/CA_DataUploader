@@ -13,11 +13,7 @@ namespace CA_DataUploaderLib.IOconf
             BoxName = list[2];
             SetMap(BoxName);
             if (!int.TryParse(list[3], out PortNumber)) throw new Exception("IOconfTypeK: wrong port number: " + row);
-
-            if (list.Count > 4)
-                HeaterName = list[4];
         }
 
-        public string HeaterName;  // bad code, remove later. 
     }
 }

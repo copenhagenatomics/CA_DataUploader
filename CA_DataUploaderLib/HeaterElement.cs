@@ -17,9 +17,11 @@ namespace CA_DataUploaderLib
         public bool ManualMode;
         public double Current;  // Amps per element. 
 
-        public HeaterElement(IOconfHeater heater)
+        public HeaterElement(IOconfHeater heater, SensorSample sensor)
         {
             ioconf = heater;
+            if(sensor != null)
+                sensors.Add(sensor);
         }
 
         public void SetTemperature(int value)

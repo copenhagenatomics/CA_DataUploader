@@ -215,19 +215,25 @@ namespace CA_DataUploaderLib
         private void CheckForNewThermocouplers()
         {
             var sensors = _caThermalBox.GetAllValidDatapoints();
-            var sensorsAttachedHeaters = sensors.Select(x => x.Heater).Where(x => x != null).ToList();
             
             // add new heaters
-            foreach(var heatingElement in sensorsAttachedHeaters)
+            foreach(var oven in IOconfFile.GetOven().SelectMany(x => x))
             {
-                if (!_heaters.Any(x => x.ioconf == heatingElement.ioconf))
-                    _heaters.Add(heatingElement);
+                var sensor = sensors.SingleOrDefault(x => x.Name == oven.TypeK.Name);
+                if (sensor != null)
+                {
+                    var heater = _heaters.SingleOrDefault(x => x.ioconf == oven.HeatingElement);
+                    if (heater == null)
+                        _heaters.Add(new HeaterElement(oven.HeatingElement, sensor));
+                    else if(!heater.sensors.Contains(sensor))
+                        heater.sensors.Add(sensor);
+                }
             }
 
             // turn heaters off for 2 minutes, if temperature is invalid. 
             foreach(var heater in _heaters)
             {
-                if (!sensorsAttachedHeaters.Any(x => x.name() == heater.name()))
+                if (!sensors.Any(x => x.Name == heater.sensors.First().Name))
                 {
                     HeaterOff(heater);
                     heater.LastOff = DateTime.Now.AddMinutes(2); // wait 2 minutes before we turn it on again. It will only turn on if it has updated thermocoupler data. 

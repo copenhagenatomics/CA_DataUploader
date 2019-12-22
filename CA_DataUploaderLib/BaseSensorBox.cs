@@ -179,7 +179,7 @@ namespace CA_DataUploaderLib
                     {
                         Debug.Assert(sensor.readJunction == false);
                         var numberOfPorts = numbers.Count() == 11 ? "1x10" : "2x8";
-                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.input), sensor.key, sensor.input.Name, board, GetHeater(sensor.input)) { Value = value, TimeStamp = timestamp, hubID = GetHubID(sensor.input.BoxName), NumberOfPorts = numberOfPorts });
+                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.input), sensor.key, sensor.input.Name, board) { Value = value, TimeStamp = timestamp, hubID = GetHubID(sensor.input.BoxName), NumberOfPorts = numberOfPorts });
                         if (FilterLength > 1)
                         {
                             _filterQueue.Add(sensor.key, new Queue<double>());
@@ -195,26 +195,6 @@ namespace CA_DataUploaderLib
         private int GetHubID(string ioconfName)
         {
             return _config.GroupBy(x => x.BoxName).Select(x => x.Key).ToList().IndexOf(ioconfName);
-        }
-
-        private HeaterElement GetHeater(IOconfInput input)
-        {
-            if (input.GetType() != typeof(IOconfTypeK))
-                return null;
-
-            IOconfTypeK typeK = (IOconfTypeK)input;
-            if (typeK.HeaterName == null)
-                return null;
-
-            var ioconfHeater = IOconfFile.GetHeater().Single(x => x.Name == typeK.HeaterName);
-            var he = heaters.SingleOrDefault(x => x.ioconf == ioconfHeater);
-            if (he == null && ioconfHeater != null)
-            {
-                he = new HeaterElement(ioconfHeater);
-                heaters.Add(he);
-            }
-
-            return he;
         }
 
         private (string key, IOconfInput input, bool readJunction) GetSensor(string IOconfName, int i)

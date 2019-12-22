@@ -73,7 +73,7 @@
     <Compile Include="Extensions\LinqExtensions.cs" />
     <Compile Include="Extensions\StringExtensions.cs" />
     <Compile Include="HeatingController.cs" />
-    <Compile Include="HeatingElement.cs" />
+    <Compile Include="HeaterElement.cs" />
     <Compile Include="IOconf\ConnectionInfo.cs" />
     <Compile Include="IOconf\IOconfDriver.cs" />
     <Compile Include="IOconf\IOconfFile.cs" />
