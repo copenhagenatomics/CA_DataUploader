@@ -19,7 +19,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public List<string> ToList()
         {
-            return RowWithoutComment().Split(";".ToCharArray()).ToList();
+            return RowWithoutComment().Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
         }
 
         public string UniqueKey()

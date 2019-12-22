@@ -11,8 +11,8 @@ namespace CA_DataUploaderLib.IOconf
             var list = ToList();
             Name = list[1];
             BoxName = list[2];
-            Map = map.Single(x => x.BoxName == BoxName);
-            if(!int.TryParse(list[3], out PortNumber)) throw new Exception("IOconfTypeK: wrong port number: " + row);
+            SetMap(BoxName, map);
+            if (!int.TryParse(list[3], out PortNumber)) throw new Exception("IOconfTypeK: wrong port number: " + row);
 
             if (list.Count > 4)
                 HeaterName = list[4];
