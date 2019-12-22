@@ -1,4 +1,5 @@
 ﻿using CA_DataUploaderLib;
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,23 +14,18 @@ namespace CA_DataUploader
             try
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
+                var ioconf = new IOconfFile();
 
                 using (var serial = new SerialNumberMapper(true))
                 {
-                    var dataLoggers = serial.ByProductType("Temperature");
-                    if (!dataLoggers.Any())
-                    {
-                        CALog.LogInfoAndConsoleLn(LogID.A, "Tempearture sensors not initialized");
-                        return;
-                    }
                     serial.PortsChanged += Serial_PortsChanged;
 
-                    // close all ports which are not temperature sensors. 
-                    serial.McuBoards.ToList().ForEach(x => { if (x.productType.StartsWith("Switch") || x.productType.StartsWith("Relay")) x.SafeClose(); });
+                    // close all relay board serial ports connections. 
+                    IOconfFile.GetOut230Vac().ToList().ForEach(x => x.Map.Board.SafeClose());
 
                     int filterLen = (args.Length > 0) ? int.Parse(args[0]) : 10;
                     using (var cmd = new CommandHandler())
-                    using (var usb = new BaseSensorBox(dataLoggers, cmd, filterLen))
+                    using (var usb = new ThermocoupleBox(cmd, filterLen))
                     using (var cloud = new ServerUploader(GetVectorDescription(usb)))
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server");

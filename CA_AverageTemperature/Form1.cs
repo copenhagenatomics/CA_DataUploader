@@ -1,4 +1,5 @@
 ﻿using CA_DataUploaderLib;
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -19,13 +20,14 @@ namespace CA_AverageTemperature
         public Form1()
         {
             InitializeComponent();
+            var ioconf = new IOconfFile();
 
             var serial = new SerialNumberMapper(true);
             var dataLoggers = serial.ByProductType("Temperature");
             if (dataLoggers.Any())
             {
                 timer1.Enabled = true;
-                _hub = new BaseSensorBox(dataLoggers);
+                _hub = new ThermocoupleBox();
             }
             else
             {

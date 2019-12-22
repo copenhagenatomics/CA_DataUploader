@@ -7,9 +7,9 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfAccount(string row) : base(row, "Account")
         {
             var list = ToList();
-            Name = list[0];
-            Email = list[1];
-            Password = list[2];
+            Name = list[1];
+            Email = list[2];
+            Password = list[3];
         }
 
         public string Name;

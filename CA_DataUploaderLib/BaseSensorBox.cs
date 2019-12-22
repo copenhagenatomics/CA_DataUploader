@@ -12,7 +12,6 @@ namespace CA_DataUploaderLib
 {
     public class BaseSensorBox : IDisposable
     {
-        protected List<MCUBoard> _mcuBoards;
         protected bool _running = true;
         public int FilterLength { get; set; }
         public double Frequency { get; private set; }
@@ -30,31 +29,6 @@ namespace CA_DataUploaderLib
         public bool Initialized { get; protected set; }
 
         public BaseSensorBox() { }
-
-        /// <summary>
-        /// Constructor: 
-        /// </summary>
-        /// <param name="boards">Input a number of boards with temperature sensors </param>
-        /// <param name="filterLength">1 = not filtering, larger than 1 = filtering and removing 10000 errors. </param>
-        public BaseSensorBox(List<MCUBoard> boards, CommandHandler cmd = null, int filterLength = 1)
-        {
-            Title = "Thermocouples";
-            Initialized = false;
-            FilterLength = filterLength;
-            _mcuBoards = boards.OrderBy(x => x.serialNumber).ToList();
-            _config = IOconfFile.GetTypeK().Cast<IOconfInput>().ToList();
-            _cmdHandler = cmd;
-            if (cmd != null)
-            {
-                cmd.AddCommand("Temperatures", ShowQueue);
-                cmd.AddCommand("help", HelpMenu);
-            }
-
-            if (_config.Any())
-                new Thread(() => this.LoopForever()).Start();
-            else
-                CALog.LogErrorAndConsole(LogID.A, "Type K thermocouple config information is missing in IO.conf");
-        }
 
         public SensorSample GetValue(int sensorID)
         {
@@ -94,12 +68,6 @@ namespace CA_DataUploaderLib
             return _config.Select(x => new VectorDescriptionItem("double", x.Name, DataTypeEnum.Input)).ToList();
         }
 
-        private bool HelpMenu(List<string> args)
-        {
-            CALog.LogInfoAndConsoleLn(LogID.A, $"temperatures              - show all temperatures in input queue");
-            return true;
-        }
-
         protected bool ShowQueue(List<string> args)
         {
             var sb = new StringBuilder();
@@ -127,7 +95,7 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    foreach (var board in _mcuBoards)
+                    foreach (var board in Boards())
                     {
                         values.Clear();
                         numbers.Clear();
@@ -147,7 +115,7 @@ namespace CA_DataUploaderLib
                             CALog.LogData(LogID.A, MakeDebugString(row) + Environment.NewLine);
 
                     }
-                    
+
                     Initialized = true;
                 }
                 catch (Exception ex)
@@ -173,10 +141,15 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            foreach (var board in _mcuBoards)
+            foreach (var board in Boards())
                 board.SafeClose();
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
+        }
+
+        private IEnumerable<MCUBoard> Boards()
+        {
+            return _config.Select(x => x.Map.Board).Distinct();
         }
 
         private void ProcessLine(IEnumerable<double> numbers, string IOconfName, MCUBoard board)
@@ -289,12 +262,12 @@ namespace CA_DataUploaderLib
             _running = false;
             for (int i = 0; i < 100; i++)
             {
-                foreach(var board in _mcuBoards)
+                foreach(var board in Boards())
                     if (board.IsOpen)
                             Thread.Sleep(10);
             }
 
-            foreach (var board in _mcuBoards)
+            foreach (var board in Boards())
                 ((IDisposable)board).Dispose();
         }
     }

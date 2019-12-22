@@ -107,6 +107,7 @@
     <Compile Include="ServerUploader.cs" />
     <Compile Include="SensorSample.cs" />
     <Compile Include="SwitchBoardBase.cs" />
+    <Compile Include="ThermocoupleBox.cs" />
     <Compile Include="VectorDescription.cs" />
   </ItemGroup>
   <ItemGroup>
