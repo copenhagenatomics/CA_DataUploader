@@ -11,6 +11,19 @@ namespace CA_DataUploaderLib
         Output = 3
     }
 
+    public enum FlowDirection
+    {
+        Unknown = 0,
+        In = 1,
+        Out = 2
+    }
+
+    public enum SafeValue
+    {
+        Off = 0, 
+        On = 1
+    }
+
     public enum PowerPhase
     {
         Null = 0,

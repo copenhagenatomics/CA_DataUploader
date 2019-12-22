@@ -6,6 +6,6 @@ namespace CA_DataUploaderLib.IOconf
 {
    public class IOconfVacuumPump : IOconfOut230Vac
     {
-        public IOconfVacuumPump(string row, IEnumerable<IOconfMap> map) : base(row, "VacuumPump", map) {}
+        public IOconfVacuumPump(string row) : base(row, "VacuumPump") {}
     }
 }

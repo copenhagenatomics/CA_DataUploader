@@ -6,17 +6,20 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfTank : IOconfDriver
     {
-        public IOconfTank(string row, IEnumerable<IOconfMap> map) : base(row, "Tank")
+        public IOconfTank(string row) : base(row, "Tank")
         {
-            var list = ToList();            
-            Name = list[1];
-            BoxName = list[2];
-            if (!int.TryParse(list[3], out PortNumber)) throw new Exception("IOconfTank: wrong port number: " + row);
-
+            var list = ToList();
+            if (!int.TryParse(list[1], out TankNumber)) throw new Exception("IOconfTank: wrong tank number: " + row);
+            Valve = IOconfFile.GetValve().Single(x => x.Name == list[2]);
+            Pressure = IOconfFile.GetPressure().Single(x => x.Name == list[3]);
+            if (!Enum.TryParse<FlowDirection>(list[4], out flowDirection)) throw new Exception("IOconfTank: in/out not defined correctly :" + row);
+            if (!Enum.TryParse<SafeValue>(list[5], out safeValue)) throw new Exception("IOconfTank: safe value not defined correctly :" + row);
         }
 
-        public string Name { get; set; }
-        public string BoxName { get; set; }
-        public int PortNumber;
+        public int TankNumber;
+        public IOconfValve Valve;
+        public IOConfPressure Pressure;
+        public FlowDirection flowDirection;
+        public SafeValue safeValue;
     }
 }

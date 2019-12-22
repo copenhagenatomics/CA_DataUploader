@@ -6,12 +6,12 @@ namespace CA_DataUploaderLib.IOconf
 {
    public class IOconfScale : IOconfInput
     {
-        public IOconfScale(string row, IEnumerable<IOconfMap> map) : base(row, "Scale")
+        public IOconfScale(string row) : base(row, "Scale")
         {
             var list = ToList();
             Name = list[1];
             BoxName = list[2];
-            SetMap(BoxName, map);
+            SetMap(BoxName);
             if (!int.TryParse(list[3], out PortNumber)) throw new Exception("IOconfScale: wrong port number: " + row);
 
         }

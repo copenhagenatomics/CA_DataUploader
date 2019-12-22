@@ -26,18 +26,18 @@ namespace CA_DataUploaderLib.IOconf
             if (row.StartsWith("LoopName")) return new IOconfLoopName(row);
             if (row.StartsWith("Account")) return new IOconfAccount(row);
             if (row.StartsWith("Map"))    return new IOconfMap(row);
-            if (row.StartsWith("TypeK"))  return new IOconfTypeK(row, GetMap());
-            if (row.StartsWith("AirFlow")) return new IOconfAirFlow(row, GetMap());
-            if (row.StartsWith("Heater")) return new IOconfHeater(row, GetMap());
-            if (row.StartsWith("Light")) return new IOconfLight(row, GetMap());
-            if (row.StartsWith("LiquidFlow")) return new IOconfLiquidFlow(row, GetMap());
-            if (row.StartsWith("Motor")) return new IOconfMotor(row, GetMap());
-            if (row.StartsWith("Oven")) return new IOconfOven(row, GetMap());
-            if (row.StartsWith("Pressure")) return new IOConfPressure(row, GetMap());
-            if (row.StartsWith("Scale")) return new IOconfScale(row, GetMap());
-            if (row.StartsWith("Tank")) return new IOconfTank(row, GetMap());
-            if (row.StartsWith("Valve")) return new IOconfValve(row, GetMap());
-            if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row, GetMap());
+            if (row.StartsWith("TypeK"))  return new IOconfTypeK(row);
+            if (row.StartsWith("AirFlow")) return new IOconfAirFlow(row);
+            if (row.StartsWith("Heater")) return new IOconfHeater(row);
+            if (row.StartsWith("Light")) return new IOconfLight(row);
+            if (row.StartsWith("LiquidFlow")) return new IOconfLiquidFlow(row);
+            if (row.StartsWith("Motor")) return new IOconfMotor(row);
+            if (row.StartsWith("Oven")) return new IOconfOven(row);
+            if (row.StartsWith("Pressure")) return new IOConfPressure(row);
+            if (row.StartsWith("Scale")) return new IOconfScale(row);
+            if (row.StartsWith("Tank")) return new IOconfTank(row);
+            if (row.StartsWith("Valve")) return new IOconfValve(row);
+            if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row);
 
             return new IOconfRow(row, "Unknown");
         }
@@ -135,5 +135,12 @@ namespace CA_DataUploaderLib.IOconf
         {
             return Table.Where(x => x.GetType() == typeof(IOconfLight)).Cast<IOconfLight>();
         }
+
+        public static List<IGrouping<int,IOconfOven>> GetOven()
+        {
+            var ovens = Table.Where(x => x.GetType() == typeof(IOconfOven)).Cast<IOconfOven>();
+            return ovens.GroupBy(x => x.OvenArea).OrderBy(x => x.Key).ToList();
+        }
+
     }
 }

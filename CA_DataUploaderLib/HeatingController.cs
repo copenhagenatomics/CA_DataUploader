@@ -8,24 +8,19 @@ namespace CA_DataUploaderLib
 {
     public class HeatingController : IDisposable
     {
-        public int TargetTemperature { get; set; }
-
         public List<SensorSample> ValidHatSensors { get; private set; }
         public double Voltage = 230;
         public int HeaterOnTimeout = 60;
-        private int _maxHeaterTemperature;
         private bool _running = true;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
         private BaseSensorBox _caThermalBox;
         protected CommandHandler _cmdHandler;
         private int _sendCount = 0;
 
-        public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd, int maxHeaterTemperature)
+        public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
         {
             _caThermalBox = caThermalBox;
-            _maxHeaterTemperature = maxHeaterTemperature;
             _cmdHandler = cmd;
-            TargetTemperature = 0;
 
             new Thread(() => this.LoopForever()).Start();
             cmd.AddCommand("escape", Stop);
@@ -57,21 +52,22 @@ namespace CA_DataUploaderLib
         private bool Oven(List<string> args)
         {
             _cmdHandler.AssertArgs(args, 2);
-            int topTemp = CommandHandler.GetCmdParam(args, 1, 300);
-            int bottomTemp = CommandHandler.GetCmdParam(args, 2, topTemp);
-
-            if (topTemp < 900 && bottomTemp < 900)
+            var areas = IOconfFile.GetOven();
+            int i = 1;
+            int areaTemp = 300; // default value;
+            foreach (var area in areas)
             {
-                TargetTemperature = topTemp;
-                _heaters.Where(x => x.name().Contains("bottom")).ToList().ForEach(x => x.OffsetSetTemperature = bottomTemp - topTemp);
-                if (TargetTemperature > 0)
-                    _cmdHandler.Execute("light on");
-                else
-                    _cmdHandler.Execute("light off");
-                return true;
+                areaTemp = CommandHandler.GetCmdParam(args, i++, areaTemp);
+                var heatingElementNames = area.Select(x => x.HeatingElement.Name).ToList();
+                foreach (var heater in _heaters.Where(x => heatingElementNames.Contains(x.ioconf.Name)))
+                    heater.SetTemperature(areaTemp);
             }
 
-            return false;
+            if (_heaters.Any(x => x.TargetTemperature > 0))
+                _cmdHandler.Execute("light on");
+            else
+                _cmdHandler.Execute("light off");
+            return true;
         }
 
         public bool Heater(List<string> args)
@@ -107,16 +103,15 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    int maxTemperature = Math.Min(TargetTemperature, _maxHeaterTemperature);
                     foreach (var heater in _heaters)
                     {
-                        if (heater.IsOn && heater.MustTurnOff(maxTemperature))
+                        if (heater.IsOn && heater.MustTurnOff())
                         {
                             heater.LastOff = DateTime.UtcNow;
                             heater.IsOn = false;
                             HeaterOff(heater);
                         }
-                        else if (!heater.IsOn && heater.CanTurnOn(maxTemperature))
+                        else if (!heater.IsOn && heater.CanTurnOn())
                         {
                             heater.LastOn = DateTime.UtcNow;
                             heater.IsOn = true;

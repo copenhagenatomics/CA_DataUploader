@@ -1,22 +1,22 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfOven : IOconfDriver
     {
-        public IOconfOven(string row, IEnumerable<IOconfMap> map) : base(row, "Oven")
+        public IOconfOven(string row) : base(row, "Oven")
         {
             var list = ToList();
-            Name = list[1];
-            BoxName = list[2];
-            if (!int.TryParse(list[3], out PortNumber)) throw new Exception("IOconfOven: wrong port number: " + row);
+            if (!int.TryParse(list[1], out OvenArea)) throw new Exception("IOconfOven: wrong OvenArea number: " + row);
+            HeatingElement = IOconfFile.GetHeater().Single(x => x.Name == list[2]);
+            TypeK = IOconfFile.GetTypeK().Single(x => x.Name == list[3]);
 
         }
 
-        public string Name { get; set; }
-        public string BoxName { get; set; }
-        public int PortNumber;
+        public int OvenArea;
+        public IOconfHeater HeatingElement;
+        public IOconfTypeK TypeK;
+        
     }
 }

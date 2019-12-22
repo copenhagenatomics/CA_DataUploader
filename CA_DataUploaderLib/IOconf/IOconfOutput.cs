@@ -14,8 +14,9 @@ namespace CA_DataUploaderLib.IOconf
         public int PortNumber;
         public IOconfMap Map { get; set; }
 
-        protected void SetMap(string boxName, IEnumerable<IOconfMap> maps)
+        protected void SetMap(string boxName)
         {
+            var maps = IOconfFile.GetMap();
             Map = maps.SingleOrDefault(x => x.BoxName == boxName);
             if (Map == null)
                 throw new Exception($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
