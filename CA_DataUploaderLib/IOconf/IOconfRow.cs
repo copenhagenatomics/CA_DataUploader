@@ -25,6 +25,9 @@ namespace CA_DataUploaderLib.IOconf
         public string UniqueKey()
         {
             var list = ToList();
+            if(GetType() == typeof(IOconfOven))
+                return list[0] + list[2];
+
             return list[0] + list[1];
         }
 

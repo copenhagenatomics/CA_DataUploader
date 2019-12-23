@@ -23,23 +23,31 @@ namespace CA_DataUploaderLib.IOconf
 
         private IOconfRow CreateType(string row)
         {
-            if (row.StartsWith("LoopName")) return new IOconfLoopName(row);
-            if (row.StartsWith("Account")) return new IOconfAccount(row);
-            if (row.StartsWith("Map"))    return new IOconfMap(row);
-            if (row.StartsWith("TypeK"))  return new IOconfTypeK(row);
-            if (row.StartsWith("AirFlow")) return new IOconfAirFlow(row);
-            if (row.StartsWith("Heater")) return new IOconfHeater(row);
-            if (row.StartsWith("Light")) return new IOconfLight(row);
-            if (row.StartsWith("LiquidFlow")) return new IOconfLiquidFlow(row);
-            if (row.StartsWith("Motor")) return new IOconfMotor(row);
-            if (row.StartsWith("Oven")) return new IOconfOven(row);
-            if (row.StartsWith("Pressure")) return new IOConfPressure(row);
-            if (row.StartsWith("Scale")) return new IOconfScale(row);
-            if (row.StartsWith("Tank")) return new IOconfTank(row);
-            if (row.StartsWith("Valve")) return new IOconfValve(row);
-            if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row);
+            try
+            {
+                if (row.StartsWith("LoopName")) return new IOconfLoopName(row);
+                if (row.StartsWith("Account")) return new IOconfAccount(row);
+                if (row.StartsWith("Map"))    return new IOconfMap(row);
+                if (row.StartsWith("TypeK"))  return new IOconfTypeK(row);
+                if (row.StartsWith("AirFlow")) return new IOconfAirFlow(row);
+                if (row.StartsWith("Heater")) return new IOconfHeater(row);
+                if (row.StartsWith("Light")) return new IOconfLight(row);
+                if (row.StartsWith("LiquidFlow")) return new IOconfLiquidFlow(row);
+                if (row.StartsWith("Motor")) return new IOconfMotor(row);
+                if (row.StartsWith("Oven")) return new IOconfOven(row);
+                if (row.StartsWith("Pressure")) return new IOConfPressure(row);
+                if (row.StartsWith("Scale")) return new IOconfScale(row);
+                if (row.StartsWith("Tank")) return new IOconfTank(row);
+                if (row.StartsWith("Valve")) return new IOconfValve(row);
+                if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row);
 
-            return new IOconfRow(row, "Unknown");
+                return new IOconfRow(row, "Unknown");
+            }
+            catch (Exception ex)
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, row + Environment.NewLine + ex.ToString());
+                throw;
+            }
         }
 
         private void CheckRules(List<string> lines)

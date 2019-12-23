@@ -1,10 +1,10 @@
 ﻿using CA_DataUploaderLib.Extensions;
 using System;
-using System.Linq;
 using System.Threading;
 using System.IO.Ports;
 using System.Diagnostics;
 using CA_DataUploaderLib.IOconf;
+using System.Collections.Generic;
 
 namespace CA_DataUploaderLib
 {
@@ -40,6 +40,9 @@ namespace CA_DataUploaderLib
 
         public DateTime PortOpenTimeStamp;
 
+        private Queue<string> _readBuffer = new Queue<string>();
+        private string _overshoot = string.Empty;
+
         public MCUBoard(string name, int baudrate) // : base(name, baudrate, 0, 8, 1, 0)
         {
 
@@ -59,6 +62,8 @@ namespace CA_DataUploaderLib
                 PortOpenTimeStamp = DateTime.UtcNow;
                 ReadTimeout = 2000;
                 WriteTimeout = 2000;
+                DataReceived += new SerialDataReceivedEventHandler(port_DataReceived);
+
                 Open();
 
                 ReadSerialNumber();
@@ -94,12 +99,18 @@ namespace CA_DataUploaderLib
             return ToString(Environment.NewLine);
         }
 
+        private void port_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        {
+            // Show all the incoming data in the port's buffer in the output window
+            _readBuffer.Enqueue(ReadExisting());
+        }
+
         public string SafeReadLine()
         {
             try
             {
                 if (IsOpen)
-                return ReadLine();
+                    return ReadLine();
 
                 Thread.Sleep(100);
                 Open();
@@ -110,10 +121,58 @@ namespace CA_DataUploaderLib
             }
             catch (Exception)
             {
-                CALog.LogErrorAndConsole(LogID.A, $"Unable to read from serial port: {PortName} {productType} {serialNumber}");
+                CALog.LogErrorAndConsole(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber}");
                 if (_safeLimit-- == 0) throw;
             }
+
             return string.Empty;
+        }
+
+        public string SafeReadLine2()
+        {
+            try
+            {
+                var stop = DateTime.Now.AddMilliseconds(ReadTimeout);
+                string result = _overshoot;  // stuff from last read;
+
+                while(DateTime.Now < stop)
+                {
+                    if(_readBuffer.Count > 0)
+                        result += _readBuffer.Dequeue();
+
+                    if (result.Contains("\n"))
+                        return RemoveOvershoot(result);
+
+                    Thread.Sleep(10);
+                }
+
+                var message = $"Timeout while reading from serial port: {PortName} {productType} {serialNumber}";
+                CALog.LogErrorAndConsole(LogID.A, message);
+                if (_safeLimit-- == 0) throw new Exception(message);
+
+            }
+            catch (Exception)
+            {
+                CALog.LogErrorAndConsole(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber}");
+                if (_safeLimit-- == 0) throw;
+            }
+
+            return string.Empty;
+        }
+
+        private string RemoveOvershoot(string result)
+        {
+            if (result.EndsWith("\n") || result.EndsWith("\r"))
+                return result;
+
+            var pos = Math.Max(result.IndexOf("\n"), result.IndexOf("\r"));
+            if(pos != -1)
+            {
+                _overshoot = result.Substring(pos+1);
+                return result.Substring(0, pos+1);
+            }
+
+            throw new Exception("Error in the RemoveOvershoot algorithm: " + result);
         }
 
         public void SafeWriteLine(string msg)
