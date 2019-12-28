@@ -16,7 +16,7 @@ namespace CA_DataUploaderLib
         private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
         private CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         private VectorDescription _vectorDescription;
-        private List<double> _dataVector;
+        private List<double> _dataVector = new List<double>();
 
         public bool IsRunning { get { return _running; } }
 
@@ -61,13 +61,19 @@ namespace CA_DataUploaderLib
 
         public void NewData(List<double> vector)
         {
-            _dataVector = vector;
+            lock (_dataVector)
+            {
+                _dataVector = vector;
+            }
         }
 
         public double GetVectorValue(string name)
         {
             var index = _vectorDescription._items.IndexOf(_vectorDescription._items.Single(x => x.Descriptor == name));
-            return _dataVector[index];
+            lock (_dataVector)
+            {
+                return _dataVector[index];
+            }
         }
 
         private bool Stop(List<string> args)
@@ -76,6 +82,7 @@ namespace CA_DataUploaderLib
             return true;
         }
 
+        // later this shall take filename.nav + function name. 
         private bool Run(List<string> args)
         {
             var asm = Assembly.LoadFrom(args[1]);
