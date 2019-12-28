@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 
@@ -14,6 +15,8 @@ namespace CA_DataUploaderLib
         private StringBuilder inputCommand = new StringBuilder();
         private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
         private CALogLevel _logLevel = IOconfFile.GetOutputLevel();
+        private VectorDescription _vectorDescription;
+        private List<double> _dataVector;
 
         public bool IsRunning { get { return _running; } }
 
@@ -22,6 +25,7 @@ namespace CA_DataUploaderLib
             new Thread(() => this.LoopForever()).Start();
             AddCommand("escape", Stop);
             AddCommand("help", HelpMenu);
+            AddCommand("Run", Run);
         }
 
         public void AddCommand(string name, Func<List<string>, bool> func)
@@ -50,12 +54,45 @@ namespace CA_DataUploaderLib
             return true;
         }
 
+        public void SetVectorDescription(VectorDescription vectorDescription)
+        {
+            _vectorDescription = vectorDescription;
+        }
+
+        public void NewData(List<double> vector)
+        {
+            _dataVector = vector;
+        }
+
+        public double GetVectorValue(string name)
+        {
+            var index = _vectorDescription._items.IndexOf(_vectorDescription._items.Single(x => x.Descriptor == name));
+            return _dataVector[index];
+        }
+
         private bool Stop(List<string> args)
         {
             _running = false;
             return true;
         }
-        
+
+        private bool Run(List<string> args)
+        {
+            var asm = Assembly.LoadFrom(args[1]);
+            if (asm == null) throw new ArgumentException("Argument 1 (dll) was not found: " + args[1]);
+
+            Type t = asm.GetType(args[2]);
+            if (t == null) throw new ArgumentException("Argument 2 (class) was not found: " + args[2]);
+
+            var methodInfo = t.GetMethod(args[3]);
+            if (methodInfo == null) throw new ArgumentException("Argument 3 (method) was not found: " + args[3]);
+
+            var o = Activator.CreateInstance(t, this);
+            new Thread(() => methodInfo.Invoke(o, null)).Start();
+
+            return true;
+        }
+
         private void LoopForever()
         {
             DateTime start = DateTime.Now;
