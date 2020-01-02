@@ -90,6 +90,8 @@ namespace CA_DataUploaderLib
             DateTime start = DateTime.Now;
             string row = string.Empty;
             int badRow = 0;
+            List<string> badPorts = new List<string>();
+            MCUBoard exBoard = null;
 
             while (_running)
             {
@@ -97,6 +99,7 @@ namespace CA_DataUploaderLib
                 {
                     foreach (var board in Boards())
                     {
+                        exBoard = board; // only used in exception
                         values.Clear();
                         numbers.Clear();
                         row = board.SafeReadLine();
@@ -130,10 +133,14 @@ namespace CA_DataUploaderLib
                     }
 
                     CALog.LogInfoAndConsoleLn(LogID.A, ".");
+                    if(exBoard != null)
+                        badPorts.Add($"{exBoard.PortName}:{exBoard.serialNumber} = {row}");
+
                     badRow++;
                     if (badRow > 10)
                     {
-                        CALog.LogInfoAndConsoleLn(LogID.A, "Too many bad rows from thermocouple ports.. shutting down.");
+                        CALog.LogInfoAndConsoleLn(LogID.A, "Too many bad rows from thermocouple ports.. shutting down:");
+                        badPorts.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x));
                         CALog.LogException(LogID.A, ex);
                         _cmdHandler.Execute("escape");
                         _running = false;
