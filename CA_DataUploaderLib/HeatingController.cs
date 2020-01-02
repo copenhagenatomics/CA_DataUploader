@@ -191,7 +191,7 @@ namespace CA_DataUploaderLib
             try
             {
                 heater.Board().SafeWriteLine($"p{heater.ioconf.PortNumber} off");
-                CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
+                CALog.LogData(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
             {
@@ -204,7 +204,7 @@ namespace CA_DataUploaderLib
             try
             {
                 heater.Board().SafeWriteLine($"p{heater.ioconf.PortNumber} on {HeaterOnTimeout}");
-                CALog.LogInfoAndConsoleLn(LogID.B, heater.ToString());
+                CALog.LogData(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
             {

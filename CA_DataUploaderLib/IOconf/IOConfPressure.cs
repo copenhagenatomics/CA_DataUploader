@@ -13,11 +13,6 @@ namespace CA_DataUploaderLib.IOconf
             BoxName = list[2];
             SetMap(BoxName);
             if (!int.TryParse(list[3], out PortNumber)) throw new Exception("IOConfPressure: wrong port number: " + row);
-            
-            if (list.Count > 4)
-                ValveName = list[4];
         }
-
-        public string ValveName;  // bad code, remove later. 
     }
 }
