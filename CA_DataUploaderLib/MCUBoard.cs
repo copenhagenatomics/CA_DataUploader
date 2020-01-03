@@ -62,7 +62,7 @@ namespace CA_DataUploaderLib
                 PortOpenTimeStamp = DateTime.UtcNow;
                 ReadTimeout = 2000;
                 WriteTimeout = 2000;
-                DataReceived += new SerialDataReceivedEventHandler(port_DataReceived);
+                // DataReceived += new SerialDataReceivedEventHandler(port_DataReceived);
 
                 Open();
 

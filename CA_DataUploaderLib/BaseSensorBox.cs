@@ -142,14 +142,19 @@ namespace CA_DataUploaderLib
                         CALog.LogInfoAndConsoleLn(LogID.A, "Too many bad rows from thermocouple ports.. shutting down:");
                         badPorts.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x));
                         CALog.LogException(LogID.A, ex);
-                        _cmdHandler.Execute("escape");
+                        if(_cmdHandler != null)
+                            _cmdHandler.Execute("escape");
+
                         _running = false;
                     }
                 }
             }
 
             foreach (var board in Boards())
-                board.SafeClose();
+            {
+                if(board != null)
+                    board.SafeClose();
+            }
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
         }
@@ -250,12 +255,13 @@ namespace CA_DataUploaderLib
             for (int i = 0; i < 100; i++)
             {
                 foreach(var board in Boards())
-                    if (board.IsOpen)
+                    if (board != null && board.IsOpen)
                             Thread.Sleep(10);
             }
 
             foreach (var board in Boards())
-                ((IDisposable)board).Dispose();
+                if(board != null)
+                    ((IDisposable)board).Dispose();
         }
     }
 }
