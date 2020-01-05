@@ -164,13 +164,13 @@ namespace CA_DataUploaderLib
                         _sendCount = 0;
                         if (heater.Current == 0 && heater.IsOn)
                         {
-                            CALog.LogInfoAndConsole(LogID.B, "_");
+                            CALog.LogData(LogID.B, "_");
                             HeaterOn(heater);
                         }
 
                         if (heater.Current > 0 && !heater.IsOn)
                         {
-                            CALog.LogInfoAndConsole(LogID.B, "_");
+                            CALog.LogData(LogID.B, "_");
                             HeaterOff(heater);
                         }
                     }
