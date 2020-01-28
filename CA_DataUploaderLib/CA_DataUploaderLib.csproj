@@ -1,143 +1,33 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{A5644A35-6961-4D03-B2C2-57710DA71C90}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>CA_DataUploaderLib</RootNamespace>
-    <AssemblyName>CA_DataUploaderLib</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>portable</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="GodSharp.SerialPort, Version=1.2.0.6, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\GodSharp.SerialPort.1.2.0.6\lib\net47\GodSharp.SerialPort.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.ComponentModel.Composition" />
-    <Reference Include="System.Configuration" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.IO">
-      <HintPath>..\packages\System.IO.4.3.0\lib\net462\System.IO.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System.Management" />
-    <Reference Include="System.Net" />
-    <Reference Include="System.Net.Http">
-      <HintPath>..\packages\System.Net.Http.4.3.4\lib\net46\System.Net.Http.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System.Net.Http.Extensions, Version=2.2.29.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Net.Http.Formatting.Extension.5.2.3.0\lib\System.Net.Http.Extensions.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Net.Http.Formatting, Version=5.2.3.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Net.Http.Formatting.Extension.5.2.3.0\lib\System.Net.Http.Formatting.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Net.Http.Primitives, Version=4.2.29.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Net.Http.Formatting.Extension.5.2.3.0\lib\System.Net.Http.Primitives.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Runtime">
-      <HintPath>..\packages\System.Runtime.4.3.1\lib\net462\System.Runtime.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System.Security.Cryptography.Algorithms">
-      <HintPath>..\packages\System.Security.Cryptography.Algorithms.4.3.1\lib\net463\System.Security.Cryptography.Algorithms.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System.Security.Cryptography.Encoding">
-      <HintPath>..\packages\System.Security.Cryptography.Encoding.4.3.0\lib\net46\System.Security.Cryptography.Encoding.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System.Security.Cryptography.Primitives">
-      <HintPath>..\packages\System.Security.Cryptography.Primitives.4.3.0\lib\net46\System.Security.Cryptography.Primitives.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System.Security.Cryptography.X509Certificates">
-      <HintPath>..\packages\System.Security.Cryptography.X509Certificates.4.3.2\lib\net461\System.Security.Cryptography.X509Certificates.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
+    <None Remove="MIT license.txt" />
+    <None Remove="RPi_versions.csv" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="BaseSensorBox.cs" />
-    <Compile Include="CommandHandler.cs" />
-    <Compile Include="DataVector.cs" />
-    <Compile Include="Enums.cs" />
-    <Compile Include="Extensions\LinqExtensions.cs" />
-    <Compile Include="Extensions\StringExtensions.cs" />
-    <Compile Include="HeatingController.cs" />
-    <Compile Include="HeaterElement.cs" />
-    <Compile Include="IOconf\ConnectionInfo.cs" />
-    <Compile Include="IOconf\IOconfDriver.cs" />
-    <Compile Include="IOconf\IOconfFile.cs" />
-    <Compile Include="CALog.cs" />
-    <Compile Include="IOconf\IOconfAccount.cs" />
-    <Compile Include="IOconf\IOconfAirFlow.cs" />
-    <Compile Include="IOconf\IOconfHeater.cs" />
-    <Compile Include="IOconf\IOconfInput.cs" />
-    <Compile Include="IOconf\IOconfLight.cs" />
-    <Compile Include="IOconf\IOconfLiquidFlow.cs" />
-    <Compile Include="IOconf\IOconfLoopName.cs" />
-    <Compile Include="IOconf\IOconfMotor.cs" />
-    <Compile Include="IOconf\IOconfOutput.cs" />
-    <Compile Include="IOconf\IOconfOven.cs" />
-    <Compile Include="IOconf\IOConfPressure.cs" />
-    <Compile Include="IOconf\IOconfRow.cs" />
-    <Compile Include="IOconf\IOconfScale.cs" />
-    <Compile Include="IOconf\IOconfState.cs" />
-    <Compile Include="IOconf\IOconfTank.cs" />
-    <Compile Include="IOconf\IOconfTypeK.cs" />
-    <Compile Include="IOconf\IOconfMap.cs" />
-    <Compile Include="IOconf\IOconfVacuumPump.cs" />
-    <Compile Include="IOconf\IOconfValve.cs" />
-    <Compile Include="IOconf\IOconfOut230Vac.cs" />
-    <Compile Include="MCUBoard.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RpiVersion.cs" />
-    <Compile Include="SerialNumberMapper.cs" />
-    <Compile Include="SerialPortWatcher.cs" />
-    <Compile Include="ServerUploader.cs" />
-    <Compile Include="SensorSample.cs" />
-    <Compile Include="SwitchBoardBase.cs" />
-    <Compile Include="ThermocoupleBox.cs" />
-    <Compile Include="VectorDescription.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="RPi_versions.csv" />
-  </ItemGroup>
+
   <ItemGroup>
     <Content Include="MIT license.txt" />
   </ItemGroup>
+
   <ItemGroup>
-    <None Include="app.config" />
-    <None Include="packages.config" />
+    <EmbeddedResource Include="RPi_versions.csv" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.7" />
+    <PackageReference Include="System.ComponentModel.Composition" Version="4.7.0" />
+    <PackageReference Include="System.IO.Ports" Version="4.7.0" />
+    <PackageReference Include="System.Management" Version="4.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="MCUBoard.cs">
+      <SubType>Component</SubType>
+    </Compile>
+  </ItemGroup>
+
 </Project>
