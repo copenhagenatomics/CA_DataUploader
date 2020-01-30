@@ -12,6 +12,8 @@
     <NeutralLanguage>en</NeutralLanguage>
     <Version>1.0.2</Version>
     <Copyright>Copenhagen Atomics</Copyright>
+    <RepositoryUrl>https://github.com/copenhagenatomics/CA_DataUploader</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>
