@@ -2,11 +2,25 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Company>Copenhagen Atomics</Company>
+    <Authors>Thomas Jam Pedersen + others</Authors>
+    <Description>Allow you to interface with digital IO hardware, and a large number of sensors. Including features to upload to web chart</Description>
+    <PackageLicenseFile>MIT license.txt</PackageLicenseFile>
+    <PackageProjectUrl>https://github.com/copenhagenatomics/CA_DataUploader</PackageProjectUrl>
+    <PackageTags>RaspberryPi, IOT</PackageTags>
+    <NeutralLanguage>en</NeutralLanguage>
+    <Version>1.0.2</Version>
+    <Copyright>Copenhagen Atomics</Copyright>
   </PropertyGroup>
 
   <ItemGroup>
     <None Remove="MIT license.txt" />
     <None Remove="RPi_versions.csv" />
+    <None Include="MIT license.txt">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
