@@ -27,11 +27,15 @@ Then I run
 
 After this you can download the release zip file here form github or FTP it to your RaspberryPi and run it with this command:
 
-> sudo mono --debug CA_AverageTemperature.exe
+> mono --debug CA_AverageTemperature.exe
 
 ![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/CA_AverageTemperature.exe.png)
 
 or
+
+Run the CA_DataUploader.exe (on Windows or Linux)
+
+> mono --debug CA_AverageTemperature.exe
 
 ![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/CA_DataUploader.exe.png)
 
