@@ -1,7 +1,5 @@
 /*******************************************************************************
 * Thermocouple to serial for MAX31855 example */
-#define softwareVersion "1.1"
-
 /* Date: 26-12-2011
 * Company: Rocket Scream Electronics
 * Website: www.rocketscream.com

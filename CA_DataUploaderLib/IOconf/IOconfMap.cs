@@ -32,7 +32,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public bool SetMCUboard(MCUBoard board)
         {
-            if (board.serialNumber == SerialNumber || board.PortName == USBPort)
+            if ((board.serialNumber == SerialNumber && SerialNumber != null) || board.PortName == USBPort)
             {
                 Board = board;
                 return true;
