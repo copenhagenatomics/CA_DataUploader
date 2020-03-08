@@ -8,9 +8,9 @@
     <Description>Allow you to interface with digital IO hardware, and a large number of sensors. Including features to upload to web chart</Description>
     <PackageLicenseFile>MIT license.txt</PackageLicenseFile>
     <PackageProjectUrl>https://github.com/copenhagenatomics/CA_DataUploader</PackageProjectUrl>
-    <PackageTags>RaspberryPi, IOT</PackageTags>
+    <PackageTags>Raspberry Pi, IOT</PackageTags>
     <NeutralLanguage>en</NeutralLanguage>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <Copyright>Copenhagen Atomics</Copyright>
     <RepositoryUrl>https://github.com/copenhagenatomics/CA_DataUploader</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

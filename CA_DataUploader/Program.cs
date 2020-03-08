@@ -26,7 +26,7 @@ namespace CA_DataUploader
                     int filterLen = (args.Length > 0) ? int.Parse(args[0]) : 10;
                     using (var cmd = new CommandHandler())
                     using (var usb = new ThermocoupleBox(cmd, filterLen))
-                    using (var cloud = new ServerUploader(GetVectorDescription(usb)))
+                    using (var cloud = new ServerUploader(GetVectorDescription(usb), cmd))
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server");
 

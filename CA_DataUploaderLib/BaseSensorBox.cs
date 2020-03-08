@@ -163,6 +163,11 @@ namespace CA_DataUploaderLib
         {
             return _config.Select(x => x.Map.Board).Distinct();
         }
+        protected bool Stop(List<string> args)
+        {
+            _running = false;
+            return true;
+        }
 
         private void ProcessLine(IEnumerable<double> numbers, string IOconfName, MCUBoard board)
         {

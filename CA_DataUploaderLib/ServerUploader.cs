@@ -20,6 +20,7 @@ namespace CA_DataUploaderLib
         private HttpClient _client = new HttpClient();
         private RSACryptoServiceProvider _rsaWriter = new RSACryptoServiceProvider(1024);
         private Queue<DataVector> _queue = new Queue<DataVector>();
+        private List<DateTime> _badPackages = new List<DateTime>();
         private Dictionary<string, string> _accountInfo;
         private int _plotID;
         private int _vectorLen;
@@ -31,7 +32,7 @@ namespace CA_DataUploaderLib
 
         public int MillisecondsBetweenUpload { get; set; }
 
-        public ServerUploader(VectorDescription vectorDescription)
+        public ServerUploader(VectorDescription vectorDescription, CommandHandler cmd = null)
         {
             try
             {
@@ -62,6 +63,8 @@ namespace CA_DataUploaderLib
                 _plotID = GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription)).Result;
                 _vectorLen = vectorDescription.Length;
                 new Thread(() => this.LoopForever()).Start();
+                if(cmd != null)
+                    cmd.AddCommand("escape", Stop);
             }
             catch (Exception ex)
             {
@@ -75,17 +78,20 @@ namespace CA_DataUploaderLib
             if (vector.Count() != _vectorLen)
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count()} <> {_vectorLen}");
 
-            if (_queue.Count < 1000)  // if problems then drop packages. 
+            lock (_queue)
             {
-                if (_lastTimestamp < timestamp)
+                if (_queue.Count < 1000)  // if problems then drop packages. 
                 {
-                    _queue.Enqueue(new DataVector
+                    if (_lastTimestamp < timestamp)
                     {
-                        timestamp = timestamp,
-                        vector = vector
-                    });
+                        _queue.Enqueue(new DataVector
+                        {
+                            timestamp = timestamp,
+                            vector = vector
+                        });
 
-                    _lastTimestamp = timestamp;
+                        _lastTimestamp = timestamp;
+                    }
                 }
             }
         }
@@ -165,9 +171,12 @@ namespace CA_DataUploaderLib
                 try
                 {
                     List<DataVector> list = new List<DataVector>();
-                    while (_queue.Any())  // dequeue all. 
+                    lock (_queue)
                     {
-                        list.Add(_queue.Dequeue());
+                        while (_queue.Any())  // dequeue all. 
+                        {
+                            list.Add(_queue.Dequeue());
+                        }
                     }
 
                     if (list.Any())
@@ -185,6 +194,8 @@ namespace CA_DataUploaderLib
                     CALog.LogErrorAndConsole(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message);
                 }
             }
+
+            PrintBadPackagesMessage();
         }
 
         private byte[] Compress(byte[] buffer)
@@ -267,9 +278,31 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                CALog.LogInfoAndConsoleLn(LogID.A, "Unable to upload vector to server: " + timestamp.ToString("HH:mm:ss"));
+                _badPackages.Add(DateTime.UtcNow);
+                CALog.LogInfoAndConsoleLn(LogID.A, $"-----------------{Environment.NewLine}Unable to upload vector to server: " + timestamp.ToString("HH:mm:ss"));
                 LogHttpException(ex);
+                CALog.LogInfoAndConsoleLn(LogID.A, "-----------------");
+                if (_badPackages.First().AddHours(1) < DateTime.UtcNow)
+                    PrintBadPackagesMessage();
             }
+        }
+
+        private void PrintBadPackagesMessage()
+        {
+            if (!_badPackages.Any())
+                return;
+
+            CALog.LogInfoAndConsoleLn(LogID.A, $"Vector upload errors within the last hour:"); 
+            foreach (var minutes in _badPackages.GroupBy(x => x.ToString("dd-MMM-yyyy HH:mm")))
+                CALog.LogInfoAndConsoleLn(LogID.A, $"{minutes.Key} = {minutes.Count()}");
+
+            _badPackages.Clear();
+        }
+
+        private bool Stop(List<string> args)
+        {
+            _running = false;
+            return true;
         }
 
         private void GetLoginToken()

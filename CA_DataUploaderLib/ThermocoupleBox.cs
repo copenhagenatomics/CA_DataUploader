@@ -26,6 +26,7 @@ namespace CA_DataUploaderLib
             {
                 cmd.AddCommand("Temperatures", ShowQueue);
                 cmd.AddCommand("help", HelpMenu);
+                cmd.AddCommand("escape", Stop);
             }
 
             if (_config.Any())
