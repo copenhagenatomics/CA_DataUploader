@@ -203,12 +203,16 @@ namespace CA_DataUploaderLib
         {
             if (sensor.GetType() == typeof(IOconfSaltLeakage))
             {
-                _values[sensor].Value = (_values[sensor].Value < 3000) ? 1d : 0d;  // Salt leakage algorithm. 
-                if (_values[sensor].Value == 1)
+                if (_values[sensor].Value < 3000 && _values[sensor].Value > 0)  // Salt leakage algorithm. 
                 {
-                    CALog.LogErrorAndConsole(LogID.A, $"Salt leak detected from {sensor.Name} {DateTime.Now.ToString("dd-MMM-yyyy HH:mm")}");
+                    CALog.LogErrorAndConsole(LogID.A, $"Salt leak detected from {sensor.Name}={_values[sensor].Value} {DateTime.Now.ToString("dd-MMM-yyyy HH:mm")}");
+                    _values[sensor].Value = 1d;
                     if (_cmdHandler != null)
                         _cmdHandler.Execute("escape"); // make the whole system shut down. 
+                }
+                else
+                {
+                    _values[sensor].Value = 0d; // no leakage
                 }
             }
         }
