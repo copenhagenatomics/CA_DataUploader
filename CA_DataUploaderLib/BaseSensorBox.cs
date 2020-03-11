@@ -19,8 +19,8 @@ namespace CA_DataUploaderLib
 
         protected CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         protected CommandHandler _cmdHandler;
-        protected ConcurrentDictionary<string, SensorSample> _values = new ConcurrentDictionary<string, SensorSample>();
-        private Dictionary<string, Queue<double>> _filterQueue = new Dictionary<string, Queue<double>>();
+        protected ConcurrentDictionary<IOconfInput, SensorSample> _values = new ConcurrentDictionary<IOconfInput, SensorSample>();
+        private Dictionary<IOconfInput, Queue<double>> _filterQueue = new Dictionary<IOconfInput, Queue<double>>();
         private Queue<double> _frequency = new Queue<double>();
         private List<HeaterElement> heaters = new List<HeaterElement>();
 
@@ -30,15 +30,11 @@ namespace CA_DataUploaderLib
 
         public BaseSensorBox() { }
 
-        public SensorSample GetValue(int sensorID)
+        public SensorSample GetValue(string sensorKey)
         {
-            if (!_config.Any(x => x.PortNumber == sensorID))
-                throw new Exception(sensorID + " sensorID not found in _config, count: " + _config.Count());
-
-            if (!_values.ContainsKey(sensorID.ToString()))
-                throw new Exception(sensorID + " sensorID not found in _temperatures, count: " + _values.Count());
-
-            return _values[sensorID.ToString()];
+            if(!_values.Any(x => (x.Key.BoxName + x.Key.PortNumber.ToString()) == sensorKey))
+                throw new Exception(sensorKey + " not found in _values, count: " + _values.Count());
+            return _values.Single(x => (x.Key.BoxName + x.Key.PortNumber.ToString()) == sensorKey).Value;
         }
 
         public SensorSample GetValueByTitle(string title)
@@ -60,7 +56,7 @@ namespace CA_DataUploaderLib
             if(!Debugger.IsAttached)
                 timedOutSensors.ForEach(x => x.Value = (x.Value < 10000 ? 10009 : x.Value)); // 10009 means timedout
 
-            return _values.Values.OrderBy(x => x.ID);
+            return _config.Where(x => _values.ContainsKey(x)).Select(x => _values[x]);
         }
 
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
@@ -71,9 +67,9 @@ namespace CA_DataUploaderLib
         protected bool ShowQueue(List<string> args)
         {
             var sb = new StringBuilder();
-            foreach (var t in _values.OrderBy(x => x.Key).Select(x => x.Value))
+            foreach (var t in _values)
             {
-                sb.Append($"{t.Name.PadRight(22)}={t.Value.ToString("N2").PadLeft(9)}  ");
+                sb.Append($"{t.Value.Name.PadRight(22)}={t.Value.Value.ToString("N2").PadLeft(9)}  ");
                 if(_filterQueue.ContainsKey(t.Key))
                     _filterQueue[t.Key].ToList().ForEach(x => sb.Append(", " + x.ToString("N2").PadLeft(9)));
                 sb.Append(Environment.NewLine);
@@ -105,14 +101,7 @@ namespace CA_DataUploaderLib
                         row = board.SafeReadLine();
                         values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                         numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
-
-                        if (numbers.Count == 18 && board.productType.StartsWith("Temperature")) // old model. 
-                        {
-                            int hubID = (int)numbers[0];
-                            ProcessLine(numbers.Skip(1), hubID.ToString(), board);
-                        }
-                        else
-                            ProcessLine(numbers, board.BoxName, board);
+                        ProcessLine(numbers, board);
 
                         if (_logLevel == CALogLevel.Debug)
                             CALog.LogData(LogID.A, MakeDebugString(row) + Environment.NewLine);
@@ -169,43 +158,58 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private void ProcessLine(IEnumerable<double> numbers, string IOconfName, MCUBoard board)
+        private void ProcessLine(IEnumerable<double> numbers, MCUBoard board)
         {
             var timestamp = DateTime.UtcNow;
 
             int i = 0;
             foreach (var value in numbers)
             {
-                var sensor = GetSensor(IOconfName, i);
-                if (sensor.input != null)
+                var sensor = _config.SingleOrDefault(x => x.BoxName == board.BoxName && x.PortNumber == i);
+                if (sensor != null)
                 {
-                    if (_values.ContainsKey(sensor.key))
+                    if (_values.ContainsKey(sensor))
                     {
-                        if (sensor.readJunction)
-                        {
-                            _values[sensor.key].Reference = value;
-                        }
-                        else
-                        {
-                            Frequency = FrequencyLowPassFilter(timestamp.Subtract(_values[sensor.key].TimeStamp));
-                            _values[sensor.key].TimeStamp = timestamp;
-                            _values[sensor.key].Value = (FilterLength > 1) ? LowPassFilter(value, sensor.key) : value;
-                        }
+                        Frequency = FrequencyLowPassFilter(timestamp.Subtract(_values[sensor].TimeStamp));
+                        _values[sensor].TimeStamp = timestamp;
+                        _values[sensor].Value = (FilterLength > 1) ? LowPassFilter(value, sensor) : value;
                     }
                     else
                     {
-                        Debug.Assert(sensor.readJunction == false);
                         var numberOfPorts = numbers.Count() == 11 ? "1x10" : "2x8";
-                        _values.TryAdd(sensor.key, new SensorSample(_config.IndexOf(sensor.input), sensor.key, sensor.input.Name, board) { Value = value, TimeStamp = timestamp, hubID = GetHubID(sensor.input.BoxName), NumberOfPorts = numberOfPorts });
+                        _values.TryAdd(sensor, new SensorSample(sensor) 
+                                                            { 
+                                                                Value = value, 
+                                                                TimeStamp = timestamp, 
+                                                                NumberOfPorts = numberOfPorts,
+                                                                HubID = GetHubID(sensor.BoxName),
+                                                                SerialNumber = board.serialNumber
+                                                            });
                         if (FilterLength > 1)
                         {
-                            _filterQueue.Add(sensor.key, new Queue<double>());
-                            _filterQueue[sensor.key].Enqueue(value);
+                            _filterQueue.Add(sensor, new Queue<double>());
+                            _filterQueue[sensor].Enqueue(value);
                         }
                     }
+
+                    HandleSaltLeakage(sensor);
                 }
 
                 i++;
+            }
+        }
+
+        private void HandleSaltLeakage(IOconfInput sensor)
+        {
+            if (sensor.GetType() == typeof(IOconfSaltLeakage))
+            {
+                _values[sensor].Value = (_values[sensor].Value < 3000) ? 1d : 0d;  // Salt leakage algorithm. 
+                if (_values[sensor].Value == 1)
+                {
+                    CALog.LogErrorAndConsole(LogID.A, $"Salt leak detected from {sensor.Name} {DateTime.Now.ToString("dd-MMM-yyyy HH:mm")}");
+                    if (_cmdHandler != null)
+                        _cmdHandler.Execute("escape"); // make the whole system shut down. 
+                }
             }
         }
 
@@ -214,23 +218,17 @@ namespace CA_DataUploaderLib
             return _config.GroupBy(x => x.BoxName).Select(x => x.Key).ToList().IndexOf(ioconfName);
         }
 
-        private (string key, IOconfInput input, bool readJunction) GetSensor(string IOconfName, int i)
-        {
-            string key = IOconfName + "." + i.ToString();
-            return (key, _config.SingleOrDefault(x => x.BoxName == IOconfName && x.PortNumber == i), i>17);
-        }
-
-        private double LowPassFilter(double value, string key)
+        private double LowPassFilter(double value, IOconfInput sensor)
         {
             double result = value;
-            _filterQueue[key].Enqueue(value);
-            var goodValues = _filterQueue[key].Where(x => x < 10000 && x != 0);
+            _filterQueue[sensor].Enqueue(value);
+            var goodValues = _filterQueue[sensor].Where(x => x < 10000 && x != 0);
             if (goodValues.Any())
                 result = goodValues.Average();
 
-            while (_filterQueue[key].Count() > FilterLength)
+            while (_filterQueue[sensor].Count() > FilterLength)
             {
-                _filterQueue[key].Dequeue();
+                _filterQueue[sensor].Dequeue();
             }
 
             return result;

@@ -22,19 +22,19 @@ namespace CA_AverageTemperature
             switch (sensor.NumberOfPorts)
             {
                 case "2x8":
-                    x = (int)(((16 - sensor.Jack) % 8 + 0.5) * width);
-                    y = (int)(((sensor.Hub) * 4 + ((sensor.Jack - 1) / 8) + 1) * height);
+                    x = (int)(((16 - sensor.PortNumber) % 8 + 0.5) * width);
+                    y = (int)(((sensor.HubID) * 4 + ((sensor.PortNumber - 1) / 8) + 1) * height);
                     w = 9;
                     break;
                 default:
                 case "1x10":
-                    x = (int)(((10 - sensor.Jack) + 0.5) * width); 
-                    y = (int)((sensor.Hub) * 4 + height);   // Wynand please fix. 
+                    x = (int)(((10 - sensor.PortNumber) + 0.5) * width); 
+                    y = (int)((sensor.HubID) * 4 + height);   // Wynand please fix. 
                     w = 11;
                     break;
             }
             Rect = new Rectangle(x, y, (int)width, (int)height);
-            if(sensor.Jack == 0)
+            if(sensor.PortNumber == 0)
             {
                 Rect = new Rectangle((int)(w * width), (int)(y + height / 2), (int)width, (int)height);
                 TitlePos = Rect.Location;
@@ -54,7 +54,7 @@ namespace CA_AverageTemperature
 
         public override string ToString()
         {
-            return $"hub:{Sensor.Hub}, jack:{Sensor.Jack} x:{Rect.X}, y:{Rect.Y}";
+            return $"hub:{Sensor.HubID}, jack:{Sensor.PortNumber} x:{Rect.X}, y:{Rect.Y}";
         }
     }
 }

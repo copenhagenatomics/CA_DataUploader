@@ -61,7 +61,7 @@ namespace CA_AverageTemperature
 
         private List<JackRectangle> Draw4Boxes(Graphics g, int width, int height)
         {
-            var list = _hub.GetAllValidDatapoints().OrderBy(x => x.Hub).Select(x => new JackRectangle(x, width, height)).ToList();
+            var list = _hub.GetAllValidDatapoints().OrderBy(x => x.PortNumber).Select(x => new JackRectangle(x, width, height)).ToList();
             g.FillRectangle(Brushes.LightGray, 0, 0, width, height);
             foreach(var jack in list)
             {
@@ -81,7 +81,7 @@ namespace CA_AverageTemperature
                 if (jack.TitlePos.X > 0)
                 {
                     g.DrawString("Internal temperature", _fontSmall, Brushes.Black, jack.TitlePos, _format);
-                    g.DrawString("Serial: " + jack.Sensor.Board.serialNumber, _fontSmall, Brushes.Black, jack.SerialPos, _format);
+                    g.DrawString("Serial: " + jack.Sensor.SerialNumber, _fontSmall, Brushes.Black, jack.SerialPos, _format);
                 }
             }
 

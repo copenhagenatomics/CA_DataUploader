@@ -29,6 +29,7 @@ namespace CA_DataUploaderLib.IOconf
                 if (row.StartsWith("Account")) return new IOconfAccount(row);
                 if (row.StartsWith("Map"))    return new IOconfMap(row);
                 if (row.StartsWith("TypeK"))  return new IOconfTypeK(row);
+                if (row.StartsWith("SaltLeakage")) return new IOconfSaltLeakage(row);
                 if (row.StartsWith("AirFlow")) return new IOconfAirFlow(row);
                 if (row.StartsWith("Heater")) return new IOconfHeater(row);
                 if (row.StartsWith("Light")) return new IOconfLight(row);
@@ -143,6 +144,12 @@ namespace CA_DataUploaderLib.IOconf
         {
             return Table.Where(x => x.GetType() == typeof(IOconfLight)).Cast<IOconfLight>();
         }
+
+        public static IEnumerable<IOconfSaltLeakage> GetSaltLeakage()
+        {
+            return Table.Where(x => x.GetType() == typeof(IOconfSaltLeakage)).Cast<IOconfSaltLeakage>();
+        }
+
 
         public static List<IGrouping<int,IOconfOven>> GetOven()
         {

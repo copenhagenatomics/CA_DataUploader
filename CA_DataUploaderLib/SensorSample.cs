@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CA_DataUploaderLib.IOconf;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -6,31 +7,22 @@ namespace CA_DataUploaderLib
 {
     public class SensorSample
     {
-        public SensorSample(int id, string key, string name, MCUBoard board) 
-        { 
-            ID = id;
-            Board = board;
-            Name = name;
-            Key = key;
+        public SensorSample(IOconfInput input) 
+        {
+            Input = input;
         }
-        public int ID { get; private set; }   // temperature sensor ID
 
-        public string Key;
-        public int hubID;
-        public DateTime TimeStamp { get; set; }
-        public MCUBoard Board { get; set; }
-
-        public string Name { get; private set; }
-
+        public int HubID;  // used by AverageTemperature to draw GUI
+        public string SerialNumber;  // used by AverageTemperature to draw GUI
         public bool MaxSlope;
 
         public double Value { get; set; }
-        public double Reference { get; set; }
+        public DateTime TimeStamp { get; set; }
+        public IOconfInput Input { get; set; }
 
-        public int Hub { get { return hubID; } }
-
+        public string Name { get { return Input.Name;  }  }
+        public int PortNumber { get { return Input.PortNumber; } }
         public string NumberOfPorts { get; set; }
-        public int Jack { get { return int.Parse(Key.Split('.')[1]); } }
 
         public override string ToString()
         {

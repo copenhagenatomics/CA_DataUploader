@@ -22,6 +22,5 @@ namespace CA_DataUploaderLib.IOconf
             if (Map == null) 
                 throw new Exception($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
         }
-
     }
 }

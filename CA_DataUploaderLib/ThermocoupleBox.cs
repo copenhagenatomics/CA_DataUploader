@@ -15,13 +15,13 @@ namespace CA_DataUploaderLib
             Title = "Thermocouples";
             Initialized = false;
             FilterLength = filterLength;
+            _cmdHandler = cmd;
 
             _config = IOconfFile.GetTypeK().Cast<IOconfInput>().ToList();
 
             if (!_config.Any())
-                throw new Exception("No TypeK temperature sensors found!");
+                return;
 
-            _cmdHandler = cmd;
             if (cmd != null)
             {
                 cmd.AddCommand("Temperatures", ShowQueue);
@@ -29,10 +29,7 @@ namespace CA_DataUploaderLib
                 cmd.AddCommand("escape", Stop);
             }
 
-            if (_config.Any())
-                new Thread(() => this.LoopForever()).Start();
-            else
-                CALog.LogErrorAndConsole(LogID.A, "Type K thermocouple config information is missing in IO.conf");
+            new Thread(() => this.LoopForever()).Start();
         }
 
         private bool HelpMenu(List<string> args)
