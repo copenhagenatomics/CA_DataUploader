@@ -17,7 +17,7 @@ namespace CA_DataUploaderLib
             FilterLength = filterLength;
             _cmdHandler = cmd;
 
-            _config = IOconfFile.GetTypeK().Cast<IOconfInput>().ToList();
+            _config = IOconfFile.GetTypeKAndLeakage().ToList();
 
             if (!_config.Any())
                 return;
