@@ -10,7 +10,7 @@
     <PackageProjectUrl>https://github.com/copenhagenatomics/CA_DataUploader</PackageProjectUrl>
     <PackageTags>Raspberry Pi, IOT</PackageTags>
     <NeutralLanguage>en</NeutralLanguage>
-    <Version>1.0.3</Version>
+    <Version>1.0.5</Version>
     <Copyright>Copenhagen Atomics</Copyright>
     <RepositoryUrl>https://github.com/copenhagenatomics/CA_DataUploader</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

@@ -29,6 +29,8 @@ namespace CA_DataUploaderLib
                 cmd.AddCommand("escape", Stop);
             }
 
+            _boards = _config.Select(x => x.Map.Board).ToList();
+
             new Thread(() => this.LoopForever()).Start();
         }
 

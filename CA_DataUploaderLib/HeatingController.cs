@@ -24,15 +24,16 @@ namespace CA_DataUploaderLib
 
             new Thread(() => this.LoopForever()).Start();
             cmd.AddCommand("escape", Stop);
-            cmd.AddCommand("help", HelpMenu);
-            cmd.AddCommand("oven", Oven);
-            cmd.AddCommand("heater", Heater);
-
             for (int i = 0; i < 20; i++)
             {
                 Thread.Sleep(200); // waiting for temperature date to arrive, this ensure only valid heating elements are created. 
                 if (_heaters.Any())
+                {
+                    cmd.AddCommand("help", HelpMenu);
+                    cmd.AddCommand("oven", Oven);
+                    cmd.AddCommand("heater", Heater);
                     break; // exit the for loop
+                }
             }
         }
 

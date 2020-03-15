@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO.Ports;
 using System.Linq;
 using System.Management;
+using System.Text.RegularExpressions;
 
 namespace CA_DataUploaderLib
 {
@@ -55,7 +56,7 @@ namespace CA_DataUploaderLib
         {
             if (mcu.serialNumber.IsNullOrEmpty())
             {
-                if (!IsAscale(mcu))
+                if (!IsAscale(mcu) && !IsALuminox(mcu))
                 {
                     mcu.serialNumber = "unknown1";
 
@@ -80,8 +81,31 @@ namespace CA_DataUploaderLib
             if (McuBoards.Any(x => x.serialNumber.StartsWith("Scale")))
                 mcu.serialNumber = "Scale" + (McuBoards.Count(x => x.serialNumber.StartsWith("Scale")) + 1);
 
-            return mcu.serialNumber.StartsWith("Scale");
+            return mcu.serialNumber?.StartsWith("Scale") ?? false;
         }
+
+        // "O 0213.1 T +21.0 P 1019 % 020.92 e 0000"
+        private const string _luminoxPattern = "O (([0-9]*[.])?[0-9]+) T ([+-]?([0-9]*[.])?[0-9]+) P (([0-9]*[.])?[0-9]+) % (([0-9]*[.])?[0-9]+) e ([0-9]*)";
+
+        private bool IsALuminox(MCUBoard mcu)
+        {
+            if (!mcu.IsOpen)
+                return false;
+
+            var line = mcu.SafeReadLine();
+            if (Regex.Match(line, _luminoxPattern).Success)
+            {
+                // I should implement the real command to get the serial number. 
+                mcu.serialNumber = "Oxygen1";
+                mcu.productType = "Luminox O2";
+            }
+
+            if (McuBoards.Any(x => x.serialNumber.StartsWith("Oxygen")))
+                mcu.serialNumber = "Oxygen" + (McuBoards.Count(x => x.serialNumber.StartsWith("Oxygen")) + 1);
+
+            return mcu.serialNumber?.StartsWith("Oxygen") ??false;
+        }
+
 
         private string GetStringFromDmesg(string portName)
         {

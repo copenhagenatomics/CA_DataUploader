@@ -41,6 +41,7 @@ namespace CA_DataUploaderLib.IOconf
                 if (row.StartsWith("Tank")) return new IOconfTank(row);
                 if (row.StartsWith("Valve")) return new IOconfValve(row);
                 if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row);
+                if (row.StartsWith("Oxygen")) return new IOconfOxygen(row);
 
                 return new IOconfRow(row, "Unknown");
             }
@@ -153,6 +154,11 @@ namespace CA_DataUploaderLib.IOconf
         public static IEnumerable<IOconfLight> GetLight()
         {
             return Table.Where(x => x.GetType() == typeof(IOconfLight)).Cast<IOconfLight>();
+        }
+
+        public static IEnumerable<IOconfOxygen> GetOxygen()
+        {
+            return Table.Where(x => x.GetType() == typeof(IOconfOxygen)).Cast<IOconfOxygen>();
         }
 
         public static List<IGrouping<int,IOconfOven>> GetOven()

@@ -25,6 +25,7 @@ namespace CA_DataUploaderLib
         private List<HeaterElement> heaters = new List<HeaterElement>();
 
         protected List<IOconfInput> _config;
+        protected List<MCUBoard> _boards = new List<MCUBoard>();
 
         public bool Initialized { get; protected set; }
 
@@ -93,7 +94,7 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    foreach (var board in Boards())
+                    foreach (var board in _boards)
                     {
                         exBoard = board; // only used in exception
                         values.Clear();
@@ -139,7 +140,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            foreach (var board in Boards())
+            foreach (var board in _boards)
             {
                 if(board != null)
                     board.SafeClose();
@@ -148,17 +149,13 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
         }
 
-        private IEnumerable<MCUBoard> Boards()
-        {
-            return _config.Select(x => x.Map.Board).Distinct();
-        }
         protected bool Stop(List<string> args)
         {
             _running = false;
             return true;
         }
 
-        private void ProcessLine(IEnumerable<double> numbers, MCUBoard board)
+        public void ProcessLine(IEnumerable<double> numbers, MCUBoard board)
         {
             var timestamp = DateTime.UtcNow;
 
@@ -176,15 +173,16 @@ namespace CA_DataUploaderLib
                     }
                     else
                     {
-                        var numberOfPorts = numbers.Count() == 11 ? "1x10" : "2x8";
-                        _values.TryAdd(sensor, new SensorSample(sensor) 
-                                                            { 
-                                                                Value = value, 
-                                                                TimeStamp = timestamp, 
-                                                                NumberOfPorts = numberOfPorts,
-                                                                HubID = GetHubID(sensor.BoxName),
-                                                                SerialNumber = board.serialNumber
-                                                            });
+                        var ss = new SensorSample(sensor)
+                        {
+                            Value = value,
+                            TimeStamp = timestamp,
+                            NumberOfPorts = GetNumberOfPorts(numbers),
+                            HubID = GetHubID(sensor.BoxName),
+                            SerialNumber = board.serialNumber
+                        };
+
+                        _values.TryAdd(sensor, ss);
                         if (FilterLength > 1)
                         {
                             _filterQueue.Add(sensor, new Queue<double>());
@@ -196,6 +194,17 @@ namespace CA_DataUploaderLib
                 }
 
                 i++;
+            }
+        }
+
+        private string GetNumberOfPorts(IEnumerable<double> numbers)
+        {
+            switch (numbers.Count())
+            {
+                case 1: return "1x1";
+                case 11: return "1x10";
+                case 17: return "2x8";
+                default: return "unknown";
             }
         }
 
@@ -261,12 +270,12 @@ namespace CA_DataUploaderLib
             _running = false;
             for (int i = 0; i < 100; i++)
             {
-                foreach(var board in Boards())
+                foreach(var board in _boards)
                     if (board != null && board.IsOpen)
                             Thread.Sleep(10);
             }
 
-            foreach (var board in Boards())
+            foreach (var board in _boards)
                 if(board != null)
                     ((IDisposable)board).Dispose();
         }
