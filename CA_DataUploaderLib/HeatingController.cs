@@ -64,7 +64,7 @@ namespace CA_DataUploaderLib
                     heater.SetTemperature(areaTemp);
             }
 
-            if (_heaters.Any(x => x.TargetTemperature > 0))
+            if (_heaters.Any(x => x.IsActive))
                 _cmdHandler.Execute("light on");
             else
                 _cmdHandler.Execute("light off");
@@ -126,7 +126,7 @@ namespace CA_DataUploaderLib
                         GetCurrentValues(box, values);
                     }
 
-                    Thread.Sleep(300);
+                    Thread.Sleep(500);
                     if (i++ % 20 == 0)   // check for new termocouplers every 10 seconds. 
                         CheckForNewThermocouplers();
                 }
@@ -225,16 +225,16 @@ namespace CA_DataUploaderLib
                 {
                     var heater = _heaters.SingleOrDefault(x => x.ioconf == oven.HeatingElement);
                     if (heater == null)
-                        _heaters.Add(new HeaterElement(oven.HeatingElement, sensor));
-                    else if(!heater.sensors.Contains(sensor))
-                        heater.sensors.Add(sensor);
+                        _heaters.Add(new HeaterElement(oven, sensor));
+                    else
+                        heater.TryAdd(sensor, oven.OvenAreaMax);
                 }
             }
 
             // turn heaters off for 2 minutes, if temperature is invalid. 
             foreach(var heater in _heaters)
             {
-                if (!sensors.Any(x => x.Name == heater.sensors.First().Name))
+                if (!heater.HasSensor(sensors))
                 {
                     HeaterOff(heater);
                     heater.LastOff = DateTime.Now.AddMinutes(2); // wait 2 minutes before we turn it on again. It will only turn on if it has updated thermocoupler data. 
@@ -254,8 +254,8 @@ namespace CA_DataUploaderLib
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
-            var list = _heaters.Select(x => new VectorDescriptionItem("double", x.sensors.First().Name + "_Power", DataTypeEnum.Input)).ToList();
-            list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.sensors.First().Name, DataTypeEnum.Output)));
+            var list = _heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_Power", DataTypeEnum.Input)).ToList();
+            list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name(), DataTypeEnum.Output)));
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from HeatingController");
             return list;
         }
