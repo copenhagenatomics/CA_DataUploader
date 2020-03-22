@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib
                 cmd.AddCommand("escape", Stop);
             }
 
-            _boards = _config.Select(x => x.Map.Board).ToList();
+            _boards = _config.Where(x => !x.Skip).Select(x => x.Map.Board).Distinct().ToList();
 
             new Thread(() => this.LoopForever()).Start();
         }

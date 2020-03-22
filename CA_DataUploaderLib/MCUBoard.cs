@@ -121,7 +121,8 @@ namespace CA_DataUploaderLib
             }
             catch (Exception)
             {
-                CALog.LogErrorAndConsole(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber}");
+                var frame = new StackTrace().GetFrame(1);
+                CALog.LogErrorAndConsole(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}");
                 if (_safeLimit-- == 0) throw;
             }
 

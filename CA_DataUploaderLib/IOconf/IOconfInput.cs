@@ -12,6 +12,7 @@ namespace CA_DataUploaderLib.IOconf
         public string Name { get; set; }
         public string BoxName { get; set; }
         public int PortNumber;
+        public bool Skip { get; set; }
         public IOconfMap Map { get; set; }
 
 
