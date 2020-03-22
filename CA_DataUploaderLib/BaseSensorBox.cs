@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 using CA_DataUploaderLib.IOconf;
+using System.Text.RegularExpressions;
 
 namespace CA_DataUploaderLib
 {
@@ -62,7 +63,9 @@ namespace CA_DataUploaderLib
 
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
-            return _config.Select(x => new VectorDescriptionItem("double", x.Name, DataTypeEnum.Input)).ToList();
+            var list = _config.Select(x => new VectorDescriptionItem("double", x.Name, DataTypeEnum.Input)).ToList();
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {this.GetType().ToString()}");
+            return list;
         }
 
         protected bool ShowQueue(List<string> args)
@@ -100,9 +103,12 @@ namespace CA_DataUploaderLib
                         values.Clear();
                         numbers.Clear();
                         row = board.SafeReadLine();
-                        values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                        numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
-                        ProcessLine(numbers, board);
+                        if (Regex.IsMatch(row, @"^\d+"))  // check that row starts with digit. 
+                        { 
+                            values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                            numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
+                            ProcessLine(numbers, board);
+                        }
 
                         if (_logLevel == CALogLevel.Debug)
                             CALog.LogData(LogID.A, MakeDebugString(row) + Environment.NewLine);
