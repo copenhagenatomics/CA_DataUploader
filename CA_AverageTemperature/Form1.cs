@@ -27,7 +27,7 @@ namespace CA_AverageTemperature
             if (dataLoggers.Any())
             {
                 timer1.Enabled = true;
-                _hub = new ThermocoupleBox();
+                _hub = new ThermocoupleBox(null, new TimeSpan(0, 0, 1));
             }
             else
             {
@@ -86,7 +86,7 @@ namespace CA_AverageTemperature
             }
 
             var pos = new Point(width / 2, height - 10);
-            g.DrawString("Frequency: " + _hub.Frequency.ToString("N1") + " Hz", _fontSmall, Brushes.Black, pos, _format);
+            g.DrawString("Frequency: " + list.First().Sensor.GetFrequency().ToString("N1") + " Hz", _fontSmall, Brushes.Black, pos, _format);
 
             return list;
         }
@@ -96,11 +96,6 @@ namespace CA_AverageTemperature
             if(_hub != null)
                 _hub.Dispose();
             timer1.Enabled = false;
-        }
-
-        private void textBox1_Leave(object sender, EventArgs e)
-        {
-            // _hub.FilterLength = (int)(int.Parse(textBox1.Text) * _hub.Frequency);
         }
     }
 }

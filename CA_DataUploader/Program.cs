@@ -23,9 +23,8 @@ namespace CA_DataUploader
                     // close all relay board serial ports connections. 
                     IOconfFile.GetOut230Vac().ToList().ForEach(x => x.Map.Board.SafeClose());
 
-                    int filterLen = (args.Length > 0) ? int.Parse(args[0]) : 10;
                     using (var cmd = new CommandHandler())
-                    using (var usb = new ThermocoupleBox(cmd, filterLen))
+                    using (var usb = new ThermocoupleBox(cmd, new TimeSpan(0, 0, 1)))
                     using (var cloud = new ServerUploader(GetVectorDescription(usb), cmd))
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server");

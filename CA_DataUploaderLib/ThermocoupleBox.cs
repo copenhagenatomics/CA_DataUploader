@@ -10,11 +10,10 @@ namespace CA_DataUploaderLib
 {
     public class ThermocoupleBox : BaseSensorBox
     {
-        public ThermocoupleBox(CommandHandler cmd = null, int filterLength = 1)
+        public ThermocoupleBox(CommandHandler cmd, TimeSpan filterLength)
         {
             Title = "Thermocouples";
             Initialized = false;
-            FilterLength = filterLength;
             _cmdHandler = cmd;
 
             _config = IOconfFile.GetTypeKAndLeakage().ToList();
@@ -30,6 +29,7 @@ namespace CA_DataUploaderLib
             }
 
             _boards = _config.Where(x => !x.Skip).Select(x => x.Map.Board).Distinct().ToList();
+            _config.ForEach(x => _values.TryAdd(x, new SensorSample(x, filterLength, GetHubID(x))));
 
             new Thread(() => this.LoopForever()).Start();
         }
