@@ -21,6 +21,6 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfHeater HeatingElement;
         public IOconfTypeK TypeK;
 
-        public bool OvenAreaMax { get { return OvenArea == 0; } }
+        public bool IsMaxTemperatureSensor { get { return OvenArea == 0; } }
     }
 }

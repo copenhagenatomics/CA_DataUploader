@@ -13,14 +13,26 @@ namespace CA_DataUploaderLib
         public int HeaterOnTimeout = 60;
         private bool _running = true;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
-        private BaseSensorBox _caThermalBox;
         protected CommandHandler _cmdHandler;
         private int _sendCount = 0;
 
         public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
         {
-            _caThermalBox = caThermalBox;
             _cmdHandler = cmd;
+
+            // map all heaters, sensors and ovens. 
+            var heaters = IOconfFile.GetOven().GroupBy(x => x.HeatingElement);
+            var sensors = caThermalBox.GetAllDatapoints().ToList();
+            foreach (var heater in heaters.Where(x => x.Any(y => y.OvenArea > 0)))
+            {
+                int area = heater.First(x => x.OvenArea > 0).OvenArea;
+                var maxSensors = heater.Where(x => x.IsMaxTemperatureSensor).Select(x => x.TypeK.Name).ToList();
+                var ovenSensor = heater.Where(x => !x.IsMaxTemperatureSensor).Select(x => x.TypeK.Name).ToList();
+                _heaters.Add(new HeaterElement(area, heater.Key, sensors.Where(x => maxSensors.Contains(x.Name)), sensors.Where(x => ovenSensor.Contains(x.Name))));
+            }
+
+            if (!_heaters.Any())
+                return;
 
             new Thread(() => this.LoopForever()).Start();
             cmd.AddCommand("escape", Stop);
@@ -53,15 +65,13 @@ namespace CA_DataUploaderLib
         private bool Oven(List<string> args)
         {
             _cmdHandler.AssertArgs(args, 2);
-            var areas = IOconfFile.GetOven();
+            var areas = IOconfFile.GetOven().GroupBy(x => x.OvenArea);
             int i = 1;
             int areaTemp = 300; // default value;
             foreach (var area in areas)
             {
                 areaTemp = CommandHandler.GetCmdParam(args, i++, areaTemp);
-                var heatingElementNames = area.Select(x => x.HeatingElement.Name).ToList();
-                foreach (var heater in _heaters.Where(x => heatingElementNames.Contains(x.ioconf.Name)))
-                    heater.SetTemperature(areaTemp);
+                _heaters.Where(x => x.IsArea(area.Key)).ToList().ForEach(x => x.SetTemperature(areaTemp));
             }
 
             if (_heaters.Any(x => x.IsActive))
@@ -127,8 +137,6 @@ namespace CA_DataUploaderLib
                     }
 
                     Thread.Sleep(500);
-                    if (i++ % 20 == 0)   // check for new termocouplers every 10 seconds. 
-                        CheckForNewThermocouplers();
                 }
                 catch (ArgumentException ex)
                 {
@@ -157,7 +165,7 @@ namespace CA_DataUploaderLib
             {
                 foreach (var heater in _heaters.Where(x => x.Board() == board))
                 {
-                    heater.Current = values[heater.ioconf.PortNumber - 1];
+                    heater.Current = values[heater._ioconf.PortNumber - 1];
 
                     // this is a hot fix to make sure heaters are on/off. 
                     if (_sendCount++ == 10)
@@ -191,7 +199,7 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                heater.Board().SafeWriteLine($"p{heater.ioconf.PortNumber} off");
+                heater.Board().SafeWriteLine($"p{heater._ioconf.PortNumber} off");
                 CALog.LogData(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
@@ -204,42 +212,12 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                heater.Board().SafeWriteLine($"p{heater.ioconf.PortNumber} on {HeaterOnTimeout}");
+                heater.Board().SafeWriteLine($"p{heater._ioconf.PortNumber} on {HeaterOnTimeout}");
                 CALog.LogData(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
             {
                 throw new TimeoutException($"Unable to write to {heater.Board().BoxName}");
-            }
-        }
-
-        private void CheckForNewThermocouplers()
-        {
-            var sensors = _caThermalBox.GetAllDatapoints();
-            
-            // add new heaters
-            foreach(var oven in IOconfFile.GetOven().SelectMany(x => x))
-            {
-                var sensor = sensors.SingleOrDefault(x => x.Name == oven.TypeK.Name);
-                if (sensor != null)
-                {
-                    var heater = _heaters.SingleOrDefault(x => x.ioconf == oven.HeatingElement);
-                    if (heater == null)
-                        _heaters.Add(new HeaterElement(oven, sensor));
-                    else
-                        heater.TryAdd(sensor, oven.OvenAreaMax);
-                }
-            }
-
-            // turn heaters off for 2 minutes, if temperature is invalid. 
-            var validSensors = sensors.Where(x => x.HasValidTemperature()).ToList();
-            foreach (var heater in _heaters)
-            {
-                if (!heater.HasSensor(validSensors))
-                {
-                    HeaterOff(heater);
-                    heater.LastOff = DateTime.Now.AddMinutes(2); // wait 2 minutes before we turn it on again. It will only turn on if it has updated thermocoupler data. 
-                }
             }
         }
 

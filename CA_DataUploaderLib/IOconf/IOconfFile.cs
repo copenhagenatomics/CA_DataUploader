@@ -58,6 +58,11 @@ namespace CA_DataUploaderLib.IOconf
             var groups = Table.GroupBy(x => x.UniqueKey());
             foreach (var g in groups.Where(x => x.Count() > 1))
                 CALog.LogErrorAndConsole(LogID.A, $"ERROR: Name: {g.First().ToList()[1]} occure {g.Count()} times in this group: {g.First().ToList()[0]}{Environment.NewLine}");
+
+            // no heater can be in several oven areas
+            var heaters = GetOven().Where(x => x.OvenArea > 0).GroupBy(x => x.HeatingElement);
+            foreach(var heater in heaters.Where(x => x.Select(y => y.OvenArea).Distinct().Count() > 1))
+                CALog.LogErrorAndConsole(LogID.A, $"ERROR: Heater: {heater.Key.Name} occure in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}");
         }
 
         public static string GetLoopName()
@@ -161,10 +166,9 @@ namespace CA_DataUploaderLib.IOconf
             return Table.Where(x => x.GetType() == typeof(IOconfOxygen)).Cast<IOconfOxygen>();
         }
 
-        public static List<IGrouping<int,IOconfOven>> GetOven()
+        public static IEnumerable<IOconfOven> GetOven()
         {
-            var ovens = Table.Where(x => x.GetType() == typeof(IOconfOven)).Cast<IOconfOven>();
-            return ovens.GroupBy(x => x.OvenArea).OrderBy(x => x.Key).ToList();
+            return Table.Where(x => x.GetType() == typeof(IOconfOven)).Cast<IOconfOven>();
         }
 
     }

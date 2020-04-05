@@ -9,9 +9,10 @@ namespace CA_DataUploaderLib
     {
         private int OvenTargetTemperature;
 
-        public IOconfHeater ioconf;
-        private List<SensorSample> sensors = new List<SensorSample>();
-        private SensorSample MaxSensor;
+        public IOconfHeater _ioconf;
+        private int _area;
+        private List<SensorSample> _ovenSensors = new List<SensorSample>();
+        private List<SensorSample> _heaterSensors = new List<SensorSample>();
         public DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         private double onTemperature = 10000;
@@ -20,17 +21,17 @@ namespace CA_DataUploaderLib
         public double Current;  // Amps per element. 
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
 
-        public HeaterElement(IOconfOven oven, SensorSample sample)
+        public HeaterElement(int area, IOconfHeater heater, IEnumerable<SensorSample> heaterSensors, IEnumerable<SensorSample> ovenSensors)
         {
-            ioconf = oven.HeatingElement;
-            MaxSensor = sample;
-            if (!oven.OvenAreaMax)
-                sensors.Add(sample);
+            _ioconf = heater;
+            _area = area;
+            _heaterSensors = heaterSensors.ToList();
+            _ovenSensors = ovenSensors.ToList();
         }
 
         public void SetTemperature(int value)
         {
-            OvenTargetTemperature = Math.Min(value, ioconf.MaxTemperature);
+            OvenTargetTemperature = Math.Min(value, _ioconf.MaxTemperature);
         }
 
         public bool CanTurnOn()
@@ -42,18 +43,19 @@ namespace CA_DataUploaderLib
                 return false;  // has been turned off for less than 10 seconds. 
 
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
-            var validSensors = sensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
+            var validSensors = _ovenSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
             if (!validSensors.Any())
-                return false;  // no valid sensors 
+                return false;  // no valid oven sensors 
 
             if (validSensors.Any(x => x.Value > OvenTargetTemperature))
-                return false;  // at least one of the temperature sensors value is valid and above maxTemperature.  
+                return false;  // at least one of the temperature sensors value is valid and above OvenTargetTemperature.  
 
-            if (MaxSensor.TimeStamp < twoSecAgo || MaxSensor.Value > 6000)
-                return false;
+            var heaterSensors = _heaterSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
+            if (!heaterSensors.Any() && _heaterSensors.Any())
+                return false;  // no valid heater sensors 
 
-            if (ioconf.MaxTemperature < MaxSensor.Value)
-                return false; // element must never reach higher than set max temperautre. 
+            if (heaterSensors.Any(x => x.Value > _ioconf.MaxTemperature))
+                return false;  // at least one of the temperature sensors value is valid and above the heating element MaxTemperature.  
 
             onTemperature = validSensors.Max(x => x.Value);
             return true;
@@ -62,60 +64,48 @@ namespace CA_DataUploaderLib
         public bool MustTurnOff()
         {
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
-            var validSensors = sensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
+            var validSensors = _ovenSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
             if (!validSensors.Any())
-                return true; // no valid sensors
+                return true; // no valid oven sensors
 
-            if (MaxSensor.TimeStamp < twoSecAgo || MaxSensor.Value > 6000)
-                return true;
+            var heaterSensors = _heaterSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
+            if (!heaterSensors.Any() && _heaterSensors.Any())
+                return true; // no valid heater sensors
 
-            if (MaxSensor.Value > ioconf.MaxTemperature)
-                return true; // element must never reach higher than set max temperautre. 
+            if (heaterSensors.Any(x => x.Value > _ioconf.MaxTemperature))
+                return true; // element must never reach above the heating element MaxTemperature. 
 
-            if (OvenTargetTemperature == 0  && ManualMode)
+            if (ManualMode)
                 return false;
 
             if (onTemperature < 10000 && validSensors.Max(x => x.Value) > onTemperature + 20)
                 return true; // If hottest sensor is 20C higher than the temperature last time we turned on, then turn off. 
 
-            return validSensors.Any(x => x.Value > OvenTargetTemperature); // turn off, if we reached maxTemperature. 
+            return validSensors.Any(x => x.Value > OvenTargetTemperature); // turn off, if we reached OvenTargetTemperature. 
+        }
+
+        public bool IsArea(int ovenArea)
+        {
+            return _area == ovenArea;
         }
 
         public override string ToString()
         {
             string msg = string.Empty;
-            foreach (var s in sensors)
+            foreach (var s in _ovenSensors)
                 msg += s.Value.ToString("N0") + ", " + (LastOn > LastOff ? "" : onTemperature.ToString("N0"));
 
-            return $"{ioconf.Name.PadRight(10)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg.PadRight(12)} {Current.ToString("N1").PadRight(5)} Amp";
+            return $"{_ioconf.Name.PadRight(10)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg.PadRight(12)} {Current.ToString("N1").PadRight(5)} Amp";
         }
 
         public string name()
         {
-            return ioconf.Name.ToLower();
+            return _ioconf.Name.ToLower();
         }
 
         public MCUBoard Board()
         {
-            return ioconf.Map.Board;
-        }
-
-        public bool HasSensor(IEnumerable<SensorSample> allValidTemperatures)
-        {
-            return allValidTemperatures.Any(x => sensors.Any(y => y.Name == x.Name));
-        }
-
-        public bool TryAdd(SensorSample sensor, bool maxSensor)
-        {
-            if (sensors.Contains(sensor))
-                return false;
-
-            if(maxSensor)
-                MaxSensor = sensor;
-            else
-                sensors.Add(sensor);
-
-            return true;
+            return _ioconf.Map.Board;
         }
     }
 }
