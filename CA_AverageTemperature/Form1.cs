@@ -61,7 +61,7 @@ namespace CA_AverageTemperature
 
         private List<JackRectangle> Draw4Boxes(Graphics g, int width, int height)
         {
-            var list = _hub.GetAllValidDatapoints().OrderBy(x => x.PortNumber).Select(x => new JackRectangle(x, width, height)).ToList();
+            var list = _hub.GetAllDatapoints().OrderBy(x => x.PortNumber).Select(x => new JackRectangle(x, width, height)).ToList();
             g.FillRectangle(Brushes.LightGray, 0, 0, width, height);
             foreach(var jack in list)
             {

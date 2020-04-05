@@ -46,9 +46,9 @@ namespace CA_DataUploaderLib
             return temp;
         }
 
-        public IEnumerable<SensorSample> GetAllValidDatapoints()
+        public IEnumerable<SensorSample> GetAllDatapoints()
         {
-            return _config.Where(x => _values.ContainsKey(x)).Select(x => _values[x]);  
+            return _values.Values;  
         }
 
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()

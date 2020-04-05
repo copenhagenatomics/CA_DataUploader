@@ -215,7 +215,7 @@ namespace CA_DataUploaderLib
 
         private void CheckForNewThermocouplers()
         {
-            var sensors = _caThermalBox.GetAllValidDatapoints();
+            var sensors = _caThermalBox.GetAllDatapoints();
             
             // add new heaters
             foreach(var oven in IOconfFile.GetOven().SelectMany(x => x))
@@ -232,9 +232,10 @@ namespace CA_DataUploaderLib
             }
 
             // turn heaters off for 2 minutes, if temperature is invalid. 
-            foreach(var heater in _heaters)
+            var validSensors = sensors.Where(x => x.HasValidTemperature()).ToList();
+            foreach (var heater in _heaters)
             {
-                if (!heater.HasSensor(sensors))
+                if (!heater.HasSensor(validSensors))
                 {
                     HeaterOff(heater);
                     heater.LastOff = DateTime.Now.AddMinutes(2); // wait 2 minutes before we turn it on again. It will only turn on if it has updated thermocoupler data. 

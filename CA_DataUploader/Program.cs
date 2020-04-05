@@ -32,7 +32,7 @@ namespace CA_DataUploader
                         int i = 0;
                         while (cmd.IsRunning)
                         {
-                            var allSensors = usb.GetAllValidDatapoints().ToList();
+                            var allSensors = usb.GetAllDatapoints().ToList();
                             if (allSensors.Any())
                             {
                                 cloud.SendVector(allSensors.Select(x => x.Value).ToList(), AverageSensorTimestamp(allSensors));

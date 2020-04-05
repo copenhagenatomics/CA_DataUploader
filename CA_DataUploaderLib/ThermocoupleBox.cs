@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib
             }
 
             _boards = _config.Where(x => !x.Skip).Select(x => x.Map.Board).Distinct().ToList();
-            _config.ForEach(x => _values.TryAdd(x, new SensorSample(x, filterLength, GetHubID(x))));
+            _config.ForEach(x => _values.TryAdd(x, new SensorSample(x, filterLength, GetHubID(x))));  // add in same order as in IO.conf
 
             new Thread(() => this.LoopForever()).Start();
         }

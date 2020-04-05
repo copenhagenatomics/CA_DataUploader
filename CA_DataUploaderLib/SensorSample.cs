@@ -30,6 +30,7 @@ namespace CA_DataUploaderLib
 
         public double TimeoutValue
         {
+            // if last sample is older than filter length, then set timeout. 
             get { return (TimeStamp < DateTime.UtcNow.Subtract(FilterLength)) ? 10009 : _value; }   // 10009 means timedout
         }
 
@@ -83,6 +84,11 @@ namespace CA_DataUploaderLib
             {
                 return (_filterQueue.Count() - 1) / _filterQueue.Last().Item2.Subtract(_filterQueue.First().Item2).TotalSeconds;
             }
+        }
+
+        public bool HasValidTemperature()
+        {
+            return Value != 0 && TimeoutValue < 10000;
         }
     }
 }
