@@ -18,7 +18,7 @@ namespace CA_DataUploaderLib
 
         protected CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         protected CommandHandler _cmdHandler;
-        protected ConcurrentDictionary<IOconfInput, SensorSample> _values = new ConcurrentDictionary<IOconfInput, SensorSample>();
+        protected Dictionary<IOconfInput, SensorSample> _values = new Dictionary<IOconfInput, SensorSample>();
 
         protected List<IOconfInput> _config;
         protected List<MCUBoard> _boards = new List<MCUBoard>();
