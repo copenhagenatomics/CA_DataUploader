@@ -6,16 +6,18 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfRow
     {
-        public IOconfRow(string row, string type)
+        public IOconfRow(string row, int lineNum, string type)
         {
             Row = row;
             Type = type;
+            LineNumber = lineNum;
             var list = ToList();
             if (list[0] != Type) throw new Exception("IOconfRow: wrong format: " + Row);
         }
 
         protected string Row;
-        protected string Type; 
+        protected string Type;
+        protected int LineNumber;
 
         public List<string> ToList()
         {

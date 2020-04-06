@@ -8,7 +8,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfMap : IOconfRow
     {
-        public IOconfMap(string row) : base(row, "Map")
+        public IOconfMap(string row, int lineNum) : base(row, lineNum, "Map")
         {
             var list = ToList();
             if (list[0] != "Map") throw new Exception("IOconfMap: wrong format: " + row);

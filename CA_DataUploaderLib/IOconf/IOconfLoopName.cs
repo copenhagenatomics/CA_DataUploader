@@ -5,7 +5,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfLoopName : IOconfState
     {
-        public IOconfLoopName(string row) : base(row, "LoopName")
+        public IOconfLoopName(string row, int lineNum) : base(row, lineNum, "LoopName")
         {
             var list = ToList();
             Name = list[1];

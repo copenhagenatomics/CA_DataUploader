@@ -5,7 +5,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfHeater : IOconfOut230Vac
     {
-        public IOconfHeater(string row) : base(row, "Heater")
+        public IOconfHeater(string row, int lineNum) : base(row, lineNum, "Heater")
         {
             var list = ToList();
             if (!int.TryParse(list[4], out MaxTemperature)) throw new Exception("IOconfHeater: missing max temperature: " + row);

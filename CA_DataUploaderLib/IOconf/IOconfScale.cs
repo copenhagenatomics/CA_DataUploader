@@ -6,7 +6,7 @@ namespace CA_DataUploaderLib.IOconf
 {
    public class IOconfScale : IOconfInput
     {
-        public IOconfScale(string row) : base(row, "Scale")
+        public IOconfScale(string row, int lineNum) : base(row, lineNum, "Scale")
         {
             var list = ToList();
             Name = list[1];

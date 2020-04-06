@@ -7,7 +7,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfInput : IOconfRow
     {
-        public IOconfInput(string row, string type) : base(row, type) { }
+        public IOconfInput(string row, int lineNum, string type) : base(row, lineNum, type) { }
 
         public string Name { get; set; }
         public string BoxName { get; set; }

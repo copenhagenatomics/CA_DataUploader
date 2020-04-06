@@ -6,7 +6,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfLiquidFlow : IOconfInput
     {
-        public IOconfLiquidFlow(string row) : base(row, "LiquidFlow")
+        public IOconfLiquidFlow(string row, int lineNum) : base(row, lineNum, "LiquidFlow")
         {
             var list = ToList();
             Name = list[1];

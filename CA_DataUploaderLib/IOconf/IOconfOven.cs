@@ -5,7 +5,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfOven : IOconfDriver
     {
-        public IOconfOven(string row) : base(row, "Oven")
+        public IOconfOven(string row, int lineNum) : base(row, lineNum, "Oven")
         {
             var list = ToList();
             if (list[1].ToLower() == "max") 

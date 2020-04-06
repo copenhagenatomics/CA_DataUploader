@@ -5,45 +5,47 @@ using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfFile
+    public static class IOconfFile
     {
-        protected static List<IOconfRow> Table = new List<IOconfRow>();
+        private static List<IOconfRow> Table = new List<IOconfRow>();
+        public static string RawFile { get; private set; }
 
-        public IOconfFile()
+        static IOconfFile()
         {
             if (File.Exists("IO.conf") && !Table.Any())
             {
                 var lines = File.ReadAllLines("IO.conf").ToList();
+                RawFile = string.Join(Environment.NewLine, lines);
                 // remove empty lines and commented out lines
-                lines = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
-                lines.ForEach(x => Table.Add(CreateType(x)));
-                CheckRules(lines);
+                var lines2 = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
+                lines2.ForEach(x => Table.Add(CreateType(x, lines.IndexOf(x))));
+                CheckRules(lines2);
             }
         }
 
-        private IOconfRow CreateType(string row)
+        private static IOconfRow CreateType(string row, int lineNum)
         {
             try
             {
-                if (row.StartsWith("LoopName")) return new IOconfLoopName(row);
-                if (row.StartsWith("Account")) return new IOconfAccount(row);
-                if (row.StartsWith("Map"))    return new IOconfMap(row);
-                if (row.StartsWith("TypeK"))  return new IOconfTypeK(row);
-                if (row.StartsWith("SaltLeakage")) return new IOconfSaltLeakage(row);
-                if (row.StartsWith("AirFlow")) return new IOconfAirFlow(row);
-                if (row.StartsWith("Heater")) return new IOconfHeater(row);
-                if (row.StartsWith("Light")) return new IOconfLight(row);
-                if (row.StartsWith("LiquidFlow")) return new IOconfLiquidFlow(row);
-                if (row.StartsWith("Motor")) return new IOconfMotor(row);
-                if (row.StartsWith("Oven")) return new IOconfOven(row);
-                if (row.StartsWith("Pressure")) return new IOConfPressure(row);
-                if (row.StartsWith("Scale")) return new IOconfScale(row);
-                if (row.StartsWith("Tank")) return new IOconfTank(row);
-                if (row.StartsWith("Valve")) return new IOconfValve(row);
-                if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row);
-                if (row.StartsWith("Oxygen")) return new IOconfOxygen(row);
+                if (row.StartsWith("LoopName")) return new IOconfLoopName(row, lineNum);
+                if (row.StartsWith("Account")) return new IOconfAccount(row, lineNum);
+                if (row.StartsWith("Map"))    return new IOconfMap(row, lineNum);
+                if (row.StartsWith("TypeK"))  return new IOconfTypeK(row, lineNum);
+                if (row.StartsWith("SaltLeakage")) return new IOconfSaltLeakage(row, lineNum);
+                if (row.StartsWith("AirFlow")) return new IOconfAirFlow(row, lineNum);
+                if (row.StartsWith("Heater")) return new IOconfHeater(row, lineNum);
+                if (row.StartsWith("Light")) return new IOconfLight(row, lineNum);
+                if (row.StartsWith("LiquidFlow")) return new IOconfLiquidFlow(row, lineNum);
+                if (row.StartsWith("Motor")) return new IOconfMotor(row, lineNum);
+                if (row.StartsWith("Oven")) return new IOconfOven(row, lineNum);
+                if (row.StartsWith("Pressure")) return new IOConfPressure(row, lineNum);
+                if (row.StartsWith("Scale")) return new IOconfScale(row, lineNum);
+                if (row.StartsWith("Tank")) return new IOconfTank(row, lineNum);
+                if (row.StartsWith("Valve")) return new IOconfValve(row, lineNum);
+                if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row, lineNum);
+                if (row.StartsWith("Oxygen")) return new IOconfOxygen(row, lineNum);
 
-                return new IOconfRow(row, "Unknown");
+                return new IOconfRow(row, lineNum, "Unknown");
             }
             catch (Exception ex)
             {
@@ -52,7 +54,7 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        private void CheckRules(List<string> lines)
+        private static void CheckRules(List<string> lines)
         {
             // no two rows can have the same type,name combination. 
             var groups = Table.GroupBy(x => x.UniqueKey());

@@ -4,7 +4,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfAccount : IOconfState
     {
-        public IOconfAccount(string row) : base(row, "Account")
+        public IOconfAccount(string row, int lineNum) : base(row, lineNum, "Account")
         {
             var list = ToList();
             Name = list[1];

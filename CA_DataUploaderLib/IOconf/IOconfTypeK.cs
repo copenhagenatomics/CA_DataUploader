@@ -6,7 +6,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfTypeK : IOconfInput
     {
-        public IOconfTypeK(string row) : base(row, "TypeK")
+        public IOconfTypeK(string row, int lineNum) : base(row, lineNum, "TypeK")
         {
             var list = ToList();
             Name = list[1];

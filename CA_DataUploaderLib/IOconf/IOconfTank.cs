@@ -6,7 +6,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfTank : IOconfDriver
     {
-        public IOconfTank(string row) : base(row, "Tank")
+        public IOconfTank(string row, int lineNum) : base(row, lineNum, "Tank")
         {
             var list = ToList();
             if (!int.TryParse(list[1], out TankNumber)) throw new Exception("IOconfTank: wrong tank number: " + row);

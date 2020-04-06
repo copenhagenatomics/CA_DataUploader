@@ -14,7 +14,6 @@ namespace CA_DataUploader
             try
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
-                var ioconf = new IOconfFile();
 
                 using (var serial = new SerialNumberMapper(true))
                 {

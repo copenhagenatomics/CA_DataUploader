@@ -6,7 +6,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfOxygen : IOconfInput
     {
-        public IOconfOxygen(string row) : base(row, "Oxygen")
+        public IOconfOxygen(string row, int lineNum) : base(row, lineNum, "Oxygen")
         {
             var list = ToList();
             Name = list[1];

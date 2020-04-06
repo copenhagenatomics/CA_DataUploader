@@ -4,7 +4,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfSaltLeakage : IOconfInput
     {
-        public IOconfSaltLeakage(string row) : base(row, "SaltLeakage")
+        public IOconfSaltLeakage(string row, int lineNum) : base(row, lineNum, "SaltLeakage")
         {
             var list = ToList();
             Name = list[1];

@@ -8,7 +8,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         public string Direction;
 
-        public IOconfMotor(string row) : base(row, "Motor")
+        public IOconfMotor(string row, int lineNum) : base(row, lineNum, "Motor")
         {
             var list = ToList();
             Name = list[1];

@@ -6,7 +6,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOConfPressure : IOconfInput
     { 
-        public IOConfPressure(string row) : base(row, "Pressure")
+        public IOConfPressure(string row, int lineNum) : base(row, lineNum, "Pressure")
         {
             var list = ToList();
             Name = list[1];

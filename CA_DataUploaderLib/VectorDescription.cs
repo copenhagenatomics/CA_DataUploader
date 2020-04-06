@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CA_DataUploaderLib.IOconf;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -10,6 +11,7 @@ namespace CA_DataUploaderLib
         public List<VectorDescriptionItem> _items;  // only public because we need to Serialize
         public string Hardware;
         public string Software;
+        public string IOconf = IOconfFile.RawFile;
         public int Length { get { return _items.Count(); } }
 
         public VectorDescription() { }

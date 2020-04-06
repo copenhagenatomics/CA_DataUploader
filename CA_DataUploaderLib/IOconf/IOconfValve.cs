@@ -6,6 +6,6 @@ namespace CA_DataUploaderLib.IOconf
 {
    public class IOconfValve : IOconfOut230Vac
     {
-        public IOconfValve(string row) : base(row, "Valve") {}
+        public IOconfValve(string row, int lineNum) : base(row, lineNum, "Valve") {}
     }
 }
