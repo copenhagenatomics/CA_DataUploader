@@ -14,7 +14,7 @@ namespace CA_DataUploaderLib.IOconf
             SetMap(BoxName);
             if (list[3].ToLower() == "skip")
             {
-                Skip = true;
+                Skip = true;   // BaseSensorBox will skip reading from this box. Data is comming from other sensors through ProcessLine() instead. You must skip all lines from this box in IO.conf, else it will not work.
             }
             else
             {
