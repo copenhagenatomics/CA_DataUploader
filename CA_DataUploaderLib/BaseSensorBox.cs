@@ -103,6 +103,7 @@ namespace CA_DataUploaderLib
 
                     }
 
+                    Thread.Sleep(50);
                     Initialized = true;
                 }
                 catch (Exception ex)

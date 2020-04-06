@@ -136,7 +136,7 @@ namespace CA_DataUploaderLib
                         GetCurrentValues(box, values);
                     }
 
-                    Thread.Sleep(500);
+                    Thread.Sleep(300);
                 }
                 catch (ArgumentException ex)
                 {

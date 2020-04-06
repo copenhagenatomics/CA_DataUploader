@@ -187,6 +187,7 @@ namespace CA_DataUploaderLib
                         PostVectorAsync(buffer, list.First().timestamp);
                     }
 
+                    PrintBadPackagesMessage(false);
                     Thread.Sleep(MillisecondsBetweenUpload);  // only send approx. one time per second. 
                 }
                 catch (Exception ex)
@@ -195,7 +196,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            PrintBadPackagesMessage();
+            PrintBadPackagesMessage(true);
         }
 
         private byte[] Compress(byte[] buffer)
@@ -268,6 +269,14 @@ namespace CA_DataUploaderLib
                 CALog.LogErrorAndConsole(LogID.A, ex.InnerException.Message);
         }
 
+        private static void LogData(Exception ex)
+        {
+            if (ex.InnerException == null)
+                CALog.LogData(LogID.A, ex.Message);
+            else
+                CALog.LogData(LogID.A, ex.InnerException.Message);
+        }
+
         private async void PostVectorAsync(byte[] buffer, DateTime timestamp)
         {
             try
@@ -278,25 +287,30 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                _badPackages.Add(DateTime.UtcNow);
-                CALog.LogInfoAndConsoleLn(LogID.A, $"-----------------{Environment.NewLine}Unable to upload vector to server: " + timestamp.ToString("HH:mm:ss"));
-                LogHttpException(ex);
-                CALog.LogInfoAndConsoleLn(LogID.A, "-----------------");
-                if (_badPackages.First().AddHours(1) < DateTime.UtcNow)
-                    PrintBadPackagesMessage();
+                lock (_badPackages)
+                {
+                    _badPackages.Add(DateTime.UtcNow);
+                }
+                LogData(ex);
             }
         }
 
-        private void PrintBadPackagesMessage()
+        private void PrintBadPackagesMessage(bool force)
         {
             if (!_badPackages.Any())
                 return;
 
-            CALog.LogInfoAndConsoleLn(LogID.A, $"Vector upload errors within the last hour:"); 
-            foreach (var minutes in _badPackages.GroupBy(x => x.ToString("dd-MMM-yyyy HH:mm")))
-                CALog.LogInfoAndConsoleLn(LogID.A, $"{minutes.Key} = {minutes.Count()}");
+            lock (_badPackages)
+            {
+                if (force || _badPackages.First().AddHours(1) < DateTime.UtcNow)
+                {
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"Vector upload errors within the last hour:");
+                    foreach (var minutes in _badPackages.GroupBy(x => x.ToString("dd-MMM-yyyy HH:mm")))
+                        CALog.LogInfoAndConsoleLn(LogID.A, $"{minutes.Key} = {minutes.Count()}");
 
-            _badPackages.Clear();
+                    _badPackages.Clear();
+                }
+            }
         }
 
         private bool Stop(List<string> args)
