@@ -58,10 +58,11 @@ namespace CA_DataUploaderLib
 
         protected bool ShowQueue(List<string> args)
         {
-            var sb = new StringBuilder();
+            var sb = new StringBuilder("NAME                     AVERAGE       1         2         3         4         5         6         7         8         9         10       FREQUENCY");
+            sb.Append(Environment.NewLine);
             foreach (var t in _values)
             {
-                sb.Append($"{t.Value.Name.PadRight(22)}={t.Value.Value.ToString("N2").PadLeft(9)}  {t.Value.FilterToString()} Freq: {t.Value.GetFrequency().ToString("N1")}");
+                sb.Append($"{t.Value.Name.PadRight(22)}={t.Value.Value.ToString("N2").PadLeft(9)}  {t.Value.FilterToString()}   {t.Value.GetFrequency().ToString("N1")}");
                 sb.Append(Environment.NewLine);
             }
 
