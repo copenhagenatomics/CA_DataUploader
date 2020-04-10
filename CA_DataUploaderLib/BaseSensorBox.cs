@@ -23,8 +23,6 @@ namespace CA_DataUploaderLib
         protected List<IOconfInput> _config;
         protected List<MCUBoard> _boards = new List<MCUBoard>();
 
-        public bool Initialized { get; protected set; }
-
         public BaseSensorBox() { }
 
         public SensorSample GetValue(string sensorKey)
@@ -102,9 +100,6 @@ namespace CA_DataUploaderLib
                             CALog.LogData(LogID.A, ShowQueue(null) + Environment.NewLine);
 
                     }
-
-                    Thread.Sleep(50);
-                    Initialized = true;
                 }
                 catch (Exception ex)
                 {
