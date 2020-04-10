@@ -1,7 +1,7 @@
 # CA_DataUploader
-C# software package to upload temperature data from CA temperature hub product. It can also be used for other type of data.
+C# software package for the Copenhagen Atomics data logger, products and services. 
 
-This software is generally made for the 10 port K-type temperature sensors product from Copenhagen Atomics. 
+This software was originally made for the 10 port K-type temperature sensors product from Copenhagen Atomics called Hub10. 
 You can connect several of these to your computer via USB and have 100+ temperature sensors upload data to a web graph in real time. 
 Sample rate e.g. 10 Hz for all sensors. 
 
@@ -9,33 +9,27 @@ More information:
 
 http://www.copenhagenatomics.com/products.php
 
-http://www.copenhagenatomics.com/pdf/Temperature%20Data%20Logger%20Datasheet.pdf (need update)
+https://www.copenhagenatomics.com/pdf/Hub10_DataLogger_Datasheet.pdf
 
 ____
 
-## How to run this datalogger from RaspberryPi  Raspbain:
+## How to run this datalogger from RaspberryPi (Linux):
 
-You first need to install Mono  (.Net Core 3.0 coming soon)
+This software run on .Net Core 3.0 and you do not need Mono any more. 
 
-First run the 4 lines from this file:
+You can download the latest release files here.
 
-https://www.mono-project.com/download/stable/#download-lin-raspbian
 
-Then I run
- 
-> sudo apt-get install mono-complete
-
-After this you can download the release zip file here form github or FTP it to your RaspberryPi and run it with this command:
-
-> mono --debug CA_AverageTemperature.exe
+Or build the source code and copy the files from the output direct to a new directory you create on RaspberryPi.
+\CA_DataUploader\CA_DataUploader\bin\Debug\netcoreapp3.0\linux-arm
 
 ![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/CA_AverageTemperature.exe.png)
 
-or
+First you need to set a few files as executable
+> chmod 755 USBmapper.sh
+> chmod 755 LoopControl
 
-Run the CA_DataUploader.exe (on Windows or Linux)
-
-> mono --debug CA_AverageTemperature.exe
+> ./CA_AverageTemperature.exe
 
 ![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/CA_DataUploader.exe.png)
 
