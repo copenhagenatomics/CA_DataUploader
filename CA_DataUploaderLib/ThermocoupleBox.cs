@@ -25,7 +25,7 @@ namespace CA_DataUploaderLib
                 cmd.AddCommand("escape", Stop);
             }
 
-            _boards = _config.Where(x => !x.Skip).Select(x => x.Map.Board).Distinct().ToList();
+            _boards = _config.Where(x => !x.Skip).Select(x => x.Map.Board).ToList();
             _config.ForEach(x => _values.Add(x, new SensorSample(x, filterLength, GetHubID(x))));  // add in same order as in IO.conf
 
             new Thread(() => this.LoopForever()).Start();

@@ -85,10 +85,14 @@ void  loop()
   int valid = 0;
   for(int i=1; i<11; i++)
   {
-    value[i] = value[i] + (random(100)-50)/50.0;
-    if(value[i] > -10 && value[i] < 10000 && value[i] != 0)
+    value[i] = value[i] + (random(100)-49)/50.0;
+    if(value[i] > -10 && value[i] < 500 && value[i] != 0)
     {
       valid++;
+    }
+    else
+    {
+      value[i] = 50;  
     }
   }
 
@@ -98,7 +102,7 @@ void  loop()
     columns = 33;
     for(int i=11; i<33; i++)
     {
-      value[i] = value[i] + (random(100)-50)/200.0;
+      value[i] = value[i] + (random(100)-49)/200.0;
     }
   }
   
