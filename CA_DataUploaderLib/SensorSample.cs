@@ -15,7 +15,7 @@ namespace CA_DataUploaderLib
         }
 
         public TimeSpan FilterLength { get; set; }
-        Queue<Tuple<double, DateTime>> _filterQueue = new Queue<Tuple<double, DateTime>>();
+        private Queue<Tuple<double, DateTime>> _filterQueue = new Queue<Tuple<double, DateTime>>();
 
         public int HubID;  // used by AverageTemperature to draw GUI
         public string SerialNumber { get { return Input.Map.Board.serialNumber; } } // used by AverageTemperature to draw GUI
@@ -34,7 +34,7 @@ namespace CA_DataUploaderLib
             get { return (TimeStamp < DateTime.UtcNow.Subtract(FilterLength)) ? 10009 : _value; }   // 10009 means timedout
         }
 
-        public DateTime TimeStamp { get; private set; }
+        public DateTime TimeStamp { get; set; }
         public IOconfInput Input { get; set; }
 
         public string Name { get { return Input.Name; } }
@@ -52,10 +52,9 @@ namespace CA_DataUploaderLib
 
         private void SetValue(double value)
         {
-            TimeStamp = DateTime.UtcNow;
-            var removeBefore = DateTime.Now.Subtract(FilterLength);
             lock (_filterQueue)
             {
+                var removeBefore = DateTime.Now.Subtract(FilterLength);
                 _filterQueue.Enqueue(new Tuple<double, DateTime>(value, DateTime.Now));
                 while (_filterQueue.First().Item2 < removeBefore)
                 {
@@ -82,9 +81,21 @@ namespace CA_DataUploaderLib
         {
             lock (_filterQueue)
             {
+                if (_filterQueue.Count == 0) 
+                    return 0;
+
                 return (_filterQueue.Count() - 1) / _filterQueue.Last().Item2.Subtract(_filterQueue.First().Item2).TotalSeconds;
             }
         }
+
+        public double FilterCount()
+        {
+            lock (_filterQueue)
+            {
+                return _filterQueue.Count();
+            }
+        }
+
 
         public bool HasValidTemperature()
         {

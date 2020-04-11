@@ -59,7 +59,7 @@ void  setup()
 
   for(int i=0; i<33; i++)
   {
-    value[i] = random(20, 200);
+    value[i] = random(300, 500);
   }
 }
 
@@ -92,7 +92,7 @@ void  loop()
     }
     else
     {
-      value[i] = 50;  
+      value[i] = 400;  
     }
   }
 

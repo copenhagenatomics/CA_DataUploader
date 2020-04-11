@@ -28,7 +28,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             var list = ToList();
             if(GetType() == typeof(IOconfOven))
-                return list[0] + list[2];
+                return list[0] + list[2] + list[3];  // you could argue that this should somehow include 1 too. 
 
             return list[0] + list[1];
         }

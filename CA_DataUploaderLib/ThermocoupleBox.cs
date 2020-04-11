@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib
             Title = "Thermocouples";
             _cmdHandler = cmd;
 
-            _config = IOconfFile.GetTypeKAndLeakage().ToList();
+            _config = IOconfFile.GetTypeKAndLeakage().Where(x => x.Map.Board != null).ToList();
 
             if (!_config.Any())
                 return;
@@ -27,6 +27,7 @@ namespace CA_DataUploaderLib
 
             _boards = _config.Where(x => !x.Skip).Select(x => x.Map.Board).ToList();
             _config.ForEach(x => _values.Add(x, new SensorSample(x, filterLength, GetHubID(x))));  // add in same order as in IO.conf
+            CALog.LogInfoAndConsoleLn(LogID.A, $"ThermocoupleBox boards: {_boards.Count()} values: {_values.Count()}");
 
             new Thread(() => this.LoopForever()).Start();
         }

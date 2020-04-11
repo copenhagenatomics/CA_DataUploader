@@ -49,10 +49,19 @@ namespace CA_DataUploaderLib
             return _values.Values;  
         }
 
+        public IEnumerable<double> GetFrequencyAndFilterCount()
+        {
+            var list1 = _values.Values.GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key).Select(x => x.First().GetFrequency());
+            var list2 = _values.Values.GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key).Select(x => x.First().FilterCount());
+            return list1.Concat(list2);
+        }
+
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
             var list = _config.Select(x => new VectorDescriptionItem("double", x.Name, DataTypeEnum.Input)).ToList();
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {this.GetType().ToString()}");
+            list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_SampleFrequency", DataTypeEnum.Input)));
+            list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_FilterSampleCount", DataTypeEnum.Input)));
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {Title}");
             return list;
         }
 
@@ -99,8 +108,9 @@ namespace CA_DataUploaderLib
 
                         if (_logLevel == CALogLevel.Debug)
                             CALog.LogData(LogID.A, ShowQueue(null) + Environment.NewLine);
-
                     }
+
+                    Thread.Sleep(50);
                 }
                 catch (Exception ex)
                 {
@@ -149,12 +159,14 @@ namespace CA_DataUploaderLib
         public void ProcessLine(IEnumerable<double> numbers, MCUBoard board)
         {
             int i = 0;
+            var timestamp = DateTime.UtcNow;
             foreach (var value in numbers)
             {
                 var sensor = _config.SingleOrDefault(x => x.BoxName == board.BoxName && x.PortNumber == i);
                 if (sensor != null)
                 {
                     _values[sensor].Value = value; // filter in here. 
+                    _values[sensor].TimeStamp = timestamp;
                     _values[sensor].NumberOfPorts = GetNumberOfPorts(numbers); // we do not know this until here. 
 
                     HandleSaltLeakage(sensor);
