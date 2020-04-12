@@ -129,51 +129,28 @@ namespace CA_DataUploaderLib
             return string.Empty;
         }
 
-        public string SafeReadLine2()
+        public bool SafeHasDataInReadBuffer()
         {
             try
             {
-                var stop = DateTime.Now.AddMilliseconds(ReadTimeout);
-                string result = _overshoot;  // stuff from last read;
+                if (IsOpen)
+                    return BytesToRead > 0;
 
-                while(DateTime.Now < stop)
-                {
-                    if(_readBuffer.Count > 0)
-                        result += _readBuffer.Dequeue();
+                Thread.Sleep(100);
+                Open();
 
-                    if (result.Contains("\n"))
-                        return RemoveOvershoot(result);
-
-                    Thread.Sleep(10);
-                }
-
-                var message = $"Timeout while reading from serial port: {PortName} {productType} {serialNumber}";
-                CALog.LogErrorAndConsole(LogID.A, message);
-                if (_safeLimit-- == 0) throw new Exception(message);
+                if (IsOpen)
+                    return BytesToRead > 0;
 
             }
             catch (Exception)
             {
-                CALog.LogErrorAndConsole(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber}");
+                var frame = new StackTrace().GetFrame(1);
+                CALog.LogErrorAndConsole(LogID.A, $"Error while checking serial port read buffer: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}");
                 if (_safeLimit-- == 0) throw;
             }
 
-            return string.Empty;
-        }
-
-        private string RemoveOvershoot(string result)
-        {
-            if (result.EndsWith("\n") || result.EndsWith("\r"))
-                return result;
-
-            var pos = Math.Max(result.IndexOf("\n"), result.IndexOf("\r"));
-            if(pos != -1)
-            {
-                _overshoot = result.Substring(pos+1);
-                return result.Substring(0, pos+1);
-            }
-
-            throw new Exception("Error in the RemoveOvershoot algorithm: " + result);
+            return false;
         }
 
         public void SafeWriteLine(string msg)
