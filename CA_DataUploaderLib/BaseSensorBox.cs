@@ -99,19 +99,22 @@ namespace CA_DataUploaderLib
                     var loopStart = DateTime.Now;
                     foreach (var board in _boards)
                     {
-                        exBoard = board; // only used in exception
-                        values.Clear();
-                        numbers.Clear();
-                        row = board.SafeReadLine();
-                        if (Regex.IsMatch(row.Trim(), @"^\d+"))  // check that row starts with digit. 
-                        { 
-                            values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                            numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
-                            ProcessLine(numbers, board);
-                        }
+                        while (board.SafeHasDataInReadBuffer())
+                        {
+                            exBoard = board; // only used in exception
+                            values.Clear();
+                            numbers.Clear();
+                            row = board.SafeReadLine();
+                            if (Regex.IsMatch(row.Trim(), @"^\d+"))  // check that row starts with digit. 
+                            {
+                                values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                                numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
+                                ProcessLine(numbers, board);
+                            }
 
-                        if (_logLevel == CALogLevel.Debug)
-                            CALog.LogData(LogID.A, ShowQueue(null) + Environment.NewLine);
+                            if (_logLevel == CALogLevel.Debug)
+                                CALog.LogData(LogID.A, ShowQueue(null) + Environment.NewLine);
+                        }
                     }
 
                     Thread.Sleep(50);
