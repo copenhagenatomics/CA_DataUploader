@@ -12,6 +12,9 @@ namespace CA_DataUploaderLib
         public double Voltage = 230;
         public int HeaterOnTimeout = 60;
         private bool _running = true;
+        private double _loopTime = 0;
+        private double _offTemperature = 0;
+        private double _lastTemperature = 0;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
         protected CommandHandler _cmdHandler;
 
@@ -111,12 +114,16 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
+                    var loopStart = DateTime.Now;
                     foreach (var heater in _heaters)
                     {
                         if (heater.IsOn && heater.MustTurnOff())
                         {
+                            _offTemperature = heater.MaxSensorTemperature();
+                            _lastTemperature = heater.lastTemperature;
                             heater.IsOn = false;
                             HeaterOff(heater);
+                            CALog.LogInfoAndConsole(LogID.A, $"OFF={_offTemperature.ToString("N0")}, ");
                         }
                         else if (!heater.IsOn && heater.CanTurnOn())
                         {
@@ -131,7 +138,8 @@ namespace CA_DataUploaderLib
                         GetCurrentValues(box, values);
                     }
 
-                    Thread.Sleep(300);
+                    Thread.Sleep(100);
+                    _loopTime = DateTime.Now.Subtract(loopStart).TotalMilliseconds;
                 }
                 catch (ArgumentException ex)
                 {
@@ -166,13 +174,13 @@ namespace CA_DataUploaderLib
                     if (heater.Current == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOn(heater);
-                        CALog.LogInfoAndConsole(LogID.A, $"on  {heater.MaxSensorTemperature().ToString("N0")}, ");
+                        CALog.LogInfoAndConsole(LogID.A, $"on={heater.MaxSensorTemperature().ToString("N0")}, ");
                     }
 
                     if (heater.Current > 0 && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOff(heater);
-                        CALog.LogInfoAndConsole(LogID.A, $"off {heater.MaxSensorTemperature().ToString("N0")}, ");
+                        CALog.LogInfoAndConsole(LogID.A, $"off={heater.MaxSensorTemperature().ToString("N0")}, ");
                     }
                 }
             }
@@ -214,7 +222,11 @@ namespace CA_DataUploaderLib
 
         public List<double> GetStates()
         {
-            return _heaters.Select(x => x.IsOn ? 1.0 : 0.0).ToList();
+            var list = _heaters.Select(x => x.IsOn ? 1.0 : 0.0).ToList();
+            list.Add(_offTemperature);
+            list.Add(_lastTemperature);
+            list.Add(_loopTime);
+            return list;
         }
 
         public List<double> GetPower()
@@ -225,7 +237,10 @@ namespace CA_DataUploaderLib
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
             var list = _heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_Power", DataTypeEnum.Input)).ToList();
-            list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name(), DataTypeEnum.Output)));
+            list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_On/Off", DataTypeEnum.Output)));
+            list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.Input));
+            list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.Input));
+            list.Add(new VectorDescriptionItem("double", "HeatingCtrl_LoopTime", DataTypeEnum.Input));
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from HeatingController");
             return list;
         }

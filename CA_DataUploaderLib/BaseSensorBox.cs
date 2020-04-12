@@ -63,7 +63,7 @@ namespace CA_DataUploaderLib
             var list = _config.Select(x => new VectorDescriptionItem("double", x.Name, DataTypeEnum.Input)).ToList();
             list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_SampleFrequency", DataTypeEnum.Input)));
             list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_FilterSampleCount", DataTypeEnum.Input)));
-            list.Add(new VectorDescriptionItem("double", "LoopTime", DataTypeEnum.Input));
+            list.Add(new VectorDescriptionItem("double", "SensorCtrl_LoopTime", DataTypeEnum.Input));
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {Title}");
             return list;
         }

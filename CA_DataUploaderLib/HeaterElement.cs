@@ -16,6 +16,7 @@ namespace CA_DataUploaderLib
         public DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         private double onTemperature = 10000;
+        public double lastTemperature = 10000;
         public bool IsOn;
         public bool ManualMode;
         public double Current;  // Amps per element. 
@@ -81,7 +82,11 @@ namespace CA_DataUploaderLib
             if (onTemperature < 10000 && validSensors.Max(x => x.Value) > onTemperature + 20)
                 return true; // If hottest sensor is 20C higher than the temperature last time we turned on, then turn off. 
 
-            return validSensors.Any(x => x.Value > OvenTargetTemperature); // turn off, if we reached OvenTargetTemperature. 
+            var turnOff = validSensors.Any(x => x.Value > OvenTargetTemperature); // turn off, if we reached OvenTargetTemperature. 
+            if(!turnOff)
+                lastTemperature = validSensors.Max(x => x.Value);
+
+            return turnOff;
         }
 
         public double MaxSensorTemperature()
