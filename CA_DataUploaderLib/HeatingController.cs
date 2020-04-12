@@ -14,7 +14,6 @@ namespace CA_DataUploaderLib
         private bool _running = true;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
         protected CommandHandler _cmdHandler;
-        private int _sendCount = 0;
 
         public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
         {
@@ -90,14 +89,12 @@ namespace CA_DataUploaderLib
             if (args[2].ToLower() == "on")
             {
                 heater.IsOn = true;
-                heater.LastOn = DateTime.UtcNow;
                 heater.ManualMode = true;
                 HeaterOn(heater);
             }
             else
             {
                 heater.IsOn = false;
-                heater.LastOff = DateTime.UtcNow;
                 heater.ManualMode = false;
                 HeaterOff(heater);
             }
@@ -118,13 +115,11 @@ namespace CA_DataUploaderLib
                     {
                         if (heater.IsOn && heater.MustTurnOff())
                         {
-                            heater.LastOff = DateTime.UtcNow;
                             heater.IsOn = false;
                             HeaterOff(heater);
                         }
                         else if (!heater.IsOn && heater.CanTurnOn())
                         {
-                            heater.LastOn = DateTime.UtcNow;
                             heater.IsOn = true;
                             HeaterOn(heater);
                         }
@@ -168,18 +163,16 @@ namespace CA_DataUploaderLib
                     heater.Current = values[heater._ioconf.PortNumber - 1];
 
                     // this is a hot fix to make sure heaters are on/off. 
-                    if (_sendCount++ == 10)
+                    if (heater.Current == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
-                        _sendCount = 0;
-                        if (heater.Current == 0 && heater.IsOn)
-                        {
-                            HeaterOn(heater);
-                        }
+                        HeaterOn(heater);
+                        CALog.LogInfoAndConsole(LogID.A, $"on  {heater.MaxSensorTemperature().ToString("N0")}, ");
+                    }
 
-                        if (heater.Current > 0 && !heater.IsOn)
-                        {
-                            HeaterOff(heater);
-                        }
+                    if (heater.Current > 0 && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
+                    {
+                        HeaterOff(heater);
+                        CALog.LogInfoAndConsole(LogID.A, $"off {heater.MaxSensorTemperature().ToString("N0")}, ");
                     }
                 }
             }
@@ -197,8 +190,8 @@ namespace CA_DataUploaderLib
         {
             try
             {
+                heater.LastOff = DateTime.UtcNow;
                 heater.Board().SafeWriteLine($"p{heater._ioconf.PortNumber} off");
-                CALog.LogData(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
             {
@@ -210,8 +203,8 @@ namespace CA_DataUploaderLib
         {
             try
             {
+                heater.LastOn = DateTime.UtcNow;
                 heater.Board().SafeWriteLine($"p{heater._ioconf.PortNumber} on {HeaterOnTimeout}");
-                CALog.LogData(LogID.B, heater.ToString());
             }
             catch (TimeoutException)
             {

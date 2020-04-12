@@ -14,6 +14,7 @@ namespace CA_DataUploaderLib
     public class BaseSensorBox : IDisposable
     {
         protected bool _running = true;
+        private double _loopTime = 0;
         public string Title { get; protected set; }
 
         protected CALogLevel _logLevel = IOconfFile.GetOutputLevel();
@@ -52,7 +53,8 @@ namespace CA_DataUploaderLib
         public IEnumerable<double> GetFrequencyAndFilterCount()
         {
             var list1 = _values.Values.GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key).Select(x => x.First().GetFrequency());
-            var list2 = _values.Values.GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key).Select(x => x.First().FilterCount());
+            var list2 = _values.Values.GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key).Select(x => x.First().FilterCount()).ToList();
+            list2.Add(_loopTime);
             return list1.Concat(list2);
         }
 
@@ -61,13 +63,14 @@ namespace CA_DataUploaderLib
             var list = _config.Select(x => new VectorDescriptionItem("double", x.Name, DataTypeEnum.Input)).ToList();
             list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_SampleFrequency", DataTypeEnum.Input)));
             list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_FilterSampleCount", DataTypeEnum.Input)));
+            list.Add(new VectorDescriptionItem("double", "LoopTime", DataTypeEnum.Input));
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {Title}");
             return list;
         }
 
         protected bool ShowQueue(List<string> args)
         {
-            var sb = new StringBuilder("NAME                     AVERAGE       1         2         3         4         5         6         7         8         9         10       FREQUENCY");
+            var sb = new StringBuilder($"NAME      {_loopTime.ToString("N0").PadLeft(4)}          AVERAGE       1         2         3         4         5         6         7         8         9         10       FREQUENCY");
             sb.Append(Environment.NewLine);
             foreach (var t in _values)
             {
@@ -93,6 +96,7 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
+                    var loopStart = DateTime.Now;
                     foreach (var board in _boards)
                     {
                         exBoard = board; // only used in exception
@@ -111,6 +115,7 @@ namespace CA_DataUploaderLib
                     }
 
                     Thread.Sleep(50);
+                    _loopTime = DateTime.Now.Subtract(loopStart).TotalMilliseconds;
                 }
                 catch (Exception ex)
                 {

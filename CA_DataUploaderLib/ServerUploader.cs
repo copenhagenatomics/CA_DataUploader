@@ -25,6 +25,7 @@ namespace CA_DataUploaderLib
         private int _plotID;
         private int _vectorLen;
         private DateTime _lastTimestamp;
+        private DateTime _waitTimestamp = DateTime.Now;
         private string _keyFilename;
         private string _loopName;
         private string _loginToken;
@@ -94,6 +95,15 @@ namespace CA_DataUploaderLib
                     }
                 }
             }
+        }
+
+        // service method, that makes it easy to control the duration of each loop in (milliseconds)
+        public int Wait(int milliseconds)
+        {
+            int wait = milliseconds - (int)DateTime.Now.Subtract(_waitTimestamp).TotalMilliseconds;
+            Thread.Sleep(Math.Max(0, wait));
+            _waitTimestamp = DateTime.Now;
+            return wait;
         }
 
         public async void UploadSensorMatch(string newDescription)

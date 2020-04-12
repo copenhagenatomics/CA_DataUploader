@@ -84,6 +84,16 @@ namespace CA_DataUploaderLib
             return validSensors.Any(x => x.Value > OvenTargetTemperature); // turn off, if we reached OvenTargetTemperature. 
         }
 
+        public double MaxSensorTemperature()
+        {
+            var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
+            var validSensors = _ovenSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
+            if(validSensors.Any())
+                return validSensors.Max(x => x.Value);
+
+            return validSensors.First().Value;
+        }
+
         public bool IsArea(int ovenArea)
         {
             return _area == ovenArea;
