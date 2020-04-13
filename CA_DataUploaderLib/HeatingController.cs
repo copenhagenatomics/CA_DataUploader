@@ -107,7 +107,6 @@ namespace CA_DataUploaderLib
 
         private void LoopForever()
         {
-            int i = 0;
             DateTime start = DateTime.Now;
             var logLevel = IOconfFile.GetOutputLevel();
             while (_running)
