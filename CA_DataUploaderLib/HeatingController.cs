@@ -123,7 +123,6 @@ namespace CA_DataUploaderLib
                             _lastTemperature = heater.lastTemperature;
                             heater.IsOn = false;
                             HeaterOff(heater);
-                            CALog.LogInfoAndConsole(LogID.A, $"OFF={_offTemperature.ToString("N0")}, ");
                         }
                         else if (!heater.IsOn && heater.CanTurnOn())
                         {
@@ -138,7 +137,7 @@ namespace CA_DataUploaderLib
                         GetCurrentValues(box, values);
                     }
 
-                    Thread.Sleep(100);
+                    Thread.Sleep(300); // if we read too often, then we will not get a full line, thus no match. 
                     _loopTime = DateTime.Now.Subtract(loopStart).TotalMilliseconds;
                 }
                 catch (ArgumentException ex)
@@ -223,9 +222,13 @@ namespace CA_DataUploaderLib
         public List<double> GetStates()
         {
             var list = _heaters.Select(x => x.IsOn ? 1.0 : 0.0).ToList();
-            list.Add(_offTemperature);
-            list.Add(_lastTemperature);
-            list.Add(_loopTime);
+            if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
+            {
+                list.Add(_offTemperature);
+                list.Add(_lastTemperature);
+                list.Add(_loopTime);
+            }
+
             return list;
         }
 
@@ -238,9 +241,13 @@ namespace CA_DataUploaderLib
         {
             var list = _heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_Power", DataTypeEnum.Input)).ToList();
             list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_On/Off", DataTypeEnum.Output)));
-            list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.Input));
-            list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.Input));
-            list.Add(new VectorDescriptionItem("double", "HeatingCtrl_LoopTime", DataTypeEnum.Input));
+            if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
+            {
+                list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.Input));
+                list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.Input));
+                list.Add(new VectorDescriptionItem("double", "HeatingCtrl_LoopTime", DataTypeEnum.Input));
+            }
+
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from HeatingController");
             return list;
         }

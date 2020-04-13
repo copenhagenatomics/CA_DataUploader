@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Globalization;
-using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Text;
 using CA_DataUploaderLib.IOconf;
 using System.Text.RegularExpressions;
@@ -61,9 +59,13 @@ namespace CA_DataUploaderLib
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
             var list = _config.Select(x => new VectorDescriptionItem("double", x.Name, DataTypeEnum.Input)).ToList();
-            list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_SampleFrequency", DataTypeEnum.Input)));
-            list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_FilterSampleCount", DataTypeEnum.Input)));
-            list.Add(new VectorDescriptionItem("double", "SensorCtrl_LoopTime", DataTypeEnum.Input));
+            if (_logLevel == CALogLevel.Debug)
+            {
+                list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_SampleFrequency", DataTypeEnum.Input)));
+                list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_FilterSampleCount", DataTypeEnum.Input)));
+                list.Add(new VectorDescriptionItem("double", "SensorCtrl_LoopTime", DataTypeEnum.Input));
+            }
+
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {Title}");
             return list;
         }
@@ -117,7 +119,7 @@ namespace CA_DataUploaderLib
                         }
                     }
 
-                    Thread.Sleep(50);
+                    Thread.Sleep(100);
                     _loopTime = DateTime.Now.Subtract(loopStart).TotalMilliseconds;
                 }
                 catch (Exception ex)
