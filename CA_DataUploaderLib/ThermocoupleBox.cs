@@ -1,4 +1,5 @@
 ﻿using CA_DataUploaderLib.IOconf;
+using CA_DataUploaderLib.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,7 +14,7 @@ namespace CA_DataUploaderLib
             Title = "Thermocouples";
             _cmdHandler = cmd;
 
-            _config = IOconfFile.GetTypeKAndLeakage().Where(x => x.Map.Board != null).ToList();
+            _config = IOconfFile.GetTypeKAndLeakage().IsInitialized().ToList();
 
             if (!_config.Any())
                 return;

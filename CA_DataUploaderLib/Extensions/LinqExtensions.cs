@@ -1,4 +1,6 @@
 ﻿using System.Linq;
+using System.Collections.Generic;
+using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib.Extensions
 {
@@ -9,5 +11,10 @@ namespace CA_DataUploaderLib.Extensions
             return collection.Contains(theObject);
         }
 
+        // only return IOconfInput rows where the MCUBoard was initialized. 
+        public static IEnumerable<T> IsInitialized<T>(this IEnumerable<T> theObject) where T : IOconfInput
+        {
+            return theObject.Where(x => x.Map.Board != null);
+        }
     }
 }
