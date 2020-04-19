@@ -36,7 +36,9 @@ namespace CA_DataUploaderLib
             if (!_heaters.Any())
                 return;
 
-            new Thread(() => this.LoopForever()).Start();
+            var t = new Thread(() => this.LoopForever());
+            t.Priority = ThreadPriority.Highest;
+            t.Start(); 
             cmd.AddCommand("escape", Stop);
             for (int i = 0; i < 20; i++)
             {
@@ -136,7 +138,7 @@ namespace CA_DataUploaderLib
                         GetCurrentValues(box, values);
                     }
 
-                    Thread.Sleep(300); // if we read too often, then we will not get a full line, thus no match. 
+                    Thread.Sleep(200); // if we read too often, then we will not get a full line, thus no match. 
                     _loopTime = DateTime.Now.Subtract(loopStart).TotalMilliseconds;
                 }
                 catch (ArgumentException ex)
@@ -171,14 +173,18 @@ namespace CA_DataUploaderLib
                     // this is a hot fix to make sure heaters are on/off. 
                     if (heater.Current == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
+                        heater.Board().SafeWriteLine(Environment.NewLine);
+                        Thread.Sleep(10);
                         HeaterOn(heater);
-                        CALog.LogInfoAndConsole(LogID.A, $"on={heater.MaxSensorTemperature().ToString("N0")}, ");
+                        //CALog.LogInfoAndConsole(LogID.A, $"on.={heater.MaxSensorTemperature().ToString("N0")}, ");
                     }
 
                     if (heater.Current > 0 && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
                     {
+                        heater.Board().SafeWriteLine(Environment.NewLine);
+                        Thread.Sleep(10);
                         HeaterOff(heater);
-                        CALog.LogInfoAndConsole(LogID.A, $"off={heater.MaxSensorTemperature().ToString("N0")}, ");
+                        // CALog.LogInfoAndConsole(LogID.A, $"off.={heater.MaxSensorTemperature().ToString("N0")}, ");
                     }
                 }
             }
@@ -225,8 +231,8 @@ namespace CA_DataUploaderLib
             {
                 list.Add(_offTemperature);
                 list.Add(_lastTemperature);
-                list.Add(_loopTime);
             }
+            list.Add(_loopTime);
 
             return list;
         }
@@ -244,8 +250,8 @@ namespace CA_DataUploaderLib
             {
                 list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.Input));
                 list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.Input));
-                list.Add(new VectorDescriptionItem("double", "HeatingCtrl_LoopTime", DataTypeEnum.Input));
             }
+            list.Add(new VectorDescriptionItem("double", "HeatingCtrl_LoopTime", DataTypeEnum.Input));
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from HeatingController");
             return list;
