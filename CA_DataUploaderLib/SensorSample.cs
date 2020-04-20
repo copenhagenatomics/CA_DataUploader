@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib
             set { SetValue(value); }
         }
 
-        public double LatestValue { get { return _latestValue;  } }
+        public double LatestValue { get { return (TimeStamp < DateTime.UtcNow.Subtract(FilterLength)) ? 500 : (_latestValue==10001)? 400: _latestValue;  } }
 
         public double TimeoutValue
         {
@@ -96,7 +96,7 @@ namespace CA_DataUploaderLib
         {
             lock (_filterQueue)
             {
-                return _filterQueue.Count();
+                return _filterQueue.Where(x => x.Item1 < 10000 && x.Item1 != 0).Count();
             }
         }
 

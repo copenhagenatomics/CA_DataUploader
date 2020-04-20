@@ -82,6 +82,9 @@ namespace CA_DataUploaderLib
             if (onTemperature < 10000 && validSensors.Max(x => x.Value) > onTemperature + 20)
                 return true; // If hottest sensor is 20C higher than the temperature last time we turned on, then turn off. 
 
+            if (validSensors.All(x => x.FilterCount() < 5))
+                return true;
+
             var turnOff = validSensors.Any(x => x.Value > OvenTargetTemperature); // turn off, if we reached OvenTargetTemperature. 
             if(!turnOff)
                 lastTemperature = validSensors.Max(x => x.Value);
