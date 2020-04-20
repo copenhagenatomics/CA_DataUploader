@@ -59,6 +59,7 @@ namespace CA_DataUploaderLib
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
             var list = _config.Select(x => new VectorDescriptionItem("double", x.Name, DataTypeEnum.Input)).ToList();
+            list.AddRange(_config.Select(x => new VectorDescriptionItem("double", x.Name + "_latest", DataTypeEnum.Input)).ToList());
             if (_logLevel == CALogLevel.Debug)
             {
                 list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_SampleFrequency", DataTypeEnum.Input)));

@@ -22,11 +22,14 @@ namespace CA_DataUploaderLib
         public bool MaxSlope;
 
         private double _value;
+        private double _latestValue;
         public double Value
         {
             get { return _value; }
             set { SetValue(value); }
         }
+
+        public double LatestValue { get { return _latestValue;  } }
 
         public double TimeoutValue
         {
@@ -52,6 +55,7 @@ namespace CA_DataUploaderLib
 
         private void SetValue(double value)
         {
+            _latestValue = value;
             lock (_filterQueue)
             {
                 var removeBefore = DateTime.Now.Subtract(FilterLength);
