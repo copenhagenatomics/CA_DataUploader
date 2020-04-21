@@ -55,6 +55,9 @@ namespace CA_DataUploaderLib
             if (!heaterSensors.Any() && _heaterSensors.Any())
                 return false;  // no valid heater sensors 
 
+            if (heaterSensors.Any() && LastOff.AddSeconds(_ioconf.MaxOnInterval) > DateTime.UtcNow)
+                return false;
+
             if (heaterSensors.Any(x => x.Value > _ioconf.MaxTemperature))
                 return false;  // at least one of the temperature sensors value is valid and above the heating element MaxTemperature.  
 
@@ -81,9 +84,6 @@ namespace CA_DataUploaderLib
 
             if (onTemperature < 10000 && validSensors.Max(x => x.Value) > onTemperature + 20)
                 return true; // If hottest sensor is 20C higher than the temperature last time we turned on, then turn off. 
-
-            if (validSensors.All(x => x.FilterCount() < 5))
-                return true;
 
             var turnOff = validSensors.Any(x => x.Value > OvenTargetTemperature); // turn off, if we reached OvenTargetTemperature. 
             if(!turnOff)

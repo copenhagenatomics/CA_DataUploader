@@ -36,9 +36,7 @@ namespace CA_DataUploaderLib
             if (!_heaters.Any())
                 return;
 
-            var t = new Thread(() => this.LoopForever());
-            t.Priority = ThreadPriority.Highest;
-            t.Start(); 
+            new Thread(() => this.LoopForever()).Start();
             cmd.AddCommand("escape", Stop);
             for (int i = 0; i < 20; i++)
             {
