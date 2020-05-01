@@ -23,6 +23,7 @@
 * 2.00      Copenhagen Atomics Temperature sensor 4xRJ45 board. 
 * 3.00      Copenhagen Atomics Temperature sensor hubard16.
 * 4.00      10 K-type connectors
+* 5.00      Added CloseCube_Si70 Written by AA (MIT license)
 *
 *******************************************************************************/
 
@@ -32,9 +33,12 @@
 //#define _mcuFamily "Arduino Nano 3.0 Ali"
 
 // ***** INCLUDES *****
+#include <Wire.h>
 #include  "MAX31855.h"
 #include "readEEPROM.h"
+#include "ClosedCube_Si7051.h"
 
+ClosedCube_Si7051 si7051;
 
 
 // ***** PIN DEFINITIONS *****
@@ -53,7 +57,9 @@ void  setup()
 {
   Serial.begin(115200);
   inString = "";
+  //si7051.begin(0x40); // default I2C address is 0x40 and 14-bit measurement resolution
   printSerial();
+  //si7051.printSerial();
 }
 
 void  loop()
@@ -77,8 +83,12 @@ void  loop()
 
   PrintDouble(value[0]);
 
+  //value[1] = si7051.readTemperature();
+  //PrintDouble(value[1]);
+
   int valid = 0;
-  for(int i=1; i<11; i++)
+  int columns = 11;
+  for(int i=columns-10; i<columns; i++)
   {
     value[i] = MAX31855.GetPortCelsius(i-1);
     if(value[i] > -10 && value[i] < FAULT_OPEN && value[i] != 0)
@@ -87,7 +97,6 @@ void  loop()
     }
   }
 
-  int columns = 11;
   if(junction)
   {
     columns = 33;
@@ -99,7 +108,7 @@ void  loop()
   
   if(valid || junction)
   {
-    for(int i=1; i<columns; i++)
+    for(int i=columns-10; i<columns; i++)
     {
       PrintDouble(value[i]);
     }
