@@ -54,6 +54,7 @@ public:
 	void setResolution(uint8_t resolution);
 
 	void reset();
+    bool IsOK() { return _isOK; }
 
 	uint8_t readFirmwareVersion();
 
@@ -62,18 +63,22 @@ public:
 
   void printSerial()
   {
-      Serial.print("Silicon Labs Si7051 firmware revision: ");
       switch (readFirmwareVersion())
       {
       case 0xFF:
+        Serial.print("Silicon Labs Si7051 firmware revision: ");
         Serial.println("version 1.0");
+        _isOK = true;
         break;
       case 0x20:
+        Serial.print("Silicon Labs Si7051 firmware revision: ");
         Serial.println("version 2.0");
+        _isOK = true;
         break;
       default:
-        Serial.println("unknow");
-          break;
+        Serial.println("No Silicon Labs Si7051 chip");
+        _isOK = false;
+        break;
   }
 
     
@@ -81,6 +86,7 @@ public:
 
 private:
 	uint8_t _address;
+    bool _isOK;
 
 };
 

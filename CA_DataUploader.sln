@@ -36,6 +36,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TemperatureFakeData", "Temp
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TemperatureUnit10pin", "TemperatureUnit10pin", "{9E649827-E30B-479E-9854-B4A96EDE0162}"
 	ProjectSection(SolutionItems) = preProject
+		Arduino\TemperatureUnit10pin\ClosedCube_Si7051.cpp = Arduino\TemperatureUnit10pin\ClosedCube_Si7051.cpp
+		Arduino\TemperatureUnit10pin\ClosedCube_Si7051.h = Arduino\TemperatureUnit10pin\ClosedCube_Si7051.h
 		Arduino\TemperatureUnit10pin\MAX31855.cpp = Arduino\TemperatureUnit10pin\MAX31855.cpp
 		Arduino\TemperatureUnit10pin\MAX31855.h = Arduino\TemperatureUnit10pin\MAX31855.h
 		Arduino\TemperatureUnit10pin\readEEPROM.h = Arduino\TemperatureUnit10pin\readEEPROM.h

@@ -38,28 +38,28 @@
 #include "readEEPROM.h"
 #include "ClosedCube_Si7051.h"
 
-ClosedCube_Si7051 si7051;
-
+// ***** CALIBRATION VALUES *******
+double calibrateMul[] = {1,1,1,1,1,1,1,1,1,1};
+double calibrateOff[] = {-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5};
 
 // ***** PIN DEFINITIONS *****
 const  unsigned  char ChipSelect = 10; 
 const  unsigned  char ClockPin = 9; 
-// int SO[] = {12,11,2,4,6,7,8,18, 13,19,3,5,14,15,16,17}; //18 port
 int SO[] = {12,11,2,4,6,7,8,3,13,5};
 bool junction = false;
 String inString = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";    // string to hold user input
-
 unsigned long timeStamp = 0; 
 
+ClosedCube_Si7051 si7051;
 MAX31855 MAX31855(SO, ClockPin, ChipSelect); 
 
 void  setup()
 {
   Serial.begin(115200);
   inString = "";
-  //si7051.begin(0x40); // default I2C address is 0x40 and 14-bit measurement resolution
+  si7051.begin(0x40); // default I2C address is 0x40 and 14-bit measurement resolution
   printSerial();
-  //si7051.printSerial();
+  si7051.printSerial();
 }
 
 void  loop()
@@ -69,7 +69,9 @@ void  loop()
     
   timeStamp = millis() + 100;
   
-  double value[33]; 
+  int valid = 0;
+  int columns = 10;
+  double value[20]; 
   MAX31855.ReadAllData(true);
 
   value[0] = MAX31855.GetAverageJunctionCelsius();
@@ -81,16 +83,16 @@ void  loop()
     return;  
   }
 
-  PrintDouble(value[0]);
-
-  //value[1] = si7051.readTemperature();
-  //PrintDouble(value[1]);
-
-  int valid = 0;
-  int columns = 11;
-  for(int i=columns-10; i<columns; i++)
+  PrintDouble(value[0]); // print even when there are no thermocouples connected.
+  if(si7051.IsOK())
   {
-    value[i] = MAX31855.GetPortCelsius(i-1);
+    value[1] = si7051.readTemperature();
+    PrintDouble(value[1]);
+  }
+
+  for(int i=0; i<columns; i++)
+  {
+    value[i] = MAX31855.GetPortCelsius(i);
     if(value[i] > -10 && value[i] < FAULT_OPEN && value[i] != 0)
     {
       valid++;
@@ -99,18 +101,25 @@ void  loop()
 
   if(junction)
   {
-    columns = 33;
-    for(int i=11; i<33; i++)
+    columns += 10;
+    for(int i=10; i<columns; i++)
     {
-      value[i] = MAX31855.GetJunctionCelsius(i-1);
+      value[i] = MAX31855.GetJunctionCelsius(i-10);
     }
   }
   
   if(valid || junction)
   {
-    for(int i=columns-10; i<columns; i++)
+    for(int i=0; i<columns; i++)
     {
-      PrintDouble(value[i]);
+      if(i < 10 && value[i] < FAULT_OPEN && value[i] != 0) 
+      {
+        PrintDouble(value[i]*calibrateMul[i] + calibrateOff[i]);
+      }
+      else
+      {
+        PrintDouble(value[i]);
+      }
     }
   }
 
