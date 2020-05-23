@@ -142,17 +142,3 @@ double GetInput()
 
   return -1.0;
 }
-
-
-/*
-void printSerial()
-{
-  Serial.print("Serial Number: ");
-  Serial.println(serialNumber);
-  Serial.print("Board Family: ");
-  Serial.println(boardFamily);
-  Serial.print("Board Version: ");
-  Serial.println(boardVersion);
-  Serial.print("Board Software: ");
-  Serial.println(boardSoftware);
-}*/

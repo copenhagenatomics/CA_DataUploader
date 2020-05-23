@@ -99,7 +99,7 @@ namespace CA_DataUploaderLib
             if(validSensors.Any())
                 return validSensors.Max(x => x.Value);
 
-            return validSensors.First().Value;
+            return _ovenSensors.First().Value;
         }
 
         public bool IsArea(int ovenArea)
