@@ -68,7 +68,7 @@ double MAX31855::GetAverageJunctionCelsius()
   double sum = 0;
   for(int i=0; i<10; i++)
   {
-    if(_dataJunction[i] < -10 || _dataJunction[i] > 100)
+    if(_dataJunction[i] < -10 || _dataJunction[i] > 150)
        return JUNCTION_TEMPERATURE_OUTSIDE_RANGE;
     sum += _dataJunction[i];
   }

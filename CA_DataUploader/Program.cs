@@ -34,7 +34,9 @@ namespace CA_DataUploader
                             var allSensors = usb.GetAllDatapoints().ToList();
                             if (allSensors.Any())
                             {
-                                cloud.SendVector(allSensors.Select(x => x.Value).ToList(), AverageSensorTimestamp(allSensors));
+                                var list = allSensors.Select(x => x.Value).ToList();
+                                list.AddRange(usb.GetFrequencyAndFilterCount());
+                                cloud.SendVector(list, AverageSensorTimestamp(allSensors));
                                 Console.Write($"\r {i}"); // we don't want this in the log file. 
                                 i += 1;
                             }
@@ -54,7 +56,7 @@ namespace CA_DataUploader
             Console.ReadKey();
         }
 
-        private static VectorDescription GetVectorDescription(BaseSensorBox usb)
+        private static VectorDescription GetVectorDescription(ThermocoupleBox usb)
         {
             var list = usb.GetVectorDescriptionItems();
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {usb.Title}");

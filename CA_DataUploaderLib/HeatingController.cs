@@ -67,13 +67,20 @@ namespace CA_DataUploaderLib
         private bool Oven(List<string> args)
         {
             _cmdHandler.AssertArgs(args, 2);
-            var areas = IOconfFile.GetOven().GroupBy(x => x.OvenArea);
-            int i = 1;
-            int areaTemp = 300; // default value;
-            foreach (var area in areas)
+            if (args[1] == "off")
             {
-                areaTemp = CommandHandler.GetCmdParam(args, i++, areaTemp);
-                _heaters.Where(x => x.IsArea(area.Key)).ToList().ForEach(x => x.SetTemperature(areaTemp));
+                _heaters.ForEach(x => x.SetTemperature(0));
+            }
+            else
+            {
+                var areas = IOconfFile.GetOven().GroupBy(x => x.OvenArea).OrderBy(x => x.Key);
+                int i = 1;
+                int areaTemp = 300; // default value;
+                foreach (var area in areas)
+                {
+                    areaTemp = CommandHandler.GetCmdParam(args, i++, areaTemp);
+                    _heaters.Where(x => x.IsArea(area.Key)).ToList().ForEach(x => x.SetTemperature(areaTemp));
+                }
             }
 
             if (_heaters.Any(x => x.IsActive))
