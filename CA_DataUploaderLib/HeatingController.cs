@@ -181,7 +181,7 @@ namespace CA_DataUploaderLib
                         heater.Board().SafeWriteLine(Environment.NewLine);
                         Thread.Sleep(2);
                         HeaterOn(heater);
-                        CALog.LogData(LogID.A, $"on.={heater.MaxSensorTemperature().ToString("N0")}, v#={values.Count}, WB={board.BytesToWrite}");
+                        CALog.LogData(LogID.A, $"on.={heater.MaxSensorTemperature().ToString("N0")}, v#={values.Count}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
 
                     if (heater.Current > 0 && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
@@ -189,7 +189,7 @@ namespace CA_DataUploaderLib
                         heater.Board().SafeWriteLine(Environment.NewLine);
                         Thread.Sleep(2);
                         HeaterOff(heater);
-                        CALog.LogData(LogID.A, $"off.={heater.MaxSensorTemperature().ToString("N0")}, v#={values.Count}, WB={board.BytesToWrite}");
+                        CALog.LogData(LogID.A, $"off.={heater.MaxSensorTemperature().ToString("N0")}, v#={values.Count}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
                 }
             }
