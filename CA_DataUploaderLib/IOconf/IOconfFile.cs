@@ -30,6 +30,8 @@ namespace CA_DataUploaderLib.IOconf
                 if (row.StartsWith("LoopName")) return new IOconfLoopName(row, lineNum);
                 if (row.StartsWith("Account")) return new IOconfAccount(row, lineNum);
                 if (row.StartsWith("Map"))    return new IOconfMap(row, lineNum);
+                if (row.StartsWith("Math")) return new IOconfMath(row, lineNum);
+                if (row.StartsWith("Alert")) return new IOconfAlert(row, lineNum);
                 if (row.StartsWith("TypeK"))  return new IOconfTypeK(row, lineNum);
                 if (row.StartsWith("SaltLeakage")) return new IOconfSaltLeakage(row, lineNum);
                 if (row.StartsWith("AirFlow")) return new IOconfAirFlow(row, lineNum);

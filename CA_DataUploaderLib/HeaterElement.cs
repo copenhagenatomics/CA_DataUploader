@@ -11,8 +11,8 @@ namespace CA_DataUploaderLib
 
         public IOconfHeater _ioconf;
         private int _area;
-        private List<SensorSample> _ovenSensors = new List<SensorSample>();
-        private List<SensorSample> _heaterSensors = new List<SensorSample>();
+        private List<SensorSample> _ovenSensors = new List<SensorSample>();    // sensors inside the oven somewhere. 
+        private List<SensorSample> _heaterSensors = new List<SensorSample>();  // sensors inside the heater or directly on the surface of the heater
         public DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         private double onTemperature = 10000;
@@ -98,6 +98,9 @@ namespace CA_DataUploaderLib
             var validSensors = _ovenSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
             if(validSensors.Any())
                 return validSensors.Max(x => x.Value);
+
+            if (!_ovenSensors.Any())
+                return 0;
 
             return _ovenSensors.First().Value;
         }
