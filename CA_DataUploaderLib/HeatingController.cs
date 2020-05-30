@@ -143,7 +143,7 @@ namespace CA_DataUploaderLib
                         GetCurrentValues(box, values);
                     }
 
-                    Thread.Sleep(200); // if we read too often, then we will not get a full line, thus no match. 
+                    Thread.Sleep(100); // if we read too often, then we will not get a full line, thus no match. 
                     _loopTime = DateTime.Now.Subtract(loopStart).TotalMilliseconds;
                 }
                 catch (ArgumentException ex)
@@ -178,16 +178,16 @@ namespace CA_DataUploaderLib
                     // this is a hot fix to make sure heaters are on/off. 
                     if (heater.Current == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
-                        heater.Board().SafeWriteLine(Environment.NewLine);
-                        Thread.Sleep(100);
+                        //heater.Board().SafeWriteLine(Environment.NewLine);
+                        //Thread.Sleep(100);
                         HeaterOn(heater);
                         CALog.LogData(LogID.A, $"on.={heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
 
                     if (heater.Current > 0 && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
                     {
-                        heater.Board().SafeWriteLine(Environment.NewLine);
-                        Thread.Sleep(100);
+                        //heater.Board().SafeWriteLine(Environment.NewLine);
+                        //Thread.Sleep(100);
                         HeaterOff(heater);
                         CALog.LogData(LogID.A, $"off.={heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }

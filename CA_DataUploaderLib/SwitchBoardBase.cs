@@ -16,8 +16,12 @@ namespace CA_DataUploaderLib
         {
             try
             {
+                string lines;
                 // try to read some text. 
-                var lines = box.ReadExisting();
+                lock (box)
+                {
+                    lines = box.ReadExisting();
+                }
 
                 // see if it matches the BoxPattern.
                 var match = Regex.Match(lines, _SwitchBoxPattern);

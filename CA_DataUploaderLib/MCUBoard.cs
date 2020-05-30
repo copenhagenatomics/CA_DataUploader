@@ -109,15 +109,17 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                if (IsOpen)
-                    return ReadLine();
+                lock (this)
+                {
+                    if (IsOpen)
+                        return ReadLine();
 
-                Thread.Sleep(100);
-                Open();
+                    Thread.Sleep(100);
+                    Open();
 
-                if (IsOpen)
-                    return ReadLine();
-
+                    if (IsOpen)
+                        return ReadLine();
+                }
             }
             catch (Exception)
             {
@@ -133,15 +135,17 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                if (IsOpen)
-                    return BytesToRead > 0;
+                lock (this)
+                {
+                    if (IsOpen)
+                        return BytesToRead > 0;
 
-                Thread.Sleep(100);
-                Open();
+                    Thread.Sleep(100);
+                    Open();
 
-                if (IsOpen)
-                    return BytesToRead > 0;
-
+                    if (IsOpen)
+                        return BytesToRead > 0;
+                }
             }
             catch (Exception)
             {
@@ -156,20 +160,23 @@ namespace CA_DataUploaderLib
         public void SafeWriteLine(string msg)
         {
             try
-            { 
-                if (IsOpen)
+            {
+                lock (this)
                 {
-                    WriteLine(msg);
-                    return;
-                }
+                    if (IsOpen)
+                    {
+                        WriteLine(msg);
+                        return;
+                    }
 
-                Thread.Sleep(100);
-                Open();
+                    Thread.Sleep(100);
+                    Open();
 
-                if (IsOpen)
-                {
-                    WriteLine(msg);
-                    return;
+                    if (IsOpen)
+                    {
+                        WriteLine(msg);
+                        return;
+                    }
                 }
             }
             catch (Exception)
@@ -207,7 +214,7 @@ namespace CA_DataUploaderLib
                 {
                     try
                     {
-                        var input = ReadLine();
+                        var input = SafeReadLine();
                         if (Debugger.IsAttached && input.Length > 0)
                         {
                             //stop = DateTime.Now.AddMinutes(1);
