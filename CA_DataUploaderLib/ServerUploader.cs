@@ -51,6 +51,7 @@ namespace CA_DataUploaderLib
 
                 MillisecondsBetweenUpload = 900;
                 string server = connectionInfo.Server;
+                _cmd = cmd;
                 _client.BaseAddress = new Uri(server);
                 _client.DefaultRequestHeaders.Accept.Clear();
                 _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -72,14 +73,14 @@ namespace CA_DataUploaderLib
                     vectorDescription._items.Add(new VectorDescriptionItem("double", math.Name, DataTypeEnum.State));
                 }
 
-                cmd.SetVectorDescription(vectorDescription);
+                _cmd.SetVectorDescription(vectorDescription);
                 _vectorDescription = vectorDescription;
 
                 _plotID = GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription)).Result;
                 _vectorLen = vectorDescription.Length;
 
                 new Thread(() => this.LoopForever()).Start();
-                cmd.AddCommand("escape", Stop);
+                _cmd.AddCommand("escape", Stop);
             }
             catch (Exception ex)
             {
