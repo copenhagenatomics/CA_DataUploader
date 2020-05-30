@@ -60,20 +60,23 @@ namespace CA_DataUploaderLib.IOconf
         public string Message { get; private set; }
         private AlertCompare type;
         private double Value;
+        private double LastValue;
 
 
         public bool CheckValue(double newValue)
         {
             Message += newValue + ")";
+            double lastValue = LastValue;
+            LastValue = newValue;
             switch(type)
             {
-                case AlertCompare.EqualTo:  return newValue == Value;
-                case AlertCompare.NotEqualTo: return newValue != Value;
-                case AlertCompare.BiggerThan: return newValue > Value;
-                case AlertCompare.SmallerThan: return newValue < Value;
-                case AlertCompare.BiggerOrEqualTo: return newValue >= Value;
-                case AlertCompare.SmallerOrEqualTo: return newValue <= Value;
-                case AlertCompare.NaN: return Double.IsNaN(newValue);
+                case AlertCompare.EqualTo:  return newValue == Value && lastValue != Value;
+                case AlertCompare.NotEqualTo: return newValue != Value && lastValue == Value;
+                case AlertCompare.BiggerThan: return newValue > Value && lastValue <= Value;
+                case AlertCompare.SmallerThan: return newValue < Value && lastValue >= Value;
+                case AlertCompare.BiggerOrEqualTo: return newValue >= Value && lastValue < Value;
+                case AlertCompare.SmallerOrEqualTo: return newValue <= Value && lastValue > Value;
+                case AlertCompare.NaN: return Double.IsNaN(newValue) && !Double.IsNaN(lastValue);
                 case AlertCompare.IsInteger: return Math.Abs(newValue % 1) <= (Double.Epsilon * 100);
                 default: throw new Exception("IOconfAlert: this should never happen");
             }
