@@ -15,6 +15,8 @@ namespace CA_DataUploaderLib
         private double _loopTime = 0;
         private double _offTemperature = 0;
         private double _lastTemperature = 0;
+        private double _lastValueTimeStamp = 0;
+        private DateTime _startTime;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
         protected CommandHandler _cmdHandler;
 
@@ -114,7 +116,7 @@ namespace CA_DataUploaderLib
 
         private void LoopForever()
         {
-            DateTime start = DateTime.Now;
+            _startTime = DateTime.Now;
             var logLevel = IOconfFile.GetOutputLevel();
             while (_running)
             {
@@ -143,7 +145,7 @@ namespace CA_DataUploaderLib
                         GetCurrentValues(box, values);
                     }
 
-                    Thread.Sleep(100); // if we read too often, then we will not get a full line, thus no match. 
+                    Thread.Sleep(200); // if we read too often, then we will not get a full line, thus no match. 
                     _loopTime = DateTime.Now.Subtract(loopStart).TotalMilliseconds;
                 }
                 catch (ArgumentException ex)
@@ -163,7 +165,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting HeatingController.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
+            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting HeatingController.LoopForever() " + DateTime.Now.Subtract(_startTime).TotalSeconds.ToString() + " seconds");
             AllOff();
         }
 
@@ -174,6 +176,7 @@ namespace CA_DataUploaderLib
                 foreach (var heater in _heaters.Where(x => x.Board() == board))
                 {
                     heater.Current = values[heater._ioconf.PortNumber - 1];
+                    _lastValueTimeStamp = DateTime.Now.Subtract(_startTime).TotalMinutes;
 
                     // this is a hot fix to make sure heaters are on/off. 
                     if (heater.Current == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
@@ -237,6 +240,7 @@ namespace CA_DataUploaderLib
                 list.Add(_offTemperature);
                 list.Add(_lastTemperature);
                 list.Add(_loopTime);
+                list.Add(_lastValueTimeStamp);
             }
 
             return list;
@@ -253,9 +257,10 @@ namespace CA_DataUploaderLib
             list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_On/Off", DataTypeEnum.Output)));
             if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
             {
-                list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.Input));
-                list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.Input));
-                list.Add(new VectorDescriptionItem("double", "HeatingCtrl_LoopTime", DataTypeEnum.Input));
+                list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.State));
+                list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.State));
+                list.Add(new VectorDescriptionItem("double", "HeatingCtrl_LoopTime", DataTypeEnum.State));
+                list.Add(new VectorDescriptionItem("double", "LastValueTimestamp", DataTypeEnum.State));
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from HeatingController");
