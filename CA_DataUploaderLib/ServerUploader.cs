@@ -65,19 +65,17 @@ namespace CA_DataUploaderLib
                 else
                     File.WriteAllBytes(_keyFilename, _rsaWriter.ExportCspBlob(true));
 
-                GetLoginToken();
-
                 foreach (var math in IOconfFile.GetMath())
                 {
-                    math.SetVarNames(vectorDescription._items.Select(x => x.Descriptor).ToList());
                     vectorDescription._items.Add(new VectorDescriptionItem("double", math.Name, DataTypeEnum.State));
                 }
 
                 _cmd.SetVectorDescription(vectorDescription);
                 _vectorDescription = vectorDescription;
-
-                _plotID = GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription)).Result;
                 _vectorLen = vectorDescription.Length;
+
+                GetLoginToken();
+                _plotID = GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription)).Result;
 
                 new Thread(() => this.LoopForever()).Start();
                 _cmd.AddCommand("escape", Stop);
@@ -91,15 +89,11 @@ namespace CA_DataUploaderLib
 
         public void SendVector(List<double> vector, DateTime timestamp)
         {
-            int added = 0;
-            foreach (var math in IOconfFile.GetMath())
-            {
-                vector.Add(math.Calculate(GetVectorValues(vector, math.VarNames)));
-                added++;
-            }
+            var dic = GetVectorDictionary(vector);
+            IOconfFile.GetMath().ToList().ForEach(x => vector.Add(x.Calculate(dic)));
 
             if (vector.Count() != _vectorLen)
-                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count()} <> {_vectorLen}, Math: {added}");
+                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count()} <> {_vectorLen}, Math: {IOconfFile.GetMath().Count()}");
 
             _cmd.NewData(vector);
 
@@ -135,13 +129,13 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private Dictionary<string, object> GetVectorValues(List<double> vector, List<string> varNames)
+        private Dictionary<string, object> GetVectorDictionary(List<double> vector)
         {
             var dic = new Dictionary<string, object>();
-            foreach(var name in varNames)
+            int i = 0;
+            foreach(var item in _vectorDescription._items)
             {
-                var index = _vectorDescription._items.IndexOf(_vectorDescription._items.Single(x => x.Descriptor == name));
-                dic.Add(name, vector[index]);
+                dic.Add(item.Descriptor, vector[i++]);
             }
 
             return dic;
