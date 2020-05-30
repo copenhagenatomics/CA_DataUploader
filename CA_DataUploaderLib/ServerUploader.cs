@@ -73,6 +73,7 @@ namespace CA_DataUploaderLib
                 _cmd.SetVectorDescription(vectorDescription);
                 _vectorDescription = vectorDescription;
                 _vectorLen = vectorDescription.Length;
+                _vectorDescription.IOconf = IOconfFile.RawFile;
 
                 GetLoginToken();
                 _plotID = GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription)).Result;
@@ -96,7 +97,6 @@ namespace CA_DataUploaderLib
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count()} <> {_vectorLen}, Math: {IOconfFile.GetMath().Count()}");
 
             _cmd.NewData(vector);
-
             foreach (var a in _alerts)
             {
                 if (a.CheckValue(_cmd.GetVectorValue(a.Name)))
@@ -361,7 +361,7 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                string query = $"api/LoopApi?message={message}&loginToken={_loginToken}";
+                string query = $"api/LoopApi?plotnameID={_plotID}&message={message}&loginToken={_loginToken}";
                 HttpResponseMessage response = await _client.GetAsync(query);
                 response.EnsureSuccessStatusCode();
             }

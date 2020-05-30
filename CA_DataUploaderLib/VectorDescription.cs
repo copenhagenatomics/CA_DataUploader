@@ -11,7 +11,7 @@ namespace CA_DataUploaderLib
         public List<VectorDescriptionItem> _items;  // only public because we need to Serialize
         public string Hardware;
         public string Software;
-        public string IOconf = IOconfFile.RawFile;
+        public string IOconf;
         public int Length { get { return _items.Count(); } }
 
         public VectorDescription() { }
