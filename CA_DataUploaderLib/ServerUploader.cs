@@ -20,7 +20,11 @@ namespace CA_DataUploaderLib
         private HttpClient _client = new HttpClient();
         private RSACryptoServiceProvider _rsaWriter = new RSACryptoServiceProvider(1024);
         private Queue<DataVector> _queue = new Queue<DataVector>();
+        private Queue<string> _alertQueue = new Queue<string>();
         private List<DateTime> _badPackages = new List<DateTime>();
+        private List<IOconfAlert> _alerts;
+        private CommandHandler _cmd;
+        private VectorDescription _vectorDescription;
         private Dictionary<string, string> _accountInfo;
         private int _plotID;
         private int _vectorLen;
@@ -33,7 +37,7 @@ namespace CA_DataUploaderLib
 
         public int MillisecondsBetweenUpload { get; set; }
 
-        public ServerUploader(VectorDescription vectorDescription, CommandHandler cmd = null)
+        public ServerUploader(VectorDescription vectorDescription, CommandHandler cmd)
         {
             try
             {
@@ -51,6 +55,7 @@ namespace CA_DataUploaderLib
                 _client.DefaultRequestHeaders.Accept.Clear();
                 _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 _loopName = IOconfFile.GetLoopName();
+                _alerts = IOconfFile.GetAlerts().ToList();
                 _keyFilename = "Key" + _loopName + ".bin";
                 CALog.LogInfoAndConsoleLn(LogID.A, _loopName);
 
@@ -61,11 +66,20 @@ namespace CA_DataUploaderLib
 
                 GetLoginToken();
 
+                foreach (var math in IOconfFile.GetMath())
+                {
+                    math.SetVarNames(vectorDescription._items.Select(x => x.Descriptor).ToList());
+                    vectorDescription._items.Add(new VectorDescriptionItem("double", math.Name, DataTypeEnum.State));
+                }
+
+                cmd.SetVectorDescription(vectorDescription);
+                _vectorDescription = vectorDescription;
+
                 _plotID = GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription)).Result;
                 _vectorLen = vectorDescription.Length;
+
                 new Thread(() => this.LoopForever()).Start();
-                if(cmd != null)
-                    cmd.AddCommand("escape", Stop);
+                cmd.AddCommand("escape", Stop);
             }
             catch (Exception ex)
             {
@@ -76,12 +90,35 @@ namespace CA_DataUploaderLib
 
         public void SendVector(List<double> vector, DateTime timestamp)
         {
+            int added = 0;
+            foreach (var math in IOconfFile.GetMath())
+            {
+                vector.Add(math.Calculate(GetVectorValues(vector, math.VarNames)));
+                added++;
+            }
+
             if (vector.Count() != _vectorLen)
-                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count()} <> {_vectorLen}");
+                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count()} <> {_vectorLen}, Math: {added}");
+
+            _cmd.NewData(vector);
+
+            foreach (var a in _alerts)
+            {
+                if (a.CheckValue(_cmd.GetVectorValue(a.Name)))
+                {
+                    lock (_alertQueue)
+                    {
+                        if (_alertQueue.Count < 10000)  // if problems then drop packages. 
+                        {
+                            _alertQueue.Enqueue(timestamp.ToString("YYYY.MM.dd HH:mm:ss") + a.Message);
+                        }
+                    }
+                }
+            }
 
             lock (_queue)
             {
-                if (_queue.Count < 1000)  // if problems then drop packages. 
+                if (_queue.Count < 10000)  // if problems then drop packages. 
                 {
                     if (_lastTimestamp < timestamp)
                     {
@@ -95,6 +132,18 @@ namespace CA_DataUploaderLib
                     }
                 }
             }
+        }
+
+        private Dictionary<string, object> GetVectorValues(List<double> vector, List<string> varNames)
+        {
+            var dic = new Dictionary<string, object>();
+            foreach(var name in varNames)
+            {
+                var index = _vectorDescription._items.IndexOf(_vectorDescription._items.Single(x => x.Descriptor == name));
+                dic.Add(name, vector[index]);
+            }
+
+            return dic;
         }
 
         // service method, that makes it easy to control the duration of each loop in (milliseconds)
@@ -197,6 +246,14 @@ namespace CA_DataUploaderLib
                         PostVectorAsync(buffer, list.First().timestamp);
                     }
 
+                    lock (_alertQueue)
+                    {
+                        while (_alertQueue.Any())  // dequeue all. 
+                        {
+                            PostAlertAsync(_alertQueue.Dequeue());
+                        }
+                    }
+
                     PrintBadPackagesMessage(false);
                     Thread.Sleep(MillisecondsBetweenUpload);  // only send approx. one time per second. 
                 }
@@ -293,6 +350,24 @@ namespace CA_DataUploaderLib
             {
                 string query = $"api/LoopApi?plotnameID={_plotID}&Ticks={timestamp.Ticks}&loginToken={_loginToken}";
                 HttpResponseMessage response = await _client.PutAsJsonAsync(query, buffer);
+                response.EnsureSuccessStatusCode();
+            }
+            catch (Exception ex)
+            {
+                lock (_badPackages)
+                {
+                    _badPackages.Add(DateTime.UtcNow);
+                }
+                LogData(ex);
+            }
+        }
+
+        private async void PostAlertAsync(string message)
+        {
+            try
+            {
+                string query = $"api/LoopApi?message={message}&loginToken={_loginToken}";
+                HttpResponseMessage response = await _client.GetAsync(query);
                 response.EnsureSuccessStatusCode();
             }
             catch (Exception ex)

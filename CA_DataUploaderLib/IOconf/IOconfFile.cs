@@ -175,5 +175,15 @@ namespace CA_DataUploaderLib.IOconf
             return Table.Where(x => x.GetType() == typeof(IOconfOven)).Cast<IOconfOven>();
         }
 
+        public static IEnumerable<IOconfAlert> GetAlerts()
+        {
+            return Table.Where(x => x.GetType() == typeof(IOconfAlert)).Cast<IOconfAlert>();
+        }
+
+        public static IEnumerable<IOconfMath> GetMath()
+        {
+            return Table.Where(x => x.GetType() == typeof(IOconfMath)).Cast<IOconfMath>();
+        }
+
     }
 }

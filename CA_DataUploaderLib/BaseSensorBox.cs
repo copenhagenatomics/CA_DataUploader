@@ -50,6 +50,9 @@ namespace CA_DataUploaderLib
 
         public IEnumerable<double> GetFrequencyAndFilterCount()
         {
+            if (_logLevel != CALogLevel.Debug)
+                return new List<double>();  // empty. 
+
             var list1 = _values.Values.GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key).Select(x => x.First().GetFrequency());
             var list2 = _values.Values.GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key).Select(x => x.First().FilterCount()).ToList();
             list2.Add(_loopTime);
@@ -60,7 +63,7 @@ namespace CA_DataUploaderLib
         {
             var list = _config.Select(x => new VectorDescriptionItem("double", x.Name, DataTypeEnum.Input)).ToList();
             // list.AddRange(_config.Select(x => new VectorDescriptionItem("double", x.Name + "_latest", DataTypeEnum.Input)).ToList());
-            // if (_logLevel == CALogLevel.Debug)
+            if (_logLevel == CALogLevel.Debug)
             {
                 list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_SampleFrequency", DataTypeEnum.Input)));
                 list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_FilterSampleCount", DataTypeEnum.Input)));

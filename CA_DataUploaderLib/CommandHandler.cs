@@ -59,6 +59,7 @@ namespace CA_DataUploaderLib
             _vectorDescription = vectorDescription;
         }
 
+        // this method should only be called from ServerUploader.SendVector()
         public void NewData(List<double> vector)
         {
             lock (_dataVector)
@@ -76,6 +77,7 @@ namespace CA_DataUploaderLib
             }
         }
 
+        
         private bool Stop(List<string> args)
         {
             _running = false;
@@ -148,11 +150,15 @@ namespace CA_DataUploaderLib
                         {
                             if(_logLevel == CALogLevel.Debug)
                                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - command accepted");
+                            else
+                                CALog.LogData(LogID.A, $"Command: {string.Join(" ", cmd)} - command accepted {Environment.NewLine}");
                         }
                         else
                         {
                             if(_logLevel == CALogLevel.Debug)
                                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - bad command");
+                            else
+                                CALog.LogData(LogID.A, $"Command: {string.Join(" ", cmd)} - bad command {Environment.NewLine}");
                         }
                     }
                     catch (ArgumentException ex)

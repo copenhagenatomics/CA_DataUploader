@@ -179,7 +179,7 @@ namespace CA_DataUploaderLib
                     if (heater.Current == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
                         heater.Board().SafeWriteLine(Environment.NewLine);
-                        Thread.Sleep(2);
+                        Thread.Sleep(100);
                         HeaterOn(heater);
                         CALog.LogData(LogID.A, $"on.={heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
@@ -187,7 +187,7 @@ namespace CA_DataUploaderLib
                     if (heater.Current > 0 && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
                     {
                         heater.Board().SafeWriteLine(Environment.NewLine);
-                        Thread.Sleep(2);
+                        Thread.Sleep(100);
                         HeaterOff(heater);
                         CALog.LogData(LogID.A, $"off.={heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
@@ -236,8 +236,8 @@ namespace CA_DataUploaderLib
             {
                 list.Add(_offTemperature);
                 list.Add(_lastTemperature);
+                list.Add(_loopTime);
             }
-            list.Add(_loopTime);
 
             return list;
         }
@@ -255,8 +255,8 @@ namespace CA_DataUploaderLib
             {
                 list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.Input));
                 list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.Input));
+                list.Add(new VectorDescriptionItem("double", "HeatingCtrl_LoopTime", DataTypeEnum.Input));
             }
-            list.Add(new VectorDescriptionItem("double", "HeatingCtrl_LoopTime", DataTypeEnum.Input));
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from HeatingController");
             return list;
