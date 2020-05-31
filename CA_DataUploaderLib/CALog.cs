@@ -26,9 +26,10 @@ namespace CA_DataUploaderLib
         {
             var temp = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine(ex.ToString() + Environment.NewLine);
+            var msg = $"{DateTime.Now.ToString("MM.dd HH:mm:ss")} - {ex.ToString()}{Environment.NewLine}";
+            Console.WriteLine(msg);
             Console.ForegroundColor = temp;
-            WriteToFile(logID, ex.ToString() + Environment.NewLine);
+            WriteToFile(logID, msg);
         }
 
         public static void LogInfoAndConsole(LogID logID, string msg)
@@ -52,13 +53,13 @@ namespace CA_DataUploaderLib
             WriteToFile(logID, msg);
         }
 
-        public static void LogErrorAndConsole(LogID logID, string error)
+        public static void LogErrorAndConsoleLn(LogID logID, string error)
         {
             var temp = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine(error);
             Console.ForegroundColor = temp;
-            WriteToFile(logID, error);
+            WriteToFile(logID, error + Environment.NewLine);
         }
 
         private static void WriteToFile(LogID logID, string msg)

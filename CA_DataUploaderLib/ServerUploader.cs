@@ -254,7 +254,7 @@ namespace CA_DataUploaderLib
                 }
                 catch (Exception ex)
                 {
-                    CALog.LogErrorAndConsole(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message);
+                    CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message);
                 }
             }
 
@@ -326,17 +326,17 @@ namespace CA_DataUploaderLib
         private static void LogHttpException(Exception ex)
         {
             if (ex.InnerException == null)
-                CALog.LogErrorAndConsole(LogID.A, ex.Message);
+                CALog.LogErrorAndConsoleLn(LogID.A, ex.Message);
             else
-                CALog.LogErrorAndConsole(LogID.A, ex.InnerException.Message);
+                CALog.LogErrorAndConsoleLn(LogID.A, ex.InnerException.Message);
         }
 
         private static void LogData(Exception ex)
         {
             if (ex.InnerException == null)
-                CALog.LogData(LogID.A, ex.Message);
+                CALog.LogData(LogID.A, ex.Message + Environment.NewLine);
             else
-                CALog.LogData(LogID.A, ex.InnerException.Message);
+                CALog.LogData(LogID.A, ex.InnerException.Message + Environment.NewLine);
         }
 
         private async void PostVectorAsync(byte[] buffer, DateTime timestamp)

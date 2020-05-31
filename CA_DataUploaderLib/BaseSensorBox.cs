@@ -204,7 +204,7 @@ namespace CA_DataUploaderLib
             {
                 if (_values[sensor].Value < 3000 && _values[sensor].Value > 0)  // Salt leakage algorithm. 
                 {
-                    CALog.LogErrorAndConsole(LogID.A, $"Salt leak detected from {sensor.Name}={_values[sensor].Value} {DateTime.Now.ToString("dd-MMM-yyyy HH:mm")}");
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Salt leak detected from {sensor.Name}={_values[sensor].Value} {DateTime.Now.ToString("dd-MMM-yyyy HH:mm")}");
                     _values[sensor].Value = 1d;
                     if (_cmdHandler != null)
                         _cmdHandler.Execute("escape"); // make the whole system shut down. 

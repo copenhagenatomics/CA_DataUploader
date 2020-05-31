@@ -149,18 +149,18 @@ namespace CA_DataUploaderLib
                 }
                 catch (ArgumentException ex)
                 {
-                    CALog.LogErrorAndConsole(LogID.A, ex.ToString());
+                    CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
                     _running = false;
                 }
                 catch (TimeoutException ex)
                 {
-                    CALog.LogErrorAndConsole(LogID.A, ex.ToString());
+                    CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
                     AllOff();
                     _heaters.Clear(); 
                 }
                 catch (Exception ex)
                 {
-                    CALog.LogErrorAndConsole(LogID.A, ex.ToString());
+                    CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
                 }
             }
 

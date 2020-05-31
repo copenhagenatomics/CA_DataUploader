@@ -114,7 +114,7 @@ namespace CA_DataUploaderLib
                 }
                 catch (Exception ex)
                 {
-                    CALog.LogErrorAndConsole(LogID.A, ex.ToString());
+                    CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
                 }
             }
 

@@ -27,7 +27,7 @@ namespace CA_DataUploaderLib
                 }
 
                 // see if it matches the BoxPattern.
-                var match = Regex.Match(lines, _SwitchBoxPattern);
+                Match match = Regex.Match(lines, _SwitchBoxPattern);
 
                 lock (_SwitchBoxPattern)
                 {
@@ -56,6 +56,7 @@ namespace CA_DataUploaderLib
             catch(Exception ex)
             {
                 CALog.LogException(LogID.B, ex);
+                box.SafeClose();  // I don't know if this will solve the problem. 
             }
 
             CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{lines}'{Environment.NewLine}");
