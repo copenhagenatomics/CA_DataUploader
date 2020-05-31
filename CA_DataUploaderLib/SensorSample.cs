@@ -56,6 +56,7 @@ namespace CA_DataUploaderLib
         private void SetValue(double value)
         {
             _latestValue = value;
+            TimeStamp = DateTime.UtcNow;
             lock (_filterQueue)
             {
                 var removeBefore = DateTime.Now.Subtract(FilterLength);

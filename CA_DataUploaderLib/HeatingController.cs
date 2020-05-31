@@ -15,7 +15,6 @@ namespace CA_DataUploaderLib
         private double _loopTime = 0;
         private double _offTemperature = 0;
         private double _lastTemperature = 0;
-        private double _lastValueTimeStamp = 0;
         private DateTime _startTime;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
         protected CommandHandler _cmdHandler;
@@ -176,7 +175,6 @@ namespace CA_DataUploaderLib
                 foreach (var heater in _heaters.Where(x => x.Board() == board))
                 {
                     heater.Current.Value = values[heater._ioconf.PortNumber - 1];
-                    _lastValueTimeStamp = DateTime.Now.Subtract(_startTime).TotalMinutes;
 
                     // this is a hot fix to make sure heaters are on/off. 
                     if (heater.Current.Value == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
@@ -236,7 +234,7 @@ namespace CA_DataUploaderLib
                 list.Add(_offTemperature);
                 list.Add(_lastTemperature);
                 list.Add(_loopTime);
-                list.Add(_lastValueTimeStamp);
+                list.Add(_startTime.Subtract(_heaters.Max(x => x.Current.TimeStamp)).TotalMinutes);
             }
 
             return list;
