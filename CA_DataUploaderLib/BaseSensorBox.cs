@@ -65,9 +65,9 @@ namespace CA_DataUploaderLib
             // list.AddRange(_config.Select(x => new VectorDescriptionItem("double", x.Name + "_latest", DataTypeEnum.Input)).ToList());
             if (_logLevel == CALogLevel.Debug)
             {
-                list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_SampleFrequency", DataTypeEnum.Input)));
-                list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_FilterSampleCount", DataTypeEnum.Input)));
-                list.Add(new VectorDescriptionItem("double", "SensorCtrl_LoopTime", DataTypeEnum.Input));
+                list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_SampleFrequency", DataTypeEnum.State)));
+                list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_FilterSampleCount", DataTypeEnum.State)));
+                list.Add(new VectorDescriptionItem("double", "SensorCtrl_LoopTime", DataTypeEnum.State));
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {Title}");
