@@ -99,12 +99,6 @@ namespace CA_DataUploaderLib
             return ToString(Environment.NewLine);
         }
 
-        private void port_DataReceived(object sender, SerialDataReceivedEventArgs e)
-        {
-            // Show all the incoming data in the port's buffer in the output window
-            _readBuffer.Enqueue(ReadExisting());
-        }
-
         public string SafeReadLine()
         {
             try
@@ -124,7 +118,7 @@ namespace CA_DataUploaderLib
             catch (Exception)
             {
                 var frame = new StackTrace().GetFrame(1);
-                CALog.LogErrorAndConsole(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}");
+                CALog.LogErrorAndConsole(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}{Environment.NewLine}");
                 if (_safeLimit-- == 0) throw;
             }
 
@@ -150,7 +144,7 @@ namespace CA_DataUploaderLib
             catch (Exception)
             {
                 var frame = new StackTrace().GetFrame(1);
-                CALog.LogErrorAndConsole(LogID.A, $"Error while checking serial port read buffer: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}");
+                CALog.LogErrorAndConsole(LogID.A, $"Error while checking serial port read buffer: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}{Environment.NewLine}");
                 if (_safeLimit-- == 0) throw;
             }
 
@@ -181,9 +175,34 @@ namespace CA_DataUploaderLib
             }
             catch (Exception)
             {
-                CALog.LogErrorAndConsole(LogID.A, $"Unable to write to serial port: {PortName} {productType} {serialNumber}");
+                CALog.LogErrorAndConsole(LogID.A, $"Unable to write to serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}");
                 if (_safeLimit-- == 0) throw;
-            };
+            }
+        }
+
+        public string SafeReadExisting()
+        {
+            try
+            {
+                lock (this)
+                {
+                    if (IsOpen)
+                        return ReadExisting();
+
+                    Thread.Sleep(100);
+                    Open();
+
+                    if (IsOpen)
+                        return ReadExisting();
+                }
+            }
+            catch (Exception)
+            {
+                CALog.LogErrorAndConsole(LogID.A, $"Unable to ReadExisting() from serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}");
+                if (_safeLimit-- == 0) throw;
+            }
+
+            return string.Empty;
         }
 
         public void SafeClose()
