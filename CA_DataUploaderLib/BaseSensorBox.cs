@@ -117,9 +117,6 @@ namespace CA_DataUploaderLib
                                 numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
                                 ProcessLine(numbers, board);
                             }
-
-                            if (_logLevel == CALogLevel.Debug)
-                                CALog.LogData(LogID.A, ShowQueue(null) + Environment.NewLine);
                         }
                     }
 
