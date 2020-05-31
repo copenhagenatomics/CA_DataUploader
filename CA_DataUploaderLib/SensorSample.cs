@@ -29,8 +29,6 @@ namespace CA_DataUploaderLib
             set { SetValue(value); }
         }
 
-        public double LatestValue { get { return (TimeStamp < DateTime.UtcNow.Subtract(FilterLength)) ? 500 : (_latestValue==10001)? 400: _latestValue;  } }
-
         public double TimeoutValue
         {
             // if last sample is older than filter length, then set timeout. 

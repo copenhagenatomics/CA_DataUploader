@@ -115,13 +115,13 @@ namespace CA_DataUploaderLib
 
         private void LoopForever()
         {
-            _startTime = DateTime.Now;
+            _startTime = DateTime.UtcNow;
             var logLevel = IOconfFile.GetOutputLevel();
             while (_running)
             {
                 try
                 {
-                    var loopStart = DateTime.Now;
+                    var loopStart = DateTime.UtcNow;
                     foreach (var heater in _heaters)
                     {
                         if (heater.IsOn && heater.MustTurnOff())
@@ -145,7 +145,7 @@ namespace CA_DataUploaderLib
                     }
 
                     Thread.Sleep(200); // if we read too often, then we will not get a full line, thus no match. 
-                    _loopTime = DateTime.Now.Subtract(loopStart).TotalMilliseconds;
+                    _loopTime = DateTime.UtcNow.Subtract(loopStart).TotalMilliseconds;
                 }
                 catch (ArgumentException ex)
                 {
@@ -164,7 +164,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting HeatingController.LoopForever() " + DateTime.Now.Subtract(_startTime).TotalSeconds.ToString() + " seconds");
+            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting HeatingController.LoopForever() " + DateTime.UtcNow.Subtract(_startTime).TotalSeconds.ToString() + " seconds");
             AllOff();
         }
 
@@ -234,7 +234,7 @@ namespace CA_DataUploaderLib
                 list.Add(_offTemperature);
                 list.Add(_lastTemperature);
                 list.Add(_loopTime);
-                list.Add(_startTime.Subtract(_heaters.Max(x => x.Current.TimeStamp)).TotalMinutes);
+                list.Add(_heaters.Max(x => x.Current.GetFrequency()));
             }
 
             return list;
@@ -254,7 +254,7 @@ namespace CA_DataUploaderLib
                 list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.State));
                 list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.State));
                 list.Add(new VectorDescriptionItem("double", "HeatingCtrl_LoopTime", DataTypeEnum.State));
-                list.Add(new VectorDescriptionItem("double", "LastValueTimestamp", DataTypeEnum.State));
+                list.Add(new VectorDescriptionItem("double", "CurrentSamplingFrequency", DataTypeEnum.State));
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from HeatingController");
