@@ -14,5 +14,10 @@ namespace CA_DataUploaderLib.IOconf
 
         public int MaxTemperature;
         public int MaxOnInterval = 30;
+
+        public IOconfInput AsConfInput()
+        {
+            return new IOconfInput(Row, LineNumber, "Current");
+        }
     }
 }

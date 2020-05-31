@@ -19,7 +19,7 @@ namespace CA_DataUploaderLib
         public double lastTemperature = 10000;
         public bool IsOn;
         public bool ManualMode;
-        public double Current;  // Amps per element. 
+        public SensorSample Current;  // Amps per element. 
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
 
         public HeaterElement(int area, IOconfHeater heater, IEnumerable<SensorSample> heaterSensors, IEnumerable<SensorSample> ovenSensors)
@@ -28,6 +28,7 @@ namespace CA_DataUploaderLib
             _area = area;
             _heaterSensors = heaterSensors.ToList();
             _ovenSensors = ovenSensors.ToList();
+            Current = new SensorSample(heater.AsConfInput(), new TimeSpan(0, 0, 0, 0, 500), 0);
         }
 
         public void SetTemperature(int value)
@@ -116,7 +117,7 @@ namespace CA_DataUploaderLib
             foreach (var s in _ovenSensors)
                 msg += s.Value.ToString("N0") + ", " + (LastOn > LastOff ? "" : onTemperature.ToString("N0"));
 
-            return $"{_ioconf.Name.PadRight(10)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg.PadRight(12)} {Current.ToString("N1").PadRight(5)} Amp";
+            return $"{_ioconf.Name.PadRight(10)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg.PadRight(12)} {Current.Value.ToString("N1").PadRight(5)} Amp";
         }
 
         public string name()

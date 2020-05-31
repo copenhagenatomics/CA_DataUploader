@@ -175,22 +175,18 @@ namespace CA_DataUploaderLib
             {
                 foreach (var heater in _heaters.Where(x => x.Board() == board))
                 {
-                    heater.Current = values[heater._ioconf.PortNumber - 1];
+                    heater.Current.Value = values[heater._ioconf.PortNumber - 1];
                     _lastValueTimeStamp = DateTime.Now.Subtract(_startTime).TotalMinutes;
 
                     // this is a hot fix to make sure heaters are on/off. 
-                    if (heater.Current == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
+                    if (heater.Current.Value == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
-                        heater.Board().SafeWriteLine(Environment.NewLine);
-                        Thread.Sleep(10);
                         HeaterOn(heater);
                         CALog.LogData(LogID.A, $"on.={heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
 
-                    if (heater.Current > 0 && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
+                    if (heater.Current.Value > 0 && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
                     {
-                        heater.Board().SafeWriteLine(Environment.NewLine);
-                        Thread.Sleep(10);
                         HeaterOff(heater);
                         CALog.LogData(LogID.A, $"off.={heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
@@ -248,7 +244,7 @@ namespace CA_DataUploaderLib
 
         public List<double> GetPower()
         {
-            return _heaters.Select(x => x.Current).ToList();
+            return _heaters.Select(x => x.Current.Value).ToList();
         }
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
