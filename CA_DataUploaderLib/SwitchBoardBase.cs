@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CA_DataUploaderLib.IOconf;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -19,6 +20,11 @@ namespace CA_DataUploaderLib
             {
                 // try to read some text. 
                 lines = box.SafeReadExisting();
+
+                if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
+                {
+                    CALog.LogData(LogID.B, $"{DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff")} - {lines}{Environment.NewLine}");
+                }
 
                 // see if it matches the BoxPattern.
                 var match = Regex.Match(lines, _SwitchBoxPattern);

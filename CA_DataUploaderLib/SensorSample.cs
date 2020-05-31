@@ -22,7 +22,6 @@ namespace CA_DataUploaderLib
         public bool MaxSlope;
 
         private double _value;
-        private double _latestValue;
         public double Value
         {
             get { return _value; }
@@ -53,12 +52,11 @@ namespace CA_DataUploaderLib
 
         private void SetValue(double value)
         {
-            _latestValue = value;
             TimeStamp = DateTime.UtcNow;
             lock (_filterQueue)
             {
-                var removeBefore = DateTime.Now.Subtract(FilterLength);
-                _filterQueue.Enqueue(new Tuple<double, DateTime>(value, DateTime.Now));
+                var removeBefore = DateTime.UtcNow.Subtract(FilterLength);
+                _filterQueue.Enqueue(new Tuple<double, DateTime>(value, DateTime.UtcNow));
                 while (_filterQueue.First().Item2 < removeBefore)
                 {
                     _filterQueue.Dequeue();
