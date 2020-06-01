@@ -21,9 +21,9 @@ namespace CA_DataUploaderLib
                 // try to read some text. 
                 lines = box.SafeReadExisting();
 
-                if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
+                if (IOconfFile.GetOutputLevel() == CALogLevel.Debug && !string.IsNullOrEmpty(lines))
                 {
-                    CALog.LogData(LogID.B, $"{lines}{Environment.NewLine}");
+                    CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{lines}'{Environment.NewLine}");
                 }
 
                 // see if it matches the BoxPattern.
@@ -58,8 +58,7 @@ namespace CA_DataUploaderLib
                 CALog.LogException(LogID.B, ex);
                 // box.SafeClose();  // I don't know if this will solve the problem. 
             }
-
-            CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{lines}'{Environment.NewLine}");
+            
             return new List<double>();  // empty list
         }
     }

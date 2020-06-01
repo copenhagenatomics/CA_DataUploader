@@ -144,7 +144,7 @@ namespace CA_DataUploaderLib
                         GetCurrentValues(box, values);
                     }
 
-                    Thread.Sleep(200); // if we read too often, then we will not get a full line, thus no match. 
+                    Thread.Sleep(120); // if we read too often, then we will not get a full line, thus no match. 
                     _loopTime = DateTime.UtcNow.Subtract(loopStart).TotalMilliseconds;
                 }
                 catch (ArgumentException ex)
