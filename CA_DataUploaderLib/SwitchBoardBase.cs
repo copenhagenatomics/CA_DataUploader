@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib
 
                 if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
                 {
-                    CALog.LogData(LogID.B, $"{DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff")} - {lines}{Environment.NewLine}");
+                    CALog.LogData(LogID.B, $"{lines}{Environment.NewLine}");
                 }
 
                 // see if it matches the BoxPattern.
@@ -56,7 +56,7 @@ namespace CA_DataUploaderLib
             catch(Exception ex)
             {
                 CALog.LogException(LogID.B, ex);
-                box.SafeClose();  // I don't know if this will solve the problem. 
+                // box.SafeClose();  // I don't know if this will solve the problem. 
             }
 
             CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{lines}'{Environment.NewLine}");
