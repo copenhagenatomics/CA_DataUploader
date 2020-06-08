@@ -125,14 +125,14 @@ namespace CA_DataUploaderLib.IOconf
             return Table.Where(x => x.GetType() == typeof(IOconfOut230Vac)).Cast<IOconfOut230Vac>();
         }
 
-        public static IEnumerable<IOConfPressure> GetPressure()
+        public static IEnumerable<IOconfInput> GetPressure()
         {
-            return Table.Where(x => x.GetType() == typeof(IOConfPressure)).Cast<IOConfPressure>();
+            return Table.Where(x => x.GetType() == typeof(IOConfPressure)).Cast<IOconfInput>();
         }
 
-        public static IEnumerable<IOconfAirFlow> GetAirFlow()
+        public static IEnumerable<IOconfInput> GetAirFlow()
         {
-            return Table.Where(x => x.GetType() == typeof(IOconfAirFlow)).Cast<IOconfAirFlow>();
+            return Table.Where(x => x.GetType() == typeof(IOconfAirFlow)).Cast<IOconfInput>();
         }
 
         public static IEnumerable<IOconfLiquidFlow> GetLiquidFlow()

@@ -18,7 +18,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public int TankNumber;
         public IOconfValve Valve;
-        public IOConfPressure Pressure;
+        public IOconfInput Pressure;
         public FlowDirection flowDirection;
         public SafeValue safeValue;
     }
