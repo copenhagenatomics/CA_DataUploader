@@ -111,7 +111,7 @@ namespace CA_DataUploaderLib
                             values.Clear();
                             numbers.Clear();
                             row = board.SafeReadLine();
-                            if (Regex.IsMatch(row.Trim(), @"^\d+"))  // check that row starts with digit. 
+                            if (Regex.IsMatch(row.Trim(), @"^\d+") && !Regex.IsMatch(row.Trim(), "\\[SLPM\\], Liter:"))  // check that row starts with digit. 
                             {
                                 values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                                 numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
