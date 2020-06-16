@@ -12,7 +12,13 @@ namespace CA_DataUploaderLib.IOconf
 
         static IOconfFile()
         {
-            if (File.Exists("IO.conf") && !Table.Any())
+            if (!File.Exists("IO.conf"))
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, "IO.conf file not found");
+                throw new Exception("IO.conf file not found");
+            }
+
+            if (!Table.Any())
             {
                 var lines = File.ReadAllLines("IO.conf").ToList();
                 RawFile = string.Join(Environment.NewLine, lines);
