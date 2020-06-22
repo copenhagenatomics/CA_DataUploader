@@ -82,7 +82,7 @@ namespace CA_DataUploaderLib
         {
             lock (_filterQueue)
             {
-                if (_filterQueue.Count == 0) 
+                if (_filterQueue.Count < 2) 
                     return 0;
 
                 return (_filterQueue.Count() - 1) / _filterQueue.Last().Item2.Subtract(_filterQueue.First().Item2).TotalSeconds;

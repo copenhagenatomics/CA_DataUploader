@@ -74,15 +74,36 @@ namespace CA_DataUploaderLib
             return list;
         }
 
+        private TimeSpan _filterZero = new TimeSpan(0, 0, 0);
+
         protected bool ShowQueue(List<string> args)
         {
-            var sb = new StringBuilder($"NAME      {_loopTime.ToString("N0").PadLeft(4)}          AVERAGE       1         2         3         4         5         6         7         8         9         10       FREQUENCY");
-            sb.Append(Environment.NewLine);
-            foreach (var t in _values)
+            if(_values.Count == 0)
+                return false;
+
+            var sb = new StringBuilder($"NAME      {_loopTime.ToString("N0").PadLeft(4)}           ");
+            if (_values.First().Value.FilterLength == _filterZero)
             {
-                sb.Append($"{t.Value.Name.PadRight(22)}={t.Value.Value.ToString("N2").PadLeft(9)}  {t.Value.FilterToString()}   {t.Value.GetFrequency().ToString("N1")}");
-                sb.Append(Environment.NewLine);
+                sb.AppendLine();
+                foreach (var t in _values)
+                {
+                    sb.AppendLine($"{t.Value.Name.PadRight(22)}={t.Value.Value.ToString("N2").PadLeft(9)}");
+                }
             }
+            else
+            {
+                sb.Append("AVERAGE       1");
+                for (int i = 2; i <= _values.First().Value.FilterCount(); i++)
+                    sb.Append(i.ToString().PadLeft(10));
+
+                sb.Append("     FREQUENCY");
+                sb.AppendLine();
+                foreach (var t in _values)
+                {
+                    sb.Append($"{t.Value.Name.PadRight(22)}={t.Value.Value.ToString("N2").PadLeft(9)}  {t.Value.FilterToString()}   {t.Value.GetFrequency().ToString("N1")}");
+                    sb.AppendLine();
+                }
+            }            
 
             CALog.LogInfoAndConsoleLn(LogID.A, sb.ToString());
             return true;

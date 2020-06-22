@@ -45,15 +45,15 @@ namespace CA_DataUploaderLib
                         if (_lastTimeStamp.AddSeconds(2) > DateTime.Now) // if it is less than 2 seconds old, then return last read. 
                             match = _LatestRead;
                     }
-                }
 
-                if (match.Success && match.Groups.Count > 4)
-                {
-                    return match.Groups.Cast<Group>().Skip(1)
-                        .Select(x => double.Parse(x.Value, CultureInfo.InvariantCulture)).ToList();
+                    if (match.Success && match.Groups.Count > 4)
+                    {
+                        return match.Groups.Cast<Group>().Skip(1)
+                            .Select(x => double.Parse(x.Value, CultureInfo.InvariantCulture)).ToList();
+                    }
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 CALog.LogException(LogID.B, ex);
                 // box.SafeClose();  // I don't know if this will solve the problem. 
