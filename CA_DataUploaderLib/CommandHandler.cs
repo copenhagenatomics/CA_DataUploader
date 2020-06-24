@@ -148,7 +148,7 @@ namespace CA_DataUploaderLib
                     {
                         if (func.Invoke(cmd))
                         {
-                            if(_logLevel == CALogLevel.Debug)
+                            if(_logLevel == CALogLevel.Debug && cmd.First().ToLower() != "help")
                                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - command accepted");
                             else
                                 CALog.LogData(LogID.A, $"Command: {string.Join(" ", cmd)} - command accepted {Environment.NewLine}");
