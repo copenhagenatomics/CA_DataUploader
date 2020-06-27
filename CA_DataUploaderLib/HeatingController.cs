@@ -13,6 +13,7 @@ namespace CA_DataUploaderLib
         public double Voltage = 230;
         public int HeaterOnTimeout = 60;
         private bool _running = true;
+        private CALogLevel _logLevel;
         private double _loopTime = 0;
         private double _offTemperature = 0;
         private double _lastTemperature = 0;
@@ -59,7 +60,7 @@ namespace CA_DataUploaderLib
         {
             CALog.LogInfoAndConsoleLn(LogID.A, $"heater [name] on/off      - turn the heater with the given name in IO.conf on and off");
             CALog.LogInfoAndConsoleLn(LogID.A, $"oven [0 - 800] [0 - 800]  - where the integer value is the oven temperature top and bottom region");
-            if (IOconfFile.GetOutputLevel() == CALogLevel.Debug) CALog.LogInfoAndConsoleLn(LogID.A, $"ovenhistory [x]           - Show a list of the last x oven commands");
+            if (_logLevel == CALogLevel.Debug) CALog.LogInfoAndConsoleLn(LogID.A, $"ovenhistory [x]           - Show a list of the last x oven commands");
             return true;
         }
 
@@ -132,7 +133,7 @@ namespace CA_DataUploaderLib
         private void LoopForever()
         {
             _startTime = DateTime.UtcNow;
-            var logLevel = IOconfFile.GetOutputLevel();
+            _logLevel = IOconfFile.GetOutputLevel();
             while (_running)
             {
                 try
@@ -222,6 +223,8 @@ namespace CA_DataUploaderLib
             {
                 heater.LastOff = DateTime.UtcNow;
                 heater.Board().SafeWriteLine($"p{heater._ioconf.PortNumber} off");
+                if (_logLevel == CALogLevel.Debug)
+                    CALog.LogData(LogID.B, $"wrote p{heater._ioconf.PortNumber} off to {heater.Board().BoxName}");
             }
             catch (TimeoutException)
             {
@@ -235,6 +238,8 @@ namespace CA_DataUploaderLib
             {
                 heater.LastOn = DateTime.UtcNow;
                 heater.Board().SafeWriteLine($"p{heater._ioconf.PortNumber} on {HeaterOnTimeout}");
+                if(_logLevel == CALogLevel.Debug)
+                    CALog.LogData(LogID.B, $"wrote p{heater._ioconf.PortNumber} on {HeaterOnTimeout} to {heater.Board().BoxName}");
             }
             catch (TimeoutException)
             {
@@ -245,7 +250,7 @@ namespace CA_DataUploaderLib
         public List<double> GetStates()
         {
             var list = _heaters.Select(x => x.IsOn ? 1.0 : 0.0).ToList();
-            if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
+            if (_logLevel == CALogLevel.Debug)
             {
                 list.Add(_offTemperature);
                 list.Add(_lastTemperature);

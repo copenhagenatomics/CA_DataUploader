@@ -24,11 +24,6 @@ namespace CA_DataUploaderLib
                 // try to read some text. 
                 lines = box.SafeReadExisting();
 
-                if (IOconfFile.GetOutputLevel() == CALogLevel.Debug && !string.IsNullOrEmpty(lines))
-                {
-                    CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{lines}'{Environment.NewLine}");
-                }
-
                 // see if it matches the BoxPattern.
                 Match match = Regex.Match(lines, _SwitchBoxPattern);
 
