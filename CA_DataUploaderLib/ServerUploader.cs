@@ -385,7 +385,7 @@ namespace CA_DataUploaderLib
                 if (force || _badPackages.First().AddHours(1) < DateTime.UtcNow)
                 {
                     CALog.LogInfoAndConsoleLn(LogID.A, $"Vector upload errors within the last hour:");
-                    foreach (var minutes in _badPackages.GroupBy(x => x.ToString("dd-MMM-yyyy HH:mm")))
+                    foreach (var minutes in _badPackages.GroupBy(x => x.ToString("MMM dd HH:mm")))
                         CALog.LogInfoAndConsoleLn(LogID.A, $"{minutes.Key} = {minutes.Count()}");
 
                     _badPackages.Clear();

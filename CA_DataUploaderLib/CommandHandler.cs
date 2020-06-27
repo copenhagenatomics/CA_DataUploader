@@ -1,4 +1,5 @@
 ﻿using CA_DataUploaderLib.IOconf;
+using Humanizer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,6 +13,7 @@ namespace CA_DataUploaderLib
     {
 
         private bool _running = true;
+        private DateTime _start = DateTime.Now;
         private StringBuilder inputCommand = new StringBuilder();
         private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
         private CALogLevel _logLevel = IOconfFile.GetOutputLevel();
@@ -25,6 +27,7 @@ namespace CA_DataUploaderLib
             new Thread(() => this.LoopForever()).Start();
             AddCommand("escape", Stop);
             AddCommand("help", HelpMenu);
+            AddCommand("up", Uptime);
             AddCommand("Run", Run);
         }
 
@@ -104,7 +107,7 @@ namespace CA_DataUploaderLib
 
         private void LoopForever()
         {
-            DateTime start = DateTime.Now;
+            _start = DateTime.Now;
             while (_running)
             {
                 try
@@ -118,7 +121,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
+            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.Now.Subtract(_start).Humanize(5));
         }
 
         private void HandleCommand(List<string> cmd)
@@ -212,6 +215,13 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, "Commands: ");
             CALog.LogInfoAndConsoleLn(LogID.A, "Esc                       - press Esc key to shut down");
             CALog.LogInfoAndConsoleLn(LogID.A, "help                      - print the full list of available commands");
+            CALog.LogInfoAndConsoleLn(LogID.A, "up                        - print how long the service has been running");
+            return true;
+        }
+
+        private bool Uptime(List<string> args)
+        {
+            CALog.LogInfoAndConsoleLn(LogID.A, DateTime.Now.Subtract(_start).Humanize(5));
             return true;
         }
 

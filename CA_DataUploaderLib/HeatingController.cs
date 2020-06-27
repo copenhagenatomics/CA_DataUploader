@@ -1,4 +1,5 @@
 ﻿using CA_DataUploaderLib.IOconf;
+using Humanizer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +18,7 @@ namespace CA_DataUploaderLib
         private double _lastTemperature = 0;
         private DateTime _startTime;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
+        private List<string> _ovenHistory = new List<string>();
         protected CommandHandler _cmdHandler;
 
         public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
@@ -46,6 +48,7 @@ namespace CA_DataUploaderLib
                 {
                     cmd.AddCommand("help", HelpMenu);
                     cmd.AddCommand("oven", Oven);
+                    if(IOconfFile.GetOutputLevel() == CALogLevel.Debug) cmd.AddCommand("ovenhistory", OvenHistory);
                     cmd.AddCommand("heater", Heater);
                     break; // exit the for loop
                 }
@@ -56,6 +59,7 @@ namespace CA_DataUploaderLib
         {
             CALog.LogInfoAndConsoleLn(LogID.A, $"heater [name] on/off      - turn the heater with the given name in IO.conf on and off");
             CALog.LogInfoAndConsoleLn(LogID.A, $"oven [0 - 800] [0 - 800]  - where the integer value is the oven temperature top and bottom region");
+            if (IOconfFile.GetOutputLevel() == CALogLevel.Debug) CALog.LogInfoAndConsoleLn(LogID.A, $"ovenhistory [x]           - Show a list of the last x oven commands");
             return true;
         }
 
@@ -84,10 +88,22 @@ namespace CA_DataUploaderLib
                 }
             }
 
+            _ovenHistory.Add(DateTime.Now.ToString("MMM dd HH:mm:ss") + string.Join(" ", args));
             if (_heaters.Any(x => x.IsActive))
                 _cmdHandler.Execute("light on");
             else
                 _cmdHandler.Execute("light off");
+            return true;
+        }
+
+        private bool OvenHistory(List<string> args)
+        {
+            if (_ovenHistory.Count == 0)
+                return false;
+
+            int nlines = Math.Min(_ovenHistory.Count, CommandHandler.GetCmdParam(args, 1, 1000000000));
+            int nSkip = _ovenHistory.Count - nlines;
+            _ovenHistory.Skip(nSkip).ToList().ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x));
             return true;
         }
 
@@ -164,7 +180,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting HeatingController.LoopForever() " + DateTime.UtcNow.Subtract(_startTime).TotalSeconds.ToString() + " seconds");
+            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting HeatingController.LoopForever() " + DateTime.UtcNow.Subtract(_startTime).Humanize(5));
             AllOff();
         }
 
