@@ -15,6 +15,9 @@ namespace CA_DataUploaderLib
 
         public static List<double> ReadInputFromSwitchBoxes(MCUBoard box)
         {
+            if (box == null)
+                return new List<double>(); // empty
+
             string lines = string.Empty;
             try
             {

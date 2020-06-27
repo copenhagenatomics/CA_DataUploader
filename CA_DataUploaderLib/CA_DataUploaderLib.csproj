@@ -17,6 +17,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="df.bat" />
     <None Remove="MIT license.txt" />
     <None Remove="RPi_versions.csv" />
     <None Include="MIT license.txt">
@@ -30,6 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="df.bat" />
     <EmbeddedResource Include="RPi_versions.csv" />
   </ItemGroup>
 

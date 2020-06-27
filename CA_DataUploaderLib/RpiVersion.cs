@@ -133,6 +133,31 @@ namespace CA_DataUploaderLib
             return "unknown";
         }
 
+        public static string GetFreeDisk()
+        {
+            if (_OS.Platform == PlatformID.Unix)
+                return ExecuteShellCommand("df -h").Trim();
+            if (_OS.Platform == PlatformID.Win32NT)
+            {
+                WriteResourceToFile("df.bat", "df.bat");
+                // return ExecuteShellCommand("df.bat").Trim();  Does not work -> need debugging. 
+            }
+
+            return "unknown";
+        }
+
+        private static void WriteResourceToFile(string resourceName, string fileName)
+        {
+            using (var resource = Assembly.GetCallingAssembly().GetManifestResourceStream("CA_DataUploaderLib." + resourceName))
+            {
+                using (var file = new FileStream(fileName, FileMode.Create, FileAccess.Write))
+                {
+                    if (!File.Exists(fileName))
+                        resource.CopyTo(file);
+                }
+            }
+        }
+
         private static string GetCPU()
         {
             if (_OS.Platform == PlatformID.Unix)

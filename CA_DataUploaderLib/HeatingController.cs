@@ -88,7 +88,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            _ovenHistory.Add(DateTime.Now.ToString("MMM dd HH:mm:ss") + string.Join(" ", args));
+            _ovenHistory.Add(DateTime.Now.ToString("MMM dd HH:mm:ss ") + string.Join(" ", args));
             if (_heaters.Any(x => x.IsActive))
                 _cmdHandler.Execute("light on");
             else
@@ -210,7 +210,7 @@ namespace CA_DataUploaderLib
 
         private void AllOff()
         {
-            foreach (var box in _heaters.Select(x => x.Board()).Distinct())
+            foreach (var box in _heaters.Select(x => x.Board()).Where(x => x != null).Distinct())
                 box.SafeWriteLine("off");
 
             CALog.LogInfoAndConsoleLn(LogID.A, "All heaters are off");

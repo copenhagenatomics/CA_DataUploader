@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Text;
 using CA_DataUploaderLib.IOconf;
 using System.Text.RegularExpressions;
+using Humanizer;
 
 namespace CA_DataUploaderLib
 {
@@ -179,7 +180,7 @@ namespace CA_DataUploaderLib
                     board.SafeClose();
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.LoopForever() " + DateTime.Now.Subtract(start).TotalSeconds.ToString() + " seconds");
+            CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.LoopForever() " + DateTime.Now.Subtract(start).Humanize(5));
         }
 
         protected bool Stop(List<string> args)
