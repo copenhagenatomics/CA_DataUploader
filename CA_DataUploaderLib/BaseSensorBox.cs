@@ -68,7 +68,7 @@ namespace CA_DataUploaderLib
             {
                 list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_SampleFrequency", DataTypeEnum.State)));
                 list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_FilterSampleCount", DataTypeEnum.State)));
-                list.Add(new VectorDescriptionItem("double", "SensorCtrl_LoopTime", DataTypeEnum.State));
+                list.Add(new VectorDescriptionItem("double", "SensorRead_LoopTime", DataTypeEnum.State));
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {Title}");
@@ -114,7 +114,9 @@ namespace CA_DataUploaderLib
         {
             List<double> numbers = new List<double>();
             List<string> values = new List<string>();
+            List<MCUBoard> skipBoard = new List<MCUBoard>();
             DateTime start = DateTime.Now;
+            var loopStart = DateTime.Now; 
             string row = string.Empty;
             int badRow = 0;
             List<string> badPorts = new List<string>();
@@ -124,26 +126,34 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    var loopStart = DateTime.Now;
                     foreach (var board in _boards)
                     {
-                        while (board.SafeHasDataInReadBuffer())
+                        if (!skipBoard.Contains(board))
                         {
-                            exBoard = board; // only used in exception
-                            values.Clear();
-                            numbers.Clear();
-                            row = board.SafeReadLine();
-                            if (Regex.IsMatch(row.Trim(), @"^\d+") && !Regex.IsMatch(row.Trim(), "\\[SLPM\\], Liter:"))  // check that row starts with digit. 
+                            while (board.SafeHasDataInReadBuffer())
                             {
-                                values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                                numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
-                                ProcessLine(numbers, board);
+                                exBoard = board; // only used in exception
+                                values.Clear();
+                                numbers.Clear();
+                                row = board.SafeReadLine();
+                                if (Regex.IsMatch(row.Trim(), "\\[SLPM\\], Liter:")) // hack to skip FlowAndPressure boards. 
+                                    skipBoard.Add(board);
+
+                                if (Regex.IsMatch(row.Trim(), @"^\d+"))  // check that row starts with digit. 
+                                {
+                                    _loopTime = DateTime.Now.Subtract(loopStart).TotalMilliseconds;
+                                    loopStart = DateTime.Now;
+                                    values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                                    numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
+                                    ProcessLine(numbers, board);
+                                }
                             }
                         }
                     }
+                    if (DateTime.UtcNow.Subtract(loopStart).TotalSeconds > 1)
+                        _loopTime = 0;
 
                     Thread.Sleep(100);
-                    _loopTime = DateTime.Now.Subtract(loopStart).TotalMilliseconds;
                 }
                 catch (Exception ex)
                 {

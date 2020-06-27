@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib
         public double Voltage = 230;
         public int HeaterOnTimeout = 60;
         private bool _running = true;
-        private CALogLevel _logLevel;
+        private CALogLevel _logLevel = CALogLevel.Normal;
         private double _loopTime = 0;
         private double _offTemperature = 0;
         private double _lastTemperature = 0;
@@ -134,11 +134,11 @@ namespace CA_DataUploaderLib
         {
             _startTime = DateTime.UtcNow;
             _logLevel = IOconfFile.GetOutputLevel();
+            var loopStart = DateTime.UtcNow;
             while (_running)
             {
                 try
                 {
-                    var loopStart = DateTime.UtcNow;
                     foreach (var heater in _heaters)
                     {
                         if (heater.IsOn && heater.MustTurnOff())
@@ -158,11 +158,19 @@ namespace CA_DataUploaderLib
                     foreach (var box in _heaters.Select(x => x.Board()).Distinct())
                     {
                         var values = SwitchBoardBase.ReadInputFromSwitchBoxes(box);
+                        if(values.Count == 4)
+                        {
+                            // measure how often we can read switchbox current values. 
+                            _loopTime = DateTime.UtcNow.Subtract(loopStart).TotalMilliseconds;
+                            loopStart = DateTime.UtcNow;
+                        }
                         GetCurrentValues(box, values);
                     }
 
+                    if (DateTime.UtcNow.Subtract(loopStart).TotalSeconds > 1)
+                        _loopTime = 0;
+
                     Thread.Sleep(120); // if we read too often, then we will not get a full line, thus no match. 
-                    _loopTime = DateTime.UtcNow.Subtract(loopStart).TotalMilliseconds;
                 }
                 catch (ArgumentException ex)
                 {
@@ -270,11 +278,11 @@ namespace CA_DataUploaderLib
         {
             var list = _heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_Power", DataTypeEnum.Input)).ToList();
             list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_On/Off", DataTypeEnum.Output)));
-            if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
+            if (_logLevel == CALogLevel.Debug)
             {
                 list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.State));
                 list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.State));
-                list.Add(new VectorDescriptionItem("double", "HeatingCtrl_LoopTime", DataTypeEnum.State));
+                list.Add(new VectorDescriptionItem("double", "ReadCurrent_LoopTime", DataTypeEnum.State));
                 list.Add(new VectorDescriptionItem("double", "CurrentSamplingFrequency", DataTypeEnum.State));
             }
 

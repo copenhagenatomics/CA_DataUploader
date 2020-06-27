@@ -15,7 +15,6 @@ namespace CA_DataUploaderLib
         private static Dictionary<LogID, DateTime> _nextSizeCheck;
         private static string _logDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
         public static int MaxLogSizeMB = 100;
-        private static bool _prependTimeStamp;
 
         public static void LogData(LogID logID, string msg)
         {
@@ -68,13 +67,13 @@ namespace CA_DataUploaderLib
             {
                 lock (_logDir)
                 {
-                    if(_prependTimeStamp)
-                        File.AppendAllText(GetFilename(logID), DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + msg);
-                    else
-                        File.AppendAllText(GetFilename(logID), msg);
-                }
+                    // allways add a NewLine
+                    if (!msg.EndsWith(Environment.NewLine))
+                        msg += Environment.NewLine;
 
-               _prependTimeStamp = msg.EndsWith(Environment.NewLine);
+                    // allways add timestamp. 
+                    File.AppendAllText(GetFilename(logID), DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + msg);
+                }
             }
             catch (Exception ex)
             {
