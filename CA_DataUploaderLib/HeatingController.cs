@@ -14,17 +14,16 @@ namespace CA_DataUploaderLib
         public int HeaterOnTimeout = 60;
         private bool _running = true;
         private CALogLevel _logLevel = CALogLevel.Normal;
-        private double _loopTime = 0;
         private double _offTemperature = 0;
         private double _lastTemperature = 0;
         private DateTime _startTime;
         private List<HeaterElement> _heaters = new List<HeaterElement>();
         private List<string> _ovenHistory = new List<string>();
-        protected CommandHandler _cmdHandler;
+        protected CommandHandler _cmd;
 
         public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
         {
-            _cmdHandler = cmd;
+            _cmd = cmd;
 
             // map all heaters, sensors and ovens. 
             var heaters = IOconfFile.GetOven().GroupBy(x => x.HeatingElement);
@@ -72,7 +71,7 @@ namespace CA_DataUploaderLib
 
         private bool Oven(List<string> args)
         {
-            _cmdHandler.AssertArgs(args, 2);
+            _cmd.AssertArgs(args, 2);
             if (args[1] == "off")
             {
                 _heaters.ForEach(x => x.SetTemperature(0));
@@ -91,9 +90,9 @@ namespace CA_DataUploaderLib
 
             _ovenHistory.Add(DateTime.Now.ToString("MMM dd HH:mm:ss ") + string.Join(" ", args));
             if (_heaters.Any(x => x.IsActive))
-                _cmdHandler.Execute("light on");
+                _cmd.Execute("light on");
             else
-                _cmdHandler.Execute("light off");
+                _cmd.Execute("light off");
             return true;
         }
 
@@ -132,6 +131,7 @@ namespace CA_DataUploaderLib
 
         private void LoopForever()
         {
+            int failCount = 0;
             _startTime = DateTime.UtcNow;
             _logLevel = IOconfFile.GetOutputLevel();
             var loopStart = DateTime.UtcNow;
@@ -158,17 +158,26 @@ namespace CA_DataUploaderLib
                     foreach (var box in _heaters.Select(x => x.Board()).Distinct())
                     {
                         var values = SwitchBoardBase.ReadInputFromSwitchBoxes(box);
-                        if(values.Count == 4)
-                        {
-                            // measure how often we can read switchbox current values. 
-                            _loopTime = DateTime.UtcNow.Subtract(loopStart).TotalMilliseconds;
-                            loopStart = DateTime.UtcNow;
-                        }
                         GetCurrentValues(box, values);
                     }
 
-                    if (DateTime.UtcNow.Subtract(loopStart).TotalSeconds > 1)
-                        _loopTime = 0;
+                    // check if any of the boards stopped responding. 
+                    foreach (var heater in _heaters)
+                    {
+                        if(heater.Current.ReadSensor_LoopTime > 1000)
+                        {
+                            heater.Current.ReadSensor_LoopTime = 0;
+                            heater._ioconf.Map.Board.SafeClose();
+                            failCount++;
+                        }
+                    }
+
+                    if (failCount > 20)
+                    {
+                        _cmd.Execute("escape");
+                        _running = false;
+                        CALog.LogErrorAndConsoleLn(LogID.A, "Shutting down: HeatingController unable to read from port");
+                    }
 
                     Thread.Sleep(120); // if we read too often, then we will not get a full line, thus no match. 
                 }
@@ -195,7 +204,7 @@ namespace CA_DataUploaderLib
 
         private void GetCurrentValues(MCUBoard board, List<double> values)
         {
-            if (values.Count() > 0)
+            if (values.Count() == 4)
             {
                 foreach (var heater in _heaters.Where(x => x.Board() == board))
                 {
@@ -257,21 +266,25 @@ namespace CA_DataUploaderLib
 
         public List<double> GetStates()
         {
-            var list = _heaters.Select(x => x.IsOn ? 1.0 : 0.0).ToList();
+            var list = new List<double>();
             if (_logLevel == CALogLevel.Debug)
             {
                 list.Add(_offTemperature);
                 list.Add(_lastTemperature);
-                list.Add(_loopTime);
                 list.Add(_heaters.Max(x => x.Current.GetFrequency()));
             }
 
             return list;
         }
 
-        public List<double> GetPower()
+        public IEnumerable<double> GetPower()
         {
-            return _heaters.Select(x => x.Current.TimeoutValue).ToList();
+            if(_logLevel == CALogLevel.Debug)
+            {
+                return _heaters.SelectMany(x => new double[] { x.Current.TimeoutValue, x.IsOn ? 1.0 : 0.0, x.Current.ReadSensor_LoopTime } );
+            }
+
+            return _heaters.SelectMany(x => new double[] { x.Current.TimeoutValue, x.IsOn ? 1.0 : 0.0 } );
         }
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
@@ -280,9 +293,9 @@ namespace CA_DataUploaderLib
             list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_On/Off", DataTypeEnum.Output)));
             if (_logLevel == CALogLevel.Debug)
             {
+                list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_LoopTime", DataTypeEnum.State)));
                 list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.State));
                 list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.State));
-                list.Add(new VectorDescriptionItem("double", "ReadCurrent_LoopTime", DataTypeEnum.State));
                 list.Add(new VectorDescriptionItem("double", "CurrentSamplingFrequency", DataTypeEnum.State));
             }
 

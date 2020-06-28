@@ -24,6 +24,11 @@ namespace CA_DataUploaderLib
                 // try to read some text. 
                 lines = box.SafeReadExisting();
 
+                if (IOconfFile.GetOutputLevel() == CALogLevel.Debug && !string.IsNullOrEmpty(lines) && DateTime.UtcNow.Subtract(_lastTimeStamp).TotalMilliseconds > 500)
+                {
+                    CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{lines}'{Environment.NewLine}");
+                }
+
                 // see if it matches the BoxPattern.
                 Match match = Regex.Match(lines, _SwitchBoxPattern);
 
@@ -33,14 +38,14 @@ namespace CA_DataUploaderLib
                     if (match.Success && match.Groups.Count > 4)
                     {
                         _LatestRead = match;
-                        _lastTimeStamp = DateTime.Now;
+                        _lastTimeStamp = DateTime.UtcNow;
                     }
                     else
                     {
                         if (_LatestRead == null)
                             return new List<double>();
 
-                        if (_lastTimeStamp.AddSeconds(2) > DateTime.Now) // if it is less than 2 seconds old, then return last read. 
+                        if (_lastTimeStamp.AddSeconds(2) > DateTime.UtcNow) // if it is less than 2 seconds old, then return last read. 
                             match = _LatestRead;
                     }
 

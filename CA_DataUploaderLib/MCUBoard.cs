@@ -207,8 +207,11 @@ namespace CA_DataUploaderLib
 
         public void SafeClose()
         {
-            if (IsOpen)
-                Close();
+            lock (this)
+            {
+                if (IsOpen)
+                    Close();
+            }
         }
 
         public string ToString(string seperator)

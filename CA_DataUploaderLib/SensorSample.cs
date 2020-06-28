@@ -14,12 +14,14 @@ namespace CA_DataUploaderLib
             HubID = hubID;
         }
 
-        public TimeSpan FilterLength { get; set; }
+        public TimeSpan FilterLength;
         private Queue<Tuple<double, DateTime>> _filterQueue = new Queue<Tuple<double, DateTime>>();
 
-        public int HubID;  // used by AverageTemperature to draw GUI
         public string SerialNumber { get { return Input.Map.Board.serialNumber; } } // used by AverageTemperature to draw GUI
         public bool MaxSlope;
+        public string NumberOfPorts;
+        public DateTime TimeStamp = DateTime.UtcNow;
+        public double ReadSensor_LoopTime;
 
         private double _value;
         public double Value
@@ -34,13 +36,10 @@ namespace CA_DataUploaderLib
             get { return (TimeStamp < DateTime.UtcNow.Subtract(FilterLength)) ? 10009 : _value; }   // 10009 means timedout
         }
 
-        public DateTime TimeStamp { get; set; }
-        public IOconfInput Input { get; set; }
-
+        public int HubID { get; private set; }  // used by AverageTemperature to draw GUI
+        public IOconfInput Input { get; private set; }
         public string Name { get { return Input.Name; } }
         public int PortNumber { get { return Input.PortNumber; } }
-
-        public string NumberOfPorts { get; set; }
 
         public override string ToString()
         {
@@ -52,6 +51,7 @@ namespace CA_DataUploaderLib
 
         private void SetValue(double value)
         {
+            ReadSensor_LoopTime = DateTime.UtcNow.Subtract(TimeStamp).TotalMilliseconds;
             TimeStamp = DateTime.UtcNow;
             lock (_filterQueue)
             {

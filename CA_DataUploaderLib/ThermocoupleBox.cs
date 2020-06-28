@@ -12,7 +12,7 @@ namespace CA_DataUploaderLib
         public ThermocoupleBox(CommandHandler cmd, TimeSpan filterLength)
         {
             Title = "Thermocouples";
-            _cmdHandler = cmd;
+            _cmd = cmd;
 
             _config = IOconfFile.GetTypeKAndLeakage().IsInitialized().ToList();
 

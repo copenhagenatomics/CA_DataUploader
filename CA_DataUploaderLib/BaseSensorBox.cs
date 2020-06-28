@@ -13,11 +13,10 @@ namespace CA_DataUploaderLib
     public class BaseSensorBox : IDisposable
     {
         protected bool _running = true;
-        private double _loopTime = 0;
         public string Title { get; protected set; }
 
         protected CALogLevel _logLevel = IOconfFile.GetOutputLevel();
-        protected CommandHandler _cmdHandler;
+        protected CommandHandler _cmd;
         protected Dictionary<IOconfInput, SensorSample> _values = new Dictionary<IOconfInput, SensorSample>();
 
         protected List<IOconfInput> _config;
@@ -54,10 +53,15 @@ namespace CA_DataUploaderLib
             if (_logLevel != CALogLevel.Debug)
                 return new List<double>();  // empty. 
 
-            var list1 = _values.Values.GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key).Select(x => x.First().GetFrequency());
-            var list2 = _values.Values.GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key).Select(x => x.First().FilterCount()).ToList();
-            list2.Add(_loopTime);
-            return list1.Concat(list2);
+            var list = new List<double>();
+            foreach(var board in _values.Values.GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key))
+            {
+                list.Add(board.Average(x => x.GetFrequency()));
+                list.Add(board.Min(x => x.FilterCount()));
+                list.Add(board.Max(x => x.ReadSensor_LoopTime));
+            }
+
+            return list;
         }
 
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
@@ -66,9 +70,12 @@ namespace CA_DataUploaderLib
             // list.AddRange(_config.Select(x => new VectorDescriptionItem("double", x.Name + "_latest", DataTypeEnum.Input)).ToList());
             if (_logLevel == CALogLevel.Debug)
             {
-                list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_SampleFrequency", DataTypeEnum.State)));
-                list.AddRange(_boards.Distinct().OrderBy(x => x.BoxName).Select(x => new VectorDescriptionItem("double", x.BoxName + "_FilterSampleCount", DataTypeEnum.State)));
-                list.Add(new VectorDescriptionItem("double", "SensorRead_LoopTime", DataTypeEnum.State));
+                foreach (var board in _boards.Distinct().OrderBy(x => x.BoxName))
+                {
+                    list.Add(new VectorDescriptionItem("double", board.BoxName + "_AvgSampleFrequency", DataTypeEnum.State));
+                    list.Add(new VectorDescriptionItem("double", board.BoxName + "_MinFilterSampleCount", DataTypeEnum.State));
+                    list.Add(new VectorDescriptionItem("double", board.BoxName + "_MaxLoopTime", DataTypeEnum.State));
+                }
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {Title}");
@@ -82,7 +89,7 @@ namespace CA_DataUploaderLib
             if(_values.Count == 0)
                 return false;
 
-            var sb = new StringBuilder($"NAME      {_loopTime.ToString("N0").PadLeft(4)}           ");
+            var sb = new StringBuilder($"NAME      {GetAvgLoopTime().ToString("N0").PadLeft(4)}           ");
             if (_values.First().Value.FilterLength == _filterZero)
             {
                 sb.AppendLine();
@@ -110,13 +117,18 @@ namespace CA_DataUploaderLib
             return true;
         }
 
+        private double GetAvgLoopTime()
+        {
+            return _values.Values.Average(x => x.ReadSensor_LoopTime);
+        }
+
         protected void LoopForever()
         {
+            int failCount = 0;
             List<double> numbers = new List<double>();
             List<string> values = new List<string>();
             List<MCUBoard> skipBoard = new List<MCUBoard>();
             DateTime start = DateTime.Now;
-            var loopStart = DateTime.Now; 
             string row = string.Empty;
             int badRow = 0;
             List<string> badPorts = new List<string>();
@@ -141,8 +153,6 @@ namespace CA_DataUploaderLib
 
                                 if (Regex.IsMatch(row.Trim(), @"^\d+"))  // check that row starts with digit. 
                                 {
-                                    _loopTime = DateTime.Now.Subtract(loopStart).TotalMilliseconds;
-                                    loopStart = DateTime.Now;
                                     values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                                     numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
                                     ProcessLine(numbers, board);
@@ -150,8 +160,24 @@ namespace CA_DataUploaderLib
                             }
                         }
                     }
-                    if (DateTime.UtcNow.Subtract(loopStart).TotalSeconds > 1)
-                        _loopTime = 0;
+
+                    // check if any of the boards stopped responding. 
+                    foreach (var item in _values.Values)
+                    {
+                        if (item.ReadSensor_LoopTime > 1000)
+                        {
+                            item.ReadSensor_LoopTime = 0;
+                            item.Input.Map.Board.SafeClose();
+                            failCount++;
+                        }
+                    }
+
+                    if (failCount > 20)
+                    {
+                        _cmd.Execute("escape");
+                        _running = false;
+                        CALog.LogErrorAndConsoleLn(LogID.A, $"Shutting down: {Title} unable to read from port");
+                    }
 
                     Thread.Sleep(100);
                 }
@@ -176,8 +202,8 @@ namespace CA_DataUploaderLib
                         CALog.LogInfoAndConsoleLn(LogID.A, "Too many bad rows from thermocouple ports.. shutting down:");
                         badPorts.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x));
                         CALog.LogException(LogID.A, ex);
-                        if(_cmdHandler != null)
-                            _cmdHandler.Execute("escape");
+                        if(_cmd != null)
+                            _cmd.Execute("escape");
 
                         _running = false;
                     }
@@ -238,8 +264,8 @@ namespace CA_DataUploaderLib
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"Salt leak detected from {sensor.Name}={_values[sensor].Value} {DateTime.Now.ToString("dd-MMM-yyyy HH:mm")}");
                     _values[sensor].Value = 1d;
-                    if (_cmdHandler != null)
-                        _cmdHandler.Execute("escape"); // make the whole system shut down. 
+                    if (_cmd != null)
+                        _cmd.Execute("escape"); // make the whole system shut down. 
                 }
                 else
                 {
