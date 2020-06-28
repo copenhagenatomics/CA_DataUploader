@@ -20,13 +20,19 @@ namespace CA_DataUploaderLib.IOconf
 
             if (!Table.Any())
             {
-                var lines = File.ReadAllLines("IO.conf").ToList();
-                RawFile = string.Join(Environment.NewLine, lines);
-                // remove empty lines and commented out lines
-                var lines2 = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
-                lines2.ForEach(x => Table.Add(CreateType(x, lines.IndexOf(x))));
-                CheckRules(lines2);
+                Reload();
             }
+        }
+
+        public static void Reload()
+        {
+            Table.Clear();
+            var lines = File.ReadAllLines("IO.conf").ToList();
+            RawFile = string.Join(Environment.NewLine, lines);
+            // remove empty lines and commented out lines
+            var lines2 = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
+            lines2.ForEach(x => Table.Add(CreateType(x, lines.IndexOf(x))));
+            CheckRules(lines2);
         }
 
         private static IOconfRow CreateType(string row, int lineNum)
