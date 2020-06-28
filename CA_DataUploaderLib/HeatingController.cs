@@ -179,7 +179,7 @@ namespace CA_DataUploaderLib
                         CALog.LogErrorAndConsoleLn(LogID.A, "Shutting down: HeatingController unable to read from port");
                     }
 
-                    Thread.Sleep(120); // if we read too often, then we will not get a full line, thus no match. 
+                    Thread.Sleep(150); // if we read too often, then we will not get a full line, thus no match. 
                 }
                 catch (ArgumentException ex)
                 {

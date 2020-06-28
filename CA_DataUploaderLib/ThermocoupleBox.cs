@@ -13,6 +13,7 @@ namespace CA_DataUploaderLib
         {
             Title = "Thermocouples";
             _cmd = cmd;
+            _logLevel = IOconfFile.GetOutputLevel();
 
             _config = IOconfFile.GetTypeKAndLeakage().IsInitialized().ToList();
 

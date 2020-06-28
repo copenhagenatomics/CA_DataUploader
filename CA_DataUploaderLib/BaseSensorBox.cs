@@ -15,7 +15,7 @@ namespace CA_DataUploaderLib
         protected bool _running = true;
         public string Title { get; protected set; }
 
-        protected CALogLevel _logLevel = IOconfFile.GetOutputLevel();
+        protected CALogLevel _logLevel;
         protected CommandHandler _cmd;
         protected Dictionary<IOconfInput, SensorSample> _values = new Dictionary<IOconfInput, SensorSample>();
 
@@ -70,11 +70,11 @@ namespace CA_DataUploaderLib
             // list.AddRange(_config.Select(x => new VectorDescriptionItem("double", x.Name + "_latest", DataTypeEnum.Input)).ToList());
             if (_logLevel == CALogLevel.Debug)
             {
-                foreach (var board in _boards.Distinct().OrderBy(x => x.BoxName))
+                foreach (var boxName in _config.Select(x => x.Map.BoxName).Distinct().OrderBy(x => x))
                 {
-                    list.Add(new VectorDescriptionItem("double", board.BoxName + "_AvgSampleFrequency", DataTypeEnum.State));
-                    list.Add(new VectorDescriptionItem("double", board.BoxName + "_MinFilterSampleCount", DataTypeEnum.State));
-                    list.Add(new VectorDescriptionItem("double", board.BoxName + "_MaxLoopTime", DataTypeEnum.State));
+                    list.Add(new VectorDescriptionItem("double", boxName + "_AvgSampleFrequency", DataTypeEnum.State));
+                    list.Add(new VectorDescriptionItem("double", boxName + "_MinFilterSampleCount", DataTypeEnum.State));
+                    list.Add(new VectorDescriptionItem("double", boxName + "_MaxLoopTime", DataTypeEnum.State));
                 }
             }
 
