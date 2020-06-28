@@ -164,7 +164,7 @@ namespace CA_DataUploaderLib
                     // check if any of the boards stopped responding. 
                     foreach (var item in _values.Values)
                     {
-                        if (item.ReadSensor_LoopTime > 1000)
+                        if (DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds > 1000)
                         {
                             item.ReadSensor_LoopTime = 0;
                             item.Input.Map.Board.SafeClose();
