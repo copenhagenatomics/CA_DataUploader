@@ -83,7 +83,8 @@ namespace CA_DataUploader
             if (lines.Any(x => x.StartsWith("LoopName")))
                 lines.Remove(lines.First(x => x.StartsWith("LoopName")));
 
-            Console.WriteLine("Please enter a name for the webchart: ");
+            Console.WriteLine("Please enter a name for the webchart ");
+            Console.WriteLine("It must be a new name you have not used before: ");
             var plotname = Console.ReadLine();
 
             lines.Insert(0, $"LoopName;{plotname};Normal;https://www.theng.dk");
@@ -104,6 +105,9 @@ namespace CA_DataUploader
             File.WriteAllLines("IO.conf", lines);
 
             IOconfFile.Reload();
+
+            if (serial.McuBoards.Count > 1)
+                Console.WriteLine("You need to manually edit the IO.conf file and add more 'TypeK' lines..");
         }
 
         private static VectorDescription GetVectorDescription(ThermocoupleBox usb)
