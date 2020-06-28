@@ -164,7 +164,7 @@ namespace CA_DataUploaderLib
                     // check if any of the boards stopped responding. 
                     foreach (var heater in _heaters)
                     {
-                        if (DateTime.UtcNow.Subtract(heater.Current.TimeStamp).TotalMilliseconds > 1000)
+                        if (DateTime.UtcNow.Subtract(heater.Current.TimeStamp).TotalMilliseconds > 2000)
                         {
                             heater.Current.ReadSensor_LoopTime = 0;
                             heater._ioconf.Map.Board.SafeClose();
@@ -172,7 +172,7 @@ namespace CA_DataUploaderLib
                         }
                     }
 
-                    if (failCount > 20)
+                    if (failCount > 200)
                     {
                         _cmd.Execute("escape");
                         _running = false;

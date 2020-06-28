@@ -12,21 +12,33 @@ namespace CA_DataUploaderLib
         private const string _SwitchBoxPattern = "P1=(\\d\\.\\d\\d)A P2=(\\d\\.\\d\\d)A P3=(\\d\\.\\d\\d)A P4=(\\d\\.\\d\\d)A";
         private static Match _LatestRead = null;
         private static DateTime _lastTimeStamp = DateTime.MinValue;
+        private static Queue<string> _debugQueue = new Queue<string>();
+        private static CALogLevel _logLevel = CALogLevel.None;
 
         public static List<double> ReadInputFromSwitchBoxes(MCUBoard box)
         {
             if (box == null)
                 return new List<double>(); // empty
 
+            if (_logLevel == CALogLevel.None)
+                _logLevel = IOconfFile.GetOutputLevel();
+
             string lines = string.Empty;
             try
             {
                 // try to read some text. 
                 lines = box.SafeReadExisting();
+                _debugQueue.Enqueue(lines);
 
-                if (IOconfFile.GetOutputLevel() == CALogLevel.Debug && !string.IsNullOrEmpty(lines) && DateTime.UtcNow.Subtract(_lastTimeStamp).TotalMilliseconds > 500)
+                if (DateTime.UtcNow.Subtract(_lastTimeStamp).TotalMilliseconds > 500)
                 {
-                    CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{lines}'{Environment.NewLine}");
+                    CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{string.Join("§", _debugQueue)}'{Environment.NewLine}");
+                    _debugQueue.Clear();
+                }
+
+                while(_debugQueue.Count > 10)
+                {
+                    _debugQueue.Dequeue();
                 }
 
                 // see if it matches the BoxPattern.
