@@ -2,9 +2,10 @@
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Data;
+using System.Diagnostics;
 using System.IO;
-using System.IO.Pipes;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace CA_DataUploader
@@ -22,7 +23,7 @@ namespace CA_DataUploader
                     // close all ports which are not Hub10
                     serial.McuBoards.Where(x => !x.mcuFamily.Contains("Temperature")).ToList().ForEach(x => x.Close());
 
-                    UpdateIOconf(serial);
+                    var email = UpdateIOconf(serial);
 
                     using (var cmd = new CommandHandler())
                     using (var usb = new ThermocoupleBox(cmd, new TimeSpan(0, 0, 1)))
@@ -43,6 +44,7 @@ namespace CA_DataUploader
                             }
 
                             Thread.Sleep(100);
+                            if (i == 20) OpenUrl("https://www.copenhagenatomics.com/plots/?" + email);
                         }
                     }
                 }
@@ -56,7 +58,7 @@ namespace CA_DataUploader
             Console.ReadKey();
         }
 
-        private static void UpdateIOconf(SerialNumberMapper serial)
+        private static string UpdateIOconf(SerialNumberMapper serial)
         {
             if (!File.Exists("IO.conf"))
                 throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
@@ -70,7 +72,15 @@ namespace CA_DataUploader
                 Console.WriteLine("Do you want to skip IO.conf setup? (yes, no)");
                 var answer = Console.ReadLine();
                 if (answer.ToLower().StartsWith("y"))
-                    return;
+                {
+                    if (lines.Any(x => x.StartsWith("Account")))
+                    {
+                        var user = lines.First(x => x.StartsWith("Account")).Split(";".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).ToList();
+                        return user[2].Trim(); // return the email address. 
+                    }  
+                        
+                    return "";
+                }
             }
 
             // add new Map lines
@@ -108,6 +118,8 @@ namespace CA_DataUploader
 
             if (serial.McuBoards.Count > 1)
                 Console.WriteLine("You need to manually edit the IO.conf file and add more 'TypeK' lines..");
+
+            return email;
         }
 
         private static VectorDescription GetVectorDescription(ThermocoupleBox usb)
@@ -115,6 +127,35 @@ namespace CA_DataUploader
             var list = usb.GetVectorDescriptionItems();
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {usb.Title}");
             return new VectorDescription(list, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
+        }
+
+        private static void OpenUrl(string url)
+        {
+            try
+            {
+                Process.Start(url);
+            }
+            catch
+            {
+                // hack because of this: https://github.com/dotnet/corefx/issues/10361
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    url = url.Replace("&", "^&");
+                    Process.Start(new ProcessStartInfo("cmd", $"/c start {url}") { CreateNoWindow = true });
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    Process.Start("xdg-open", url);
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    Process.Start("open", url);
+                }
+                else
+                {
+                    throw;
+                }
+            }
         }
     }
 }
