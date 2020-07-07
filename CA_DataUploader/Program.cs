@@ -5,6 +5,7 @@ using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Mail;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -18,10 +19,10 @@ namespace CA_DataUploader
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
 
-                using (var serial = new SerialNumberMapper(true))
+                using (var serial = new SerialNumberMapper())
                 {
                     // close all ports which are not Hub10
-                    serial.McuBoards.Where(x => !x.mcuFamily.Contains("Temperature")).ToList().ForEach(x => x.Close());
+                    serial.McuBoards.Where(x => !x.productType.Contains("Temperature")).ToList().ForEach(x => x.Close());
 
                     var email = UpdateIOconf(serial);
 
@@ -29,7 +30,7 @@ namespace CA_DataUploader
                     using (var usb = new ThermocoupleBox(cmd, new TimeSpan(0, 0, 1)))
                     using (var cloud = new ServerUploader(GetVectorDescription(usb), cmd))
                     {
-                        CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server");
+                        CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
 
                         int i = 0;
                         while (cmd.IsRunning)
@@ -64,10 +65,7 @@ namespace CA_DataUploader
                 throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
 
             var lines = File.ReadAllLines("IO.conf").ToList();
-            // comment out all the existing Map lines
-            lines.Where(x => x.StartsWith("Map")).ToList().ForEach(x => { x = "// " + x;  });
-
-            if(lines.Any(x => x.StartsWith("LoopName")) && lines.Any(x => x.StartsWith("Account")) && lines.Any(x => x.StartsWith("Map")) && lines.Count(x => x.StartsWith("TypeK")) > 1)
+            if (lines.Any(x => x.StartsWith("LoopName")) && lines.Any(x => x.StartsWith("Account")) && lines.Any(x => x.StartsWith("Map")) && lines.Count(x => x.StartsWith("TypeK")) > 1)
             {
                 Console.WriteLine("Do you want to skip IO.conf setup? (yes, no)");
                 var answer = Console.ReadLine();
@@ -77,15 +75,24 @@ namespace CA_DataUploader
                     {
                         var user = lines.First(x => x.StartsWith("Account")).Split(";".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).ToList();
                         return user[2].Trim(); // return the email address. 
-                    }  
-                        
+                    }
+
                     return "";
+                }
+            }
+            else
+            {
+                // comment out all the existing Map lines
+                foreach (var mapLine in lines.Where(x => x.StartsWith("Map")).ToList())
+                {
+                    int j = lines.IndexOf(mapLine);
+                    lines[j] = "// " + lines[j];
                 }
             }
 
             // add new Map lines
             int i = 1;
-            foreach (var mcu in serial.McuBoards)
+            foreach (var mcu in serial.McuBoards.Where(x => !x.serialNumber.StartsWith("unknown")))
             {
                 lines.Insert(4, $"Map;{mcu.serialNumber};ThermalBox{i++}");
             }
@@ -104,8 +111,14 @@ namespace CA_DataUploader
 
             Console.WriteLine("Please enter your full name: ");
             var fullname = Console.ReadLine();
-            Console.WriteLine("Please enter your email address: ");
-            var email = Console.ReadLine();
+            string email;
+            do
+            {
+                Console.WriteLine("Please enter your email address: ");
+                email = Console.ReadLine();
+            } 
+            while (IsValidEmail(email));
+
             Console.WriteLine("Please enter a password for the webchart: ");
             var pwd = Console.ReadLine();
 
@@ -113,13 +126,38 @@ namespace CA_DataUploader
 
             File.Delete("IO.conf");
             File.WriteAllLines("IO.conf", lines);
-
-            IOconfFile.Reload();
+            ReloadIOconf(serial);
 
             if (serial.McuBoards.Count > 1)
                 Console.WriteLine("You need to manually edit the IO.conf file and add more 'TypeK' lines..");
 
             return email;
+        }
+
+        private static bool IsValidEmail(string email)
+        {
+            try
+            {
+                MailAddress m = new MailAddress(email);
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+        }
+
+        private static void ReloadIOconf(SerialNumberMapper serial)
+        {
+            IOconfFile.Reload();
+            foreach (var board in serial.McuBoards)
+            {
+                foreach (var ioconfMap in IOconfFile.GetMap())
+                {
+                    if (ioconfMap.SetMCUboard(board))
+                        board.BoxName = ioconfMap.BoxName;
+                }
+            }
         }
 
         private static VectorDescription GetVectorDescription(ThermocoupleBox usb)

@@ -1,4 +1,5 @@
 ﻿using CA_DataUploaderLib.Extensions;
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -13,6 +14,7 @@ namespace CA_DataUploaderLib
     {
         public List<MCUBoard> McuBoards = new List<MCUBoard>();
         private static string[] _serialPorts = RpiVersion.GetUSBports();
+        private CALogLevel _logLevel;
 
         private static ManagementEventWatcher arrival;
 
@@ -20,8 +22,10 @@ namespace CA_DataUploaderLib
 
         public event EventHandler<PortsChangedArgs> PortsChanged;
 
-        public SerialNumberMapper(bool debug)
+        public SerialNumberMapper()
         {
+            _logLevel = IOconfFile.GetOutputLevel();
+
             foreach (string name in _serialPorts)
             {
                 try
@@ -36,7 +40,7 @@ namespace CA_DataUploaderLib
                     if (mcu.productType is null)
                         mcu.productType = GetStringFromDmesg(mcu.PortName);
 
-                    if (debug)
+                    if (_logLevel == CALogLevel.Debug)
                         CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToString());
 
                     MonitorDeviceChanges();

@@ -13,7 +13,7 @@ namespace ShowAvailableComPorts
 {
     public partial class Form1 : Form
     {
-        private SerialNumberMapper _ports = new SerialNumberMapper(false);
+        private SerialNumberMapper _ports = new SerialNumberMapper();
         private MCUBoard _selectedBoard;
         private bool _running = true;
 

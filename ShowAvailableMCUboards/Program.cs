@@ -7,7 +7,7 @@ namespace ShowAvailableMCUboards
     {
         static void Main(string[] args)
         {
-            var ports = new SerialNumberMapper(true);
+            var ports = new SerialNumberMapper();
 
             foreach(var board in ports.McuBoards)
             {

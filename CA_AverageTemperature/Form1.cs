@@ -20,7 +20,7 @@ namespace CA_AverageTemperature
         public Form1()
         {
             InitializeComponent();
-            var serial = new SerialNumberMapper(true);
+            var serial = new SerialNumberMapper();
             var dataLoggers = serial.ByProductType("Temperature");
             if (dataLoggers.Any())
             {
