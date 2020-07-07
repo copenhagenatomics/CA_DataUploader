@@ -117,7 +117,7 @@ namespace CA_DataUploader
                 Console.WriteLine("Please enter your email address: ");
                 email = Console.ReadLine();
             } 
-            while (IsValidEmail(email));
+            while (!IsValidEmail(email));
 
             Console.WriteLine("Please enter a password for the webchart: ");
             var pwd = Console.ReadLine();
