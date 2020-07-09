@@ -5,6 +5,7 @@ using System.IO.Ports;
 using System.Diagnostics;
 using CA_DataUploaderLib.IOconf;
 using System.Collections.Generic;
+using System.IO;
 
 namespace CA_DataUploaderLib
 {
@@ -68,10 +69,13 @@ namespace CA_DataUploaderLib
 
                 ReadSerialNumber();
 
-                foreach(var ioconfMap in IOconfFile.GetMap())
+                if (File.Exists("IO.conf"))
                 {
-                    if (ioconfMap.SetMCUboard(this))
-                        BoxName = ioconfMap.BoxName;
+                    foreach (var ioconfMap in IOconfFile.GetMap())
+                    {
+                        if (ioconfMap.SetMCUboard(this))
+                            BoxName = ioconfMap.BoxName;
+                    }
                 }
             }
             catch (Exception ex)
@@ -243,7 +247,7 @@ namespace CA_DataUploaderLib
                             CALog.LogColor(LogID.A, ConsoleColor.Green, input);
                         }
 
-                        UnableToRead = false;
+                        UnableToRead = input.Length < 2;
                         if (input.Contains(MCUBoard.serialNumberHeader))
                             serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
 

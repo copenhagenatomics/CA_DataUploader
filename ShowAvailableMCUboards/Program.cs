@@ -17,6 +17,9 @@ namespace ShowAvailableMCUboards
                 for(int i=0; i<4; i++)
                     Console.WriteLine(board.SafeReadLine());
             }
+
+            Console.WriteLine("hit any key to exit");
+            Console.ReadKey();
         }
     }
 }

@@ -106,6 +106,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public static CALogLevel GetOutputLevel()
         {
+            if (!Table.Any()) return CALogLevel.None;
             return ((IOconfLoopName)Table.Single(x => x.GetType() == typeof(IOconfLoopName))).LogLevel;
         }
 

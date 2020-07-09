@@ -3,6 +3,7 @@ using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Management;
@@ -14,7 +15,7 @@ namespace CA_DataUploaderLib
     {
         public List<MCUBoard> McuBoards = new List<MCUBoard>();
         private static string[] _serialPorts = RpiVersion.GetUSBports();
-        private CALogLevel _logLevel;
+        private CALogLevel _logLevel = CALogLevel.Normal;
 
         private static ManagementEventWatcher arrival;
 
@@ -24,7 +25,8 @@ namespace CA_DataUploaderLib
 
         public SerialNumberMapper()
         {
-            _logLevel = IOconfFile.GetOutputLevel();
+            if(File.Exists("IO.conf"))
+                _logLevel = IOconfFile.GetOutputLevel();
 
             foreach (string name in _serialPorts)
             {
