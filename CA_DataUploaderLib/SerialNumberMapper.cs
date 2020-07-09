@@ -41,6 +41,8 @@ namespace CA_DataUploaderLib
                         mcu.productType = GetStringFromDmesg(mcu.PortName);
 
                     if (_logLevel == CALogLevel.Debug)
+                        CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToDebugString(Environment.NewLine));
+                    else
                         CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToString());
 
                     MonitorDeviceChanges();

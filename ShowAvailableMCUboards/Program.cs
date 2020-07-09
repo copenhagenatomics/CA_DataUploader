@@ -12,7 +12,7 @@ namespace ShowAvailableMCUboards
             foreach(var board in ports.McuBoards)
             {
                 Console.WriteLine("--------------------------------------------");
-                Console.WriteLine(board.ToString(Environment.NewLine));
+                Console.WriteLine(board.ToDebugString(Environment.NewLine));
 
                 for(int i=0; i<4; i++)
                     Console.WriteLine(board.SafeReadLine());

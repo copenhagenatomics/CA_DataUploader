@@ -12,12 +12,6 @@ namespace CA_DataUploaderLib.IOconf
 
         static IOconfFile()
         {
-            if (!File.Exists("IO.conf"))
-            {
-                CALog.LogErrorAndConsoleLn(LogID.A, "IO.conf file not found");
-                throw new Exception("IO.conf file not found");
-            }
-
             if (!Table.Any())
             {
                 Reload();
@@ -27,6 +21,9 @@ namespace CA_DataUploaderLib.IOconf
         public static void Reload()
         {
             Table.Clear();
+            if (!File.Exists("IO.conf"))
+                throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
+
             var lines = File.ReadAllLines("IO.conf").ToList();
             RawFile = string.Join(Environment.NewLine, lines);
             // remove empty lines and commented out lines
@@ -63,7 +60,7 @@ namespace CA_DataUploaderLib.IOconf
             }
             catch (Exception ex)
             {
-                CALog.LogInfoAndConsoleLn(LogID.A, row + Environment.NewLine + ex.ToString());
+                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in line {lineNum} of {Directory.GetCurrentDirectory()}\\IO.conf {Environment.NewLine}{row}{Environment.NewLine}" + ex.ToString());
                 throw;
             }
         }
@@ -73,12 +70,12 @@ namespace CA_DataUploaderLib.IOconf
             // no two rows can have the same type,name combination. 
             var groups = Table.GroupBy(x => x.UniqueKey());
             foreach (var g in groups.Where(x => x.Count() > 1))
-                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR: Name: {g.First().ToList()[1]} occure {g.Count()} times in this group: {g.First().ToList()[0]}{Environment.NewLine}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Name: {g.First().ToList()[1]} occure {g.Count()} times in this group: {g.First().ToList()[0]}{Environment.NewLine}");
 
             // no heater can be in several oven areas
             var heaters = GetOven().Where(x => x.OvenArea > 0).GroupBy(x => x.HeatingElement);
             foreach(var heater in heaters.Where(x => x.Select(y => y.OvenArea).Distinct().Count() > 1))
-                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR: Heater: {heater.Key.Name} occure in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Heater: {heater.Key.Name} occure in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}");
         }
 
         public static string GetLoopName()
@@ -103,7 +100,7 @@ namespace CA_DataUploaderLib.IOconf
             }
             catch (Exception ex)
             {
-                throw new Exception("Did you forgot to include login information in top of IO.conf ?", ex);
+                throw new Exception($"Did you forgot to include login information in top of {Directory.GetCurrentDirectory()}\\IO.conf ?", ex);
             }
         }
 

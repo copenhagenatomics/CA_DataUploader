@@ -93,12 +93,7 @@ namespace CA_DataUploaderLib
                     productType.IsNullOrEmpty() ||
                     softwareVersion.IsNullOrEmpty();
         }
-
-        public override string ToString()
-        {
-            return ToString(Environment.NewLine);
-        }
-
+        
         public string SafeReadLine()
         {
             try
@@ -214,9 +209,14 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public string ToString(string seperator)
+        public string ToDebugString(string seperator)
         {
             return $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
+        }
+
+        public override string ToString()
+        {
+            return $"{productTypeHeader}{productType.PadRight(20)} {serialNumberHeader}{serialNumber.PadRight(12)} Port name: {PortName}";
         }
 
         public string ToStringSimple(string seperator)

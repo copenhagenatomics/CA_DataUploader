@@ -25,14 +25,14 @@ namespace ShowAvailableComPorts
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            listBox1.DataSource = _ports.McuBoards.Select(x => x.ToString(", ")).ToList();
+            listBox1.DataSource = _ports.McuBoards.Select(x => x.ToString()).ToList();
         }
 
         private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
             textBox1.Clear();
             var str = listBox1.SelectedItem.ToString();
-            _selectedBoard = _ports.McuBoards.First(x => x.ToString(", ") == str);
+            _selectedBoard = _ports.McuBoards.First(x => x.ToString() == str);
         }
 
         private void LoopForever()
