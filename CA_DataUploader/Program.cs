@@ -54,10 +54,33 @@ namespace CA_DataUploader
             }
             catch (Exception ex)
             {
-                CALog.LogException(LogID.A, ex);
+                ShowHumanErrorMessages(ex);
             }
 
             Console.ReadKey();
+        }
+
+        private static void ShowHumanErrorMessages(Exception ex)
+        {
+            if (ex.Message.StartsWith("account already exist"))
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, "Your password was wrong. Please exit and try again..");
+                CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Press any key to exit");
+            }
+            else if (ex.Message.StartsWith("Could not find any devices connected to USB"))
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, ex.Message + " Please check USB connections and try again..");
+                CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Press any key to exit");
+            }
+            else if (ex.InnerException != null && ex.InnerException.Message.Contains("LoopName already used before:"))
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, "Please change your Webchart name and try again..");
+                CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Press any key to exit");
+            }
+            else
+            {
+                CALog.LogException(LogID.A, ex);
+            }
         }
 
         private static VectorDescription GetVectorDescription(ThermocoupleBox usb)

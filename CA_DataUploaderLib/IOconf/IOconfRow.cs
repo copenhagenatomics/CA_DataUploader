@@ -37,7 +37,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             var temp = Row;
             var pos = Row.IndexOf("//");
-            if (pos > 2 && !Row.Contains("https://"))
+            if (pos > 2 && !Row.Contains("https://") && !Row.Contains("http://"))
                 temp = Row.Substring(0, pos);  // remove any comments in the end of the line. 
             return temp;
         }

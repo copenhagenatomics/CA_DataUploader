@@ -307,10 +307,11 @@ namespace CA_DataUploaderLib
 
         private async Task<int> GetPlotIDAsync(byte[] publicKey, byte[] vectorDescription)
         {
+            HttpResponseMessage response = null;
             try
             {
                 string query = $"api/LoopApi?LoopName={_loopName}&ticks={DateTime.UtcNow.Ticks}&loginToken={_loginToken}";
-                HttpResponseMessage response = await _client.PutAsJsonAsync(query, publicKey.Concat(vectorDescription));
+                response = await _client.PutAsJsonAsync(query, publicKey.Concat(vectorDescription));
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsAsync<int>();
             }
@@ -318,6 +319,11 @@ namespace CA_DataUploaderLib
             {
                 if (ex.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'" || ex.InnerException?.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'")
                     throw new HttpRequestException("Check your internet connection", ex);
+
+                var error = response?.Content?.ReadAsStringAsync()?.Result;
+                if (!string.IsNullOrEmpty(error))
+                    throw new Exception(error);
+
                 LogHttpException(ex);
                 throw;
             }

@@ -12,6 +12,10 @@ namespace CA_DataUploader
     {
         public static string UpdateIOconf(SerialNumberMapper serial)
         {
+            var mcuList = serial.McuBoards.Where(x => !x.serialNumber.StartsWith("unknown"));
+            if (!mcuList.Any())
+                throw new Exception($"Could not find any devices connected to USB.");
+
             if (!File.Exists("IO.conf"))
                 throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
 
@@ -31,19 +35,17 @@ namespace CA_DataUploader
                     return "";
                 }
             }
-            else
+
+            // comment out all the existing Map lines
+            foreach (var mapLine in lines.Where(x => x.StartsWith("Map")).ToList())
             {
-                // comment out all the existing Map lines
-                foreach (var mapLine in lines.Where(x => x.StartsWith("Map")).ToList())
-                {
-                    int j = lines.IndexOf(mapLine);
-                    lines[j] = "// " + lines[j];
-                }
+                int j = lines.IndexOf(mapLine);
+                lines[j] = "// " + lines[j];
             }
 
             // add new Map lines
             int i = 1;
-            foreach (var mcu in serial.McuBoards.Where(x => !x.serialNumber.StartsWith("unknown")))
+            foreach (var mcu in mcuList)
             {
                 lines.Insert(4, $"Map;{mcu.serialNumber};ThermalBox{i++}");
             }
@@ -51,8 +53,7 @@ namespace CA_DataUploader
             if (lines.Any(x => x.StartsWith("LoopName")))
                 lines.Remove(lines.First(x => x.StartsWith("LoopName")));
 
-            Console.WriteLine("Please enter a name for the webchart ");
-            Console.WriteLine("It must be a new name you have not used before: ");
+            Console.Write("Please enter a name for the webchart (It must be a new name you have not used before): ");
             var plotname = Console.ReadLine();
             if (plotname.Length > 50)
                 plotname = plotname.Substring(0, 50);
@@ -62,13 +63,13 @@ namespace CA_DataUploader
             if (lines.Any(x => x.StartsWith("Account")))
                 lines.Remove(lines.First(x => x.StartsWith("Account")));
 
-            Console.WriteLine("Please enter your full name: ");
+            Console.Write("Please enter your full name: ");
             var fullname = Console.ReadLine();
             if (fullname.Length > 100)
                 fullname = fullname.Substring(0, 100);
 
             string email;
-            Console.WriteLine("Please enter your email address: ");
+            Console.Write("Please enter your email address: ");
             do
             {
                 email = Console.ReadLine();
@@ -76,7 +77,7 @@ namespace CA_DataUploader
             while (!IsValidEmail(email));
 
             string pwd;
-            Console.WriteLine("Please enter a password for the webchart: ");
+            Console.Write("Please enter a password for the webchart: ");
             do
             {
                 pwd = Console.ReadLine();
@@ -89,9 +90,11 @@ namespace CA_DataUploader
             File.WriteAllLines("IO.conf", lines);
             ReloadIOconf(serial);
 
-            if (serial.McuBoards.Count > 1)
+            if (mcuList.Count() > 1)
             {
+                Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("You need to manually edit the IO.conf file and add more 'TypeK' lines..");
+                Console.ForegroundColor = ConsoleColor.DarkGray;
                 DULutil.OpenUrl("https://github.com/copenhagenatomics/CA_DataUploader/wiki/IO.conf-documentation");
             }
 

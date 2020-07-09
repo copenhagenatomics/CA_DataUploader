@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CA_DataUploaderLib.IOconf;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -16,13 +17,16 @@ namespace CA_DataUploaderLib
         public static string GetWelcomeMessage(string purpose, string i2cConfig = null)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Code made by Thomas Jam Pedersen...");
-            sb.AppendLine("UTC time now: " + DateTime.UtcNow.ToString("ddd MMM dd. HH:mm:ss"));
+            sb.AppendLine("This is Open Source code by Copenhagen Atomics");
             sb.AppendLine(purpose);
             sb.AppendLine();
-            sb.AppendLine(GetSoftware());
-            sb.AppendLine(GetHardware(i2cConfig));
-            sb.AppendLine();
+            if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
+            {
+                sb.AppendLine("UTC time now: " + DateTime.UtcNow.ToString("ddd MMM dd. HH:mm:ss"));
+                sb.AppendLine(GetSoftware());
+                sb.AppendLine(GetHardware(i2cConfig));
+                sb.AppendLine();
+            }
             sb.AppendLine("Press ESC to stop");
             sb.AppendLine();
             return sb.ToString();
