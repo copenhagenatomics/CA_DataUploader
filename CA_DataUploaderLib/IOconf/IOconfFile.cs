@@ -50,6 +50,7 @@ namespace CA_DataUploaderLib.IOconf
                 if (row.StartsWith("Motor")) return new IOconfMotor(row, lineNum);
                 if (row.StartsWith("Oven")) return new IOconfOven(row, lineNum);
                 if (row.StartsWith("Pressure")) return new IOConfPressure(row, lineNum);
+                if (row.StartsWith("Geiger")) return new IOConfGeiger(row, lineNum);
                 if (row.StartsWith("Scale")) return new IOconfScale(row, lineNum);
                 if (row.StartsWith("Tank")) return new IOconfTank(row, lineNum);
                 if (row.StartsWith("Valve")) return new IOconfValve(row, lineNum);
@@ -138,6 +139,11 @@ namespace CA_DataUploaderLib.IOconf
         public static IEnumerable<IOconfInput> GetPressure()
         {
             return Table.Where(x => x.GetType() == typeof(IOConfPressure)).Cast<IOconfInput>();
+        }
+
+        public static IEnumerable<IOconfInput> GetGeiger()
+        {
+            return Table.Where(x => x.GetType() == typeof(IOConfGeiger)).Cast<IOconfInput>();
         }
 
         public static IEnumerable<IOconfInput> GetAirFlow()
