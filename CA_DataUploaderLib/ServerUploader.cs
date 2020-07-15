@@ -41,13 +41,8 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                var connectionInfo = IOconfFile.GetConnectionInfo();
-                _accountInfo = new Dictionary<string, string>
-                {
-                    { "email", connectionInfo.email },
-                    { "password", connectionInfo.password },
-                    { "fullname", connectionInfo.Fullname }
-                };
+                CheckInputData(vectorDescription);
+                var connectionInfo = GetAccountInfo();
 
                 MillisecondsBetweenUpload = 900;
                 string server = connectionInfo.Server;
@@ -65,11 +60,6 @@ namespace CA_DataUploaderLib
                 else
                     File.WriteAllBytes(_keyFilename, _rsaWriter.ExportCspBlob(true));
 
-                foreach (var math in IOconfFile.GetMath())
-                {
-                    vectorDescription._items.Add(new VectorDescriptionItem("double", math.Name, DataTypeEnum.State));
-                }
-
                 _cmd.SetVectorDescription(vectorDescription);
                 _vectorDescription = vectorDescription;
                 _vectorLen = vectorDescription.Length;
@@ -86,6 +76,30 @@ namespace CA_DataUploaderLib
                 LogHttpException(ex);
                 throw;
             }
+        }
+
+        private static void CheckInputData(VectorDescription vectorDescription)
+        {
+            foreach (var math in IOconfFile.GetMath())
+            {
+                vectorDescription._items.Add(new VectorDescriptionItem("double", math.Name, DataTypeEnum.State));
+            }
+
+            var dublicates = vectorDescription._items.GroupBy(x => x.Descriptor).Where(x => x.Count() > 1).Select(x => x.Key);
+            if (dublicates.Any())
+                throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", dublicates));
+        }
+
+        private ConnectionInfo GetAccountInfo()
+        {
+            var connectionInfo = IOconfFile.GetConnectionInfo();
+            _accountInfo = new Dictionary<string, string>
+                {
+                    { "email", connectionInfo.email },
+                    { "password", connectionInfo.password },
+                    { "fullname", connectionInfo.Fullname }
+                };
+            return connectionInfo;
         }
 
         public void SendVector(List<double> vector, DateTime timestamp)

@@ -54,7 +54,7 @@ namespace CA_DataUploaderLib
                 return new List<double>();  // empty. 
 
             var list = new List<double>();
-            foreach(var board in _values.Values.GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key))
+            foreach(var board in _values.Where(x => !x.Key.Skip).Select(x => x.Value).GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key))
             {
                 list.Add(board.Average(x => x.GetFrequency()));
                 list.Add(board.Min(x => x.FilterCount()));
@@ -70,7 +70,7 @@ namespace CA_DataUploaderLib
             // list.AddRange(_config.Select(x => new VectorDescriptionItem("double", x.Name + "_latest", DataTypeEnum.Input)).ToList());
             if (_logLevel == CALogLevel.Debug)
             {
-                foreach (var boxName in _config.Select(x => x.Map.BoxName).Distinct().OrderBy(x => x))
+                foreach (var boxName in _config.Where(x => !x.Skip).Select(x => x.Map.BoxName).Distinct().OrderBy(x => x))
                 {
                     list.Add(new VectorDescriptionItem("double", boxName + "_AvgSampleFrequency", DataTypeEnum.State));
                     list.Add(new VectorDescriptionItem("double", boxName + "_MinFilterSampleCount", DataTypeEnum.State));
@@ -124,7 +124,6 @@ namespace CA_DataUploaderLib
 
         protected void LoopForever()
         {
-            int failCount = 0;
             List<double> numbers = new List<double>();
             List<string> values = new List<string>();
             List<MCUBoard> skipBoard = new List<MCUBoard>();
@@ -162,22 +161,7 @@ namespace CA_DataUploaderLib
                     }
 
                     // check if any of the boards stopped responding. 
-                    foreach (var item in _values.Values)
-                    {
-                        if (DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds > 2000)
-                        {
-                            item.ReadSensor_LoopTime = 0;
-                            item.Input.Map.Board.SafeClose();
-                            failCount++;
-                        }
-                    }
-
-                    if (failCount > 200)
-                    {
-                        _cmd.Execute("escape");
-                        _running = false;
-                        CALog.LogErrorAndConsoleLn(LogID.A, $"Shutting down: {Title} unable to read from port");
-                    }
+                    CheckFails();
 
                     Thread.Sleep(100);
                 }
@@ -217,6 +201,31 @@ namespace CA_DataUploaderLib
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.LoopForever() " + DateTime.Now.Subtract(start).Humanize(5));
+        }
+
+        private int failCount = 0;
+
+        private void CheckFails()
+        {
+            List<string> failPorts = new List<string>();
+            foreach (var item in _values.Values)
+            {
+                var maxDelay = (item.Input.Name.ToLower().Contains("luminox")) ? 10000 : 2000;
+                if (DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds > maxDelay)
+                {
+                    item.ReadSensor_LoopTime = 0;
+                    item.Input.Map.Board.SafeClose();
+                    failCount++;
+                    failPorts.Add(item.Input.Name);
+                }
+            }
+
+            if (failCount > 200)
+            {
+                _cmd.Execute("escape");
+                _running = false;
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Shutting down: {Title} unable to read from port: {string.Join(", ", failPorts)}");
+            }
         }
 
         protected bool Stop(List<string> args)

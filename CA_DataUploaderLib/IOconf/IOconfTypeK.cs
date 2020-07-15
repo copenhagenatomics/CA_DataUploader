@@ -16,7 +16,7 @@ namespace CA_DataUploaderLib.IOconf
             {
                 Skip = true;   // BaseSensorBox will skip reading from this box. Data is comming from other sensors through ProcessLine() instead. You must skip all lines from this box in IO.conf, else it will not work.
             }
-            if (list[3].ToLower() == "all")
+            else if (list[3].ToLower() == "all")
             {
                 AllJunction = true;   // all => special command to show all junction temperatures including the first as average (used for calibration)
                 PortNumber = 0;
