@@ -28,17 +28,20 @@ namespace CA_DataUploaderLib
             {
                 // try to read some text. 
                 lines = box.SafeReadExisting();
-                _debugQueue.Enqueue(lines);
-
-                if (DateTime.UtcNow.Subtract(_lastTimeStamp).TotalMilliseconds > 500)
+                lock (_debugQueue)
                 {
-                    CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{string.Join("§", _debugQueue)}'{Environment.NewLine}");
-                    _debugQueue.Clear();
-                }
+                    _debugQueue.Enqueue(lines);
 
-                while(_debugQueue.Count > 10)
-                {
-                    _debugQueue.Dequeue();
+                    if (DateTime.UtcNow.Subtract(_lastTimeStamp).TotalMilliseconds > 500)
+                    {
+                        CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{string.Join("§", _debugQueue)}'{Environment.NewLine}");
+                        _debugQueue.Clear();
+                    }
+
+                    while (_debugQueue.Count > 10)
+                    {
+                        _debugQueue.Dequeue();
+                    }
                 }
 
                 // see if it matches the BoxPattern.

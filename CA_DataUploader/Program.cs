@@ -46,7 +46,7 @@ namespace CA_DataUploader
                             }
 
                             Thread.Sleep(100);
-                            if (i == 20) DULutil.OpenUrl("https://www.copenhagenatomics.com/plots/?" + email);
+                            if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
                         }
                     }
                 }

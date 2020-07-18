@@ -56,6 +56,7 @@ namespace CA_DataUploaderLib
         {
             var temp = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.Red;
+            error = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + error;
             Console.WriteLine(error);
             Console.ForegroundColor = temp;
             WriteToFile(logID, error + Environment.NewLine);
@@ -71,8 +72,12 @@ namespace CA_DataUploaderLib
                     if (!msg.EndsWith(Environment.NewLine))
                         msg += Environment.NewLine;
 
+                    var time = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ");
+                    if (!msg.StartsWith(time))
+                        msg = time + msg;
+
                     // allways add timestamp. 
-                    File.AppendAllText(GetFilename(logID), DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + msg);
+                    File.AppendAllText(GetFilename(logID), msg);
                 }
             }
             catch (Exception ex)

@@ -183,7 +183,7 @@ namespace CA_DataUploaderLib
                     badRow++;
                     if (badRow > 10)
                     {
-                        CALog.LogInfoAndConsoleLn(LogID.A, "Too many bad rows from thermocouple ports.. shutting down:");
+                        CALog.LogErrorAndConsoleLn(LogID.A, "Too many bad rows from thermocouple ports.. shutting down:");
                         badPorts.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x));
                         CALog.LogException(LogID.A, ex);
                         if(_cmd != null)

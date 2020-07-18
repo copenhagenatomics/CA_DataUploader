@@ -10,7 +10,7 @@
     <PackageProjectUrl>https://github.com/copenhagenatomics/CA_DataUploader</PackageProjectUrl>
     <PackageTags>Raspberry Pi, IOT, Data Logger</PackageTags>
     <NeutralLanguage>en</NeutralLanguage>
-    <Version>1.0.10</Version>
+    <Version>1.0.11</Version>
     <Copyright>Copenhagen Atomics</Copyright>
     <RepositoryUrl>https://github.com/copenhagenatomics/CA_DataUploader</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -45,9 +45,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="MCUBoard.cs">
-      <SubType>Component</SubType>
-    </Compile>
+    <Compile Update="MCUBoard.cs" />
   </ItemGroup>
 
 </Project>

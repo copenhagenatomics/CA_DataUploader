@@ -179,6 +179,11 @@ namespace CA_DataUploaderLib
             }
         }
 
+        public string GetPlotUrl()
+        {
+            return "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plotID;
+        }
+
         public string PrintMyPlots()
         {
             var sb = new StringBuilder(Environment.NewLine);
