@@ -122,6 +122,8 @@ namespace CA_DataUploaderLib
             return _values.Values.Average(x => x.ReadSensor_LoopTime);
         }
 
+        protected string _matchPattern = @"-?\d{1,10}(,\d{3})*(\.\d+)?";  // this will match any integer or decimal number. (but not scientific notation)
+
         protected void LoopForever()
         {
             List<double> numbers = new List<double>();
@@ -150,7 +152,7 @@ namespace CA_DataUploaderLib
                                 if (Regex.IsMatch(row.Trim(), "\\[SLPM\\], Liter:")) // hack to skip FlowAndPressure boards. 
                                     skipBoard.Add(board);
 
-                                if (Regex.IsMatch(row.Trim(), @"^\d+"))  // check that row starts with digit. 
+                                if (Regex.IsMatch(row.Trim(), @"^(-|\d+)"))  // check that row starts with digit. 
                                 {
                                     values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                                     numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
