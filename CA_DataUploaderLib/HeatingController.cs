@@ -164,6 +164,9 @@ namespace CA_DataUploaderLib
                     // check if any of the boards stopped responding. 
                     foreach (var heater in _heaters)
                     {
+                        if (heater._ioconf.BoxName == "ArduinoHack")
+                            continue;
+
                         if (DateTime.UtcNow.Subtract(heater.Current.TimeStamp).TotalMilliseconds > 2000)
                         {
                             heater.Current.ReadSensor_LoopTime = 0;
