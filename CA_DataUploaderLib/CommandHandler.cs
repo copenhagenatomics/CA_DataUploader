@@ -13,6 +13,7 @@ namespace CA_DataUploaderLib
     {
 
         private bool _running = true;
+        private SerialNumberMapper _mapper;
         private DateTime _start = DateTime.Now;
         private StringBuilder inputCommand = new StringBuilder();
         private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
@@ -22,12 +23,14 @@ namespace CA_DataUploaderLib
 
         public bool IsRunning { get { return _running; } }
 
-        public CommandHandler()
+        public CommandHandler(SerialNumberMapper mapper = null)
         {
+            _mapper = mapper;
             new Thread(() => this.LoopForever()).Start();
             AddCommand("escape", Stop);
             AddCommand("help", HelpMenu);
             AddCommand("up", Uptime);
+            AddCommand("version", GetVersion);
             AddCommand("Run", Run);
         }
 
@@ -216,12 +219,23 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, "Esc                       - press Esc key to shut down");
             CALog.LogInfoAndConsoleLn(LogID.A, "help                      - print the full list of available commands");
             CALog.LogInfoAndConsoleLn(LogID.A, "up                        - print how long the service has been running");
+            CALog.LogInfoAndConsoleLn(LogID.A, "version                   - print the software version and hardware of this system");
             return true;
         }
 
         private bool Uptime(List<string> args)
         {
             CALog.LogInfoAndConsoleLn(LogID.A, DateTime.Now.Subtract(_start).Humanize(5));
+            return true;
+        }
+
+        private bool GetVersion(List<string> args)
+        {
+            CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetSoftware() 
+                                            + Environment.NewLine 
+                                            + RpiVersion.GetHardware()
+                                            + Environment.NewLine
+                                            + string.Join(Environment.NewLine, _mapper.McuBoards.Select(x => x.ToString())));
             return true;
         }
 

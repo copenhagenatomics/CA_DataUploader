@@ -205,7 +205,7 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.LoopForever() " + DateTime.Now.Subtract(start).Humanize(5));
         }
 
-        private int failCount = 0;
+        private int _failCount = 0;
 
         private void CheckFails()
         {
@@ -217,16 +217,16 @@ namespace CA_DataUploaderLib
                 {
                     item.ReadSensor_LoopTime = 0;
                     item.Input.Map.Board.SafeClose();
-                    failCount++;
+                    _failCount++;
                     failPorts.Add(item.Input.Name);
                 }
             }
 
-            if (failCount > 200)
+            if (_failCount > 200)
             {
                 _cmd.Execute("escape");
                 _running = false;
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Shutting down: {Title} unable to read from port: {string.Join(", ", failPorts)}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Shutting down: {Title} unable to read from port: {string.Join(", ", failPorts)}{Environment.NewLine}Failed {_failCount} times read operations in a row where latest valid read was more than 2 seconds old");
             }
         }
 

@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib
     public static class CALog
     {
         private static Dictionary<LogID, DateTime> _nextSizeCheck;
-        private static string _logDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+        private static string _logDir = Path.GetDirectoryName(Directory.GetCurrentDirectory());
         public static int MaxLogSizeMB = 100;
 
         public static void LogData(LogID logID, string msg)

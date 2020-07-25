@@ -27,7 +27,7 @@ namespace CA_DataUploader
 
                     var email = IOconfSetup.UpdateIOconf(serial);
 
-                    using (var cmd = new CommandHandler())
+                    using (var cmd = new CommandHandler(serial))
                     using (var usb = new ThermocoupleBox(cmd, new TimeSpan(0, 0, 1)))
                     using (var cloud = new ServerUploader(GetVectorDescription(usb), cmd))
                     {

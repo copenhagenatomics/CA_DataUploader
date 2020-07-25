@@ -118,7 +118,7 @@ namespace CA_DataUploaderLib
             {
                 var frame = new StackTrace().GetFrame(1);
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}{Environment.NewLine}");
-                if (_safeLimit-- == 0) throw;
+                if (_safeLimit-- <= 0) throw;
             }
 
             return string.Empty;
@@ -144,7 +144,7 @@ namespace CA_DataUploaderLib
             {
                 var frame = new StackTrace().GetFrame(1);
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Error while checking serial port read buffer: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}{Environment.NewLine}");
-                if (_safeLimit-- == 0) throw;
+                if (_safeLimit-- <= 0) throw;
             }
 
             return false;
@@ -175,7 +175,7 @@ namespace CA_DataUploaderLib
             catch (Exception)
             {
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to write to serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}");
-                if (_safeLimit-- == 0) throw;
+                if (_safeLimit-- <= 0) throw;
             }
         }
 
@@ -198,7 +198,7 @@ namespace CA_DataUploaderLib
             catch (Exception)
             {
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to ReadExisting() from serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}");
-                if (_safeLimit-- == 0) throw;
+                if (_safeLimit-- <= 0) throw;
             }
 
             return string.Empty;

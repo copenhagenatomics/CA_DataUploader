@@ -11,7 +11,7 @@
     <PackageTags>Raspberry Pi, IOT, Data Logger</PackageTags>
     <NeutralLanguage>en</NeutralLanguage>
     <Version>1.0.11</Version>
-    <Copyright>Copenhagen Atomics</Copyright>
+    <Copyright>Copyright © $([System.DateTime]::UtcNow.Year) Copenhagen Atomics ($([System.DateTime]::UtcNow.ToString("dd-MMM-yyyy HH:mm")))</Copyright>
     <RepositoryUrl>https://github.com/copenhagenatomics/CA_DataUploader</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>

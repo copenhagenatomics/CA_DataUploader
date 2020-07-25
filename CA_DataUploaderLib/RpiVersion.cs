@@ -51,7 +51,13 @@ namespace CA_DataUploaderLib
 
         public static string GetSoftware()
         {
-            return "Kernal version : " + GetKernalVersion();
+            Assembly asm = Assembly.GetExecutingAssembly();
+            FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(asm.Location);
+            return asm.GetName() + " Version : " + String.Format("{0}.{1}", fvi.ProductMajorPart, fvi.ProductMinorPart)
+                + Environment.NewLine
+                + fvi.LegalCopyright
+                + Environment.NewLine
+                + "Kernal version : " + GetKernalVersion();
         }
 
         public static string GetHardwareInfo()

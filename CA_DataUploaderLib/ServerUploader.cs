@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -27,6 +28,7 @@ namespace CA_DataUploaderLib
         private VectorDescription _vectorDescription;
         private Dictionary<string, string> _accountInfo;
         private int _plotID;
+        private string _plotname;
         private int _vectorLen;
         private DateTime _lastTimestamp;
         private DateTime _waitTimestamp = DateTime.Now;
@@ -66,7 +68,7 @@ namespace CA_DataUploaderLib
                 _vectorDescription.IOconf = IOconfFile.RawFile;
 
                 GetLoginToken();
-                _plotID = GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription)).Result;
+                GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription));
 
                 new Thread(() => this.LoopForever()).Start();
                 _cmd.AddCommand("escape", Stop);
@@ -181,7 +183,7 @@ namespace CA_DataUploaderLib
 
         public string GetPlotUrl()
         {
-            return "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plotID;
+            return "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plotname;
         }
 
         public string PrintMyPlots()
@@ -204,7 +206,7 @@ namespace CA_DataUploaderLib
                 result = result.Substring(startPos); // remove LoggedIn + Table "header"
                 result = result.Substring(0, result.Length - 2); // remove squar brackets. 
                 List<string> list = FormatPlotList(result);
-                return list.ToDictionary(x => x.StringBetween("\"PlotName\":", "\",\""), x => x);
+                return list.ToDictionary(x => x.StringBetween("\"PlotNameId\":\"", "\",\""), x => x);
             }
             catch (Exception ex)
             {
@@ -324,15 +326,17 @@ namespace CA_DataUploaderLib
         }
 
 
-        private async Task<int> GetPlotIDAsync(byte[] publicKey, byte[] vectorDescription)
+        private void GetPlotIDAsync(byte[] publicKey, byte[] vectorDescription)
         {
             HttpResponseMessage response = null;
             try
             {
                 string query = $"api/LoopApi?LoopName={_loopName}&ticks={DateTime.UtcNow.Ticks}&loginToken={_loginToken}";
-                response = await _client.PutAsJsonAsync(query, publicKey.Concat(vectorDescription));
+                response = _client.PutAsJsonAsync(query, publicKey.Concat(vectorDescription)).Result;
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsAsync<int>();
+                var result = response.Content.ReadAsAsync<string>().Result;
+                _plotID = result.StringBefore(" ").ToInt();
+                _plotname = result.StringAfter(" ");
             }
             catch (Exception ex)
             {
