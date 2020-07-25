@@ -117,7 +117,7 @@ namespace CA_DataUploaderLib
             catch (Exception)
             {
                 var frame = new StackTrace().GetFrame(1);
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}{Environment.NewLine}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber} in {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}() at line {frame.GetFileLineNumber()}{Environment.NewLine}");
                 if (_safeLimit-- <= 0) throw;
             }
 

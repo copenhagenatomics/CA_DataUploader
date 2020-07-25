@@ -180,7 +180,7 @@ namespace CA_DataUploaderLib
 
                     CALog.LogInfoAndConsoleLn(LogID.A, ".");
                     if(exBoard != null)
-                        badPorts.Add($"{exBoard.PortName}:{exBoard.serialNumber} = {row}");
+                        badPorts.Add($"{exBoard.PortName}:{exBoard.serialNumber} = '{row}'");
 
                     badRow++;
                     if (badRow > 10)

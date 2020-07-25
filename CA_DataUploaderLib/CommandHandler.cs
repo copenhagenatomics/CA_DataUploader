@@ -234,7 +234,6 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetSoftware() 
                                             + Environment.NewLine 
                                             + RpiVersion.GetHardware()
-                                            + Environment.NewLine
                                             + string.Join(Environment.NewLine, _mapper.McuBoards.Select(x => x.ToString())));
             return true;
         }
