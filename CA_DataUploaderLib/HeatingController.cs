@@ -3,6 +3,7 @@ using Humanizer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 
 namespace CA_DataUploaderLib
@@ -26,14 +27,15 @@ namespace CA_DataUploaderLib
             _cmd = cmd;
 
             // map all heaters, sensors and ovens. 
-            var heaters = IOconfFile.GetOven().GroupBy(x => x.HeatingElement);
+            var heaters = IOconfFile.GetHeater().ToList();
+            var oven = IOconfFile.GetOven().ToList();
             var sensors = caThermalBox.GetAllDatapoints().ToList();
-            foreach (var heater in heaters.Where(x => x.Any(y => y.OvenArea > 0)))
+            foreach (var heater in heaters)
             {
-                int area = heater.First(x => x.OvenArea > 0).OvenArea;
-                var maxSensors = heater.Where(x => x.IsMaxTemperatureSensor).Select(x => x.TypeK.Name).ToList();
-                var ovenSensor = heater.Where(x => !x.IsMaxTemperatureSensor).Select(x => x.TypeK.Name).ToList();
-                _heaters.Add(new HeaterElement(area, heater.Key, sensors.Where(x => maxSensors.Contains(x.Name)), sensors.Where(x => ovenSensor.Contains(x.Name))));
+                var maxSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.IsMaxTemperatureSensor)?.TypeK.Name;
+                var ovenSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && !x.IsMaxTemperatureSensor)?.TypeK.Name;
+                int area = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.OvenArea > 0)?.OvenArea??-1;
+                _heaters.Add(new HeaterElement(area, heater, sensors.Where(x => x.Name == maxSensor), sensors.Where(x => x.Name == ovenSensor)));
             }
 
             if (!_heaters.Any())
@@ -47,9 +49,14 @@ namespace CA_DataUploaderLib
                 if (_heaters.Any())
                 {
                     cmd.AddCommand("help", HelpMenu);
-                    cmd.AddCommand("oven", Oven);
-                    if(IOconfFile.GetOutputLevel() == CALogLevel.Debug) cmd.AddCommand("ovenhistory", OvenHistory);
                     cmd.AddCommand("heater", Heater);
+                    if (oven.Any())
+                    {
+                        cmd.AddCommand("oven", Oven);
+                        if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
+                            cmd.AddCommand("ovenhistory", OvenHistory);
+                    }
+
                     break; // exit the for loop
                 }
             }
@@ -58,8 +65,12 @@ namespace CA_DataUploaderLib
         private bool HelpMenu(List<string> args)
         {
             CALog.LogInfoAndConsoleLn(LogID.A, $"heater [name] on/off      - turn the heater with the given name in IO.conf on and off");
-            CALog.LogInfoAndConsoleLn(LogID.A, $"oven [0 - 800] [0 - 800]  - where the integer value is the oven temperature top and bottom region");
-            if (_logLevel == CALogLevel.Debug) CALog.LogInfoAndConsoleLn(LogID.A, $"ovenhistory [x]           - Show a list of the last x oven commands");
+            if (_heaters.Any(x => !x.IsArea(-1)))
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"oven [0 - 800] [0 - 800]  - where the integer value is the oven temperature top and bottom region");
+                if (_logLevel == CALogLevel.Debug) CALog.LogInfoAndConsoleLn(LogID.A, $"ovenhistory [x]           - Show a list of the last x oven commands");
+            }
+
             return true;
         }
 

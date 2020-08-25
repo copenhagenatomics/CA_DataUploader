@@ -10,7 +10,7 @@ namespace CA_DataUploaderLib
         private int OvenTargetTemperature;
 
         public IOconfHeater _ioconf;
-        private int _area;
+        private int _area;  // -1 if not defined. 
         private List<SensorSample> _ovenSensors = new List<SensorSample>();    // sensors inside the oven somewhere. 
         private List<SensorSample> _heaterSensors = new List<SensorSample>();  // sensors inside the heater or directly on the surface of the heater
         public DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
