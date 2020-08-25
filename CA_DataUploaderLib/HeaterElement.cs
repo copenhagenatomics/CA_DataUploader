@@ -49,7 +49,7 @@ namespace CA_DataUploaderLib
             if (!validSensors.Any())
                 return false;  // no valid oven sensors 
 
-            if (validSensors.Any(x => x.Value > OvenTargetTemperature))
+            if (validSensors.Any(x => x.Value >= OvenTargetTemperature))
                 return false;  // at least one of the temperature sensors value is valid and above OvenTargetTemperature.  
 
             var heaterSensors = _heaterSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);

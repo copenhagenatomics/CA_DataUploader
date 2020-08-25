@@ -212,7 +212,7 @@ namespace CA_DataUploaderLib
             List<string> failPorts = new List<string>();
             foreach (var item in _values.Values)
             {
-                var maxDelay = (item.Input.Name.ToLower().Contains("luminox")) ? 10000 : 2000;
+                var maxDelay = (item.Input.Name.ToLower().Contains("luminox")) ? 20000 : 2000;
                 if (DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds > maxDelay)
                 {
                     item.ReadSensor_LoopTime = 0;

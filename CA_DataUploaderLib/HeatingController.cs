@@ -80,6 +80,7 @@ namespace CA_DataUploaderLib
             return true;
         }
 
+        // usage: oven 200 220 400
         private bool Oven(List<string> args)
         {
             _cmd.AssertArgs(args, 2);
