@@ -128,7 +128,6 @@ namespace CA_DataUploaderLib
         {
             List<double> numbers = new List<double>();
             List<string> values = new List<string>();
-            List<MCUBoard> skipBoard = new List<MCUBoard>();
             DateTime start = DateTime.Now;
             string row = string.Empty;
             int badRow = 0;
@@ -141,23 +140,18 @@ namespace CA_DataUploaderLib
                 {
                     foreach (var board in _boards)
                     {
-                        if (!skipBoard.Contains(board))
+                        while (board.SafeHasDataInReadBuffer())
                         {
-                            while (board.SafeHasDataInReadBuffer())
-                            {
-                                exBoard = board; // only used in exception
-                                values.Clear();
-                                numbers.Clear();
-                                row = board.SafeReadLine();
-                                if (Regex.IsMatch(row.Trim(), "\\[SLPM\\], Liter:")) // hack to skip FlowAndPressure boards. 
-                                    skipBoard.Add(board);
+                            exBoard = board; // only used in exception
+                            values.Clear();
+                            numbers.Clear();
+                            row = board.SafeReadLine();
 
-                                if (Regex.IsMatch(row.Trim(), @"^(-|\d+)"))  // check that row starts with digit. 
-                                {
-                                    values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                                    numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
-                                    ProcessLine(numbers, board);
-                                }
+                            if (Regex.IsMatch(row.Trim(), @"^(-|\d+)"))  // check that row starts with digit. 
+                            {
+                                values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                                numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
+                                ProcessLine(numbers, board);
                             }
                         }
                     }
@@ -210,9 +204,10 @@ namespace CA_DataUploaderLib
         private void CheckFails()
         {
             List<string> failPorts = new List<string>();
+            int maxDelay = 2000;
             foreach (var item in _values.Values)
             {
-                var maxDelay = (item.Input.Name.ToLower().Contains("luminox")) ? 20000 : 2000;
+                maxDelay = (item.Input.Name.ToLower().Contains("luminox")) ? 10000 : 2000;
                 if (DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds > maxDelay)
                 {
                     item.ReadSensor_LoopTime = 0;
@@ -226,7 +221,7 @@ namespace CA_DataUploaderLib
             {
                 _cmd.Execute("escape");
                 _running = false;
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Shutting down: {Title} unable to read from port: {string.Join(", ", failPorts)}{Environment.NewLine}Failed {_failCount} times read operations in a row where latest valid read was more than 2 seconds old");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Shutting down: {Title} unable to read from port: {string.Join(", ", failPorts)}{Environment.NewLine}Failed {_failCount} times read operations in a row where latest valid read was more than {maxDelay} seconds old");
             }
         }
 
