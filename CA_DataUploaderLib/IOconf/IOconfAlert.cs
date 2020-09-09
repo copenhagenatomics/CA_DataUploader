@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using static System.FormattableString;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -20,28 +21,27 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfAlert(string row, int lineNum) : base(row, lineNum, "Alert")
         {
             var list = ToList();
-            if (list[0] != "Alert") throw new Exception("IOconfAlert: wrong format: " + row);
-
-
+            if (list[0] != "Alert" || list.Count < 3) throw new Exception("IOconfAlert: wrong format: " + row);
             Name = list[1];
-            if (list.Count > 2 && !double.TryParse(list[3], NumberStyles.Any, CultureInfo.InvariantCulture, out Value))
+            string comparisson = list[2].ToLower();
+            bool hasValidValue = list.Count > 3 && double.TryParse(list[3], NumberStyles.Any & ~NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out Value);
+            if (!hasValidValue && comparisson != "int" && comparisson != "nan")
+                throw new Exception("IOconfAlert: wrong format: " + row);
+
+            MessageTemplate = Invariant($" {Name} {list[2]} {Value} (");
+            if (comparisson == "int")
             {
-                if (list[2].ToLower() != "int" && list[2].ToLower() != "nan")
-                    throw new Exception("IOconfAlert: wrong format: " + row);
+                MessageTemplate = $" {Name} is an integer (";
             }
 
-            Message = $" {Name} {list[2]} {Value} (";
-            if (list[2].ToLower() == "int")
+            if (comparisson == "nan")
             {
-                Message = $" {Name} is an integer (";
+                MessageTemplate = $" {Name} is not a number (";
             }
 
-            if (list[2].ToLower() == "nan")
-            {
-                Message = $" {Name} is not a number (";
-            }
+            Message = MessageTemplate;
 
-            switch (list[2])
+            switch (comparisson) 
             {
                 case "=": type = AlertCompare.EqualTo; break;
                 case "!=": type = AlertCompare.NotEqualTo; break;
@@ -49,10 +49,11 @@ namespace CA_DataUploaderLib.IOconf
                 case "<": type = AlertCompare.SmallerThan; break;
                 case ">=": type = AlertCompare.BiggerOrEqualTo; break;
                 case "<=": type = AlertCompare.SmallerOrEqualTo; break;
-                case "NaN": type = AlertCompare.NaN; break;
+                case "nan": type = AlertCompare.NaN; break;
                 case "int": type = AlertCompare.IsInteger; break;
                 default:  throw new Exception("IOconfAlert: wrong format: " + row);
             }
+
         }
 
 
@@ -61,11 +62,12 @@ namespace CA_DataUploaderLib.IOconf
         private AlertCompare type;
         private double Value;
         private double LastValue;
+        private string MessageTemplate;
 
 
         public bool CheckValue(double newValue)
         {
-            Message += newValue + ")";
+            Message = MessageTemplate + newValue.ToString(CultureInfo.InvariantCulture) + ")"; 
             double lastValue = LastValue;
             LastValue = newValue;
             switch(type)
