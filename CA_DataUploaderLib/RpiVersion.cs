@@ -41,6 +41,7 @@ namespace CA_DataUploaderLib
             sb.AppendLine("CPU            : " + GetCPU());
             sb.AppendLine("Core count     : " + GetNumberOfCores().ToString());
             sb.AppendLine("Serial no      : " + GetSerialNumber());
+            sb.AppendLine("WiFi SSID      : " + GetWiFi_SSID());
             sb.AppendLine();
 
             if (i2cConfig != null)
@@ -142,6 +143,15 @@ namespace CA_DataUploaderLib
 
             return "unknown";
         }
+
+        private static string GetWiFi_SSID()
+        {
+            if (_OS.Platform == PlatformID.Unix)
+                return ExecuteShellCommand("sudo iwgetid").Trim();
+
+            return "unknown";
+        }
+        
 
         public static string GetFreeDisk()
         {
