@@ -48,6 +48,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CALogTests.cs" />
+    <Compile Include="IOconfMathTests.cs" />
     <Compile Include="IOconfAlertTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ServerUploaderTests.cs" />
