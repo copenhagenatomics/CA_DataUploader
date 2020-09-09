@@ -12,7 +12,16 @@ namespace CA_DataUploaderLib.IOconf
             if (list[0] != "Math") throw new Exception("IOconfMath: wrong format: " + row);
             
             Name = list[1];
-            expression = new Expression(row.Substring(Name.Length + 6));
+
+            try
+            {
+                var compiledExpression = Expression.Compile(row.Substring(Name.Length + 6), true);
+                expression = new Expression(compiledExpression);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("IOconfMath: wrong format - expression: " + row, ex);
+            }
         }
 
         public string Name { get; set; }
@@ -26,7 +35,9 @@ namespace CA_DataUploaderLib.IOconf
         public double Calculate(Dictionary<string, object> values)
         {
             expression.Parameters = values;
-            return (double)expression.Evaluate();
+            // Convert.ToDouble allows some expressions that return int, decimals or even boolean to work
+            // note that some expression may even return different values depending on the branch hit i.e. when using if(...)
+            return Convert.ToDouble(expression.Evaluate());
         }
     }
 }
