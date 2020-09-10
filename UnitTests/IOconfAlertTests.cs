@@ -20,6 +20,9 @@ namespace UnitTests
         [DataRow("Alert;MyName;int", 1d)]
         [DataRow("Alert;MyName;int", -1d)]
         [DataRow("Alert;MyName;int", -10000000d)]
+        [DataRow("Alert;MyName;<=;123", 123d)]
+        [DataRow("Alert;MyName;<=;123", 122d)]
+        [DataRow("Alert;MyName;<;123", 122d)]
         [DataTestMethod]
         public void AlertTriggers(string row, double value) 
         {
