@@ -63,24 +63,32 @@ namespace CA_DataUploaderLib.IOconf
         private double Value;
         private double LastValue;
         private string MessageTemplate;
+        private bool _isFirstCheck = true;
 
 
         public bool CheckValue(double newValue)
         {
-            Message = MessageTemplate + newValue.ToString(CultureInfo.InvariantCulture) + ")"; 
+            Message = MessageTemplate + newValue.ToString(CultureInfo.InvariantCulture) + ")";
             double lastValue = LastValue;
             LastValue = newValue;
-            switch(type)
+            var res = RawCheckValue(newValue) && (_isFirstCheck || !RawCheckValue(lastValue));
+            _isFirstCheck = false;
+            return res;
+
+            bool RawCheckValue(double val)
             {
-                case AlertCompare.EqualTo:  return newValue == Value && lastValue != Value;
-                case AlertCompare.NotEqualTo: return newValue != Value && lastValue == Value;
-                case AlertCompare.BiggerThan: return newValue > Value && lastValue <= Value;
-                case AlertCompare.SmallerThan: return newValue < Value && lastValue >= Value;
-                case AlertCompare.BiggerOrEqualTo: return newValue >= Value && lastValue < Value;
-                case AlertCompare.SmallerOrEqualTo: return newValue <= Value && lastValue > Value;
-                case AlertCompare.NaN: return Double.IsNaN(newValue) && !Double.IsNaN(lastValue);
-                case AlertCompare.IsInteger: return Math.Abs(newValue % 1) <= (Double.Epsilon * 100);
-                default: throw new Exception("IOconfAlert: this should never happen");
+                switch (type)
+                {
+                    case AlertCompare.EqualTo: return val == Value;
+                    case AlertCompare.NotEqualTo: return val != Value;
+                    case AlertCompare.BiggerThan: return val > Value;
+                    case AlertCompare.SmallerThan: return val < Value;
+                    case AlertCompare.BiggerOrEqualTo: return val >= Value;
+                    case AlertCompare.SmallerOrEqualTo: return val <= Value;
+                    case AlertCompare.NaN: return Double.IsNaN(val);
+                    case AlertCompare.IsInteger: return Math.Abs(val % 1) <= (Double.Epsilon * 100);
+                    default: throw new Exception("IOconfAlert: this should never happen");
+                }
             }
         }
 

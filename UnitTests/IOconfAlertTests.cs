@@ -38,6 +38,9 @@ namespace UnitTests
         [DataRow("Alert;MyName;!=;123", 123d, 122.999d)]
         [DataRow("Alert;MyName;nan", 123d, double.NaN)]
         [DataRow("Alert;MyName;=;123", double.NaN, 123d)]
+        [DataRow("Alert;MyName;>;123", double.NaN, 123.00012d)]
+        [DataRow("Alert;MyName;>=;123", double.NaN, 123d)]
+        [DataRow("Alert;MyName;<=;123", double.NaN, 122d)]
         [DataTestMethod]
         public void AlertTriggersWhenOldValueDidNotMatch(string row, double oldValue, double value)
         {
