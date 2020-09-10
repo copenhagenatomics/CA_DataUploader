@@ -25,11 +25,10 @@ namespace CA_DataUploaderLib
         private List<DateTime> _badPackages = new List<DateTime>();
         private List<IOconfAlert> _alerts;
         private CommandHandler _cmd;
-        private VectorDescription _vectorDescription;
+        private MathVectorExpansion _mathVectorExpansion;
         private Dictionary<string, string> _accountInfo;
         private int _plotID;
         private string _plotname;
-        private int _vectorLen;
         private DateTime _lastTimestamp;
         private DateTime _waitTimestamp = DateTime.Now;
         private string _keyFilename;
@@ -43,6 +42,8 @@ namespace CA_DataUploaderLib
         {
             try
             {
+                _mathVectorExpansion = new MathVectorExpansion(vectorDescription);
+                vectorDescription = _mathVectorExpansion.VectorDescription;
                 CheckInputData(vectorDescription);
                 var connectionInfo = GetAccountInfo();
 
@@ -63,9 +64,7 @@ namespace CA_DataUploaderLib
                     File.WriteAllBytes(_keyFilename, _rsaWriter.ExportCspBlob(true));
 
                 _cmd.SetVectorDescription(vectorDescription);
-                _vectorDescription = vectorDescription;
-                _vectorLen = vectorDescription.Length;
-                _vectorDescription.IOconf = IOconfFile.RawFile;
+                vectorDescription.IOconf = IOconfFile.RawFile;
 
                 GetLoginToken();
                 GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription));
@@ -82,11 +81,6 @@ namespace CA_DataUploaderLib
 
         private static void CheckInputData(VectorDescription vectorDescription)
         {
-            foreach (var math in IOconfFile.GetMath())
-            {
-                vectorDescription._items.Add(new VectorDescriptionItem("double", math.Name, DataTypeEnum.State));
-            }
-
             var dublicates = vectorDescription._items.GroupBy(x => x.Descriptor).Where(x => x.Count() > 1).Select(x => x.Key);
             if (dublicates.Any())
                 throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", dublicates));
@@ -106,12 +100,7 @@ namespace CA_DataUploaderLib
 
         public void SendVector(List<double> vector, DateTime timestamp)
         {
-            var dic = GetVectorDictionary(vector);
-            IOconfFile.GetMath().ToList().ForEach(x => vector.Add(x.Calculate(dic)));
-
-            if (vector.Count() != _vectorLen)
-                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count()} <> {_vectorLen}, Math: {IOconfFile.GetMath().Count()}");
-
+            _mathVectorExpansion.Expand(vector);
             _cmd.NewData(vector);
             foreach (var a in _alerts)
             {
@@ -143,18 +132,6 @@ namespace CA_DataUploaderLib
                     }
                 }
             }
-        }
-
-        private Dictionary<string, object> GetVectorDictionary(List<double> vector)
-        {
-            var dic = new Dictionary<string, object>();
-            int i = 0;
-            foreach(var item in _vectorDescription._items)
-            {
-                dic.Add(item.Descriptor, vector[i++]);
-            }
-
-            return dic;
         }
 
         // service method, that makes it easy to control the duration of each loop in (milliseconds)
