@@ -12,13 +12,19 @@ namespace CA_DataUploaderLib
         public string Hardware;
         public string Software;
         public string IOconf;
-        public int Length { get { return _items.Count(); } }
+        public int Length { get { return _items.Count; } }
 
         public VectorDescription() { }
         public VectorDescription(List<VectorDescriptionItem> items, string hardware, string software) { _items = items; Hardware = hardware; Software = software; }
+
         public string GetVectorItemDescriptions() { return string.Join(Environment.NewLine, _items.Select(x => x.Descriptor)); }
         public string GetVectorItemTypes() { return string.Join(Environment.NewLine, _items.Select(x => x.DataType)); }
         public string GetVectorInputOutput() { return string.Join(Environment.NewLine, _items.Select(x => x.DirectionType.ToString())); }
+
+        /// <summary>Returns a copy of the vector description with additional entries</summary>
+        /// <remarks>While this leaves the current instance unmodified, we are pretending the entries are immutable for now.</remarks>
+        public VectorDescription WithExtraItems(IEnumerable<VectorDescriptionItem> extraEntries) =>
+            new VectorDescription(_items.Concat(extraEntries).ToList(), Hardware, Software);
 
         public override string ToString()
         {

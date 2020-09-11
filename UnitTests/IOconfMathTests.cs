@@ -45,7 +45,7 @@ namespace UnitTests
             Assert.AreEqual(expectedResult, math.Calculate(new Dictionary<string, object> { { "MyValue", value }}));
         }
 
-        [DataTestMethod]
+        [TestMethod]
         public void RejectsExpressionWithThousandsSeparator()
         {
             var ex = Assert.ThrowsException<Exception>(() => new IOconfMath("Math;MyName;MyValue + 123,222", 0));

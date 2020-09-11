@@ -24,8 +24,8 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        public string Name { get; set; }
-        private Expression expression;
+        public string Name { get; }
+        private readonly Expression expression;
 
         // https://www.codeproject.com/Articles/18880/State-of-the-Art-Expression-Evaluation
         // uses NCalc 2 for .NET core. 
