@@ -7,11 +7,9 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Xml.Serialization;
 
 namespace CA_DataUploaderLib
@@ -54,7 +52,7 @@ namespace CA_DataUploaderLib
                 _client.DefaultRequestHeaders.Accept.Clear();
                 _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 _loopName = IOconfFile.GetLoopName();
-                _alerts = IOconfFile.GetAlerts().ToList();
+                _alerts = GetAlerts(vectorDescription);
                 _keyFilename = "Key" + _loopName + ".bin";
                 CALog.LogInfoAndConsoleLn(LogID.A, _loopName);
 
@@ -77,6 +75,17 @@ namespace CA_DataUploaderLib
                 LogHttpException(ex);
                 throw;
             }
+        }
+
+        private static List<IOconfAlert> GetAlerts(VectorDescription vectorDesc)
+        {
+            var alerts = IOconfFile.GetAlerts().ToList();
+            var alertsWithoutItem = alerts.Where(a => !vectorDesc.HasItem(a.Sensor)).ToList();
+            foreach (var alert in alertsWithoutItem)
+                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Alert: {alert.Name} points to missing sensor: {alert.Sensor}");
+            if (alertsWithoutItem.Count > 0)
+                throw new InvalidOperationException("Misconfigured alerts detected");
+            return alerts;
         }
 
         private static void CheckInputData(VectorDescription vectorDescription)
@@ -104,7 +113,7 @@ namespace CA_DataUploaderLib
             _cmd.NewData(vector);
             foreach (var a in _alerts)
             {
-                if (a.CheckValue(_cmd.GetVectorValue(a.Name)))
+                if (a.CheckValue(_cmd.GetVectorValue(a.Sensor)))
                 {
                     lock (_alertQueue)
                     {
