@@ -104,7 +104,7 @@ namespace CA_DataUploaderLib
             _cmd.NewData(vector);
             foreach (var a in _alerts)
             {
-                if (a.CheckValue(_cmd.GetVectorValue(a.Name)))
+                if (a.CheckValue(_cmd.GetVectorValue(a.Sensor)))
                 {
                     lock (_alertQueue)
                     {
