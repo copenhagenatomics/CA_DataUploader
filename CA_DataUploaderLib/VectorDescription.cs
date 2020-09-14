@@ -26,6 +26,8 @@ namespace CA_DataUploaderLib
         public VectorDescription WithExtraItems(IEnumerable<VectorDescriptionItem> extraEntries) =>
             new VectorDescription(_items.Concat(extraEntries).ToList(), Hardware, Software);
 
+        public bool HasItem(string descriptor) => _items.Any(i => i.Descriptor == descriptor);
+
         public override string ToString()
         {
             string msg = string.Empty;
