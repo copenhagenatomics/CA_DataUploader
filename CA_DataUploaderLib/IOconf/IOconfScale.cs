@@ -8,6 +8,8 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfScale(string row, int lineNum) : base(row, lineNum, "Scale")
         {
+            format = "Scale;Name;BoxName";
+
             var list = ToList();
             Name = list[1];
             BoxName = list[2];

@@ -55,6 +55,7 @@
     <Compile Include="ServerUploaderTests.cs" />
     <Compile Include="SerialPortTests.cs" />
     <Compile Include="HeatingControllerTests.cs" />
+    <Compile Include="LinqExtensionsTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="IO.conf">

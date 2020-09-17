@@ -8,6 +8,8 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfLiquidFlow(string row, int lineNum) : base(row, lineNum, "LiquidFlow")
         {
+            format = "LiquidFlow;Name;BoxName;[port number]";
+
             var list = ToList();
             Name = list[1];
             BoxName = list[2];

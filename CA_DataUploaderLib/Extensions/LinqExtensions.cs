@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using CA_DataUploaderLib.IOconf;
 using System;
+using System.Diagnostics;
 
 namespace CA_DataUploaderLib.Extensions
 {
@@ -20,8 +21,16 @@ namespace CA_DataUploaderLib.Extensions
 
         public static double TriangleFilter(this IEnumerable<Tuple<double, DateTime>> list, double filterLength)  // filterLength in seconds
         {
+            // order with the latest sample first. 
+            list = list.OrderByDescending(x => x.Item2).ToList();
+            var now = list.First().Item2;
 
-            return 0;
+            // skip samples that are outside the filterlength
+            list = list.Where(x => x.Item2 > now.AddSeconds(-filterLength)).ToList();
+
+            // find the sum of all timespans.  
+            var sum = list.Sum(x => filterLength - now.Subtract(x.Item2).TotalSeconds);
+            return list.Sum(x => x.Item1 * (filterLength - now.Subtract(x.Item2).TotalSeconds) / sum);
         }
     }
 }

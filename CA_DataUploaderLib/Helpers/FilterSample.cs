@@ -60,23 +60,23 @@ namespace CA_DataUploaderLib.Helpers
                     _filterQueue.Dequeue();
                 }
 
-                var valid = _filterQueue.Where(x => x.Item1 < 10000 && x.Item1 != 0);
-                if (valid.Any())
+                var validSamples = _filterQueue.Where(x => x.Item1 < 10000 && x.Item1 != 0).ToList();
+                if (validSamples.Any())
                 {
                     _value = new SensorSample(Filter.SourceNames.First()) { Value = value.Value, TimeStamp = value.TimeStamp };
                     switch (Filter.filterType)
                     {
                         case FilterType.Average:
-                            _value.Value = valid.Average(x => x.Item1);
+                            _value.Value = validSamples.Average(x => x.Item1);
                             return;
                         case FilterType.Max:
-                            _value.Value = valid.Max(x => x.Item1);
+                            _value.Value = validSamples.Max(x => x.Item1);
                             return;
                         case FilterType.Min:
-                            _value.Value = valid.Min(x => x.Item1);
+                            _value.Value = validSamples.Min(x => x.Item1);
                             return;
                         case FilterType.Triangle:
-                            _value.Value = valid.TriangleFilter(Filter.filterLength);
+                            _value.Value = validSamples.TriangleFilter(Filter.filterLength);
                             return;
                     }
                 }
