@@ -64,6 +64,27 @@ namespace CA_DataUploaderLib
             return list;
         }
 
+        protected bool ShowQueue(List<string> args)
+        {
+            if (_values.Count == 0)
+                return false;
+
+            var sb = new StringBuilder($"NAME      {GetAvgLoopTime().ToString("N0").PadLeft(4)}           ");
+            sb.AppendLine();
+            foreach (var t in _values)
+            {
+                sb.AppendLine($"{t.Input.Name.PadRight(22)}={t.Value.ToString("N2").PadLeft(9)}");
+            }
+
+            CALog.LogInfoAndConsoleLn(LogID.A, sb.ToString());
+            return true;
+        }
+
+        private double GetAvgLoopTime()
+        {
+            return _values.Average(x => x.ReadSensor_LoopTime);
+        }
+
         protected string _matchPattern = @"-?\d{1,10}(,\d{3})*(\.\d+)?";  // this will match any integer or decimal number. (but not scientific notation)
 
         protected void LoopForever()
@@ -152,6 +173,7 @@ namespace CA_DataUploaderLib
                 maxDelay = (item.Input.Name.ToLower().Contains("luminox")) ? 10000 : 2000;
                 if (DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds > maxDelay)
                 {
+                    item.ReadSensor_LoopTime = 0;
                     item.Input.Map.Board.SafeClose();
                     _failCount++;
                     failPorts.Add(item.Input.Name);
@@ -181,7 +203,8 @@ namespace CA_DataUploaderLib
                 var sensor = _values.SingleOrDefault(x => x.Input.BoxName == board.BoxName && x.Input.PortNumber == i);
                 if (sensor != null)
                 {
-                    sensor.Value = value; // filter in here. 
+                    sensor.Value = value;
+                    sensor.ReadSensor_LoopTime = timestamp.Subtract(sensor.TimeStamp).TotalMilliseconds;
                     sensor.TimeStamp = timestamp;
 
                     HandleSaltLeakage(sensor);

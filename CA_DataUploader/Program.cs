@@ -26,9 +26,10 @@ namespace CA_DataUploader
                     serial.McuBoards.Where(x => !x.productType.Contains("Temperature")).ToList().ForEach(x => x.Close());
 
                     var email = IOconfSetup.UpdateIOconf(serial);
+                    var filters = new FilterUtil();
 
                     using (var cmd = new CommandHandler(serial))
-                    using (var usb = new ThermocoupleBox(cmd, new TimeSpan(0, 0, 1)))
+                    using (var usb = new ThermocoupleBox(cmd))
                     using (var cloud = new ServerUploader(GetVectorDescription(usb), cmd))
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
@@ -40,7 +41,7 @@ namespace CA_DataUploader
                             if (allSensors.Any())
                             {
                                 var list = allSensors.Select(x => x.Value).ToList();
-                                list.AddRange(usb.GetFrequencyAndFilterCount());
+                                list = filters.FilterAndMath(list);
                                 cloud.SendVector(list, allSensors.First().TimeStamp);
                                 Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
                             }

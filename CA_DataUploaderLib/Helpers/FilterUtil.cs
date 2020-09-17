@@ -8,14 +8,11 @@ namespace CA_DataUploaderLib.Helpers
     public class FilterUtil
     {
         protected List<IOconfInput> _config;
-        protected double _filterLength;
-        public FilterUtil(double filterLength)  // in seconds
+        public FilterUtil()
         {
             _config = IOconfFile.GetFilters().Cast<IOconfInput>().IsInitialized().ToList();
             if (!_config.Any())
                 return;
-
-            _filterLength = filterLength;
 
         }
 

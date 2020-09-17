@@ -25,7 +25,7 @@ namespace CA_AverageTemperature
             if (dataLoggers.Any())
             {
                 timer1.Enabled = true;
-                _hub = new ThermocoupleBox(null, new TimeSpan(0, 0, 1));
+                _hub = new ThermocoupleBox(null);
             }
             else
             {
@@ -59,7 +59,7 @@ namespace CA_AverageTemperature
 
         private List<JackRectangle> Draw4Boxes(Graphics g, int width, int height)
         {
-            var list = _hub.GetAllDatapoints().OrderBy(x => x.PortNumber).Select(x => new JackRectangle(x, width, height)).ToList();
+            var list = _hub.GetAllDatapoints().OrderBy(x => x.Input.PortNumber).Select(x => new JackRectangle(x, width, height, "1x10", 1)).ToList();
             g.FillRectangle(Brushes.LightGray, 0, 0, width, height);
             foreach(var jack in list)
             {
@@ -79,12 +79,12 @@ namespace CA_AverageTemperature
                 if (jack.TitlePos.X > 0)
                 {
                     g.DrawString("Internal temperature", _fontSmall, Brushes.Black, jack.TitlePos, _format);
-                    g.DrawString("Serial: " + jack.Sensor.SerialNumber, _fontSmall, Brushes.Black, jack.SerialPos, _format);
+                    g.DrawString("Serial: " + jack.Sensor.Input.Map.Board.serialNumber, _fontSmall, Brushes.Black, jack.SerialPos, _format);
                 }
             }
 
             var pos = new Point(width / 2, height - 10);
-            g.DrawString("Frequency: " + list.First().Sensor.GetFrequency().ToString("N1") + " Hz", _fontSmall, Brushes.Black, pos, _format);
+            g.DrawString("Frequency: " + "unknown" + " Hz", _fontSmall, Brushes.Black, pos, _format);
 
             return list;
         }
