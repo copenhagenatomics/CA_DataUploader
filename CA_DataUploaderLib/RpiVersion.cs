@@ -41,7 +41,7 @@ namespace CA_DataUploaderLib
             sb.AppendLine("CPU            : " + GetCPU());
             sb.AppendLine("Core count     : " + GetNumberOfCores().ToString());
             sb.AppendLine("Serial no      : " + GetSerialNumber());
-            sb.AppendLine("WiFi SSID      : " + GetWiFi_SSID());
+            sb.AppendLine("WiFi     " + GetWiFi_SSID());
             sb.AppendLine();
 
             if (i2cConfig != null)
@@ -119,7 +119,8 @@ namespace CA_DataUploaderLib
             if (IsWindows())
                 return "PC";
 
-            if(_OS.Platform == PlatformID.Unix)
+            // https://elinux.org/RPi_HardwareHistory
+            if (_OS.Platform == PlatformID.Unix)
                 return ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}' | sed 's/^1000//'").Trim();
 
             return "unknown";

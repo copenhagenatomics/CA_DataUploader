@@ -16,5 +16,10 @@ namespace CA_DataUploaderLib.Extensions
         {
             return theObject.Where(x => x.Map.Board != null);
         }
+
+        public static double TriangleFilter(this IEnumerable<double> list)
+        {
+            return list.First();  // still need to implement. 
+        }
     }
 }

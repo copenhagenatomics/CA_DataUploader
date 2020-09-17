@@ -35,7 +35,7 @@ namespace CA_DataUploaderLib
                 var maxSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.IsMaxTemperatureSensor)?.TypeK.Name;
                 var ovenSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && !x.IsMaxTemperatureSensor)?.TypeK.Name;
                 int area = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.OvenArea > 0)?.OvenArea??-1;
-                _heaters.Add(new HeaterElement(area, heater, sensors.Where(x => x.Name == maxSensor), sensors.Where(x => x.Name == ovenSensor)));
+                _heaters.Add(new HeaterElement(area, heater, sensors.Where(x => x.Input.Name == maxSensor), sensors.Where(x => x.Input.Name == ovenSensor)));
             }
 
             if (!_heaters.Any())
@@ -181,7 +181,6 @@ namespace CA_DataUploaderLib
 
                         if (DateTime.UtcNow.Subtract(heater.Current.TimeStamp).TotalMilliseconds > 2000)
                         {
-                            heater.Current.ReadSensor_LoopTime = 0;
                             heater._ioconf.Map.Board.SafeClose();
                             failCount++;
                         }
@@ -226,13 +225,13 @@ namespace CA_DataUploaderLib
                     heater.Current.Value = values[heater._ioconf.PortNumber - 1];
 
                     // this is a hot fix to make sure heaters are on/off. 
-                    if (heater.Current.TimeoutValue == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
+                    if (heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOn(heater);
                         CALog.LogData(LogID.A, $"on.={heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
 
-                    if (heater.Current.TimeoutValue > 0 && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
+                    if (!heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOff(heater);
                         CALog.LogData(LogID.A, $"off.={heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
@@ -286,20 +285,9 @@ namespace CA_DataUploaderLib
             {
                 list.Add(_offTemperature);
                 list.Add(_lastTemperature);
-                list.Add(_heaters.Max(x => x.Current.GetFrequency()));
             }
 
             return list;
-        }
-
-        public IEnumerable<double> GetPower()
-        {
-            if(_logLevel == CALogLevel.Debug)
-            {
-                return _heaters.SelectMany(x => new double[] { x.Current.TimeoutValue, x.IsOn ? 1.0 : 0.0, x.Current.ReadSensor_LoopTime } );
-            }
-
-            return _heaters.SelectMany(x => new double[] { x.Current.TimeoutValue, x.IsOn ? 1.0 : 0.0 } );
         }
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()

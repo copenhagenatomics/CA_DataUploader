@@ -1,4 +1,4 @@
-﻿using CA_DataUploaderLib;
+﻿using CA_DataUploaderLib.Helpers;
 using System.Drawing;
 
 
@@ -6,13 +6,13 @@ namespace CA_AverageTemperature
 {
     public class JackRectangle
     {
-        public SensorSample Sensor;
+        public FilterSample Sensor;
         public Rectangle Rect;
         public Point TextPos;
         public Point TitlePos;
         public Point SerialPos;
 
-        public JackRectangle(SensorSample sensor, double colWidth, double lineHeight)
+        public JackRectangle(FilterSample sensor, double colWidth, double lineHeight)
         {
             double height = lineHeight / 16.0;
             double width = sensor.NumberOfPorts == "" ? colWidth / 10.5 : colWidth / 13;

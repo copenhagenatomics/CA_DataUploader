@@ -28,7 +28,7 @@ namespace CA_DataUploaderLib
             _area = area;
             _heaterSensors = heaterSensors.ToList();
             _ovenSensors = ovenSensors.ToList();
-            Current = new SensorSample(heater.AsConfInput(), new TimeSpan(0, 0, 0, 0, 800), 0);
+            Current = new SensorSample(heater.AsConfInput());
         }
 
         public void SetTemperature(int value)

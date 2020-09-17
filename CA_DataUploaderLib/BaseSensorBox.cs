@@ -17,26 +17,24 @@ namespace CA_DataUploaderLib
 
         protected CALogLevel _logLevel;
         protected CommandHandler _cmd;
-        protected Dictionary<IOconfInput, SensorSample> _values = new Dictionary<IOconfInput, SensorSample>();
-
-        protected List<IOconfInput> _config;
+        protected List<SensorSample> _values = new List<SensorSample>();
         protected List<MCUBoard> _boards = new List<MCUBoard>();
 
         public BaseSensorBox() { }
 
         public SensorSample GetValue(string sensorKey)
         {
-            if(!_values.Any(x => (x.Key.BoxName + x.Key.PortNumber.ToString()) == sensorKey))
+            if(!_values.Any(x => (x.Input.BoxName + x.Input.PortNumber.ToString()) == sensorKey))
                 throw new Exception(sensorKey + " not found in _values, count: " + _values.Count());
-            return _values.Single(x => (x.Key.BoxName + x.Key.PortNumber.ToString()) == sensorKey).Value;
+            return _values.Single(x => (x.Input.BoxName + x.Input.PortNumber.ToString()) == sensorKey);
         }
 
         public SensorSample GetValueByTitle(string title)
         {
-            if (!_config.Any(x => x.Name == title))
-                throw new Exception(title + " not found in _config. Known names: " + string.Join(", ", _config.Select(x => x.Name)));
+            if (!_values.Any(x => x.Input.Name == title))
+                throw new Exception(title + " not found in _config. Known names: " + string.Join(", ", _values.Select(x => x.Input.Name)));
 
-            var temp = _values.Values.SingleOrDefault(x => x.Name == title);
+            var temp = _values.SingleOrDefault(x => x.Input.Name == title);
             if (temp == null)
                 throw new Exception(title + " not found in _values, count: " + _values.Count());
 
@@ -45,32 +43,16 @@ namespace CA_DataUploaderLib
 
         public IEnumerable<SensorSample> GetAllDatapoints()
         {
-            return _values.Values;  
-        }
-
-        public IEnumerable<double> GetFrequencyAndFilterCount()
-        {
-            if (_logLevel != CALogLevel.Debug)
-                return new List<double>();  // empty. 
-
-            var list = new List<double>();
-            foreach(var board in _values.Where(x => !x.Key.Skip).Select(x => x.Value).GroupBy(x => x.Input.BoxName).OrderBy(x => x.Key))
-            {
-                list.Add(board.Average(x => x.GetFrequency()));
-                list.Add(board.Min(x => x.FilterCount()));
-                list.Add(board.Max(x => x.ReadSensor_LoopTime));
-            }
-
-            return list;
+            return _values;  
         }
 
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
-            var list = _config.Select(x => new VectorDescriptionItem("double", x.Name, DataTypeEnum.Input)).ToList();
+            var list = _values.Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input)).ToList();
             // list.AddRange(_config.Select(x => new VectorDescriptionItem("double", x.Name + "_latest", DataTypeEnum.Input)).ToList());
             if (_logLevel == CALogLevel.Debug)
             {
-                foreach (var boxName in _config.Where(x => !x.Skip).Select(x => x.Map.BoxName).Distinct().OrderBy(x => x))
+                foreach (var boxName in _values.Where(x => !x.Input.Skip).Select(x => x.Input.Map.BoxName).Distinct().OrderBy(x => x))
                 {
                     list.Add(new VectorDescriptionItem("double", boxName + "_AvgSampleFrequency", DataTypeEnum.State));
                     list.Add(new VectorDescriptionItem("double", boxName + "_MinFilterSampleCount", DataTypeEnum.State));
@@ -80,46 +62,6 @@ namespace CA_DataUploaderLib
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {Title}");
             return list;
-        }
-
-        private TimeSpan _filterZero = new TimeSpan(0, 0, 0);
-
-        protected bool ShowQueue(List<string> args)
-        {
-            if(_values.Count == 0)
-                return false;
-
-            var sb = new StringBuilder($"NAME      {GetAvgLoopTime().ToString("N0").PadLeft(4)}           ");
-            if (_values.First().Value.FilterLength == _filterZero)
-            {
-                sb.AppendLine();
-                foreach (var t in _values)
-                {
-                    sb.AppendLine($"{t.Value.Name.PadRight(22)}={t.Value.Value.ToString("N2").PadLeft(9)}");
-                }
-            }
-            else
-            {
-                sb.Append("AVERAGE       1");
-                for (int i = 2; i <= _values.First().Value.FilterCount(); i++)
-                    sb.Append(i.ToString().PadLeft(10));
-
-                sb.Append("     FREQUENCY");
-                sb.AppendLine();
-                foreach (var t in _values)
-                {
-                    sb.Append($"{t.Value.Name.PadRight(22)}={t.Value.Value.ToString("N2").PadLeft(9)}  {t.Value.FilterToString()}   {t.Value.GetFrequency().ToString("N1")}");
-                    sb.AppendLine();
-                }
-            }            
-
-            CALog.LogInfoAndConsoleLn(LogID.A, sb.ToString());
-            return true;
-        }
-
-        private double GetAvgLoopTime()
-        {
-            return _values.Values.Average(x => x.ReadSensor_LoopTime);
         }
 
         protected string _matchPattern = @"-?\d{1,10}(,\d{3})*(\.\d+)?";  // this will match any integer or decimal number. (but not scientific notation)
@@ -205,12 +147,11 @@ namespace CA_DataUploaderLib
         {
             List<string> failPorts = new List<string>();
             int maxDelay = 2000;
-            foreach (var item in _values.Values)
+            foreach (var item in _values)
             {
                 maxDelay = (item.Input.Name.ToLower().Contains("luminox")) ? 10000 : 2000;
                 if (DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds > maxDelay)
                 {
-                    item.ReadSensor_LoopTime = 0;
                     item.Input.Map.Board.SafeClose();
                     _failCount++;
                     failPorts.Add(item.Input.Name);
@@ -237,12 +178,11 @@ namespace CA_DataUploaderLib
             var timestamp = DateTime.UtcNow;
             foreach (var value in numbers)
             {
-                var sensor = _config.SingleOrDefault(x => x.BoxName == board.BoxName && x.PortNumber == i);
+                var sensor = _values.SingleOrDefault(x => x.Input.BoxName == board.BoxName && x.Input.PortNumber == i);
                 if (sensor != null)
                 {
-                    _values[sensor].Value = value; // filter in here. 
-                    _values[sensor].TimeStamp = timestamp;
-                    _values[sensor].NumberOfPorts = GetNumberOfPorts(numbers); // we do not know this until here. 
+                    sensor.Value = value; // filter in here. 
+                    sensor.TimeStamp = timestamp;
 
                     HandleSaltLeakage(sensor);
                 }
@@ -251,38 +191,27 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private string GetNumberOfPorts(IEnumerable<double> numbers)
-        {
-            switch (numbers.Count())
-            {
-                case 1: return "1x1";
-                case 11: return "1x10";
-                case 17: return "2x8";
-                default: return "unknown";
-            }
-        }
-
-        private void HandleSaltLeakage(IOconfInput sensor)
+        private void HandleSaltLeakage(SensorSample sensor)
         {
             if (sensor.GetType() == typeof(IOconfSaltLeakage))
             {
-                if (_values[sensor].Value < 3000 && _values[sensor].Value > 0)  // Salt leakage algorithm. 
+                if (sensor.Value < 3000 && sensor.Value > 0)  // Salt leakage algorithm. 
                 {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Salt leak detected from {sensor.Name}={_values[sensor].Value} {DateTime.Now.ToString("dd-MMM-yyyy HH:mm")}");
-                    _values[sensor].Value = 1d;
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Salt leak detected from {sensor.Input.Name}={sensor.Value} {DateTime.Now.ToString("dd-MMM-yyyy HH:mm")}");
+                    sensor.Value = 1d;
                     if (_cmd != null)
                         _cmd.Execute("escape"); // make the whole system shut down. 
                 }
                 else
                 {
-                    _values[sensor].Value = 0d; // no leakage
+                    sensor.Value = 0d; // no leakage
                 }
             }
         }
 
-        protected int GetHubID(IOconfInput sensor)
+        protected int GetHubID(SensorSample sensor)
         {
-            return _config.GroupBy(x => x.BoxName).Select(x => x.Key).ToList().IndexOf(sensor.BoxName);
+            return _values.GroupBy(x => x.Input.BoxName).Select(x => x.Key).ToList().IndexOf(sensor.Input.BoxName);
         }
 
         public void Dispose()
