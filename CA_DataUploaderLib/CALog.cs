@@ -62,6 +62,16 @@ namespace CA_DataUploaderLib
             WriteToFile(logID, error + Environment.NewLine);
         }
 
+        public static void LogErrorAndConsoleLn(LogID logID, string error, Exception ex)
+        {
+            var temp = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.Red;
+            error = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + error;
+            Console.WriteLine(error);
+            Console.ForegroundColor = temp;
+            WriteToFile(logID, error + Environment.NewLine + ex.ToString() + Environment.NewLine);
+        }
+
         private static void WriteToFile(LogID logID, string msg)
         {
             try

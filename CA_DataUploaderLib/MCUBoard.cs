@@ -140,10 +140,10 @@ namespace CA_DataUploaderLib
                         return BytesToRead > 0;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 var frame = new StackTrace().GetFrame(1);
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while checking serial port read buffer: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}{Environment.NewLine}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while checking serial port read buffer: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}{Environment.NewLine}", ex);
                 if (_safeLimit-- <= 0) throw;
             }
 
@@ -195,9 +195,9 @@ namespace CA_DataUploaderLib
                         return ReadExisting();
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to ReadExisting() from serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to ReadExisting() from serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}", ex);
                 if (_safeLimit-- <= 0) throw;
             }
 
