@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using System.Collections.Generic;
 using CA_DataUploaderLib.IOconf;
+using System;
 
 namespace CA_DataUploaderLib.Extensions
 {
@@ -17,9 +18,10 @@ namespace CA_DataUploaderLib.Extensions
             return theObject.Where(x => x.Map.Board != null);
         }
 
-        public static double TriangleFilter(this IEnumerable<double> list)
+        public static double TriangleFilter(this IEnumerable<Tuple<double, DateTime>> list, double filterLength)  // filterLength in seconds
         {
-            return list.First();  // still need to implement. 
+
+            return 0;
         }
     }
 }

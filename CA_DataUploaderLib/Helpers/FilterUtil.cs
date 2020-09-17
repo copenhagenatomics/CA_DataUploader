@@ -7,20 +7,21 @@ namespace CA_DataUploaderLib.Helpers
 {
     public class FilterUtil
     {
-        protected List<IOconfInput> _config;
+        protected List<FilterSample> _values;
         public FilterUtil()
         {
-            _config = IOconfFile.GetFilters().Cast<IOconfInput>().IsInitialized().ToList();
-            if (!_config.Any())
+            _values = IOconfFile.GetFilters().Select(x => new FilterSample(x)).ToList();
+            if (!_values.Any())
                 return;
 
         }
 
         public List<double> FilterAndMath(List<double> vector)
         {
-            // for each of the value which need to be filtered send it through the filter
-            // Call FilterSample.Value
-            return vector;
+            // foreach(var filter in _values)
+
+
+            return new List<double>();
         }
     }
 }

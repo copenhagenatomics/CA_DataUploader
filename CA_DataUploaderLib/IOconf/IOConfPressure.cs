@@ -6,6 +6,8 @@ namespace CA_DataUploaderLib.IOconf
     { 
         public IOConfPressure(string row, int lineNum) : base(row, lineNum, "Pressure")
         {
+            format = "Pressure;Name;BoxName;[port number];[skip]";
+
             var list = ToList();
             Name = list[1];
             BoxName = list[2];
@@ -18,6 +20,8 @@ namespace CA_DataUploaderLib.IOconf
             {
                 if (!int.TryParse(list[3], out PortNumber)) throw new Exception("IOConfPressure: wrong port number: " + row);
             }
+
+
         }
     }
 }

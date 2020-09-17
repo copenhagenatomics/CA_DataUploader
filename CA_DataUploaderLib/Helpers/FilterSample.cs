@@ -17,29 +17,19 @@ namespace CA_DataUploaderLib.Helpers
 
     public class FilterSample
     {
-        public FilterSample(IOconfInput input, TimeSpan filterLength, FilterType filterType, int hubID)
+        public FilterSample(IOconfFilter filter)
         {
-            Input = input;
-            FilterLength = filterLength;
-            _filterType = filterType;
-            HubID = hubID;
+            Filter = filter;
         }
 
-        public TimeSpan FilterLength { get; private set; }
-        public FilterType _filterType { get; private set; }
-        public int HubID { get; private set; }  // used by AverageTemperature to draw GUI
-        public IOconfInput Input { get; private set; }
+        public IOconfFilter Filter { get; private set; }
 
         private Queue<Tuple<double, DateTime>> _filterQueue = new Queue<Tuple<double, DateTime>>();
 
-        public string SerialNumber { get { return Input.Map.Board.serialNumber; } } // used by AverageTemperature to draw GUI
         public bool MaxSlope;
-        public string NumberOfPorts;
-        public DateTime TimeStamp = DateTime.UtcNow;
-        public double ReadSensor_LoopTime;
 
-        private double _value;
-        public double Value
+        private SensorSample _value;
+        public SensorSample Value
         {
             get { return _value; }
             set { SetValue(value); }
@@ -48,29 +38,23 @@ namespace CA_DataUploaderLib.Helpers
         public double TimeoutValue
         {
             // if last sample is older than filter length, then set timeout. 
-            get { return (TimeStamp < DateTime.UtcNow.Subtract(FilterLength)) ? 10009 : _value; }   // 10009 means timedout
+            get { return (_value.TimeStamp < DateTime.UtcNow.AddSeconds(-Filter.filterLength)) ? 10009 : _value.Value; }   // 10009 means timedout
         }
-
-        
-        public string Name { get { return Input.Name; } }
-        public int PortNumber { get { return Input.PortNumber; } }
 
         public override string ToString()
         {
-            if (Value > 9000)
+            if (Value.Value > 9000)
                 return "NC";
 
             return $"{Value}";
         }
 
-        private void SetValue(double value)
+        private void SetValue(SensorSample value)
         {
-            ReadSensor_LoopTime = DateTime.UtcNow.Subtract(TimeStamp).TotalMilliseconds;
-            TimeStamp = DateTime.UtcNow;
             lock (_filterQueue)
             {
-                var removeBefore = DateTime.UtcNow.Subtract(FilterLength);
-                _filterQueue.Enqueue(new Tuple<double, DateTime>(value, DateTime.UtcNow));
+                var removeBefore = DateTime.UtcNow.AddSeconds(-Filter.filterLength);
+                _filterQueue.Enqueue(new Tuple<double, DateTime>(value.Value, value.TimeStamp));
                 while (_filterQueue.First().Item2 < removeBefore)
                 {
                     _filterQueue.Dequeue();
@@ -79,19 +63,20 @@ namespace CA_DataUploaderLib.Helpers
                 var valid = _filterQueue.Where(x => x.Item1 < 10000 && x.Item1 != 0);
                 if (valid.Any())
                 {
-                    switch (_filterType)
+                    _value = new SensorSample(Filter.SourceNames.First()) { Value = value.Value, TimeStamp = value.TimeStamp };
+                    switch (Filter.filterType)
                     {
                         case FilterType.Average:
-                            _value = valid.Average(x => x.Item1);
+                            _value.Value = valid.Average(x => x.Item1);
                             return;
                         case FilterType.Max:
-                            _value = valid.Max(x => x.Item1);
+                            _value.Value = valid.Max(x => x.Item1);
                             return;
                         case FilterType.Min:
-                            _value = valid.Min(x => x.Item1);
+                            _value.Value = valid.Min(x => x.Item1);
                             return;
                         case FilterType.Triangle:
-                            _value = valid.Select(x => x.Item1).TriangleFilter();
+                            _value.Value = valid.TriangleFilter(Filter.filterLength);
                             return;
                     }
                 }
@@ -130,7 +115,7 @@ namespace CA_DataUploaderLib.Helpers
 
         public bool HasValidTemperature()
         {
-            return Value != 0 && TimeoutValue < 10000;
+            return Value.Value != 0 && TimeoutValue < 10000;
         }
     }
 }
