@@ -145,7 +145,7 @@ namespace CA_DataUploaderLib
                             exBoard = board; // only used in exception
                             values.Clear();
                             numbers.Clear();
-                            row = board.SafeReadLine();
+                            row = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
 
                             if (Regex.IsMatch(row.Trim(), @"^(-|\d+)"))  // check that row starts with digit. 
                             {

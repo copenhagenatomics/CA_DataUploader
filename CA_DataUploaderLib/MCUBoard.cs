@@ -31,7 +31,7 @@ namespace CA_DataUploaderLib
         public const string softwareCompileDateHeader = "Software Compile Date: ";
 
         public string pcbVersion = null;
-        public const string pcbVersionHeader = "PCB Version: ";
+        public const string pcbVersionHeader = "PCB version: ";
         public const string boardVersionHeader = "Board Version: ";
 
         public string mcuFamily = null;
@@ -93,9 +93,12 @@ namespace CA_DataUploaderLib
 
         public bool IsEmpty()
         {
+            // pcbVersion is included in this list because at the time of writting is the last value in the readEEPROM header, 
+            // which avoids the rest of the header being treated as "values".
             return serialNumber.IsNullOrEmpty() ||
                     productType.IsNullOrEmpty() ||
-                    softwareVersion.IsNullOrEmpty();
+                    softwareVersion.IsNullOrEmpty() ||
+                    pcbVersion.IsNullOrEmpty();  
         }
         
         public string SafeReadLine()
@@ -114,10 +117,10 @@ namespace CA_DataUploaderLib
                         return ReadLine();
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 var frame = new StackTrace().GetFrame(1);
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber} in {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}() at line {frame.GetFileLineNumber()}{Environment.NewLine}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber} in {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}() at line {frame.GetFileLineNumber()}{Environment.NewLine}", ex);
                 if (_safeLimit-- <= 0) throw;
             }
 
