@@ -213,7 +213,7 @@ namespace CA_DataUploaderLib
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} stale value detected for port: {item.Input.Name}{Environment.NewLine}{msSinceLastRead} milliseconds since last read - closing serial port to restablish connection");
                     item.ReadSensor_LoopTime = 0;
-                    item.Input.Map.Board.SafeClose();
+                    item.Input.Map.Board.SafeReopen();
                     _failCount++;
                     failPorts.Add(item.Input.Name);
                 }

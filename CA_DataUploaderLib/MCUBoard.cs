@@ -6,6 +6,7 @@ using System.Diagnostics;
 using CA_DataUploaderLib.IOconf;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace CA_DataUploaderLib
 {
@@ -36,7 +37,7 @@ namespace CA_DataUploaderLib
 
         public string mcuFamily = null;
         public const string mcuFamilyHeader = "MCU Family: ";
-
+        private readonly Regex _startsWithNumberRegex = new Regex(@"^(-|\d+)");
         public bool UnableToRead = true;
 
         public DateTime PortOpenTimeStamp;
@@ -229,6 +230,54 @@ namespace CA_DataUploaderLib
         public string ToStringSimple(string seperator)
         {
             return $"{PortName}{seperator}{serialNumber}{seperator}{productType}";
+        }
+
+        /// <summary>
+        /// Reopens the connection skipping the header.
+        /// </summary>
+        /// <param name="headerLines">The amount of header lines expected.</param>
+        /// <returns>The skipped header lines</returns>
+        /// <remarks>
+        /// This method assumes only value lines start with numbers, 
+        /// so it considers such a line to be past the header.
+        /// 
+        /// A log entry to <see cref="LogID.B"/> is added with the skipped header 
+        /// and the bytes in the receive buffer 500ms after the port was opened again.
+        /// </remarks>
+        public void SafeReopen(int expectedHeaderLines = 8)
+        {
+            var lines = new List<string>();
+            var bytesToRead500ms = 0;
+            try
+            {
+                lock (this)
+                {
+                    if (IsOpen)
+                        Close();
+
+                    Thread.Sleep(200);
+                    Open();
+
+                    Thread.Sleep(500);
+                    bytesToRead500ms = BytesToRead;
+                    for (int i = 0; i < expectedHeaderLines; i++)
+                    {
+                        var line = ReadLine().Trim();
+                        lines.Add(line);
+                        if (_startsWithNumberRegex.IsMatch(line))
+                        { // we are past the header.
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                CALog.LogData(LogID.B, $"Failure reopening port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header {lines}");
+                throw;
+            }
+
+            CALog.LogData(LogID.B, $"Reopened port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header {lines}");
         }
 
         private void ReadSerialNumber()
