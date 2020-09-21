@@ -255,7 +255,7 @@ namespace CA_DataUploaderLib
                     if (IsOpen)
                         Close();
 
-                    Thread.Sleep(200);
+                    Thread.Sleep(500);
                     Open();
 
                     Thread.Sleep(500);
