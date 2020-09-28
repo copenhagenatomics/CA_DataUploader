@@ -145,7 +145,7 @@ namespace CA_DataUploaderLib
                             exBoard = board; // only used in exception
                             values.Clear();
                             numbers.Clear();
-                            row = board.SafeReadLine();
+                            row = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
 
                             if (Regex.IsMatch(row.Trim(), @"^(-|\d+)"))  // check that row starts with digit. 
                             {
@@ -208,8 +208,10 @@ namespace CA_DataUploaderLib
             foreach (var item in _values.Values)
             {
                 maxDelay = (item.Input.Name.ToLower().Contains("luminox")) ? 10000 : 2000;
-                if (DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds > maxDelay)
+                var msSinceLastRead = DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds;
+                if (msSinceLastRead > maxDelay)
                 {
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} stale value detected for port: {item.Input.Name}{Environment.NewLine}{msSinceLastRead} milliseconds since last read - closing serial port to restablish connection");
                     item.ReadSensor_LoopTime = 0;
                     item.Input.Map.Board.SafeClose();
                     _failCount++;
