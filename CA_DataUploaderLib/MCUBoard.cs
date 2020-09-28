@@ -271,20 +271,23 @@ namespace CA_DataUploaderLib
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                CALog.LogData(LogID.B, $"Failure reopening port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header {lines}");
+                CALog.LogErrorAndConsoleLn(
+                    LogID.B, 
+                    $"Failure reopening port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
+                    ex);
                 throw;
             }
 
-            CALog.LogData(LogID.B, $"Reopened port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header {lines}");
+            CALog.LogData(LogID.B, $"Reopened port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§", lines)}'");
         }
 
         private void ReadSerialNumber()
         {
             // CALog.LogColor(LogID.A, ConsoleColor.Green, Environment.NewLine + "Sending Serial request");
             WriteLine("Serial");
-            var stop = DateTime.Now.AddSeconds(2);
+            var stop = DateTime.Now.AddSeconds(5);
             while (IsEmpty() && DateTime.Now < stop)
             {
 
