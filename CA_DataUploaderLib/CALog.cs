@@ -43,6 +43,12 @@ namespace CA_DataUploaderLib
             WriteToFile(logID, msg + Environment.NewLine);
         }
 
+        public static void LogInfoAndConsoleLn(LogID logID, string msg, Exception ex)
+        {
+            Console.WriteLine(msg);
+            WriteToFile(logID, msg + Environment.NewLine + ex.ToString() + Environment.NewLine);
+        }
+
         public static void LogColor(LogID logID, ConsoleColor color, string msg)
         {
             var temp = Console.ForegroundColor;

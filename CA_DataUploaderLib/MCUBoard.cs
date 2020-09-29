@@ -253,12 +253,17 @@ namespace CA_DataUploaderLib
                 lock (this)
                 {
                     if (IsOpen)
+                    {
+                        CALog.LogData(LogID.B, $"(Reopen) Closing port {PortName} {productType} {serialNumber}");
                         Close();
-
-                    Thread.Sleep(500);
+                        Thread.Sleep(500);
+                    }
+                    
+                    CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {productType} {serialNumber}");
                     Open();
-
                     Thread.Sleep(500);
+
+                    CALog.LogData(LogID.B, $"(Reopen) skipping {expectedHeaderLines} header lines for port {PortName} {productType} {serialNumber} ");
                     bytesToRead500ms = BytesToRead;
                     for (int i = 0; i < expectedHeaderLines; i++)
                     {
