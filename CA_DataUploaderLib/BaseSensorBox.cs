@@ -140,8 +140,11 @@ namespace CA_DataUploaderLib
                 {
                     foreach (var board in _boards)
                     {
+                        var hadDataAvailable = false;
+                        // we read all lines available (boards typically write a line every 100 ms)
                         while (board.SafeHasDataInReadBuffer())
                         {
+                            hadDataAvailable = true;
                             exBoard = board; // only used in exception
                             values.Clear();
                             numbers.Clear();
@@ -153,6 +156,19 @@ namespace CA_DataUploaderLib
                                 numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
                                 ProcessLine(numbers, board);
                             }
+                            else
+                            {
+                                // these should be mostly responses to commands on headers on reconnects,
+                                // but if it becomes too noisy we might need to tune it down.
+                                CALog.LogErrorAndConsoleLn(LogID.B, "Unhandled board response " + board.ToString() + " line: " + row);
+                            }
+                        }
+                        
+                        if (!hadDataAvailable)
+                        {
+                            // we expect data on every cycle (each 100 ms), as the boards normally write a line every 100 ms,
+                            // if this becomes too noisy we might need to tune it down.
+                            CALog.LogData(LogID.B, "No data available for " + board.ToString());
                         }
                     }
 
@@ -172,7 +188,7 @@ namespace CA_DataUploaderLib
                         CALog.LogException(LogID.A, ex);
                     }
 
-                    CALog.LogInfoAndConsoleLn(LogID.A, ".");
+                    CALog.LogInfoAndConsoleLn(LogID.A, ".", ex);
                     if(exBoard != null)
                         badPorts.Add($"{exBoard.PortName}:{exBoard.serialNumber} = '{row}'");
 
