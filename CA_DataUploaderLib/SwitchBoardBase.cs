@@ -74,7 +74,6 @@ namespace CA_DataUploaderLib
             catch (Exception ex)
             {
                 CALog.LogException(LogID.B, ex);
-                // box.SafeClose();  // I don't know if this will solve the problem. 
             }
             
             return new List<double>();  // empty list

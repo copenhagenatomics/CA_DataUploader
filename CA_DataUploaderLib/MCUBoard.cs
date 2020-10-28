@@ -13,6 +13,7 @@ namespace CA_DataUploaderLib
     public class MCUBoard : SerialPort
     {
         private int _safeLimit = 100;
+        private int _reconnectLimit = 100;
 
         public string BoxName = null;
         public const string BoxNameHeader = "IOconf.Map BoxName: ";
@@ -44,6 +45,7 @@ namespace CA_DataUploaderLib
 
         private Queue<string> _readBuffer = new Queue<string>();
         private string _overshoot = string.Empty;
+        private DateTime _lastReopenTime;
 
         public MCUBoard(string name, int baudrate) // : base(name, baudrate, 0, 8, 1, 0)
         {
@@ -236,15 +238,17 @@ namespace CA_DataUploaderLib
         /// Reopens the connection skipping the header.
         /// </summary>
         /// <param name="headerLines">The amount of header lines expected.</param>
-        /// <returns>The skipped header lines</returns>
+        /// <returns><c>false</c> if the reconnect limit has been exceeded.</returns>
         /// <remarks>
         /// This method assumes only value lines start with numbers, 
         /// so it considers such a line to be past the header.
         /// 
         /// A log entry to <see cref="LogID.B"/> is added with the skipped header 
         /// and the bytes in the receive buffer 500ms after the port was opened again.
+        /// 
+        /// No exceptions are produced if there is a failure to reopen, although information about is added to log B.
         /// </remarks>
-        public void SafeReopen(int expectedHeaderLines = 8)
+        public bool SafeReopen(int expectedHeaderLines = 8)
         {
             var lines = new List<string>();
             var bytesToRead500ms = 0;
@@ -252,6 +256,17 @@ namespace CA_DataUploaderLib
             {
                 lock (this)
                 {
+                    TimeSpan timeSinceLastReopen = DateTime.Now.Subtract(_lastReopenTime);
+                    if (timeSinceLastReopen.TotalSeconds < 4)
+                    {
+                        CALog.LogData(LogID.B, $"(Reopen) skipped {PortName} {productType} {serialNumber} - time since last reopen {timeSinceLastReopen}");
+                        return true;
+                    }
+
+                    if (_reconnectLimit-- < 0)
+                        return false;
+
+                    _lastReopenTime = DateTime.Now;
                     if (IsOpen)
                     {
                         CALog.LogData(LogID.B, $"(Reopen) Closing port {PortName} {productType} {serialNumber}");
@@ -282,10 +297,10 @@ namespace CA_DataUploaderLib
                     LogID.B, 
                     $"Failure reopening port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
                     ex);
-                throw;
             }
 
             CALog.LogData(LogID.B, $"Reopened port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§", lines)}'");
+            return true;
         }
 
         private void ReadSerialNumber()

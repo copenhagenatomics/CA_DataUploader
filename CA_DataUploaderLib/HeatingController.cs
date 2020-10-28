@@ -143,7 +143,6 @@ namespace CA_DataUploaderLib
 
         private void LoopForever()
         {
-            int failCount = 0;
             _startTime = DateTime.UtcNow;
             _logLevel = IOconfFile.GetOutputLevel();
             var loopStart = DateTime.UtcNow;
@@ -174,6 +173,7 @@ namespace CA_DataUploaderLib
                     }
 
                     // check if any of the boards stopped responding. 
+                    bool reconnectLimitExceeded = false;
                     foreach (var heater in _heaters)
                     {
                         if (heater._ioconf.BoxName == "ArduinoHack")
@@ -182,12 +182,11 @@ namespace CA_DataUploaderLib
                         if (DateTime.UtcNow.Subtract(heater.Current.TimeStamp).TotalMilliseconds > 2000)
                         {
                             heater.Current.ReadSensor_LoopTime = 0;
-                            heater._ioconf.Map.Board.SafeReopen();
-                            failCount++;
+                            reconnectLimitExceeded |= heater._ioconf.Map.Board.SafeReopen();
                         }
                     }
 
-                    if (failCount > 200)
+                    if (reconnectLimitExceeded)
                     {
                         _cmd.Execute("escape");
                         _running = false;
