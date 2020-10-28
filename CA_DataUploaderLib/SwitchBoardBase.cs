@@ -32,7 +32,7 @@ namespace CA_DataUploaderLib
                 {
                     _debugQueue.Enqueue(lines);
 
-                    if (DateTime.UtcNow.Subtract(_lastTimeStamp).TotalMilliseconds > 500)
+                    if (_lastTimeStamp > DateTime.MinValue && DateTime.UtcNow.Subtract(_lastTimeStamp).TotalMilliseconds > 500)
                     {
                         CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{string.Join("§", _debugQueue)}'{Environment.NewLine}");
                         _debugQueue.Clear();
