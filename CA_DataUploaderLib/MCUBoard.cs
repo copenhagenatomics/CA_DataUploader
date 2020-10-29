@@ -284,7 +284,7 @@ namespace CA_DataUploaderLib
                     {
                         var line = ReadLine().Trim();
                         lines.Add(line);
-                        if (_startsWithNumberRegex.IsMatch(line))
+                        if (_startsWithNumberRegex.IsMatch(line) && i > 0) // making sure we skip the first one, as it is something a partial line (perhaps from the last read before the restart, although pi buffer is cleared).
                         { // we are past the header.
                             break;
                         }
