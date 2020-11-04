@@ -293,12 +293,24 @@ namespace CA_DataUploaderLib
 
         public IEnumerable<double> GetPower()
         {
-            if(_logLevel == CALogLevel.Debug)
+            var powerValues = _heaters.Select(x => x.Current.TimeoutValue);
+            var states =_heaters.Select(x => x.IsOn ? 1.0 : 0.0);
+            var values = powerValues.Concat(states);
+            if (_logLevel == CALogLevel.Debug)
             {
-                return _heaters.SelectMany(x => new double[] { x.Current.TimeoutValue, x.IsOn ? 1.0 : 0.0, x.Current.ReadSensor_LoopTime } );
+                IEnumerable<double> loopTimes = _heaters.Select(x => x.Current.ReadSensor_LoopTime);
+                return values.Concat(loopTimes);
             }
 
-            return _heaters.SelectMany(x => new double[] { x.Current.TimeoutValue, x.IsOn ? 1.0 : 0.0 } );
+            return values;
+        }
+
+        /// <summary>
+        /// Gets all the values in the order specified by <see cref="GetVectorDescriptionItems"/>.
+        /// </summary>
+        public IEnumerable<double> GetValues()
+        {
+            return GetPower().Concat(GetStates());
         }
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
