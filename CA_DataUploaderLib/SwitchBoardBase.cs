@@ -1,5 +1,5 @@
-﻿using CA_DataUploaderLib.IOconf;
-using System;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -9,30 +9,36 @@ namespace CA_DataUploaderLib
 {
     public static class SwitchBoardBase
     {
-        private const string _SwitchBoxPattern = "P1=(\\d\\.\\d\\d)A P2=(\\d\\.\\d\\d)A P3=(\\d\\.\\d\\d)A P4=(\\d\\.\\d\\d)A";
-        private static Match _LatestRead = null;
-        private static DateTime _lastTimeStamp = DateTime.MinValue;
-        private static Queue<string> _debugQueue = new Queue<string>();
-        private static CALogLevel _logLevel = CALogLevel.None;
-
+        private static readonly ConcurrentDictionary<MCUBoard, SwitchBoardValues> Values = new ConcurrentDictionary<MCUBoard, SwitchBoardValues>();
         public static List<double> ReadInputFromSwitchBoxes(MCUBoard box)
         {
             if (box == null)
-                return new List<double>(); // empty
+                return new List<double>();
 
-            if (_logLevel == CALogLevel.None)
-                _logLevel = IOconfFile.GetOutputLevel();
+            var values = Values.GetOrAdd(box, b => new SwitchBoardValues(b));
+            lock (values)
+                return values.ReadInputFromSwitchBoxes();
+        }
 
-            string lines = string.Empty;
-            try
+        private class SwitchBoardValues
+        {
+            private const string _SwitchBoxPattern = "P1=(\\d\\.\\d\\d)A P2=(\\d\\.\\d\\d)A P3=(\\d\\.\\d\\d)A P4=(\\d\\.\\d\\d)A";
+            private static readonly Regex _switchBoxCurrentsRegex = new Regex(_SwitchBoxPattern);
+            private readonly MCUBoard box;
+            private Match _lastValidRead = null;
+            private DateTime _lastValidReadTime = DateTime.MinValue;
+            private Queue<string> _debugQueue = new Queue<string>();
+
+            public SwitchBoardValues(MCUBoard box) => this.box = box;
+
+            public List<double> ReadInputFromSwitchBoxes()
             {
-                // try to read some text. 
-                lines = box.SafeReadExisting();
-                lock (_debugQueue)
+                try
                 {
+                    string lines = box.SafeReadExisting();
                     _debugQueue.Enqueue(lines);
 
-                    if (DateTime.UtcNow.Subtract(_lastTimeStamp).TotalMilliseconds > 500)
+                    if (LastReadIsOlderThan(milliseconds: 500))
                     {
                         CALog.LogData(LogID.B, $"ReadInputFromSwitchBoxes: '{string.Join("§", _debugQueue)}'{Environment.NewLine}");
                         _debugQueue.Clear();
@@ -42,26 +48,20 @@ namespace CA_DataUploaderLib
                     {
                         _debugQueue.Dequeue();
                     }
-                }
 
-                // see if it matches the BoxPattern.
-                Match match = Regex.Match(lines, _SwitchBoxPattern);
-
-                lock (_SwitchBoxPattern)
-                {
-                    // if match, then store this value for later unsucessful reads. 
+                    Match match = _switchBoxCurrentsRegex.Match(lines);
                     if (match.Success && match.Groups.Count > 4)
                     {
-                        _LatestRead = match;
-                        _lastTimeStamp = DateTime.UtcNow;
+                        _lastValidRead = match;
+                        _lastValidReadTime = DateTime.UtcNow;
                     }
                     else
                     {
-                        if (_LatestRead == null)
+                        if (_lastValidRead == null)
                             return new List<double>();
 
-                        if (_lastTimeStamp.AddSeconds(2) > DateTime.UtcNow) // if it is less than 2 seconds old, then return last read. 
-                            match = _LatestRead;
+                        if (!LastReadIsOlderThan(milliseconds: 2000))
+                            match = _lastValidRead;
                     }
 
                     if (match.Success && match.Groups.Count > 4)
@@ -70,14 +70,16 @@ namespace CA_DataUploaderLib
                             .Select(x => double.Parse(x.Value, CultureInfo.InvariantCulture)).ToList();
                     }
                 }
+                catch (Exception ex)
+                {
+                    CALog.LogException(LogID.B, ex);
+                }
+
+                return new List<double>();  // empty list
             }
-            catch (Exception ex)
-            {
-                CALog.LogException(LogID.B, ex);
-                // box.SafeClose();  // I don't know if this will solve the problem. 
-            }
-            
-            return new List<double>();  // empty list
+
+            private bool LastReadIsOlderThan(int milliseconds) =>
+                _lastValidReadTime > DateTime.MinValue && DateTime.UtcNow.Subtract(_lastValidReadTime).TotalMilliseconds > milliseconds;
         }
     }
 }
