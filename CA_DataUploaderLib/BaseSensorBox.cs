@@ -7,6 +7,7 @@ using System.Text;
 using CA_DataUploaderLib.IOconf;
 using System.Text.RegularExpressions;
 using Humanizer;
+using System.Diagnostics;
 
 namespace CA_DataUploaderLib
 {
@@ -19,6 +20,7 @@ namespace CA_DataUploaderLib
         protected CommandHandler _cmd;
         protected List<SensorSample> _values = new List<SensorSample>();
         protected List<MCUBoard> _boards = new List<MCUBoard>();
+        protected int expectedHeaderLines = 8;
 
         public BaseSensorBox() { }
 
@@ -45,6 +47,14 @@ namespace CA_DataUploaderLib
         {
             return _values;  
         }
+
+        //public IEnumerable<double> GetValues()
+        //{
+        //    var values = GetAllDatapoints().Select(s => s.Value);
+        //    return _logLevel == CALogLevel.Debug ?
+        //        values.Concat(GetFrequencyAndFilterCount()) :
+        //        values;
+        //}
 
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
@@ -85,7 +95,7 @@ namespace CA_DataUploaderLib
             return _values.Average(x => x.ReadSensor_LoopTime);
         }
 
-        protected string _matchPattern = @"-?\d{1,10}(,\d{3})*(\.\d+)?";  // this will match any integer or decimal number. (but not scientific notation)
+        private static Regex _startsWithDigitRegex = new Regex(@"^\s*(-|\d+)\s*");
 
         protected void LoopForever()
         {
@@ -103,19 +113,47 @@ namespace CA_DataUploaderLib
                 {
                     foreach (var board in _boards)
                     {
-                        while (board.SafeHasDataInReadBuffer())
+                        var hadDataAvailable = false;
+                        var timeInLoop = Stopwatch.StartNew();
+                        // we read all lines available (boards typically write a line every 100 ms)
+                        // we make sure to exit if 2 seconds pass in the loop, to allow failure counting when error data is continuously returned by the board.
+                        // we use time instead of attempts as SafeHasDataInReadBuffer can continuously report there is data when a partial line is returned by a board that stalls,
+                        // which then consistently times out in SafeReadLine, making each loop iteration 2 seconds.
+                        while (board.SafeHasDataInReadBuffer() && timeInLoop.ElapsedMilliseconds < 2000)
                         {
+                            hadDataAvailable = true;
                             exBoard = board; // only used in exception
                             values.Clear();
                             numbers.Clear();
-                            row = board.SafeReadLine();
+                            row = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
 
-                            if (Regex.IsMatch(row.Trim(), @"^(-|\d+)"))  // check that row starts with digit. 
+                            if (_startsWithDigitRegex.IsMatch(row))  // check that row starts with digit. 
                             {
-                                values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                                numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
-                                ProcessLine(numbers, board);
+                                try
+                                {
+                                    values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                                    numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
+                                    ProcessLine(numbers, board);
+                                }
+                                catch (Exception)
+                                {
+                                    CALog.LogErrorAndConsoleLn(LogID.B, "Failed handling board response " + board.ToString() + " line: " + row);
+                                    throw;
+                                }
                             }
+                            else
+                            {
+                                // these should be mostly responses to commands on headers on reconnects,
+                                // but if it becomes too noisy we might need to tune it down.
+                                CALog.LogErrorAndConsoleLn(LogID.B, "Unhandled board response " + board.ToString() + " line: " + row);
+                            }
+                        }
+                        
+                        if (!hadDataAvailable)
+                        {
+                            // we expect data on every cycle (each 100 ms), as the boards normally write a line every 100 ms,
+                            // if this becomes too noisy we might need to tune it down.
+                            CALog.LogData(LogID.B, "No data available for " + board.ToString());
                         }
                     }
 
@@ -135,7 +173,7 @@ namespace CA_DataUploaderLib
                         CALog.LogException(LogID.A, ex);
                     }
 
-                    CALog.LogInfoAndConsoleLn(LogID.A, ".");
+                    CALog.LogInfoAndConsoleLn(LogID.A, ".", ex);
                     if(exBoard != null)
                         badPorts.Add($"{exBoard.PortName}:{exBoard.serialNumber} = '{row}'");
 
@@ -162,29 +200,29 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.LoopForever() " + DateTime.Now.Subtract(start).Humanize(5));
         }
 
-        private int _failCount = 0;
-
         private void CheckFails()
         {
             List<string> failPorts = new List<string>();
             int maxDelay = 2000;
+            bool reconnectLimitExceeded = false;
             foreach (var item in _values)
             {
                 maxDelay = (item.Input.Name.ToLower().Contains("luminox")) ? 10000 : 2000;
-                if (DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds > maxDelay)
+                var msSinceLastRead = DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds;
+                if (msSinceLastRead > maxDelay)
                 {
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} stale value detected for port: {item.Input.Name}{Environment.NewLine}{msSinceLastRead} milliseconds since last read - closing serial port to restablish connection");
                     item.ReadSensor_LoopTime = 0;
-                    item.Input.Map.Board.SafeClose();
-                    _failCount++;
+                    reconnectLimitExceeded |= !item.Input.Map.Board.SafeReopen(expectedHeaderLines);
                     failPorts.Add(item.Input.Name);
                 }
             }
 
-            if (_failCount > 200)
+            if (reconnectLimitExceeded)
             {
                 _cmd.Execute("escape");
                 _running = false;
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Shutting down: {Title} unable to read from port: {string.Join(", ", failPorts)}{Environment.NewLine}Failed {_failCount} times read operations in a row where latest valid read was more than {maxDelay} seconds old");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Shutting down: {Title} unable to read from port: {string.Join(", ", failPorts)}{Environment.NewLine}Reconnection limit exceeded, latest valid read was more than {maxDelay} seconds old");
             }
         }
 

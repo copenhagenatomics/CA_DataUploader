@@ -143,7 +143,6 @@ namespace CA_DataUploaderLib
 
         private void LoopForever()
         {
-            int failCount = 0;
             _startTime = DateTime.UtcNow;
             _logLevel = IOconfFile.GetOutputLevel();
             var loopStart = DateTime.UtcNow;
@@ -174,6 +173,7 @@ namespace CA_DataUploaderLib
                     }
 
                     // check if any of the boards stopped responding. 
+                    bool reconnectLimitExceeded = false;
                     foreach (var heater in _heaters)
                     {
                         if (heater._ioconf.BoxName == "ArduinoHack")
@@ -181,12 +181,12 @@ namespace CA_DataUploaderLib
 
                         if (DateTime.UtcNow.Subtract(heater.Current.TimeStamp).TotalMilliseconds > 2000)
                         {
-                            heater._ioconf.Map.Board.SafeClose();
-                            failCount++;
+                            heater.Current.ReadSensor_LoopTime = 0;
+                            reconnectLimitExceeded |= !heater._ioconf.Map.Board.SafeReopen();
                         }
                     }
 
-                    if (failCount > 200)
+                    if (reconnectLimitExceeded)
                     {
                         _cmd.Execute("escape");
                         _running = false;
@@ -228,13 +228,13 @@ namespace CA_DataUploaderLib
                     if (heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOn(heater);
-                        CALog.LogData(LogID.A, $"on.={heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
+                        CALog.LogData(LogID.A, $"on.={heater.name()}-{heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
 
                     if (!heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOff(heater);
-                        CALog.LogData(LogID.A, $"off.={heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
+                        CALog.LogData(LogID.A, $"off.={heater.name()}-{heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
                 }
             }
@@ -288,6 +288,28 @@ namespace CA_DataUploaderLib
             }
 
             return list;
+        }
+
+        public IEnumerable<double> GetPower()
+        {
+            var powerValues = _heaters.Select(x => x.Current.Value);
+            var states =_heaters.Select(x => x.IsOn ? 1.0 : 0.0);
+            var values = powerValues.Concat(states);
+            if (_logLevel == CALogLevel.Debug)
+            {
+                IEnumerable<double> loopTimes = _heaters.Select(x => x.Current.ReadSensor_LoopTime);
+                return values.Concat(loopTimes);
+            }
+
+            return values;
+        }
+
+        /// <summary>
+        /// Gets all the values in the order specified by <see cref="GetVectorDescriptionItems"/>.
+        /// </summary>
+        public IEnumerable<double> GetValues()
+        {
+            return GetPower().Concat(GetStates());
         }
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()

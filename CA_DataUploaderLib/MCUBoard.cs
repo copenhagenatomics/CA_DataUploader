@@ -6,12 +6,14 @@ using System.Diagnostics;
 using CA_DataUploaderLib.IOconf;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace CA_DataUploaderLib
 {
     public class MCUBoard : SerialPort
     {
         private int _safeLimit = 100;
+        private int _reconnectLimit = 100;
 
         public string BoxName = null;
         public const string BoxNameHeader = "IOconf.Map BoxName: ";
@@ -31,18 +33,19 @@ namespace CA_DataUploaderLib
         public const string softwareCompileDateHeader = "Software Compile Date: ";
 
         public string pcbVersion = null;
-        public const string pcbVersionHeader = "PCB Version: ";
+        public const string pcbVersionHeader = "PCB version: ";
         public const string boardVersionHeader = "Board Version: ";
 
         public string mcuFamily = null;
         public const string mcuFamilyHeader = "MCU Family: ";
-
+        private readonly Regex _startsWithNumberRegex = new Regex(@"^(-|\d+)");
         public bool UnableToRead = true;
 
         public DateTime PortOpenTimeStamp;
 
         private Queue<string> _readBuffer = new Queue<string>();
         private string _overshoot = string.Empty;
+        private DateTime _lastReopenTime;
 
         public MCUBoard(string name, int baudrate) // : base(name, baudrate, 0, 8, 1, 0)
         {
@@ -93,9 +96,12 @@ namespace CA_DataUploaderLib
 
         public bool IsEmpty()
         {
+            // pcbVersion is included in this list because at the time of writting is the last value in the readEEPROM header, 
+            // which avoids the rest of the header being treated as "values".
             return serialNumber.IsNullOrEmpty() ||
                     productType.IsNullOrEmpty() ||
-                    softwareVersion.IsNullOrEmpty();
+                    softwareVersion.IsNullOrEmpty() ||
+                    pcbVersion.IsNullOrEmpty();  
         }
         
         public string SafeReadLine()
@@ -114,10 +120,10 @@ namespace CA_DataUploaderLib
                         return ReadLine();
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 var frame = new StackTrace().GetFrame(1);
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber} in {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}() at line {frame.GetFileLineNumber()}{Environment.NewLine}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber} in {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}() at line {frame.GetFileLineNumber()}{Environment.NewLine}", ex);
                 if (_safeLimit-- <= 0) throw;
             }
 
@@ -140,10 +146,10 @@ namespace CA_DataUploaderLib
                         return BytesToRead > 0;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 var frame = new StackTrace().GetFrame(1);
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while checking serial port read buffer: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}{Environment.NewLine}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while checking serial port read buffer: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}{Environment.NewLine}", ex);
                 if (_safeLimit-- <= 0) throw;
             }
 
@@ -195,9 +201,9 @@ namespace CA_DataUploaderLib
                         return ReadExisting();
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to ReadExisting() from serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to ReadExisting() from serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}", ex);
                 if (_safeLimit-- <= 0) throw;
             }
 
@@ -228,11 +234,80 @@ namespace CA_DataUploaderLib
             return $"{PortName}{seperator}{serialNumber}{seperator}{productType}";
         }
 
+        /// <summary>
+        /// Reopens the connection skipping the header.
+        /// </summary>
+        /// <param name="headerLines">The amount of header lines expected.</param>
+        /// <returns><c>false</c> if the reconnect limit has been exceeded.</returns>
+        /// <remarks>
+        /// This method assumes only value lines start with numbers, 
+        /// so it considers such a line to be past the header.
+        /// 
+        /// A log entry to <see cref="LogID.B"/> is added with the skipped header 
+        /// and the bytes in the receive buffer 500ms after the port was opened again.
+        /// 
+        /// No exceptions are produced if there is a failure to reopen, although information about is added to log B.
+        /// </remarks>
+        public bool SafeReopen(int expectedHeaderLines = 8)
+        {
+            var lines = new List<string>();
+            var bytesToRead500ms = 0;
+            try
+            {
+                lock (this)
+                {
+                    TimeSpan timeSinceLastReopen = DateTime.Now.Subtract(_lastReopenTime);
+                    if (timeSinceLastReopen.TotalSeconds < 4)
+                    {
+                        CALog.LogData(LogID.B, $"(Reopen) skipped {PortName} {productType} {serialNumber} - time since last reopen {timeSinceLastReopen}");
+                        return true;
+                    }
+
+                    if (_reconnectLimit-- < 0)
+                        return false;
+
+                    _lastReopenTime = DateTime.Now;
+                    if (IsOpen)
+                    {
+                        CALog.LogData(LogID.B, $"(Reopen) Closing port {PortName} {productType} {serialNumber}");
+                        Close();
+                        Thread.Sleep(500);
+                    }
+                    
+                    CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {productType} {serialNumber}");
+                    Open();
+                    Thread.Sleep(500);
+
+                    CALog.LogData(LogID.B, $"(Reopen) skipping {expectedHeaderLines} header lines for port {PortName} {productType} {serialNumber} ");
+                    bytesToRead500ms = BytesToRead;
+                    for (int i = 0; i < expectedHeaderLines; i++)
+                    {
+                        var line = ReadLine().Trim();
+                        lines.Add(line);
+                        if (_startsWithNumberRegex.IsMatch(line) && i > 0) // making sure we skip the first one, as it is something a partial line (perhaps from the last read before the restart, although pi buffer is cleared).
+                        { // we are past the header.
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                CALog.LogErrorAndConsoleLn(
+                    LogID.B, 
+                    $"Failure reopening port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
+                    ex);
+            }
+
+            CALog.LogData(LogID.B, $"Reopened port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§", lines)}'");
+            return true;
+        }
+
         private void ReadSerialNumber()
         {
             // CALog.LogColor(LogID.A, ConsoleColor.Green, Environment.NewLine + "Sending Serial request");
             WriteLine("Serial");
-            var stop = DateTime.Now.AddSeconds(2);
+            var stop = DateTime.Now.AddSeconds(5);
             while (IsEmpty() && DateTime.Now < stop)
             {
 

@@ -72,7 +72,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                LogHttpException(ex);
+                OnError("failed initializing uploader", ex);
                 throw;
             }
         }
@@ -119,7 +119,7 @@ namespace CA_DataUploaderLib
                     {
                         if (_alertQueue.Count < 10000)  // if problems then drop packages. 
                         {
-                            _alertQueue.Enqueue(timestamp.ToString("YYYY.MM.dd HH:mm:ss") + a.Message);
+                            _alertQueue.Enqueue(timestamp.ToString("yyyy.MM.dd HH:mm:ss") + a.Message);
                         }
                     }
                 }
@@ -162,7 +162,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                LogHttpException(ex);
+                OnError("failed uploading sensor match", ex);
                 throw;
             }
         }
@@ -196,7 +196,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                LogHttpException(ex);
+                OnError("failed listing plots", ex);
                 throw;
             }
         }
@@ -333,26 +333,12 @@ namespace CA_DataUploaderLib
                 if (!string.IsNullOrEmpty(error))
                     throw new Exception(error);
 
-                LogHttpException(ex);
+                OnError("failed getting plot id", ex);
                 throw;
             }
         }
 
-        private static void LogHttpException(Exception ex)
-        {
-            if (ex.InnerException == null)
-                CALog.LogErrorAndConsoleLn(LogID.A, ex.Message);
-            else
-                CALog.LogErrorAndConsoleLn(LogID.A, ex.InnerException.Message);
-        }
-
-        private static void LogData(Exception ex)
-        {
-            if (ex.InnerException == null)
-                CALog.LogData(LogID.A, ex.Message + Environment.NewLine);
-            else
-                CALog.LogData(LogID.A, ex.InnerException.Message + Environment.NewLine);
-        }
+        private static void OnError(string message, Exception ex) => CALog.LogErrorAndConsoleLn(LogID.A, message, ex);
 
         private async void PostVectorAsync(byte[] buffer, DateTime timestamp)
         {
@@ -368,7 +354,7 @@ namespace CA_DataUploaderLib
                 {
                     _badPackages.Add(DateTime.UtcNow);
                 }
-                LogData(ex);
+                OnError("failed posting vector", ex);
             }
         }
 
@@ -376,8 +362,9 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                string query = $"api/LoopApi?plotnameID={_plotID}&message={message}&loginToken={_loginToken}";
-                HttpResponseMessage response = await _client.GetAsync(query);
+                string query = $"api/LoopApi/AlertMessage?plotnameID={_plotID}";
+
+                HttpResponseMessage response = await _client.PutAsJsonAsync(query, SignedMessage(message));
                 response.EnsureSuccessStatusCode();
             }
             catch (Exception ex)
@@ -386,7 +373,7 @@ namespace CA_DataUploaderLib
                 {
                     _badPackages.Add(DateTime.UtcNow);
                 }
-                LogData(ex);
+                OnError("failed posting alert: " + message, ex);
             }
         }
 
