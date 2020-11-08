@@ -48,13 +48,10 @@ namespace CA_DataUploaderLib
             return _values;  
         }
 
-        //public IEnumerable<double> GetValues()
-        //{
-        //    var values = GetAllDatapoints().Select(s => s.Value);
-        //    return _logLevel == CALogLevel.Debug ?
-        //        values.Concat(GetFrequencyAndFilterCount()) :
-        //        values;
-        //}
+        public IEnumerable<double> GetValues()
+        {
+            return GetAllDatapoints().Select(s => s.Value);
+        }
 
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
