@@ -19,13 +19,6 @@ namespace CA_DataUploaderLib
             Input = input;
         }
 
-        public SensorSample(IOconfMath input, double value = 0)
-        {
-            Value = value;
-            TimeStamp = DateTime.UtcNow;
-            Math = input;
-        }
-
         public SensorSample(string other, double value = 0)
         {
             Value = value;

@@ -14,7 +14,10 @@ namespace CA_DataUploaderLib.Helpers
         Average = 1, 
         Max = 2,
         Min = 3,
-        Triangle = 4
+        SumAvg = 4,
+        DiffAvg = 5,
+        Triangle = 6,
+
     }
 
     public class FilterSample
@@ -81,6 +84,17 @@ namespace CA_DataUploaderLib.Helpers
                             return;
                         case FilterType.Min:
                             Output.Value = allSamples.Min(x => x.Value);
+                            Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
+                            return;
+                        case FilterType.SumAvg:
+                            Output.Value = validSamples.Average(y => y.Sum(x => x.Value));
+                            Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
+                            return;
+                        case FilterType.DiffAvg:
+                            if (validSamples.First().Count != 2)
+                                throw new Exception("Filter DiffAvg must have two input source names");
+
+                            Output.Value = validSamples.Average(y => y[0].Value - y[1].Value);
                             Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
                             return;
                         case FilterType.Triangle:

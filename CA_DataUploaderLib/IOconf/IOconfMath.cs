@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfMath : IOconfRow
+    public class IOconfMath : IOconfInput
     {
         public IOconfMath(string row, int lineNum) : base(row, lineNum, "Math")
         {
