@@ -23,7 +23,6 @@ namespace CA_DataUploaderLib
         private List<DateTime> _badPackages = new List<DateTime>();
         private List<IOconfAlert> _alerts;
         private CommandHandler _cmd;
-        private MathVectorExpansion _mathVectorExpansion;
         private Dictionary<string, string> _accountInfo;
         private int _plotID;
         private string _plotname;
@@ -40,8 +39,6 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                _mathVectorExpansion = new MathVectorExpansion(vectorDescription);
-                vectorDescription = _mathVectorExpansion.VectorDescription;
                 CheckInputData(vectorDescription);
                 var connectionInfo = GetAccountInfo();
 
@@ -109,7 +106,6 @@ namespace CA_DataUploaderLib
 
         public void SendVector(List<double> vector, DateTime timestamp)
         {
-            _mathVectorExpansion.Expand(vector);
             _cmd.NewData(vector);
             foreach (var a in _alerts)
             {

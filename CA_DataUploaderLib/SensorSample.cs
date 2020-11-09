@@ -8,6 +8,7 @@ namespace CA_DataUploaderLib
         public double Value;
         public DateTime TimeStamp;
         public IOconfInput Input = null;
+        public IOconfMath Math = null;
         public double ReadSensor_LoopTime;  // in miliseconds. 
 
         public SensorSample(IOconfInput input)
@@ -15,6 +16,13 @@ namespace CA_DataUploaderLib
             Value = 0;
             TimeStamp = DateTime.UtcNow;
             Input = input;
+        }
+
+        public SensorSample(IOconfMath input, double value)
+        {
+            Value = value;
+            TimeStamp = DateTime.UtcNow;
+            Math = input;
         }
     }
 }

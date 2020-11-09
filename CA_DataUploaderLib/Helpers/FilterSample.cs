@@ -17,12 +17,14 @@ namespace CA_DataUploaderLib.Helpers
 
     public class FilterSample
     {
-        public FilterSample(IOconfFilter filter)
+        public FilterSample(IOconfFilter filter, List<int> vectorIndexs)
         {
             Filter = filter;
+            VectorIndexs = vectorIndexs;
         }
 
         public IOconfFilter Filter { get; private set; }
+        public List<int> VectorIndexs { get; private set; }
 
         private Queue<Tuple<double, DateTime>> _filterQueue = new Queue<Tuple<double, DateTime>>();
 

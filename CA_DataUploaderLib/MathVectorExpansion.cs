@@ -19,12 +19,19 @@ namespace CA_DataUploaderLib
             VectorDescription = vectorDescription.WithExtraItems(_mathStatements.Select(m => new VectorDescriptionItem("double", m.Name, DataTypeEnum.State)));
         }
 
+        internal List<int> IndexOf(IOconfFilter filter)
+        {
+            var inputs = filter.SourceNames.Select(x => x.Name);
+            var match = VectorDescription._items.Where(x => inputs.Contains(x.Descriptor)).ToList();
+            return match.Select(x => VectorDescription._items.IndexOf(x)).ToList();
+        }
+
         /// <param name="vector">The vector to expand.</param>
         /// <remarks>
         /// The vector must match the order and amount of entries specified in <see cref="MathVectorExpansion(VectorDescription)"/>.
         /// This method and class does not track changes to the <see cref="IOconfFile"/>, use a new instance if needed.
         /// </remarks>
-        public void Expand(List<double> vector)
+        public void Expand(List<SensorSample> vector)
         {
             if (vector.Count() != _vectorDescriptionWithoutMath.Length)
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescriptionWithoutMath.Length}");
@@ -36,7 +43,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private Dictionary<string, object> GetVectorDictionary(List<double> vector)
+        private Dictionary<string, object> GetVectorDictionary(List<SensorSample> vector)
         {
             var dic = new Dictionary<string, object>(_vectorDescriptionWithoutMath._items.Count);
             int i = 0;
