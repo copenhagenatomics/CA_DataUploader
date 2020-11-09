@@ -115,7 +115,7 @@ namespace CA_DataUploaderLib.Helpers
                 if (_filterQueue.Count < 2) 
                     return 0;
 
-                return (_filterQueue.Count() - 1) / _filterQueue.Last().Item2.Subtract(_filterQueue.First().Item2).TotalSeconds;
+                return (_filterQueue.Count() - 1) / _filterQueue.Last().Select(d => d.TimeStamp.Ticks).AverageTime().Subtract(_filterQueue.First().Select(d => d.TimeStamp.Ticks).AverageTime()).TotalSeconds;
             }
         }
 
@@ -123,14 +123,14 @@ namespace CA_DataUploaderLib.Helpers
         {
             lock (_filterQueue)
             {
-                return _filterQueue.Where(x => x.Item1 < 10000 && x.Item1 != 0).Count();
+                return _filterQueue.Where(x => x.All(y => y.Value < 10000 && y.Value != 0)).Count();
             }
         }
 
 
         public bool HasValidTemperature()
         {
-            return Value.Value != 0 && TimeoutValue < 10000;
+            return Output.Value != 0 && TimeoutValue < 10000;
         }
     }
 }
