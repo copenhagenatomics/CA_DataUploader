@@ -32,5 +32,7 @@ namespace CA_DataUploaderLib
             TimeStamp = DateTime.UtcNow;
             Other = other;
         }
+
+        public string Name { get { return (Input != null ? Input.Name : (Math != null ? Math.Name : Other)); } }
     }
 }

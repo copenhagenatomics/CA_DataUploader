@@ -3,6 +3,8 @@ using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
 
 namespace CA_DataUploaderLib.Helpers
 {
@@ -17,73 +19,80 @@ namespace CA_DataUploaderLib.Helpers
 
     public class FilterSample
     {
-        public FilterSample(IOconfFilter filter, List<int> vectorIndexs)
+        public FilterSample(IOconfFilter filter)
         {
             Filter = filter;
-            VectorIndexs = vectorIndexs;
         }
 
         public IOconfFilter Filter { get; private set; }
         public List<int> VectorIndexs { get; private set; }
 
-        private Queue<Tuple<double, DateTime>> _filterQueue = new Queue<Tuple<double, DateTime>>();
+        private Queue<List<SensorSample>> _filterQueue = new Queue<List<SensorSample>>();
 
         public bool MaxSlope;
 
-        private SensorSample _value;
-        public SensorSample Value
+        public void Input(List<SensorSample> input)
         {
-            get { return _value; }
-            set { SetValue(value); }
+            var sourceNames = Filter.SourceNames.Select(x => x.Name);
+            CalculateOutput(input.Where(x => sourceNames.Contains(x.Name)).ToList());
         }
 
-        public double TimeoutValue
+        public SensorSample Output { get; }
+
+        // currently this only returns the first input value. 
+        public double TimeoutValue 
         {
             // if last sample is older than filter length, then set timeout. 
-            get { return (_value.TimeStamp < DateTime.UtcNow.AddSeconds(-Filter.filterLength)) ? 10009 : _value.Value; }   // 10009 means timedout
+            get { return Output.TimeStamp < DateTime.UtcNow.AddSeconds(-Filter.filterLength) ? 10009 : Output.Value; }   // 10009 means timedout
         }
 
         public override string ToString()
         {
-            if (Value.Value > 9000)
+            if (Output.Value > 9000)
                 return "NC";
 
-            return $"{Value}";
+            return $"{Output.Value}";
         }
 
-        private void SetValue(SensorSample value)
+        private void CalculateOutput(List<SensorSample> input)
         {
             lock (_filterQueue)
             {
                 var removeBefore = DateTime.UtcNow.AddSeconds(-Filter.filterLength);
-                _filterQueue.Enqueue(new Tuple<double, DateTime>(value.Value, value.TimeStamp));
-                while (_filterQueue.First().Item2 < removeBefore)
+                _filterQueue.Enqueue(input);
+                while (_filterQueue.First().Any(x => x.TimeStamp < removeBefore))
                 {
                     _filterQueue.Dequeue();
                 }
 
-                var validSamples = _filterQueue.Where(x => x.Item1 < 10000 && x.Item1 != 0).ToList();
+                var validSamples = _filterQueue.Where(x => x.All(y => y.Value < 10000 && y.Value != 0)).ToList();
                 if (validSamples.Any())
                 {
-                    _value = new SensorSample(Filter.SourceNames.First()) { Value = value.Value, TimeStamp = value.TimeStamp };
+                    var allSamples = validSamples.SelectMany(x => x.Select(y => y)).ToList();
                     switch (Filter.filterType)
                     {
                         case FilterType.Average:
-                            _value.Value = validSamples.Average(x => x.Item1);
+                            Output.Value = allSamples.Average(x => x.Value);
+                            Output.TimeStamp = allSamples.Select(d => d.TimeStamp.Ticks).AverageTime();
                             return;
                         case FilterType.Max:
-                            _value.Value = validSamples.Max(x => x.Item1);
+                            Output.Value = allSamples.Max(x => x.Value);
+                            Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime(); 
                             return;
                         case FilterType.Min:
-                            _value.Value = validSamples.Min(x => x.Item1);
+                            Output.Value = allSamples.Min(x => x.Value);
+                            Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
                             return;
                         case FilterType.Triangle:
-                            _value.Value = validSamples.TriangleFilter(Filter.filterLength);
+                            Output.Value = validSamples.TriangleFilter(Filter.filterLength);
+                            Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
                             return;
                     }
                 }
-                
-                _value = value;
+
+                // incase of no valid samples or invalid filter type
+                Output.Value = _filterQueue.Last().Select(x => x.Value).Average();
+                Output.TimeStamp = _filterQueue.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
             }
         }
 
@@ -91,7 +100,11 @@ namespace CA_DataUploaderLib.Helpers
         {
             lock (_filterQueue)
             {
-                return string.Join(",", _filterQueue.Select(x => x.Item1.ToString("N2").PadLeft(9)));
+                var sb = new StringBuilder();
+                for(int i = 0;i<_filterQueue.First().Count;i++)
+                    sb.AppendLine(string.Join(",", _filterQueue.Select(x => x[i].Value.ToString("N2").PadLeft(9))));
+
+                return sb.ToString();
             }
         }
 

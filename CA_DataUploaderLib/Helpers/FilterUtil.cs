@@ -14,7 +14,7 @@ namespace CA_DataUploaderLib.Helpers
         {
             _mathVectorExpansion = new MathVectorExpansion(vectorDescription);
 
-            _values = IOconfFile.GetFilters().Select(x => new FilterSample(x, _mathVectorExpansion.IndexOf(x))).ToList();
+            _values = IOconfFile.GetFilters().Select(x => new FilterSample(x)).ToList();
             if (!_values.Any())
                 return;
 
@@ -28,11 +28,9 @@ namespace CA_DataUploaderLib.Helpers
 
             foreach (var filter in _values)
             {
-                var index = filter.VectorIndexs.First();
-                filter.Value = vector[index];
-                vector[index] = filter.Value;
+                filter.Input(vector);
+                vector.Add(filter.Output);
             }
-
 
             return vector.Select(x => x.Value).ToList();
         }

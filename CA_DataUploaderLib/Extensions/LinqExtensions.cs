@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace CA_DataUploaderLib.Extensions
 {
@@ -19,18 +20,23 @@ namespace CA_DataUploaderLib.Extensions
             return theObject.Where(x => x.Map.Board != null);
         }
 
-        public static double TriangleFilter(this IEnumerable<Tuple<double, DateTime>> list, double filterLength)  // filterLength in seconds
+        public static DateTime AverageTime(this IEnumerable<long> input)
+        {
+            return new DateTime((long)input.Average());
+        }
+
+        public static double TriangleFilter(this List<List<SensorSample>> list, double filterLength)  // filterLength in seconds
         {
             // order with the latest sample first. 
-            list = list.OrderByDescending(x => x.Item2).ToList();
-            var now = list.First().Item2;
+            list = list.OrderByDescending(x => x.Select(y => y.TimeStamp.Ticks).AverageTime()).ToList();
+            var now = list.First().Select(y => y.TimeStamp.Ticks).AverageTime();
 
             // skip samples that are outside the filterlength
-            list = list.Where(x => x.Item2 > now.AddSeconds(-filterLength)).ToList();
+            list = list.Where(x => x.Select(y => y.TimeStamp.Ticks).AverageTime() > now.AddSeconds(-filterLength)).ToList();
 
             // find the sum of all timespans.  
-            var sum = list.Sum(x => filterLength - now.Subtract(x.Item2).TotalSeconds);
-            return list.Sum(x => x.Item1 * (filterLength - now.Subtract(x.Item2).TotalSeconds) / sum);
+            var sum = list.Sum(x => filterLength - now.Subtract(x.Select(y => y.TimeStamp.Ticks).AverageTime()).TotalSeconds);
+            return list.Sum(x => x.Average(y => y.Value) * (filterLength - now.Subtract(x.Select(y => y.TimeStamp.Ticks).AverageTime()).TotalSeconds) / sum);
         }
     }
 }
