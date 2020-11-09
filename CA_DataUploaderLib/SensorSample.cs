@@ -9,20 +9,28 @@ namespace CA_DataUploaderLib
         public DateTime TimeStamp;
         public IOconfInput Input = null;
         public IOconfMath Math = null;
+        public string Other = null;
         public double ReadSensor_LoopTime;  // in miliseconds. 
 
-        public SensorSample(IOconfInput input)
+        public SensorSample(IOconfInput input, double value = 0)
         {
-            Value = 0;
+            Value = value;
             TimeStamp = DateTime.UtcNow;
             Input = input;
         }
 
-        public SensorSample(IOconfMath input, double value)
+        public SensorSample(IOconfMath input, double value = 0)
         {
             Value = value;
             TimeStamp = DateTime.UtcNow;
             Math = input;
+        }
+
+        public SensorSample(string other, double value = 0)
+        {
+            Value = value;
+            TimeStamp = DateTime.UtcNow;
+            Other = other;
         }
     }
 }

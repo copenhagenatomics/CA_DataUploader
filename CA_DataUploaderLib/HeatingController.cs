@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib
             // map all heaters, sensors and ovens. 
             var heaters = IOconfFile.GetHeater().ToList();
             var oven = IOconfFile.GetOven().ToList();
-            var sensors = caThermalBox.GetAllDatapoints().ToList();
+            var sensors = caThermalBox.GetValues().ToList();
             foreach (var heater in heaters)
             {
                 var maxSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.IsMaxTemperatureSensor)?.TypeK.Name;
@@ -278,26 +278,26 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public List<double> GetStates()
+        public List<SensorSample> GetStates()
         {
-            var list = new List<double>();
+            var list = new List<SensorSample>();
             if (_logLevel == CALogLevel.Debug)
             {
-                list.Add(_offTemperature);
-                list.Add(_lastTemperature);
+                list.Add(new SensorSample("HeaterOffTemperature", _offTemperature));
+                list.Add(new SensorSample("HeaterLastTemperature", _lastTemperature));
             }
 
             return list;
         }
 
-        public IEnumerable<double> GetPower()
+        public IEnumerable<SensorSample> GetPower()
         {
-            var powerValues = _heaters.Select(x => x.Current.Value);
-            var states =_heaters.Select(x => x.IsOn ? 1.0 : 0.0);
+            var powerValues = _heaters.Select(x => x.Current);
+            var states =_heaters.Select(x => new SensorSample("HeaterOnOff", x.IsOn ? 1.0 : 0.0));
             var values = powerValues.Concat(states);
             if (_logLevel == CALogLevel.Debug)
             {
-                IEnumerable<double> loopTimes = _heaters.Select(x => x.Current.ReadSensor_LoopTime);
+                var loopTimes = _heaters.Select(x => new SensorSample("HeaterLoopTime", x.Current.ReadSensor_LoopTime));
                 return values.Concat(loopTimes);
             }
 
@@ -307,7 +307,7 @@ namespace CA_DataUploaderLib
         /// <summary>
         /// Gets all the values in the order specified by <see cref="GetVectorDescriptionItems"/>.
         /// </summary>
-        public IEnumerable<double> GetValues()
+        public IEnumerable<SensorSample> GetValues()
         {
             return GetPower().Concat(GetStates());
         }

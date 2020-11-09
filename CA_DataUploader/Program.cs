@@ -37,7 +37,7 @@ namespace CA_DataUploader
                         int i = 0;
                         while (cmd.IsRunning)
                         {
-                            var allSensors = usb.GetAllDatapoints().ToList();
+                            var allSensors = usb.GetValues().ToList();
                             if (allSensors.Any())
                             {
                                 var list = filterUtil.FilterAndMath(allSensors);
