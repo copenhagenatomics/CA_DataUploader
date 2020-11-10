@@ -54,6 +54,8 @@ namespace CA_DataUploaderLib.IOconf
                 if (row.StartsWith("Scale")) return new IOconfScale(row, lineNum);
                 if (row.StartsWith("Tank")) return new IOconfTank(row, lineNum);
                 if (row.StartsWith("Valve")) return new IOconfValve(row, lineNum);
+                if (row.StartsWith("Filter")) return new IOconfFilter(row, lineNum);
+                if (row.StartsWith("RPiTemp")) return new IOconfRPiTemp(row, lineNum);
                 if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row, lineNum);
                 if (row.StartsWith("Oxygen")) return new IOconfOxygen(row, lineNum);
 
@@ -126,9 +128,9 @@ namespace CA_DataUploaderLib.IOconf
             return Table.Where(x => x.GetType() == typeof(IOconfSaltLeakage)).Cast<IOconfSaltLeakage>();
         }
 
-        public static IEnumerable<IOconfInput> GetTypeKAndLeakage()
+        public static IEnumerable<IOconfInput> GetTypeKAndLeakageAndRPiTemp()
         {
-            return Table.Where(x => x.GetType() == typeof(IOconfTypeK) || x.GetType() == typeof(IOconfSaltLeakage)).Cast<IOconfInput>();
+            return Table.Where(x => x.GetType() == typeof(IOconfTypeK) || x.GetType() == typeof(IOconfSaltLeakage) || x.GetType() == typeof(IOconfRPiTemp)).Cast<IOconfInput>();
         }
 
         public static IEnumerable<IOconfOut230Vac> GetOut230Vac()

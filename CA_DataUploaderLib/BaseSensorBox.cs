@@ -87,6 +87,8 @@ namespace CA_DataUploaderLib
             return _values.Average(x => x.ReadSensor_LoopTime);
         }
 
+        protected virtual void ParentLoopForever() { }
+
         private static Regex _startsWithDigitRegex = new Regex(@"^\s*(-|\d+)\s*");
 
         protected void LoopForever()
@@ -150,6 +152,7 @@ namespace CA_DataUploaderLib
                     }
 
                     // check if any of the boards stopped responding. 
+                    ParentLoopForever();
                     CheckFails();
 
                     Thread.Sleep(100);
@@ -204,8 +207,8 @@ namespace CA_DataUploaderLib
                 if (msSinceLastRead > maxDelay)
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} stale value detected for port: {item.Input.Name}{Environment.NewLine}{msSinceLastRead} milliseconds since last read - closing serial port to restablish connection");
-                    item.ReadSensor_LoopTime = 0;
-                    reconnectLimitExceeded |= !item.Input.Map.Board.SafeReopen(expectedHeaderLines);
+                    if(item.Input.Map != null)
+                        reconnectLimitExceeded |= !item.Input.Map.Board.SafeReopen(expectedHeaderLines);
                     failPorts.Add(item.Input.Name);
                 }
             }
@@ -234,7 +237,6 @@ namespace CA_DataUploaderLib
                 if (sensor != null)
                 {
                     sensor.Value = value;
-                    sensor.ReadSensor_LoopTime = timestamp.Subtract(sensor.TimeStamp).TotalMilliseconds;
                     sensor.TimeStamp = timestamp;
 
                     HandleSaltLeakage(sensor);

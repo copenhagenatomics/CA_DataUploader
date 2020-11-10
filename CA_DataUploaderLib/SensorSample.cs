@@ -6,11 +6,18 @@ namespace CA_DataUploaderLib
     public class SensorSample
     {
         public double Value;
-        public DateTime TimeStamp;
         public IOconfInput Input = null;
         public IOconfMath Math = null;
         public string Other = null;
-        public double ReadSensor_LoopTime;  // in miliseconds. 
+        public string Name { get { return (Input != null ? Input.Name : (Math != null ? Math.Name : Other)); } }
+
+        private DateTime _timeStamp;
+        public DateTime TimeStamp 
+        { 
+            get { return _timeStamp; }
+            set { ReadSensor_LoopTime = value.Subtract(_timeStamp).TotalMilliseconds; _timeStamp = value; }
+        } 
+        public double ReadSensor_LoopTime { get; private set; }  // in miliseconds. 
 
         public SensorSample(IOconfInput input, double value = 0)
         {
@@ -25,7 +32,5 @@ namespace CA_DataUploaderLib
             TimeStamp = DateTime.UtcNow;
             Other = other;
         }
-
-        public string Name { get { return (Input != null ? Input.Name : (Math != null ? Math.Name : Other)); } }
     }
 }

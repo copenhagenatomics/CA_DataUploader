@@ -4,6 +4,7 @@ using CA_DataUploaderLib.IOconf;
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CA_DataUploaderLib.Extensions
 {
@@ -17,12 +18,13 @@ namespace CA_DataUploaderLib.Extensions
         // only return IOconfInput rows where the MCUBoard was initialized. 
         public static IEnumerable<T> IsInitialized<T>(this IEnumerable<T> theObject) where T : IOconfInput
         {
-            return theObject.Where(x => x.Map.Board != null);
+            return theObject.Where(x => x.Skip || x.Map.Board != null);
         }
 
         public static DateTime AverageTime(this IEnumerable<long> input)
         {
-            return new DateTime((long)input.Average());
+            double sum = input.Select(x => (double)x).Sum();
+            return new DateTime((long)(sum/input.Count()));
         }
 
         public static double TriangleFilter(this List<List<SensorSample>> list, double filterLength)  // filterLength in seconds

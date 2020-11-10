@@ -1,13 +1,8 @@
 ﻿using CA_DataUploaderLib;
 using CA_DataUploaderLib.Helpers;
-using CA_DataUploaderLib.IOconf;
 using System;
 using System.Data;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Net.Mail;
-using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace CA_DataUploader
@@ -30,7 +25,7 @@ namespace CA_DataUploader
                     using (var cmd = new CommandHandler(serial))
                     using (var usb = new ThermocoupleBox(cmd))
                     using (var filterUtil = new FilterUtil(GetVectorDescription(usb)))
-                    using (var cloud = new ServerUploader(filterUtil.ExpandedVectorDescription, cmd))
+                    using (var cloud = new ServerUploader(filterUtil.VectorDescription, cmd))
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
 

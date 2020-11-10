@@ -12,26 +12,25 @@ namespace CA_DataUploaderLib.Helpers
         protected MathVectorExpansion _mathVectorExpansion;
         public FilterUtil(VectorDescription vectorDescription)
         {
-            _mathVectorExpansion = new MathVectorExpansion(vectorDescription);
-
             _values = IOconfFile.GetFilters().Select(x => new FilterSample(x)).ToList();
             if (!_values.Any())
                 return;
 
+            vectorDescription._items.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Filter.Name, DataTypeEnum.Input)));
+            _mathVectorExpansion = new MathVectorExpansion(vectorDescription);
         }
 
-        public VectorDescription ExpandedVectorDescription { get { return _mathVectorExpansion.VectorDescription; } }
+        public VectorDescription VectorDescription { get { return _mathVectorExpansion.VectorDescription; } }
 
         public List<double> FilterAndMath(List<SensorSample> vector)
         {
-            _mathVectorExpansion.Expand(vector);
-
             foreach (var filter in _values)
             {
                 filter.Input(vector);
                 vector.Add(filter.Output);
             }
 
+            _mathVectorExpansion.Expand(vector);
             return vector.Select(x => x.Value).ToList();
         }
 

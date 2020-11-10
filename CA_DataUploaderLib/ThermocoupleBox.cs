@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using CA_DataUploaderLib.Helpers;
 
 namespace CA_DataUploaderLib
 {
@@ -15,7 +16,7 @@ namespace CA_DataUploaderLib
             _cmd = cmd;
             _logLevel = IOconfFile.GetOutputLevel();
 
-            _values = IOconfFile.GetTypeKAndLeakage().IsInitialized().Select(x => new SensorSample(x)).ToList();
+            _values = IOconfFile.GetTypeKAndLeakageAndRPiTemp().IsInitialized().Select(x => new SensorSample(x)).ToList();
 
             if (!_values.Any())
                 return;
@@ -37,6 +38,19 @@ namespace CA_DataUploaderLib
             }
 
             new Thread(() => this.LoopForever()).Start();
+        }
+
+        protected override void ParentLoopForever()
+        {
+            foreach (var rpi in _values.Where(x => x.Input.GetType() == typeof(IOconfRPiTemp)))
+            {
+                if (RpiVersion.IsWindows())
+                    rpi.Value = 0;
+                else
+                    rpi.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
+                
+                rpi.TimeStamp = DateTime.UtcNow;
+            }
         }
 
         private bool HelpMenu(List<string> args)

@@ -2,8 +2,8 @@
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace CA_DataUploaderLib.Helpers
@@ -25,6 +25,7 @@ namespace CA_DataUploaderLib.Helpers
         public FilterSample(IOconfFilter filter)
         {
             Filter = filter;
+            Output = new SensorSample("Filter_" + filter.Name);
         }
 
         public IOconfFilter Filter { get; private set; }

@@ -39,7 +39,7 @@ namespace CA_DataUploaderLib.IOconf
             expression.Parameters = values;
             // Convert.ToDouble allows some expressions that return int, decimals or even boolean to work
             // note that some expression may even return different values depending on the branch hit i.e. when using if(...)
-            return new SensorSample(this, Convert.ToDouble(expression.Evaluate()));
+            return new SensorSample(this, Convert.ToDouble(expression.Evaluate())) { TimeStamp = DateTime.UtcNow };
         }
     }
 }

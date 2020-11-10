@@ -23,9 +23,7 @@ namespace CA_DataUploaderLib
 
         /// <summary>Returns a copy of the vector description with additional entries</summary>
         /// <remarks>While this leaves the current instance unmodified, we are pretending the entries are immutable for now.</remarks>
-        public VectorDescription WithExtraItems(IEnumerable<VectorDescriptionItem> extraEntries) =>
-            new VectorDescription(_items.Concat(extraEntries).ToList(), Hardware, Software);
-
+        
         public bool HasItem(string descriptor) => _items.Any(i => i.Descriptor == descriptor);
 
         public override string ToString()
@@ -45,7 +43,7 @@ namespace CA_DataUploaderLib
     {
         public VectorDescriptionItem() { }
         public VectorDescriptionItem(string datatype, string descriptor, DataTypeEnum direction) { Descriptor = descriptor; DataType = datatype; DirectionType = direction; }
-        public string Descriptor { get; set; }
+        public string Descriptor { get; set; }  // Name of data line in webchart. 
         public DataTypeEnum DirectionType { get; set; }
         public string DataType { get; set; }
     }

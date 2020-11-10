@@ -181,7 +181,6 @@ namespace CA_DataUploaderLib
 
                         if (DateTime.UtcNow.Subtract(heater.Current.TimeStamp).TotalMilliseconds > 2000)
                         {
-                            heater.Current.ReadSensor_LoopTime = 0;
                             reconnectLimitExceeded |= !heater._ioconf.Map.Board.SafeReopen();
                         }
                     }
