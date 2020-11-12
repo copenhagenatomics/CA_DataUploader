@@ -23,6 +23,7 @@ namespace CA_DataUploaderLib
 
             if (cmd != null)
             {
+                cmd.AddCommand("temperatures", ShowQueue);
                 cmd.AddCommand("help", HelpMenu);
                 cmd.AddCommand("Junction", Junction);
                 cmd.AddCommand("escape", Stop);
