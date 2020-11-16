@@ -51,17 +51,6 @@ namespace CA_DataUploaderLib
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
             var list = _values.Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input)).ToList();
-            // list.AddRange(_config.Select(x => new VectorDescriptionItem("double", x.Name + "_latest", DataTypeEnum.Input)).ToList());
-            if (_logLevel == CALogLevel.Debug)
-            {
-                foreach (var boxName in _values.Where(x => !x.Input.Skip).Select(x => x.Input.Map.BoxName).Distinct().OrderBy(x => x))
-                {
-                    list.Add(new VectorDescriptionItem("double", boxName + "_AvgSampleFrequency", DataTypeEnum.State));
-                    list.Add(new VectorDescriptionItem("double", boxName + "_MinFilterSampleCount", DataTypeEnum.State));
-                    list.Add(new VectorDescriptionItem("double", boxName + "_MaxLoopTime", DataTypeEnum.State));
-                }
-            }
-
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {Title}");
             return list;
         }

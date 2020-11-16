@@ -106,7 +106,7 @@ namespace CA_DataUploaderLib
 
         public void SendVector(List<double> vector, DateTime timestamp)
         {
-            _cmd.NewData(vector);
+            _cmd.NewData(vector); // this will also check the vector length. 
             foreach (var a in _alerts)
             {
                 if (a.CheckValue(_cmd.GetVectorValue(a.Sensor)))

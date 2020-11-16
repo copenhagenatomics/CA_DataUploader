@@ -33,12 +33,9 @@ namespace CA_DataUploader
                         while (cmd.IsRunning)
                         {
                             var allSensors = usb.GetValues().ToList();
-                            if (allSensors.Any())
-                            {
-                                var list = filterUtil.FilterAndMath(allSensors);
-                                cloud.SendVector(list, allSensors.First().TimeStamp);
-                                Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
-                            }
+                            var list = filterUtil.FilterAndMath(allSensors);
+                            cloud.SendVector(list, allSensors.First().TimeStamp);
+                            Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
 
                             Thread.Sleep(100);
                             if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());

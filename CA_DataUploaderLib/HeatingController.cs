@@ -320,7 +320,6 @@ namespace CA_DataUploaderLib
                 list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_LoopTime", DataTypeEnum.State)));
                 list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.State));
                 list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.State));
-                list.Add(new VectorDescriptionItem("double", "CurrentSamplingFrequency", DataTypeEnum.State));
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from HeatingController");

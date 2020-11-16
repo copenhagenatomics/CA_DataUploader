@@ -68,6 +68,9 @@ namespace CA_DataUploaderLib
         // this method should only be called from ServerUploader.SendVector()
         public void NewData(List<double> vector)
         {
+            if (vector.Count() != _vectorDescription.Length)
+                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescription.Length}");
+
             lock (_dataVector)
             {
                 _dataVector = vector;
