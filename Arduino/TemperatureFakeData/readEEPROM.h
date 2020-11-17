@@ -7,6 +7,12 @@
 #ifndef _productType
   #define _productType "NA"
 #endif
+#ifndef _pcbVersion
+#define _pcbVersion "NA"
+#endif
+#ifndef _eepromBurnDate
+#define _eepromBurnDate "NA"
+#endif
 #ifndef _mcuFamily
   #define _mcuFamily "NA"
 #endif
@@ -36,8 +42,8 @@ void printSerial()
 
   String serialNumber = sizeof(_serialNumber) > 3 || pos1 == 0?_serialNumber:eepromString.substring(0, pos1);
   String productType = sizeof(_productType) > 3 || pos2 == pos1 +1 ?_productType:eepromString.substring(pos1+1, pos2);
-  String pcbVersion = eepromString.substring(pos2+1, pos3);
-  String eepromBurnDate = eepromString.substring(pos3+1, pos4);
+  String pcbVersion = sizeof(_pcbVersion) > 3 || pos3 == pos2 + 1 ? _pcbVersion : eepromString.substring(pos2 + 1, pos3);
+  String eepromBurnDate = sizeof(_eepromBurnDate) > 3 || pos4 == pos3 + 1 ? _eepromBurnDate : eepromString.substring(pos3+1, pos4);
   String mcuFamily = sizeof(_productType) > 3 || pos5 == pos4 +1?_mcuFamily:eepromString.substring(pos4+1, pos5);
   
   Serial.println("");

@@ -30,11 +30,13 @@
 
 #define softwareVersion "0.9"
 #define _serialNumber "WERdsciB25"
+#define _pcbVersion "3.1"
+#define _eepromBurnDate "14-1-2020 12:56:45"
 #define _productType "Temperature FakeData"
 #define _mcuFamily "Arduino Nano 3.0 Ali"
 
 // ***** INCLUDES *****
-// #include "readEEPROM.h"
+#include "readEEPROM.h"
 
 
 
@@ -55,7 +57,7 @@ void  setup()
 {
   Serial.begin(115200);
   inString = "";
-  // printSerial();
+  printSerial();
 
   for(int i=0; i<33; i++)
   {
@@ -140,17 +142,3 @@ void  loop()
   Serial.println();
   GetInput();
 }
-
-
-/*
-void printSerial()
-{
-  Serial.print("Serial Number: ");
-  Serial.println(serialNumber);
-  Serial.print("Board Family: ");
-  Serial.println(boardFamily);
-  Serial.print("Board Version: ");
-  Serial.println(boardVersion);
-  Serial.print("Board Software: ");
-  Serial.println(boardSoftware);
-}*/
