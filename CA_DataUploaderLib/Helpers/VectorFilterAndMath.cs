@@ -6,11 +6,11 @@ using System.Linq;
 
 namespace CA_DataUploaderLib.Helpers
 {
-    public class FilterUtil : IDisposable
+    public class VectorFilterAndMath : IDisposable
     {
         protected List<FilterSample> _values;
         protected MathVectorExpansion _mathVectorExpansion;
-        public FilterUtil(VectorDescription vectorDescription)
+        public VectorFilterAndMath(VectorDescription vectorDescription)
         {
             _values = IOconfFile.GetFilters().Select(x => new FilterSample(x)).ToList();
             if (_values.Any())
@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib.Helpers
 
         public VectorDescription VectorDescription { get { return _mathVectorExpansion.VectorDescription; } }
 
-        public List<double> FilterAndMath(List<SensorSample> vector)
+        public List<double> Apply(List<SensorSample> vector)
         {
             foreach (var filter in _values)
             {

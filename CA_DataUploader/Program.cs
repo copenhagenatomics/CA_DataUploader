@@ -24,8 +24,8 @@ namespace CA_DataUploader
 
                     using (var cmd = new CommandHandler(serial))
                     using (var usb = new ThermocoupleBox(cmd))
-                    using (var filterUtil = new FilterUtil(GetVectorDescription(usb)))
-                    using (var cloud = new ServerUploader(filterUtil.VectorDescription, cmd))
+                    using (var filter = new VectorFilterAndMath(GetVectorDescription(usb)))
+                    using (var cloud = new ServerUploader(filter.VectorDescription, cmd))
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
 
@@ -33,7 +33,7 @@ namespace CA_DataUploader
                         while (cmd.IsRunning)
                         {
                             var allSensors = usb.GetValues().ToList();
-                            var list = filterUtil.FilterAndMath(allSensors);
+                            var list = filter.Apply(allSensors);
                             cloud.SendVector(list, allSensors.First().TimeStamp);
                             Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
 
