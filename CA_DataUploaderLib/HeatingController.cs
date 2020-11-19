@@ -225,13 +225,14 @@ namespace CA_DataUploaderLib
                     heater.Current.Value = values[heater._ioconf.PortNumber - 1];
 
                     // this is a hot fix to make sure heaters are on/off. 
-                    if (heater.Current.TimeoutValue == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
+                    const double CurrentZeroNoiseLevel = 0.5d; // this can be reduced as we confirm noise is consistently lower.
+                    if (heater.Current.TimeoutValue <= CurrentZeroNoiseLevel && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOn(heater);
                         CALog.LogData(LogID.A, $"on.={heater.name()}-{heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
 
-                    if (heater.Current.TimeoutValue > 0 && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
+                    if (heater.Current.TimeoutValue > CurrentZeroNoiseLevel && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOff(heater);
                         CALog.LogData(LogID.A, $"off.={heater.name()}-{heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
