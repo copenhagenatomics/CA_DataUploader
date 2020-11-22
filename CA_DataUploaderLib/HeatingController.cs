@@ -49,6 +49,7 @@ namespace CA_DataUploaderLib
                 if (_heaters.Any())
                 {
                     cmd.AddCommand("help", HelpMenu);
+                    cmd.AddCommand("emergencyshutdown", EmergencyShutdown);
                     cmd.AddCommand("heater", Heater);
                     if (oven.Any())
                     {
@@ -60,6 +61,12 @@ namespace CA_DataUploaderLib
                     break; // exit the for loop
                 }
             }
+        }
+
+        private bool EmergencyShutdown(List<string> arg)
+        {
+            AllOff();
+            return true;
         }
 
         private bool HelpMenu(List<string> args)
@@ -242,6 +249,7 @@ namespace CA_DataUploaderLib
 
         private void AllOff()
         {
+            _heaters.ForEach(x => x.SetTemperature(0));
             foreach (var box in _heaters.Select(x => x.Board()).Where(x => x != null).Distinct())
                 box.SafeWriteLine("off");
 
