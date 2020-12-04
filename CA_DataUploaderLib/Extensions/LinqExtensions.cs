@@ -2,9 +2,6 @@
 using System.Collections.Generic;
 using CA_DataUploaderLib.IOconf;
 using System;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using System.Diagnostics.CodeAnalysis;
 
 namespace CA_DataUploaderLib.Extensions
 {
@@ -23,11 +20,11 @@ namespace CA_DataUploaderLib.Extensions
 
         public static DateTime AverageTime(this IEnumerable<long> input)
         {
-            double sum = input.Select(x => (double)x).Sum();
-            return new DateTime((long)(sum/input.Count()));
+            decimal avg = input.Average(l => (decimal)l);
+            return new DateTime((long)avg);
         }
 
-        public static double TriangleFilter(this List<List<SensorSample>> list, double filterLength)  // filterLength in seconds
+        internal static double TriangleFilter(this List<List<SensorSample>> list, double filterLength)  // filterLength in seconds
         {
             // order with the latest sample first. 
             list = list.OrderByDescending(x => x.Select(y => y.TimeStamp.Ticks).AverageTime()).ToList();

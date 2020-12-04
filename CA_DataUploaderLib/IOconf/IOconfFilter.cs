@@ -11,10 +11,14 @@ namespace CA_DataUploaderLib.IOconf
         public double filterLength;  // in seconds. 
         public string Name { get; set; }
 
-        public List<IOconfInput> SourceNames;
+        public List<string> SourceNames;
 
 
-        public IOconfFilter(string row, int lineNum) : base(row, lineNum, "Filter")
+        public IOconfFilter(string row, int lineNum) : this(row, lineNum, true)
+        {
+        }
+
+        public IOconfFilter(string row, int lineNum, bool validateSourceNames) : base(row, lineNum, "Filter")
         {
             format = "Filter;Name;FilterType;FilterLength;SourceNames";
 
@@ -26,7 +30,10 @@ namespace CA_DataUploaderLib.IOconf
             if (!double.TryParse(list[3], out filterLength))
                 throw new Exception($"Wrong filter length: {row} {Environment.NewLine}{format}");
 
-            SourceNames = IOconfFile.GetInputs().Where(x => list.Skip(4).Contains(x.Name)).ToList();
+            if (validateSourceNames)
+                SourceNames = IOconfFile.GetInputs().Where(x => list.Skip(4).Contains(x.Name)).Select(x => x.Name).ToList();
+            else
+                SourceNames = list.Skip(4).ToList();
         }
     }
 }

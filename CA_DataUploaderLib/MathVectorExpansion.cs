@@ -20,8 +20,7 @@ namespace CA_DataUploaderLib
 
         internal List<int> IndexOf(IOconfFilter filter)
         {
-            var inputs = filter.SourceNames.Select(x => x.Name);
-            var match = VectorDescription._items.Where(x => inputs.Contains(x.Descriptor)).ToList();
+            var match = VectorDescription._items.Where(x => filter.SourceNames.Contains(x.Descriptor)).ToList();
             return match.Select(x => VectorDescription._items.IndexOf(x)).ToList();
         }
 

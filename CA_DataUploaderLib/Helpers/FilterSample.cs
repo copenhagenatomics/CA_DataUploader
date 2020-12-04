@@ -37,8 +37,7 @@ namespace CA_DataUploaderLib.Helpers
 
         public void Input(List<SensorSample> input)
         {
-            var sourceNames = Filter.SourceNames.Select(x => x.Name);
-            CalculateOutput(input.Where(x => sourceNames.Contains(x.Name)).ToList());
+            CalculateOutput(input.Where(x => Filter.SourceNames.Contains(x.Name)).ToList());
         }
 
         public SensorSample Output { get; }
