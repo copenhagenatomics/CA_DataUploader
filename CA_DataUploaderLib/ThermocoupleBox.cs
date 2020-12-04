@@ -49,8 +49,6 @@ namespace CA_DataUploaderLib
                     rpi.Value = 0;
                 else
                     rpi.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
-                
-                rpi.TimeStamp = DateTime.UtcNow;
             }
         }
 

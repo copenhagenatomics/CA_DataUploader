@@ -5,7 +5,12 @@ namespace CA_DataUploaderLib
 {
     public class SensorSample
     {
-        public double Value;
+        private double _value;
+        public double Value { 
+            get => _value; 
+            set { TimeStamp = DateTime.UtcNow; _value = value; } 
+        }
+
         public IOconfInput Input = null;
         public IOconfMath Math = null;
         public string Other = null;
@@ -22,14 +27,12 @@ namespace CA_DataUploaderLib
         public SensorSample(IOconfInput input, double value = 0)
         {
             Value = value;
-            TimeStamp = DateTime.UtcNow;
             Input = input;
         }
 
         public SensorSample(string other, double value = 0)
         {
             Value = value;
-            TimeStamp = DateTime.UtcNow;
             Other = other;
         }
     }

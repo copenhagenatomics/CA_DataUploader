@@ -218,7 +218,6 @@ namespace CA_DataUploaderLib
                 if (sensor != null)
                 {
                     sensor.Value = value;
-                    sensor.TimeStamp = timestamp;
 
                     HandleSaltLeakage(sensor);
                 }
