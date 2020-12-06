@@ -22,7 +22,6 @@ namespace CA_DataUploaderLib
         private Queue<string> _alertQueue = new Queue<string>();
         private List<DateTime> _badPackages = new List<DateTime>();
         private List<IOconfAlert> _alerts;
-        private CommandHandler _cmd;
         private MathVectorExpansion _mathVectorExpansion;
         private Dictionary<string, string> _accountInfo;
         private int _plotID;
@@ -33,8 +32,13 @@ namespace CA_DataUploaderLib
         private string _loopName;
         private string _loginToken;
         private bool _running;
+        private VectorDescription _vectorDescription;
 
         public int MillisecondsBetweenUpload { get; set; }
+
+        public ServerUploader(VectorDescription vectorDescription) : this(vectorDescription, null)
+        {
+        }
 
         public ServerUploader(VectorDescription vectorDescription, CommandHandler cmd)
         {
@@ -47,7 +51,6 @@ namespace CA_DataUploaderLib
 
                 MillisecondsBetweenUpload = 900;
                 string server = connectionInfo.Server;
-                _cmd = cmd;
                 _client.BaseAddress = new Uri(server);
                 _client.DefaultRequestHeaders.Accept.Clear();
                 _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -61,14 +64,14 @@ namespace CA_DataUploaderLib
                 else
                     File.WriteAllBytes(_keyFilename, _rsaWriter.ExportCspBlob(true));
 
-                _cmd.SetVectorDescription(vectorDescription);
                 vectorDescription.IOconf = IOconfFile.RawFile;
+                _vectorDescription = vectorDescription;
 
                 GetLoginToken();
                 GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription));
 
                 new Thread(() => this.LoopForever()).Start();
-                _cmd.AddCommand("escape", Stop);
+                cmd?.AddCommand("escape", Stop);
             }
             catch (Exception ex)
             {
@@ -110,10 +113,10 @@ namespace CA_DataUploaderLib
         public void SendVector(List<double> vector, DateTime timestamp)
         {
             _mathVectorExpansion.Expand(vector);
-            _cmd.NewData(vector);
+
             foreach (var a in _alerts)
             {
-                if (a.CheckValue(_cmd.GetVectorValue(a.Sensor)))
+                if (a.CheckValue(GetVectorValue(vector, a.Sensor)))
                 {
                     lock (_alertQueue)
                     {
@@ -441,6 +444,12 @@ namespace CA_DataUploaderLib
             }
            
             throw new Exception(response.Result.ReasonPhrase);
+        }
+
+        private double GetVectorValue(List<double> values, string name)
+        {
+            var index = _vectorDescription._items.IndexOf(_vectorDescription._items.Single(x => x.Descriptor == name));
+            return values[index];
         }
 
         #region IDisposable Support
