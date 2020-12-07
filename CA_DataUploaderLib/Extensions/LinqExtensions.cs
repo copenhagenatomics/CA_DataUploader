@@ -23,15 +23,5 @@ namespace CA_DataUploaderLib.Extensions
             decimal avg = input.Average(l => (decimal)l);
             return new DateTime((long)avg);
         }
-
-        /// <summary>
-        /// filter where values weight more the closest they are to the latest. 
-        /// </summary>
-        internal static double TriangleFilter(this List<List<SensorSample>> list, double filterLength, DateTime latestEntryTime)  // filterLength in seconds
-        {
-            // find the sum of all timespans.  
-            var sum = list.Sum(x => filterLength - latestEntryTime.Subtract(x.Select(y => y.TimeStamp.Ticks).AverageTime()).TotalSeconds);
-            return list.Sum(x => x.Average(y => y.Value) * (filterLength - latestEntryTime.Subtract(x.Select(y => y.TimeStamp.Ticks).AverageTime()).TotalSeconds) / sum);
-        }
     }
 }

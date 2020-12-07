@@ -74,7 +74,7 @@ namespace CA_DataUploaderLib.Helpers
                         FilterType.DiffAvg => validSamples.First().Count == 2 ? 
                             validSamples.Average(y => y[0].Value - y[1].Value) : 
                             throw new Exception("Filter DiffAvg must have two input source names"),
-                        FilterType.Triangle => validSamples.TriangleFilter(Filter.filterLength, latestEntryTime),
+                        FilterType.Triangle => TriangleFilter(validSamples, Filter.filterLength, latestEntryTime),
                         _ => validSamples.Last().Select(x => x.Value).Average()
                     };
                     return;
@@ -115,6 +115,16 @@ namespace CA_DataUploaderLib.Helpers
             {
                 return _filterQueue.Where(x => x.All(y => y.Value < 10000 && y.Value != 0)).Count();
             }
+        }
+
+        /// <summary>
+        /// filter where values weight more the closest they are to the latest. 
+        /// </summary>
+        private static double TriangleFilter(List<List<SensorSample>> list, double filterLength, DateTime latestEntryTime)  // filterLength in seconds
+        {
+            // find the sum of all timespans.  
+            var sum = list.Sum(x => filterLength - latestEntryTime.Subtract(x.Select(y => y.TimeStamp.Ticks).AverageTime()).TotalSeconds);
+            return list.Sum(x => x.Average(y => y.Value) * (filterLength - latestEntryTime.Subtract(x.Select(y => y.TimeStamp.Ticks).AverageTime()).TotalSeconds) / sum);
         }
     }
 }
