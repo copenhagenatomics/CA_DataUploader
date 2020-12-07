@@ -18,12 +18,6 @@ namespace CA_DataUploaderLib
             VectorDescription._items.AddRange(_mathStatements.Select(m => new VectorDescriptionItem("double", m.Name, DataTypeEnum.State)));
         }
 
-        internal List<int> IndexOf(IOconfFilter filter)
-        {
-            var match = VectorDescription._items.Where(x => filter.SourceNames.Contains(x.Descriptor)).ToList();
-            return match.Select(x => VectorDescription._items.IndexOf(x)).ToList();
-        }
-
         /// <param name="vector">The vector to expand.</param>
         /// <remarks>
         /// The vector must match the order and amount of entries specified in <see cref="MathVectorExpansion(VectorDescription)"/>.
