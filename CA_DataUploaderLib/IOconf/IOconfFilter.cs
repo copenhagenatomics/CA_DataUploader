@@ -1,6 +1,8 @@
 ﻿using CA_DataUploaderLib.Helpers;
+using CA_DataUploaderLib.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
@@ -27,7 +29,7 @@ namespace CA_DataUploaderLib.IOconf
             if (!Enum.TryParse(list[2], out filterType))
                 throw new Exception($"Wrong filter type: {row} {Environment.NewLine}{format}");
 
-            if (!double.TryParse(list[3], out filterLength))
+            if (!list[3].TryToDouble(out filterLength))
                 throw new Exception($"Wrong filter length: {row} {Environment.NewLine}{format}");
 
             if (validateSourceNames)

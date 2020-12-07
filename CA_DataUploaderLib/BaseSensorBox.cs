@@ -8,6 +8,7 @@ using CA_DataUploaderLib.IOconf;
 using System.Text.RegularExpressions;
 using Humanizer;
 using System.Diagnostics;
+using CA_DataUploaderLib.Extensions;
 
 namespace CA_DataUploaderLib
 {
@@ -107,7 +108,7 @@ namespace CA_DataUploaderLib
                                 try
                                 {
                                     values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                                    numbers = values.Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
+                                    numbers = values.Select(x => x.ToDouble()).ToList();
                                     ProcessLine(numbers, board);
                                 }
                                 catch (Exception)
