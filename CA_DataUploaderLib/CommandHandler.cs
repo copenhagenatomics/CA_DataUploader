@@ -18,8 +18,8 @@ namespace CA_DataUploaderLib
         private StringBuilder inputCommand = new StringBuilder();
         private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
         private CALogLevel _logLevel = IOconfFile.GetOutputLevel();
-        private VectorDescription _vectorDescription;
-        private List<double> _dataVector = new List<double>();
+        private readonly List<string> AcceptedCommands = new List<string>();
+        private int AcceptedCommandsIndex = -1;
 
         public bool IsRunning { get { return _running; } }
 
@@ -42,11 +42,7 @@ namespace CA_DataUploaderLib
                 _commands.Add(name.ToLower(), new List<Func<List<string>, bool>>{func});
         }
 
-        public void Execute(string command)
-        {
-            var cmd = command.Split(' ').Select(x => x.Trim()).ToList();
-            HandleCommand(cmd);
-        }
+        public void Execute(string command) => HandleCommand(command);
 
         public bool AssertArgs(List<string> args, int minimumLen)
         {
@@ -59,33 +55,6 @@ namespace CA_DataUploaderLib
 
             return true;
         }
-
-        public void SetVectorDescription(VectorDescription vectorDescription)
-        {
-            _vectorDescription = vectorDescription;
-        }
-
-        // this method should only be called from ServerUploader.SendVector()
-        public void NewData(List<double> vector)
-        {
-            if (vector.Count() != _vectorDescription.Length)
-                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescription.Length}");
-
-            lock (_dataVector)
-            {
-                _dataVector = vector;
-            }
-        }
-
-        public double GetVectorValue(string name)
-        {
-            var index = _vectorDescription._items.IndexOf(_vectorDescription._items.Single(x => x.Descriptor == name));
-            lock (_dataVector)
-            {
-                return _dataVector[index];
-            }
-        }
-
         
         private bool Stop(List<string> args)
         {
@@ -130,13 +99,15 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.Now.Subtract(_start).Humanize(5));
         }
 
-        private void HandleCommand(List<string> cmd)
+        private void HandleCommand(string cmdString)
         {
-            if (cmd == null)  // no NewLine
+            if (cmdString == null)  // no NewLine
             {
                 // echo to console here
                 return;
             }
+
+            var cmd = cmdString.Split(' ').Select(x => x.Trim()).ToList();
 
             CALog.LogInfoAndConsoleLn(LogID.A, ""); // this ensures that next command start on a new line. 
             if (!cmd.Any())
@@ -157,49 +128,65 @@ namespace CA_DataUploaderLib
                     {
                         if (func.Invoke(cmd))
                         {
-                            if(_logLevel == CALogLevel.Debug && cmd.First().ToLower() != "help")
-                                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - command accepted");
-                            else
-                                CALog.LogData(LogID.A, $"Command: {string.Join(" ", cmd)} - command accepted {Environment.NewLine}");
+                            CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
+                            OnCommandAccepted(cmdString);
                         }
                         else
-                        {
-                            if(_logLevel == CALogLevel.Debug)
-                                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {string.Join(" ", cmd)} - bad command");
-                            else
-                                CALog.LogData(LogID.A, $"Command: {string.Join(" ", cmd)} - bad command {Environment.NewLine}");
-                        }
+                            CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command");
                     }
                     catch (ArgumentException ex)
                     {
-                        CALog.LogInfoAndConsoleLn(LogID.A, ex.Message);
+                        CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - invalid arguments", ex);
                     }
                 }
 
                 if (cmd.First().ToLower() == "help")
                     CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");  // end help menu divider
             }
+            else
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - unknown command");
+            }
         }
 
-        private List<string> GetCommand()
+        private void OnCommandAccepted(string cmdString)
+        {
+            AcceptedCommands.Add(cmdString);
+            AcceptedCommandsIndex = AcceptedCommands.Count;
+        }
+
+        private string GetCommand()
         {
             var info = Console.ReadKey(true);
             while (info.Key != ConsoleKey.Enter && info.Key != ConsoleKey.Escape && _running)
             {
-                Console.Write(info.KeyChar);
-                inputCommand.Append(info.KeyChar);
+                if (info.Key == ConsoleKey.Backspace)
+                {
+                    Console.Write("\b \b"); // https://stackoverflow.com/a/53976873/66372
+                    if (inputCommand.Length > 0)
+                        inputCommand.Remove(inputCommand.Length - 1, 1);
+                }
+                else if (info.Key == ConsoleKey.UpArrow)
+                    RestorePreviousAcceptedCommand();
+                else if (info.Key == ConsoleKey.DownArrow)
+                    RestoreNextAcceptedCommand();
+                else
+                {
+                    Console.Write(info.KeyChar);
+                    inputCommand.Append(info.KeyChar);
+                }
                 info = Console.ReadKey(true);
             }
 
             if (info.Key == ConsoleKey.Escape)
             {
-                return new List<string> { "escape" };
+                return "escape";
             }
 
             if (info.Key != ConsoleKey.Enter)
                 return null;
 
-            return inputCommand.ToString().Split(' ').Select(x => x.Trim()).ToList();
+            return inputCommand.ToString();
         }
 
         public static int GetCmdParam(List<string> cmd, int index, int defaultValue)
@@ -212,6 +199,31 @@ namespace CA_DataUploaderLib
             }
 
             return defaultValue;
+        }
+
+        private void RestoreNextAcceptedCommand()
+        {
+            if (AcceptedCommandsIndex >= AcceptedCommands.Count - 1)
+                return;
+
+            AcceptedCommandsIndex++;
+            ReplaceInputCommand(AcceptedCommands[AcceptedCommandsIndex]);
+        }
+
+        private void RestorePreviousAcceptedCommand()
+        {
+            if (AcceptedCommandsIndex > 0)
+
+            AcceptedCommandsIndex--;
+            ReplaceInputCommand(AcceptedCommands[AcceptedCommandsIndex]);
+        }
+
+        private void ReplaceInputCommand(string cmd)
+        {
+            inputCommand.Clear();
+            inputCommand.Append(cmd);
+            Console.Write("\r" + new string(' ', Console.WindowWidth) + "\r"); // clear line first https://stackoverflow.com/a/14083947/66372
+            Console.Write("\r" + cmd);
         }
 
         private bool HelpMenu(List<string> args)

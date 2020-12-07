@@ -3,7 +3,6 @@ using Humanizer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 
 namespace CA_DataUploaderLib
@@ -49,6 +48,7 @@ namespace CA_DataUploaderLib
                 if (_heaters.Any())
                 {
                     cmd.AddCommand("help", HelpMenu);
+                    cmd.AddCommand("emergencyshutdown", EmergencyShutdown);
                     cmd.AddCommand("heater", Heater);
                     if (oven.Any())
                     {
@@ -60,6 +60,12 @@ namespace CA_DataUploaderLib
                     break; // exit the for loop
                 }
             }
+        }
+
+        private bool EmergencyShutdown(List<string> arg)
+        {
+            AllOff();
+            return true;
         }
 
         private bool HelpMenu(List<string> args)
@@ -223,14 +229,15 @@ namespace CA_DataUploaderLib
                 {
                     heater.Current.Value = values[heater._ioconf.PortNumber - 1];
 
-                    // this is safety redundancy, to make sure heaters are on/off. 
-                    if (heater.Current.Value == 0 && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
+                    // this is a hot fix to make sure heaters are on/off. 
+                    const double CurrentZeroNoiseLevel = 0.5d; // this can be reduced as we confirm noise is consistently lower.
+                    if (heater.Current.Value <= CurrentZeroNoiseLevel && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOn(heater);
                         CALog.LogData(LogID.A, $"on.={heater.name()}-{heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
 
-                    if (heater.Current.Value > 0 && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
+                    if (heater.Current.Value > CurrentZeroNoiseLevel && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOff(heater);
                         CALog.LogData(LogID.A, $"off.={heater.name()}-{heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
@@ -241,6 +248,7 @@ namespace CA_DataUploaderLib
 
         private void AllOff()
         {
+            _heaters.ForEach(x => x.SetTemperature(0));
             foreach (var box in _heaters.Select(x => x.Board()).Where(x => x != null).Distinct())
                 box.SafeWriteLine("off");
 
