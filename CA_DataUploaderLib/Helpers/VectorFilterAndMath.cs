@@ -1,12 +1,10 @@
-﻿using CA_DataUploaderLib;
-using CA_DataUploaderLib.IOconf;
-using System;
+﻿using CA_DataUploaderLib.IOconf;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace CA_DataUploaderLib.Helpers
 {
-    public class VectorFilterAndMath : IDisposable
+    public class VectorFilterAndMath
     {
         protected List<FilterSample> _values;
         protected MathVectorExpansion _mathVectorExpansion;
@@ -34,25 +32,5 @@ namespace CA_DataUploaderLib.Helpers
             _mathVectorExpansion.Expand(vector);
             return vector.Select(x => x.Value).ToList();
         }
-
-        #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposedValue)
-            {
-                disposedValue = true;
-            }
-        }
-
-        // This code added to correctly implement the disposable pattern.
-        public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(true);
-        }
-
-        #endregion
     }
 }

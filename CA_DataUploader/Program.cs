@@ -22,24 +22,22 @@ namespace CA_DataUploader
 
                     var email = IOconfSetup.UpdateIOconf(serial);
 
-                    using (var cmd = new CommandHandler(serial))
-                    using (var usb = new ThermocoupleBox(cmd))
-                    using (var filter = new VectorFilterAndMath(GetVectorDescription(usb)))
-                    using (var cloud = new ServerUploader(filter.VectorDescription, cmd))
+                    using var cmd = new CommandHandler(serial);
+                    using var usb = new ThermocoupleBox(cmd);
+                    var filter = new VectorFilterAndMath(GetVectorDescription(usb));
+                    using var cloud = new ServerUploader(filter.VectorDescription, cmd);
+                    CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
+
+                    int i = 0;
+                    while (cmd.IsRunning)
                     {
-                        CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
+                        var allSensors = usb.GetValues().ToList();
+                        var list = filter.Apply(allSensors);
+                        cloud.SendVector(list, allSensors.First().TimeStamp);
+                        Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
 
-                        int i = 0;
-                        while (cmd.IsRunning)
-                        {
-                            var allSensors = usb.GetValues().ToList();
-                            var list = filter.Apply(allSensors);
-                            cloud.SendVector(list, allSensors.First().TimeStamp);
-                            Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
-
-                            Thread.Sleep(100);
-                            if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
-                        }
+                        Thread.Sleep(100);
+                        if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
                     }
                 }
                 CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
