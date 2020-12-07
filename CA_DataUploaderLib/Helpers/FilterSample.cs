@@ -65,33 +65,22 @@ namespace CA_DataUploaderLib.Helpers
                 {
                     var allSamples = validSamples.SelectMany(x => x.Select(y => y)).ToList();
                     Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
-                    switch (Filter.filterType)
+                    Output.Value = Filter.filterType switch
                     {
-                        case FilterType.Average:
-                            Output.Value = allSamples.Average(x => x.Value);
-                            return;
-                        case FilterType.Max:
-                            Output.Value = allSamples.Max(x => x.Value);
-                            return;
-                        case FilterType.Min:
-                            Output.Value = allSamples.Min(x => x.Value);
-                            return;
-                        case FilterType.SumAvg:
-                            Output.Value = validSamples.Average(y => y.Sum(x => x.Value));
-                            return;
-                        case FilterType.DiffAvg:
-                            if (validSamples.First().Count != 2)
-                                throw new Exception("Filter DiffAvg must have two input source names");
-
-                            Output.Value = validSamples.Average(y => y[0].Value - y[1].Value);
-                            return;
-                        case FilterType.Triangle:
-                            Output.Value = validSamples.TriangleFilter(Filter.filterLength, latestEntryTime);
-                            return;
-                    }
+                        FilterType.Average => allSamples.Average(x => x.Value),
+                        FilterType.Max => allSamples.Max(x => x.Value),
+                        FilterType.Min => allSamples.Min(x => x.Value),
+                        FilterType.SumAvg => validSamples.Average(y => y.Sum(x => x.Value)),
+                        FilterType.DiffAvg => validSamples.First().Count == 2 ? 
+                            validSamples.Average(y => y[0].Value - y[1].Value) : 
+                            throw new Exception("Filter DiffAvg must have two input source names"),
+                        FilterType.Triangle => validSamples.TriangleFilter(Filter.filterLength, latestEntryTime),
+                        _ => validSamples.Last().Select(x => x.Value).Average()
+                    };
+                    return;
                 }
 
-                // incase of no valid samples or invalid filter type
+                // incase of no valid samples
                 Output.Value = _filterQueue.Last().Select(x => x.Value).Average();
                 Output.TimeStamp = _filterQueue.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
             }
