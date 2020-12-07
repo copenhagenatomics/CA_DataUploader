@@ -28,11 +28,9 @@ namespace CA_DataUploaderLib.Helpers
         }
 
         public IOconfFilter Filter { get; private set; }
-        public List<int> VectorIndexs { get; private set; }
 
         private Queue<List<SensorSample>> _filterQueue = new Queue<List<SensorSample>>();
 
-        public bool MaxSlope;
 
         public void Input(List<SensorSample> input)
         {
@@ -40,13 +38,6 @@ namespace CA_DataUploaderLib.Helpers
         }
 
         public SensorSample Output { get; }
-
-        // currently this only returns the first input value. 
-        public double TimeoutValue 
-        {
-            // if last sample is older than filter length, then set timeout. 
-            get { return Output.TimeStamp < DateTime.UtcNow.AddSeconds(-Filter.filterLength) ? 10009 : Output.Value; }   // 10009 means timedout
-        }
 
         public override string ToString()
         {
@@ -140,12 +131,6 @@ namespace CA_DataUploaderLib.Helpers
             {
                 return _filterQueue.Where(x => x.All(y => y.Value < 10000 && y.Value != 0)).Count();
             }
-        }
-
-
-        public bool HasValidTemperature()
-        {
-            return Output.Value != 0 && TimeoutValue < 10000;
         }
     }
 }
