@@ -64,34 +64,29 @@ namespace CA_DataUploaderLib.Helpers
                 if (validSamples.Any())
                 {
                     var allSamples = validSamples.SelectMany(x => x.Select(y => y)).ToList();
+                    Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
                     switch (Filter.filterType)
                     {
                         case FilterType.Average:
                             Output.Value = allSamples.Average(x => x.Value);
-                            Output.TimeStamp = allSamples.Select(d => d.TimeStamp.Ticks).AverageTime();
                             return;
                         case FilterType.Max:
                             Output.Value = allSamples.Max(x => x.Value);
-                            Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime(); 
                             return;
                         case FilterType.Min:
                             Output.Value = allSamples.Min(x => x.Value);
-                            Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
                             return;
                         case FilterType.SumAvg:
                             Output.Value = validSamples.Average(y => y.Sum(x => x.Value));
-                            Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
                             return;
                         case FilterType.DiffAvg:
                             if (validSamples.First().Count != 2)
                                 throw new Exception("Filter DiffAvg must have two input source names");
 
                             Output.Value = validSamples.Average(y => y[0].Value - y[1].Value);
-                            Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
                             return;
                         case FilterType.Triangle:
                             Output.Value = validSamples.TriangleFilter(Filter.filterLength, latestEntryTime);
-                            Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
                             return;
                     }
                 }
