@@ -11,11 +11,7 @@ namespace CA_DataUploaderLib.Helpers
         public VectorFilterAndMath(VectorDescription vectorDescription)
         {
             _values = IOconfFile.GetFilters().Select(x => new FilterSample(x)).ToList();
-            if (_values.Any())
-            {
-                vectorDescription._items.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Filter.Name, DataTypeEnum.Input)));
-            }
-            
+            vectorDescription._items.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Filter.Name, DataTypeEnum.Input)));            
             _mathVectorExpansion = new MathVectorExpansion(vectorDescription);
         }
 
