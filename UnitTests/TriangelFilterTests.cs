@@ -10,7 +10,7 @@ using System.Threading;
 namespace UnitTests
 {
     [TestClass]
-    public class LinqExtensionsTests
+    public class TriangelFilterTests
     {
         [TestMethod]
         public void TriangleFilter1()

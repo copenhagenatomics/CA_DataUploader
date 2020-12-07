@@ -2,7 +2,6 @@
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -61,8 +60,10 @@ namespace CA_DataUploaderLib.Helpers
         {
             lock (_filterQueue)
             {
-                var removeBefore = DateTime.UtcNow.AddSeconds(-Filter.filterLength);
                 _filterQueue.Enqueue(input);
+                var latestEntryTime = input.Select(y => y.TimeStamp.Ticks).AverageTime();
+                var removeBefore = latestEntryTime.AddSeconds(-Filter.filterLength);
+
                 while (_filterQueue.First().Any(x => x.TimeStamp < removeBefore))
                 {
                     _filterQueue.Dequeue();
@@ -98,7 +99,7 @@ namespace CA_DataUploaderLib.Helpers
                             Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
                             return;
                         case FilterType.Triangle:
-                            Output.Value = validSamples.TriangleFilter(Filter.filterLength);
+                            Output.Value = validSamples.TriangleFilter(Filter.filterLength, latestEntryTime);
                             Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
                             return;
                     }
