@@ -25,13 +25,6 @@ namespace CA_DataUploaderLib
 
         public BaseSensorBox() { }
 
-        public SensorSample GetValue(string sensorKey)
-        {
-            if(!_values.Any(x => (x.Input.BoxName + x.Input.PortNumber.ToString()) == sensorKey))
-                throw new Exception(sensorKey + " not found in _values, count: " + _values.Count());
-            return _values.Single(x => (x.Input.BoxName + x.Input.PortNumber.ToString()) == sensorKey);
-        }
-
         public SensorSample GetValueByTitle(string title) =>
                 _values.SingleOrDefault(x => x.Input.Name == title) ??
                 throw new Exception(title + " not found in _config. Known names: " + string.Join(", ", _values.Select(x => x.Input.Name)));
