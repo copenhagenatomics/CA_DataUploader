@@ -12,9 +12,8 @@ namespace CA_DataUploaderLib
         }
 
         public IOconfInput Input = null;
-        public IOconfMath Math = null;
         public string Other = null;
-        public string Name { get { return (Input != null ? Input.Name : (Math != null ? Math.Name : Other)); } }
+        public string Name { get { return Input != null ? Input.Name : Other; } }
 
         private DateTime _timeStamp;
         public DateTime TimeStamp 
