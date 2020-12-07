@@ -208,9 +208,6 @@ namespace CA_DataUploaderLib.IOconf
             return Table.Where(x => x.GetType() == typeof(IOconfFilter)).Cast<IOconfFilter>();  
         }
 
-        public static IEnumerable<IOconfInput> GetInputs()
-        {
-            return Table.Where(x => x.GetType().IsSubclassOf(typeof(IOconfInput))).Cast<IOconfInput>();   
-        }
+        public static IEnumerable<IOconfInput> GetInputs() => Table.OfType<IOconfInput>();
     }
 }
