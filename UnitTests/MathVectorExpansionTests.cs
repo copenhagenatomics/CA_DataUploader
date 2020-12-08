@@ -13,7 +13,7 @@ namespace UnitTests
         [TestMethod]
         public void VectorDescriptionIncludesMath()
         {
-            IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
+            static IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
             var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
             var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
             Assert.AreEqual("MyName" + Environment.NewLine + "MyMath", math.VectorDescription.GetVectorItemDescriptions());
@@ -22,7 +22,7 @@ namespace UnitTests
         [TestMethod]
         public void ExpandsVector()
         {
-            IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
+            static IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
             var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
             var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
             var values = new List<SensorSample>() { new SensorSample(new IOconfInput("KType;MyName", 1, "KType"), 0.2) };
@@ -33,7 +33,7 @@ namespace UnitTests
         [TestMethod]
         public void RejectsUnexpectedVectorLength()
         {
-            IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
+            static IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
             var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
             var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
             var values = new List<SensorSample>() {

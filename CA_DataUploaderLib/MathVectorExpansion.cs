@@ -8,7 +8,7 @@ namespace CA_DataUploaderLib
     public class MathVectorExpansion
     {
         public VectorDescription VectorDescription { get; private set; }
-        private List<IOconfMath> _mathStatements;
+        private readonly List<IOconfMath> _mathStatements;
 
         public MathVectorExpansion(VectorDescription vectorDescription) : this(vectorDescription, IOconfFile.GetMath) { }
         public MathVectorExpansion(VectorDescription vectorDescription, Func<IEnumerable<IOconfMath>> getMath)
