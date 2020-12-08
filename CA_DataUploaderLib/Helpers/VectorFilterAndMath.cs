@@ -14,7 +14,7 @@ namespace CA_DataUploaderLib.Helpers
         {
             _logLevel = IOconfFile.GetOutputLevel();
             _values = IOconfFile.GetFilters().Select(x => new FilterSample(x)).ToList();
-            vectorDescription._items.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Filter.Name, DataTypeEnum.Input)));
+            vectorDescription._items.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Output.Name, DataTypeEnum.Input)));
             RemoveHiddenSources(vectorDescription._items, i => i.Descriptor);
             _mathVectorExpansion = new MathVectorExpansion(vectorDescription);
         }
