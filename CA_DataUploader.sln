@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29306.81
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CA_AverageTemperature", "CA_AverageTemperature\CA_AverageTemperature.csproj", "{C978284B-E108-4C6F-B5C8-AA2B52085B5E}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShowAvailableComPorts", "ShowAvailableComPorts\ShowAvailableComPorts.csproj", "{FE66C692-9A95-47D3-B262-241B9833D885}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ScreenShots", "ScreenShots", "{9AC8D98A-B7B2-41E5-AD84-E6BAA91FF674}"
@@ -50,10 +48,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{C978284B-E108-4C6F-B5C8-AA2B52085B5E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C978284B-E108-4C6F-B5C8-AA2B52085B5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C978284B-E108-4C6F-B5C8-AA2B52085B5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C978284B-E108-4C6F-B5C8-AA2B52085B5E}.Release|Any CPU.Build.0 = Release|Any CPU
 		{FE66C692-9A95-47D3-B262-241B9833D885}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{FE66C692-9A95-47D3-B262-241B9833D885}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FE66C692-9A95-47D3-B262-241B9833D885}.Release|Any CPU.ActiveCfg = Release|Any CPU

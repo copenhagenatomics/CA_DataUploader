@@ -23,13 +23,11 @@ You can download the latest release files here.
 Or build the source code and copy the files from the output direct to a new directory you create on RaspberryPi.
 \CA_DataUploader\CA_DataUploader\bin\Debug\netcoreapp3.0\linux-arm
 
-![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/CA_AverageTemperature.exe.png)
-
 First you need to set a few files as executable
 > chmod 755 USBmapper.sh
-> chmod 755 LoopControl
+> chmod 755 CA_DataUploader
 
-> ./CA_AverageTemperature.exe
+> ./CA_DataUploader
 
 ![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/CA_DataUploader.exe.png)
 
