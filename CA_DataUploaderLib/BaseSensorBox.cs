@@ -37,7 +37,7 @@ namespace CA_DataUploaderLib
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
             var list = _values.Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input)).ToList();
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {Title}");
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count,2} datapoints from {Title}");
             return list;
         }
 
@@ -46,11 +46,11 @@ namespace CA_DataUploaderLib
             if (_values.Count == 0)
                 return false;
 
-            var sb = new StringBuilder($"NAME      {GetAvgLoopTime().ToString("N0").PadLeft(4)}           ");
+            var sb = new StringBuilder($"NAME      {GetAvgLoopTime(),4:N0}           ");
             sb.AppendLine();
             foreach (var t in _values)
             {
-                sb.AppendLine($"{t.Input.Name.PadRight(22)}={t.Value.ToString("N2").PadLeft(9)}");
+                sb.AppendLine($"{t.Input.Name,-22}={t.Value,9:N2}");
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, sb.ToString());
@@ -64,7 +64,7 @@ namespace CA_DataUploaderLib
 
         protected virtual void ParentLoopForever() { }
 
-        private static Regex _startsWithDigitRegex = new Regex(@"^\s*(-|\d+)\s*");
+        private static readonly Regex _startsWithDigitRegex = new Regex(@"^\s*(-|\d+)\s*");
 
         protected void LoopForever()
         {
@@ -75,77 +75,73 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    foreach (var board in _boards)
-                    {
-                        var hadDataAvailable = false;
-                        var timeInLoop = Stopwatch.StartNew();
-                        // we read all lines available (boards typically write a line every 100 ms)
-                        // we make sure to exit if 2 seconds pass in the loop, to allow failure counting when error data is continuously returned by the board.
-                        // we use time instead of attempts as SafeHasDataInReadBuffer can continuously report there is data when a partial line is returned by a board that stalls,
-                        // which then consistently times out in SafeReadLine, making each loop iteration 2 seconds.
-                        while (board.SafeHasDataInReadBuffer() && timeInLoop.ElapsedMilliseconds < 2000)
-                        {
-                            hadDataAvailable = true;
-                            var row = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
-
-                            if (_startsWithDigitRegex.IsMatch(row))  // check that row starts with digit. 
-                            {
-                                try
-                                {
-                                    var values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                                    var numbers = values.Select(x => x.ToDouble()).ToList();
-                                    ProcessLine(numbers, board);
-                                }
-                                catch (Exception)
-                                {
-                                    CALog.LogErrorAndConsoleLn(LogID.B, "Failed handling board response " + board.ToString() + " line: " + row);
-                                    throw;
-                                }
-                            }
-                            else
-                            {
-                                // these should be mostly responses to commands on headers on reconnects,
-                                // but if it becomes too noisy we might need to tune it down.
-                                CALog.LogErrorAndConsoleLn(LogID.B, "Unhandled board response " + board.ToString() + " line: " + row);
-                            }
-                        }
-                        
-                        if (!hadDataAvailable)
-                        {
-                            // we expect data on every cycle (each 100 ms), as the boards normally write a line every 100 ms,
-                            // if this becomes too noisy we might need to tune it down.
-                            CALog.LogData(LogID.B, "No data available for " + board.ToString());
-                        }
-                    }
-
-                    // check if any of the boards stopped responding. 
-                    ParentLoopForever();
-                    CheckFails();
-
-                    Thread.Sleep(100);
+                    ReadSensors();
+                    CheckFails(); // check if any of the boards stopped responding. 
+                    Thread.Sleep(100);//boards typically write a line every 100 ms
                 }
                 catch (Exception ex)
                 {
                     CALog.LogInfoAndConsoleLn(LogID.A, ".", ex);
-                    badRow++;
-                    if (badRow > 10)
+                    if (badRow++ > 10)
                     {
                         CALog.LogErrorAndConsoleLn(LogID.A, "Too many bad rows from thermocouple ports.. shutting down:");
-                        if(_cmd != null)
-                            _cmd.Execute("escape");
-
+                        _cmd?.Execute("escape");
                         _running = false;
                     }
                 }
             }
 
             foreach (var board in _boards)
-            {
-                if(board != null)
-                    board.SafeClose();
-            }
+                board?.SafeClose();
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.LoopForever() " + DateTime.Now.Subtract(start).Humanize(5));
+        }
+
+        protected virtual void ReadSensors()
+        {
+            foreach (var board in _boards)
+            {
+                var hadDataAvailable = false;
+                var timeInLoop = Stopwatch.StartNew();
+                // We read all lines available. We make sure to exit within 100ms, to allow reads to other boards
+                // and to avoid being stuck when data with errors is continuously returned by the board.
+                // We use time instead of attempts as SafeHasDataInReadBuffer can continuously report there is data when a partial line is returned by a board that stalls,
+                // which then consistently times out in SafeReadLine, making each loop iteration 2 seconds.
+                while (board.SafeHasDataInReadBuffer() && timeInLoop.ElapsedMilliseconds < 100)
+                {
+                    hadDataAvailable = true;
+                    var row = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
+                    try
+                    {
+                        var numbers = TryParseAsDoubleList(row);
+                        if (numbers != null)
+                            ProcessLine(numbers, board);
+                        else // mostly responses to commands or headers on reconnects.
+                            CALog.LogInfoAndConsoleLn(LogID.B, "Unhandled board response " + board.ToString() + " line: " + row);
+                    }
+                    catch (Exception ex)
+                    {
+                        CALog.LogErrorAndConsoleLn(LogID.B, "Failed handling board response " + board.ToString() + " line: " + row, ex);
+                    }
+                }
+
+                if (!hadDataAvailable) 
+                    // we expect data on every cycle (each 100 ms), as the boards normally write a line every 100 ms.
+                    CALog.LogData(LogID.B, "No data available for " + board.ToString());
+            }
+        }
+
+        /// <returns>the list of doubles, otherwise <c>null</c></returns>
+        protected static List<double> TryParseAsDoubleList(string row)
+        {
+            if (_startsWithDigitRegex.IsMatch(row))
+                return null;
+
+            return row.Split(",".ToCharArray())
+                .Select(x => x.Trim())
+                .Where(x => x.Length > 0)
+                .Select(x => x.ToDouble())
+                .ToList();
         }
 
         private void CheckFails()
@@ -204,7 +200,7 @@ namespace CA_DataUploaderLib
             {
                 if (sensor.Value < 3000 && sensor.Value > 0)  // Salt leakage algorithm. 
                 {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Salt leak detected from {sensor.Input.Name}={sensor.Value} {DateTime.Now.ToString("dd-MMM-yyyy HH:mm")}");
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Salt leak detected from {sensor.Input.Name}={sensor.Value} {DateTime.Now:dd-MMM-yyyy HH:mm}");
                     sensor.Value = 1d;
                     if (_cmd != null)
                         _cmd.Execute("escape"); // make the whole system shut down. 

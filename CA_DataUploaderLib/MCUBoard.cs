@@ -43,8 +43,6 @@ namespace CA_DataUploaderLib
 
         public DateTime PortOpenTimeStamp;
 
-        private Queue<string> _readBuffer = new Queue<string>();
-        private string _overshoot = string.Empty;
         private DateTime _lastReopenTime;
 
         public MCUBoard(string name, int baudrate) // : base(name, baudrate, 0, 8, 1, 0)
@@ -226,7 +224,7 @@ namespace CA_DataUploaderLib
 
         public override string ToString()
         {
-            return $"{productTypeHeader}{productType.PadRight(20)} {serialNumberHeader}{serialNumber.PadRight(12)} Port name: {PortName}";
+            return $"{productTypeHeader}{productType,-20} {serialNumberHeader}{serialNumber,-12} Port name: {PortName}";
         }
 
         public string ToStringSimple(string seperator)
