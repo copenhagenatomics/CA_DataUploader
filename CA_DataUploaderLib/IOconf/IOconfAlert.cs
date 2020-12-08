@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using static System.FormattableString;
+using CA_DataUploaderLib.Extensions;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -25,7 +26,7 @@ namespace CA_DataUploaderLib.IOconf
             Name = list[1];
             Sensor = list[2];
             string comparisson = list[3].ToLower();
-            bool hasValidValue = list.Count > 4 && double.TryParse(list[4], NumberStyles.Any & ~NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out Value);
+            bool hasValidValue = list.Count > 4 && list[4].TryToDouble(out Value);
             if (!hasValidValue && comparisson != "int" && comparisson != "nan")
                 throw new Exception("IOconfAlert: wrong format: " + row);
 

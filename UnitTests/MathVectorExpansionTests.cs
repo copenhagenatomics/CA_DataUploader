@@ -24,7 +24,7 @@ namespace UnitTests
             IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
             var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
             var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
-            var values = new List<double> { 0.2 };
+            var values = new List<SensorSample>() { new SensorSample(new IOconfInput("bla", 1, "KType")) };
             math.Expand(values);
             CollectionAssert.AreEqual(new[] { 0.2, 2.2 }, values);
         }
@@ -35,7 +35,7 @@ namespace UnitTests
             IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
             var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
             var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
-            var values = new List<double> { 0.2, 3 };
+            var values = new List<SensorSample>() { new SensorSample(new IOconfInput("bla", 1, "KType")) };
             var ex = Assert.ThrowsException<ArgumentException>(() => math.Expand(values));
             Assert.AreEqual("wrong vector length (input, expected): 2 <> 1", ex.Message);
         }
@@ -47,7 +47,7 @@ namespace UnitTests
             IEnumerable<IOconfMath> GetTestMath() => ioconfEntries;
             var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
             var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
-            var values = new List<double> { 0.2 };
+            var values = new List<SensorSample>() { new SensorSample(new IOconfInput("bla", 1, "KType")) };
 
             ioconfEntries = new[] { new IOconfMath("Math;MyMath;MyName + 2", 2), new IOconfMath("Math;MyMath2;MyName + 3", 2) };
             math.Expand(values);

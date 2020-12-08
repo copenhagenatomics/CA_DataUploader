@@ -4,10 +4,12 @@ using System.Collections.Generic;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfMath : IOconfRow
+    public class IOconfMath : IOconfInput
     {
         public IOconfMath(string row, int lineNum) : base(row, lineNum, "Math")
         {
+            format = "Math;Name;math expression";
+
             var list = ToList();
             if (list[0] != "Math") throw new Exception("IOconfMath: wrong format: " + row);
             
@@ -24,7 +26,6 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        public string Name { get; }
         private readonly Expression expression;
 
         // https://www.codeproject.com/Articles/18880/State-of-the-Art-Expression-Evaluation
@@ -32,12 +33,12 @@ namespace CA_DataUploaderLib.IOconf
         // https://github.com/sklose/NCalc2
         // examples:
         // https://github.com/sklose/NCalc2/blob/master/test/NCalc.Tests/Fixtures.cs
-        public double Calculate(Dictionary<string, object> values)
+        public SensorSample Calculate(Dictionary<string, object> values)
         {
             expression.Parameters = values;
             // Convert.ToDouble allows some expressions that return int, decimals or even boolean to work
             // note that some expression may even return different values depending on the branch hit i.e. when using if(...)
-            return Convert.ToDouble(expression.Evaluate());
+            return new SensorSample(this, Convert.ToDouble(expression.Evaluate())) { TimeStamp = DateTime.UtcNow };
         }
     }
 }

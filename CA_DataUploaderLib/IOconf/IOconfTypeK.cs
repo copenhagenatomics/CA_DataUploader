@@ -7,6 +7,8 @@ namespace CA_DataUploaderLib.IOconf
         public bool AllJunction { get; private set; }
         public IOconfTypeK(string row, int lineNum) : base(row, lineNum, "TypeK")
         {
+            format = "TypeK;Name;BoxName;[port number];[skip/all]";
+
             var list = ToList();
             Name = list[1];
             BoxName = list[2];

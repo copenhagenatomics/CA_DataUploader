@@ -6,6 +6,8 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfSaltLeakage(string row, int lineNum) : base(row, lineNum, "SaltLeakage")
         {
+            format = "SaltLeakage;Name;BoxName;[port number]";
+
             var list = ToList();
             Name = list[1];
             BoxName = list[2];

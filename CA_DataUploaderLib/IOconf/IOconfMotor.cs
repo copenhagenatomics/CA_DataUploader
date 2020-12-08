@@ -10,6 +10,8 @@ namespace CA_DataUploaderLib.IOconf
 
         public IOconfMotor(string row, int lineNum) : base(row, lineNum, "Motor")
         {
+            format = "Motor;Name;BoxName;Forward/Backward";
+
             var list = ToList();
             Name = list[1];
             BoxName = list[2];

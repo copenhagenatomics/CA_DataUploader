@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CA_DataUploaderLib.Extensions;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
@@ -67,7 +68,7 @@ namespace CA_DataUploaderLib
                     if (match.Success && match.Groups.Count > 4)
                     {
                         return match.Groups.Cast<Group>().Skip(1)
-                            .Select(x => double.Parse(x.Value, CultureInfo.InvariantCulture)).ToList();
+                            .Select(x => x.Value.ToDouble()).ToList();
                     }
                 }
                 catch (Exception ex)

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using CA_DataUploaderLib.Extensions;
 
 namespace UnitTests
 {
@@ -32,8 +33,8 @@ namespace UnitTests
             {
                 double dummy;
                 var values = match.Groups.Cast<Group>().Skip(1)
-                    .Where(x => double.TryParse(x.Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out dummy))
-                    .Select(x => double.Parse(x.Value, CultureInfo.InvariantCulture)).ToArray();
+                    .Where(x => x.Value.TryToDouble(out dummy))
+                    .Select(x => x.Value.ToDouble()).ToArray();
                 Debug.Print(values.Count().ToString());
             }
         }

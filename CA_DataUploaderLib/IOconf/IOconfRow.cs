@@ -18,6 +18,7 @@ namespace CA_DataUploaderLib.IOconf
         protected string Row;
         protected string Type;
         protected int LineNumber;
+        protected string format;
 
         public List<string> ToList()
         {

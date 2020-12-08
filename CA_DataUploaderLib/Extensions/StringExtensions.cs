@@ -135,6 +135,10 @@ namespace CA_DataUploaderLib.Extensions
             return int.Parse(s);
         }
 
+        public static double ToDouble(this string s) => double.Parse(s, NumberStyles.Float, CultureInfo.InvariantCulture);
+
+        public static bool TryToDouble(this string s, out double val) => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out val);
+
         public static DateTime ToDateTime(this string s)
         {
             return DateTime.Parse(s, CultureInfo.InvariantCulture);

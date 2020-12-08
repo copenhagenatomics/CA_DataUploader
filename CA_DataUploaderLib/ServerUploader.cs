@@ -22,7 +22,6 @@ namespace CA_DataUploaderLib
         private Queue<string> _alertQueue = new Queue<string>();
         private List<DateTime> _badPackages = new List<DateTime>();
         private List<IOconfAlert> _alerts;
-        private MathVectorExpansion _mathVectorExpansion;
         private Dictionary<string, string> _accountInfo;
         private int _plotID;
         private string _plotname;
@@ -44,8 +43,6 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                _mathVectorExpansion = new MathVectorExpansion(vectorDescription);
-                vectorDescription = _mathVectorExpansion.VectorDescription;
                 CheckInputData(vectorDescription);
                 var connectionInfo = GetAccountInfo();
 
@@ -112,7 +109,8 @@ namespace CA_DataUploaderLib
 
         public void SendVector(List<double> vector, DateTime timestamp)
         {
-            _mathVectorExpansion.Expand(vector);
+            if (vector.Count() != _vectorDescription.Length)
+                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescription.Length}");
 
             foreach (var a in _alerts)
             {

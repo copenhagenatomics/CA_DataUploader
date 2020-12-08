@@ -30,6 +30,8 @@
 
 #define softwareVersion "0.9"
 #define _serialNumber "WERdsciB25"
+#define _pcbVersion "3.1"
+#define _eepromBurnDate "14-1-2020 12:56:45"
 #define _productType "Temperature FakeData"
 #define _mcuFamily "Arduino Nano 3.0 Ali"
 
@@ -63,6 +65,37 @@ void  setup()
   }
 }
 
+void PrintDouble(double value)
+{
+  char str[11];
+  dtostrf(value, 6,2, str);
+  strcat(str, ", \0");
+  Serial.print(str);
+}
+
+double GetInput()
+{
+  char inChar = Serial.read();
+  if (inChar == 'S' || inChar == 'e' || inChar == 'r' || inChar == 'i' || inChar == 'a' || inChar == 'l' || inChar == 'J' ||inChar == 'u' ||inChar == 'n' || inChar == 'c' ||inChar == 't' || inChar == 'o' ) 
+  {
+      // convert the incoming byte to a char and add it to the string:
+      inString += inChar;
+  }
+  else if (inChar != -1) 
+  {
+      if(inString == "Junction")
+      {
+        junction = true;
+      }
+
+      inString = "";  
+    return -1.0;
+  }  
+
+  return -1.0;
+}
+
+
 void  loop()
 { 
   if(millis() < timeStamp)
@@ -72,14 +105,6 @@ void  loop()
   
 
   value[0] = value[0] + (random(100)-50)/1000.0;
-  if(value[0] > 150 || value[0] == 0)
-  {
-    Serial.print("Error: board junction temperature outside range ");
-    PrintDouble(value[0]);
-    Serial.println();
-    return;  
-  }
-
   PrintDouble(value[0]);
 
   int valid = 0;
@@ -117,51 +142,3 @@ void  loop()
   Serial.println();
   GetInput();
 }
-
-void PrintDouble(double value)
-{
-  char str[11];
-  dtostrf(value, 6,2, str);
-  strcat(str, ", \0");
-  Serial.print(str);
-}
-
-double GetInput()
-{
-  char inChar = Serial.read();
-  if (inChar == 'S' || inChar == 'e' || inChar == 'r' || inChar == 'i' || inChar == 'a' || inChar == 'l' || inChar == 'J' ||inChar == 'u' ||inChar == 'n' || inChar == 'c' ||inChar == 't' || inChar == 'o' ) 
-  {
-      // convert the incoming byte to a char and add it to the string:
-      inString += inChar;
-  }
-  else if (inChar != -1) 
-  {
-      if(inString == "Serial")
-      {
-        printSerial();
-      }
-      else if(inString == "Junction")
-      {
-        junction = true;
-      }
-
-      inString = "";  
-    return -1.0;
-  }  
-
-  return -1.0;
-}
-
-
-/*
-void printSerial()
-{
-  Serial.print("Serial Number: ");
-  Serial.println(serialNumber);
-  Serial.print("Board Family: ");
-  Serial.println(boardFamily);
-  Serial.print("Board Version: ");
-  Serial.println(boardVersion);
-  Serial.print("Board Software: ");
-  Serial.println(boardSoftware);
-}*/

@@ -3,7 +3,6 @@ using Humanizer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 
 namespace CA_DataUploaderLib
@@ -29,13 +28,13 @@ namespace CA_DataUploaderLib
             // map all heaters, sensors and ovens. 
             var heaters = IOconfFile.GetHeater().ToList();
             var oven = IOconfFile.GetOven().ToList();
-            var sensors = caThermalBox.GetAllDatapoints().ToList();
+            var sensors = caThermalBox.GetAutoUpdatedValues().ToList();
             foreach (var heater in heaters)
             {
                 var maxSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.IsMaxTemperatureSensor)?.TypeK.Name;
                 var ovenSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && !x.IsMaxTemperatureSensor)?.TypeK.Name;
                 int area = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.OvenArea > 0)?.OvenArea??-1;
-                _heaters.Add(new HeaterElement(area, heater, sensors.Where(x => x.Name == maxSensor), sensors.Where(x => x.Name == ovenSensor)));
+                _heaters.Add(new HeaterElement(area, heater, sensors.Where(x => x.Input.Name == maxSensor), sensors.Where(x => x.Input.Name == ovenSensor)));
             }
 
             if (!_heaters.Any())
@@ -188,7 +187,6 @@ namespace CA_DataUploaderLib
 
                         if (DateTime.UtcNow.Subtract(heater.Current.TimeStamp).TotalMilliseconds > 2000)
                         {
-                            heater.Current.ReadSensor_LoopTime = 0;
                             reconnectLimitExceeded |= !heater._ioconf.Map.Board.SafeReopen();
                         }
                     }
@@ -233,13 +231,13 @@ namespace CA_DataUploaderLib
 
                     // this is a hot fix to make sure heaters are on/off. 
                     const double CurrentZeroNoiseLevel = 0.5d; // this can be reduced as we confirm noise is consistently lower.
-                    if (heater.Current.TimeoutValue <= CurrentZeroNoiseLevel && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
+                    if (heater.Current.Value <= CurrentZeroNoiseLevel && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOn(heater);
                         CALog.LogData(LogID.A, $"on.={heater.name()}-{heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
 
-                    if (heater.Current.TimeoutValue > CurrentZeroNoiseLevel && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
+                    if (heater.Current.Value > CurrentZeroNoiseLevel && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOff(heater);
                         CALog.LogData(LogID.A, $"off.={heater.name()}-{heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
@@ -287,27 +285,26 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public List<double> GetStates()
+        public List<SensorSample> GetStates()
         {
-            var list = new List<double>();
+            var list = new List<SensorSample>();
             if (_logLevel == CALogLevel.Debug)
             {
-                list.Add(_offTemperature);
-                list.Add(_lastTemperature);
-                list.Add(_heaters.Max(x => x.Current.GetFrequency()));
+                list.Add(new SensorSample("off_temperature", _offTemperature));
+                list.Add(new SensorSample("last_temperature", _lastTemperature));
             }
 
             return list;
         }
 
-        public IEnumerable<double> GetPower()
+        public IEnumerable<SensorSample> GetPower()
         {
-            var powerValues = _heaters.Select(x => x.Current.TimeoutValue);
-            var states =_heaters.Select(x => x.IsOn ? 1.0 : 0.0);
+            var powerValues = _heaters.Select(x => x.Current.Clone());
+            var states =_heaters.Select(x => new SensorSample(x.name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
             var values = powerValues.Concat(states);
             if (_logLevel == CALogLevel.Debug)
             {
-                IEnumerable<double> loopTimes = _heaters.Select(x => x.Current.ReadSensor_LoopTime);
+                var loopTimes = _heaters.Select(x => new SensorSample(x.name() + "_LoopTime", x.Current.ReadSensor_LoopTime));
                 return values.Concat(loopTimes);
             }
 
@@ -317,21 +314,20 @@ namespace CA_DataUploaderLib
         /// <summary>
         /// Gets all the values in the order specified by <see cref="GetVectorDescriptionItems"/>.
         /// </summary>
-        public IEnumerable<double> GetValues()
+        public IEnumerable<SensorSample> GetValues()
         {
             return GetPower().Concat(GetStates());
         }
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
-            var list = _heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_Power", DataTypeEnum.Input)).ToList();
+            var list = _heaters.Select(x => new VectorDescriptionItem("double", x.Current.Name, DataTypeEnum.Input)).ToList();
             list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_On/Off", DataTypeEnum.Output)));
             if (_logLevel == CALogLevel.Debug)
             {
                 list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_LoopTime", DataTypeEnum.State)));
                 list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.State));
                 list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.State));
-                list.Add(new VectorDescriptionItem("double", "CurrentSamplingFrequency", DataTypeEnum.State));
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from HeatingController");

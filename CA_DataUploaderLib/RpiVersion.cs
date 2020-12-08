@@ -1,4 +1,5 @@
-﻿using CA_DataUploaderLib.IOconf;
+﻿using CA_DataUploaderLib.Helpers;
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -41,7 +42,7 @@ namespace CA_DataUploaderLib
             sb.AppendLine("CPU            : " + GetCPU());
             sb.AppendLine("Core count     : " + GetNumberOfCores().ToString());
             sb.AppendLine("Serial no      : " + GetSerialNumber());
-            sb.AppendLine("WiFi SSID      : " + GetWiFi_SSID());
+            sb.AppendLine("WiFi     " + GetWiFi_SSID());
             sb.AppendLine();
 
             if (i2cConfig != null)
@@ -74,7 +75,7 @@ namespace CA_DataUploaderLib
         public static string[] GetUSBports()
         {
             if (_OS.Platform == PlatformID.Unix)
-                return ExecuteShellCommand("ls -1a /dev/USB*").Split("\n".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).Select(x => x.Replace("\r", "").Trim()).ToArray();
+                return DULutil.ExecuteShellCommand("ls -1a /dev/USB*").Split("\n".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).Select(x => x.Replace("\r", "").Trim()).ToArray();
 
             return SerialPort.GetPortNames();
         }
@@ -119,8 +120,9 @@ namespace CA_DataUploaderLib
             if (IsWindows())
                 return "PC";
 
-            if(_OS.Platform == PlatformID.Unix)
-                return ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}' | sed 's/^1000//'").Trim();
+            // https://elinux.org/RPi_HardwareHistory
+            if (_OS.Platform == PlatformID.Unix)
+                return DULutil.ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}' | sed 's/^1000//'").Trim();
 
             return "unknown";
         }
@@ -131,7 +133,7 @@ namespace CA_DataUploaderLib
             //    return "BCM2835";
 
             if (_OS.Platform == PlatformID.Unix)
-                return ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'Hardware' | awk '{print $3}' | sed 's/^1000//'").Trim();
+                return DULutil.ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'Hardware' | awk '{print $3}' | sed 's/^1000//'").Trim();
 
             return Environment.Is64BitProcess ? "64 bit" : "32 bit";
         }
@@ -139,7 +141,7 @@ namespace CA_DataUploaderLib
         private static string GetSerialNumber()
         {
             if (_OS.Platform == PlatformID.Unix)
-                return ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'Serial' | awk '{print $3}' | sed 's/^1000//'").Trim();
+                return DULutil.ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'Serial' | awk '{print $3}' | sed 's/^1000//'").Trim();
 
             return "unknown";
         }
@@ -147,7 +149,7 @@ namespace CA_DataUploaderLib
         private static string GetWiFi_SSID()
         {
             if (_OS.Platform == PlatformID.Unix)
-                return ExecuteShellCommand("sudo iwgetid").Trim();
+                return DULutil.ExecuteShellCommand("sudo iwgetid").Trim();
 
             return "unknown";
         }
@@ -156,7 +158,7 @@ namespace CA_DataUploaderLib
         public static string GetFreeDisk()
         {
             if (_OS.Platform == PlatformID.Unix)
-                return ExecuteShellCommand("df -h").Trim();
+                return DULutil.ExecuteShellCommand("df -h").Trim();
             if (_OS.Platform == PlatformID.Win32NT)
             {
                 WriteResourceToFile("df.bat", "df.bat");
@@ -181,7 +183,7 @@ namespace CA_DataUploaderLib
         private static string GetCPU()
         {
             if (_OS.Platform == PlatformID.Unix)
-                return ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'model name'").Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).First().Substring(18).Trim();
+                return DULutil.ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'model name'").Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).First().Substring(18).Trim();
 
             return System.Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE");
         }
@@ -189,7 +191,7 @@ namespace CA_DataUploaderLib
         private static string GetKernalVersion()
         {
             if(_OS.Platform == PlatformID.Unix)
-                return ExecuteShellCommand("uname -r").Trim();
+                return DULutil.ExecuteShellCommand("uname -r").Trim();
 
             return _OS.VersionString;
         }
@@ -197,30 +199,9 @@ namespace CA_DataUploaderLib
         private static int GetNumberOfCores()
         {
             if(_OS.Platform == PlatformID.Unix)
-                return ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'model name'").Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).Count();
+                return DULutil.ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'model name'").Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).Count();
 
             return Environment.ProcessorCount;
-        }
-
-        private static string ExecuteShellCommand(string command)
-        {
-            // execute shell command:
-            var info = new ProcessStartInfo()
-            {
-                FileName = "/bin/bash",
-                Arguments = "-c \"" + command + "\"",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            var p = Process.Start(info);
-            string output = p.StandardOutput.ReadToEnd();
-            string err = p.StandardError.ReadToEnd();
-            Console.WriteLine(err);
-            p.WaitForExit();
-            return output;
         }
 
         public static bool IsWindows()

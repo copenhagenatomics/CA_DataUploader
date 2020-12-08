@@ -8,6 +8,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfAirFlow(string row, int lineNum) : base(row, lineNum, "AirFlow")
         {
+            format = "AirFlow;Name;BoxName;[port number]";
             var list = ToList();
             Name = list[1];
             BoxName = list[2];

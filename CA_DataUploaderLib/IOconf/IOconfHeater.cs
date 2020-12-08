@@ -7,6 +7,8 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfHeater(string row, int lineNum) : base(row, lineNum, "Heater")
         {
+            format = "Heater;Name;BoxName;[port number]";
+
             var list = ToList();
             if (!int.TryParse(list[4], out MaxTemperature)) throw new Exception("IOconfHeater: missing max temperature: " + row);
             if (list.Count > 5 && !int.TryParse(list[5], out MaxOnInterval)) throw new Exception("IOconfHeater: bad max on interfal: " + row);
@@ -17,7 +19,10 @@ namespace CA_DataUploaderLib.IOconf
 
         public IOconfInput AsConfInput()
         {
-            return new IOconfInput(Row, LineNumber, "Heater");
+            return new IOconfInput(Row, LineNumber, "Heater")
+            {
+                Name = Name + "_Power"
+            };
         }
     }
 }

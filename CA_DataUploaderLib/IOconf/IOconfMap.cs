@@ -6,8 +6,10 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfMap(string row, int lineNum) : base(row, lineNum, "Map")
         {
+            format = "Map;SerialNo/COM1/USB1;BoxName;[baud rate]";
+
             var list = ToList();
-            if (list[0] != "Map") throw new Exception("IOconfMap: wrong format: " + row);
+            if (list[0] != "Map") throw new Exception($"IOconfMap: wrong format: {row} {format}");
             if (RpiVersion.IsWindows())
             {
                 if (list[1].StartsWith("COM"))

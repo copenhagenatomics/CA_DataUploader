@@ -1,13 +1,8 @@
 ﻿using CA_DataUploaderLib;
 using CA_DataUploaderLib.Helpers;
-using CA_DataUploaderLib.IOconf;
 using System;
 using System.Data;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Net.Mail;
-using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace CA_DataUploader
@@ -27,27 +22,22 @@ namespace CA_DataUploader
 
                     var email = IOconfSetup.UpdateIOconf(serial);
 
-                    using (var cmd = new CommandHandler(serial))
-                    using (var usb = new ThermocoupleBox(cmd, new TimeSpan(0, 0, 1)))
-                    using (var cloud = new ServerUploader(GetVectorDescription(usb), cmd))
+                    using var cmd = new CommandHandler(serial);
+                    using var usb = new ThermocoupleBox(cmd);
+                    var filter = new VectorFilterAndMath(GetVectorDescription(usb));
+                    using var cloud = new ServerUploader(filter.VectorDescription, cmd);
+                    CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
+
+                    int i = 0;
+                    while (cmd.IsRunning)
                     {
-                        CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
+                        var allSensors = usb.GetValues().ToList();
+                        var list = filter.Apply(allSensors);
+                        cloud.SendVector(list, allSensors.First().TimeStamp);
+                        Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
 
-                        int i = 0;
-                        while (cmd.IsRunning)
-                        {
-                            var allSensors = usb.GetAllDatapoints().ToList();
-                            if (allSensors.Any())
-                            {
-                                var list = allSensors.Select(x => x.Value).ToList();
-                                list.AddRange(usb.GetFrequencyAndFilterCount());
-                                cloud.SendVector(list, allSensors.First().TimeStamp);
-                                Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
-                            }
-
-                            Thread.Sleep(100);
-                            if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
-                        }
+                        Thread.Sleep(100);
+                        if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
                     }
                 }
                 CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
