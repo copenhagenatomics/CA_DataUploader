@@ -14,7 +14,7 @@ namespace CA_DataUploaderLib.IOconf
         public string Name { get; set; }
 
         public List<string> SourceNames;
-
+        public bool HideSource { get; private set; }
 
         public IOconfFilter(string row, int lineNum) : this(row, lineNum, true)
         {
@@ -22,7 +22,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public IOconfFilter(string row, int lineNum, bool validateSourceNames) : base(row, lineNum, "Filter")
         {
-            format = "Filter;Name;FilterType;FilterLength;SourceNames";
+            format = "Filter;Name;FilterType;FilterLength;SourceNames;[hidesource]";
 
             var list = ToList();
             Name = list[1];
@@ -32,10 +32,14 @@ namespace CA_DataUploaderLib.IOconf
             if (!list[3].TryToDouble(out filterLength))
                 throw new Exception($"Wrong filter length: {row} {Environment.NewLine}{format}");
 
-            if (validateSourceNames)
-                SourceNames = IOconfFile.GetInputs().Where(x => list.Skip(4).Contains(x.Name)).Select(x => x.Name).ToList();
-            else
-                SourceNames = list.Skip(4).ToList();
+            var sources = list.Skip(4).ToList();
+            if (sources.Last() == "hidesource")
+            {
+                HideSource = true;
+                sources.Remove("hidesource");
+            }
+
+            SourceNames = (validateSourceNames) ? IOconfFile.GetInputs().Select(x => x.Name).Where(sources.Contains).ToList() : sources;
         }
     }
 }

@@ -290,8 +290,8 @@ namespace CA_DataUploaderLib
             var list = new List<SensorSample>();
             if (_logLevel == CALogLevel.Debug)
             {
-                list.Add(new SensorSample("HeaterOffTemperature", _offTemperature));
-                list.Add(new SensorSample("HeaterLastTemperature", _lastTemperature));
+                list.Add(new SensorSample("off_temperature", _offTemperature));
+                list.Add(new SensorSample("last_temperature", _lastTemperature));
             }
 
             return list;
@@ -300,11 +300,11 @@ namespace CA_DataUploaderLib
         public IEnumerable<SensorSample> GetPower()
         {
             var powerValues = _heaters.Select(x => x.Current);
-            var states =_heaters.Select(x => new SensorSample("HeaterOnOff", x.IsOn ? 1.0 : 0.0));
+            var states =_heaters.Select(x => new SensorSample(x.name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
             var values = powerValues.Concat(states);
             if (_logLevel == CALogLevel.Debug)
             {
-                var loopTimes = _heaters.Select(x => new SensorSample("HeaterLoopTime", x.Current.ReadSensor_LoopTime));
+                var loopTimes = _heaters.Select(x => new SensorSample(x.name() + "_LoopTime", x.Current.ReadSensor_LoopTime));
                 return values.Concat(loopTimes);
             }
 
@@ -321,7 +321,7 @@ namespace CA_DataUploaderLib
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
-            var list = _heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_Power", DataTypeEnum.Input)).ToList();
+            var list = _heaters.Select(x => new VectorDescriptionItem("double", x.Current.Name, DataTypeEnum.Input)).ToList();
             list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_On/Off", DataTypeEnum.Output)));
             if (_logLevel == CALogLevel.Debug)
             {

@@ -74,7 +74,7 @@ namespace CA_DataUploaderLib.Helpers
                         FilterType.DiffAvg => validSamples.First().Count == 2 ? 
                             validSamples.Average(y => y[0].Value - y[1].Value) : 
                             throw new Exception("Filter DiffAvg must have two input source names"),
-                        FilterType.Triangle => TriangleFilter(validSamples, Filter.filterLength, latestEntryTime),
+                        FilterType.Triangle => TriangleFilter(validSamples, Filter.filterLength, Output.TimeStamp),
                         _ => validSamples.Last().Select(x => x.Value).Average()
                     };
                     return;
@@ -116,6 +116,8 @@ namespace CA_DataUploaderLib.Helpers
                 return _filterQueue.Where(x => x.All(y => y.Value < 10000 && y.Value != 0)).Count();
             }
         }
+
+        public bool HasSource(string sourceName) => Filter.SourceNames.Contains(sourceName);
 
         /// <summary>
         /// filter where values weight more the closest they are to the latest. 

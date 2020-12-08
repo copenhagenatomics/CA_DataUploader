@@ -19,7 +19,10 @@ namespace CA_DataUploaderLib.IOconf
 
         public IOconfInput AsConfInput()
         {
-            return new IOconfInput(Row, LineNumber, "Heater");
+            return new IOconfInput(Row, LineNumber, "Heater")
+            {
+                Name = Name + "_Power"
+            };
         }
     }
 }
