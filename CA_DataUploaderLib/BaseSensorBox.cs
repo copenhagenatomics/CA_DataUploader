@@ -29,10 +29,10 @@ namespace CA_DataUploaderLib
                 _values.SingleOrDefault(x => x.Input.Name == title) ??
                 throw new Exception(title + " not found in _config. Known names: " + string.Join(", ", _values.Select(x => x.Input.Name)));
 
-        public IEnumerable<SensorSample> GetValues()
-        {
-            return _values;  
-        }
+        public IEnumerable<SensorSample> GetValues() => _values.Select(s => s.Clone());
+
+        /// <remarks>Unlike <see cref="GetValues"/>, the instances returned by this method are updated as we get new data from the sensors.</remarks>
+        public IEnumerable<SensorSample> GetAutoUpdatedValues() => _values;
 
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {

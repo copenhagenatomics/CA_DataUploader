@@ -28,7 +28,7 @@ namespace CA_DataUploaderLib
             // map all heaters, sensors and ovens. 
             var heaters = IOconfFile.GetHeater().ToList();
             var oven = IOconfFile.GetOven().ToList();
-            var sensors = caThermalBox.GetValues().ToList();
+            var sensors = caThermalBox.GetAutoUpdatedValues().ToList();
             foreach (var heater in heaters)
             {
                 var maxSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.IsMaxTemperatureSensor)?.TypeK.Name;
@@ -299,7 +299,7 @@ namespace CA_DataUploaderLib
 
         public IEnumerable<SensorSample> GetPower()
         {
-            var powerValues = _heaters.Select(x => x.Current);
+            var powerValues = _heaters.Select(x => x.Current.Clone());
             var states =_heaters.Select(x => new SensorSample(x.name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
             var values = powerValues.Concat(states);
             if (_logLevel == CALogLevel.Debug)

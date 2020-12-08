@@ -34,5 +34,14 @@ namespace CA_DataUploaderLib
             Value = value;
             Other = other;
         }
+
+        public SensorSample Clone()
+        {
+            return new SensorSample(Input, Value){
+                _timeStamp = TimeStamp,
+                Other = Other,
+                ReadSensor_LoopTime = ReadSensor_LoopTime
+            };
+        }
     }
 }
