@@ -40,7 +40,7 @@ namespace CA_DataUploaderLib
             var dic = new Dictionary<string, object>(VectorDescription.Length);
             for(int i = 0;i<vector.Count;i++)            
             {
-                dic.Add(VectorDescription._items[i].Descriptor, vector[i]);
+                dic.Add(VectorDescription._items[i].Descriptor, vector[i].Value);
             }
 
             return dic;

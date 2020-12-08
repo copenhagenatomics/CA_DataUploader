@@ -54,15 +54,9 @@
     <Compile Include="IOconfAlertTests.cs" />
     <Compile Include="MathVectorExpansionTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ServerUploaderTests.cs" />
     <Compile Include="SerialPortTests.cs" />
     <Compile Include="HeatingControllerTests.cs" />
     <Compile Include="TriangelFilterTests.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="IO.conf">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CA_DataUploaderLib\CA_DataUploaderLib.csproj">

@@ -33,7 +33,7 @@ namespace UnitTests
         public void CalculatesExpectedValue(string row, double value, double expectedResult) 
         {
             var math = new IOconfMath(row, 0);
-            Assert.AreEqual(expectedResult, math.Calculate(new Dictionary<string, object> { { "MyValue", value }, { "PI", Math.PI} }));
+            Assert.AreEqual(expectedResult, math.Calculate(new Dictionary<string, object> { { "MyValue", value }, { "PI", Math.PI} }).Value);
         }
 
         [DataRow("Math;MyName;MyValue > 2", 5d, 1d)]
@@ -42,7 +42,7 @@ namespace UnitTests
         public void CanUseComparisons(string row, double value, double expectedResult)
         {
             var math = new IOconfMath(row, 0);
-            Assert.AreEqual(expectedResult, math.Calculate(new Dictionary<string, object> { { "MyValue", value }}));
+            Assert.AreEqual(expectedResult, math.Calculate(new Dictionary<string, object> { { "MyValue", value }}).Value);
         }
 
         [TestMethod]
