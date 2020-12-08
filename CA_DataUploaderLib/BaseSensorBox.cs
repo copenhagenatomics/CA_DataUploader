@@ -68,13 +68,8 @@ namespace CA_DataUploaderLib
 
         protected void LoopForever()
         {
-            List<double> numbers = new List<double>();
-            List<string> values = new List<string>();
             DateTime start = DateTime.Now;
-            string row = string.Empty;
             int badRow = 0;
-            List<string> badPorts = new List<string>();
-            MCUBoard exBoard = null;
 
             while (_running)
             {
@@ -91,17 +86,14 @@ namespace CA_DataUploaderLib
                         while (board.SafeHasDataInReadBuffer() && timeInLoop.ElapsedMilliseconds < 2000)
                         {
                             hadDataAvailable = true;
-                            exBoard = board; // only used in exception
-                            values.Clear();
-                            numbers.Clear();
-                            row = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
+                            var row = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
 
                             if (_startsWithDigitRegex.IsMatch(row))  // check that row starts with digit. 
                             {
                                 try
                                 {
-                                    values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-                                    numbers = values.Select(x => x.ToDouble()).ToList();
+                                    var values = row.Split(",".ToCharArray()).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                                    var numbers = values.Select(x => x.ToDouble()).ToList();
                                     ProcessLine(numbers, board);
                                 }
                                 catch (Exception)
@@ -134,25 +126,11 @@ namespace CA_DataUploaderLib
                 }
                 catch (Exception ex)
                 {
-                    if (_logLevel == CALogLevel.Debug)
-                    {
-                        CALog.LogInfoAndConsoleLn(LogID.A, "Exception at: " + row);
-                        CALog.LogInfoAndConsole(LogID.A, "Values: ");
-                        values.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x));
-                        numbers.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x.ToString()));
-                        CALog.LogException(LogID.A, ex);
-                    }
-
                     CALog.LogInfoAndConsoleLn(LogID.A, ".", ex);
-                    if(exBoard != null)
-                        badPorts.Add($"{exBoard.PortName}:{exBoard.serialNumber} = '{row}'");
-
                     badRow++;
                     if (badRow > 10)
                     {
                         CALog.LogErrorAndConsoleLn(LogID.A, "Too many bad rows from thermocouple ports.. shutting down:");
-                        badPorts.ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x));
-                        CALog.LogException(LogID.A, ex);
                         if(_cmd != null)
                             _cmd.Execute("escape");
 
