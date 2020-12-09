@@ -31,10 +31,9 @@ namespace CA_DataUploaderLib
             var sensors = caThermalBox.GetAutoUpdatedValues().ToList();
             foreach (var heater in heaters)
             {
-                var maxSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.IsMaxTemperatureSensor)?.TypeK.Name;
-                var ovenSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && !x.IsMaxTemperatureSensor)?.TypeK.Name;
+                var ovenSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name)?.TypeK.Name;
                 int area = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.OvenArea > 0)?.OvenArea??-1;
-                _heaters.Add(new HeaterElement(area, heater, sensors.Where(x => x.Input.Name == maxSensor), sensors.Where(x => x.Input.Name == ovenSensor)));
+                _heaters.Add(new HeaterElement(area, heater, sensors.Where(x => x.Input.Name == ovenSensor)));
             }
 
             if (!_heaters.Any())
