@@ -1,6 +1,7 @@
 ﻿using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace CA_DataUploaderLib
@@ -14,6 +15,7 @@ namespace CA_DataUploaderLib
         private readonly List<SensorSample> _ovenSensors = new List<SensorSample>();    // sensors inside the oven somewhere.
         public DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
+        public Stopwatch invalidOffCountdown = new Stopwatch();
         private double onTemperature = 10000;
         public double lastTemperature = 10000;
         public bool IsOn;
@@ -58,8 +60,18 @@ namespace CA_DataUploaderLib
         {
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
             var validSensors = _ovenSensors.Select(s => s.Clone()).Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000);
-            if (!validSensors.Any())
-                return true; // no valid oven sensors
+            var hasValidSensors = validSensors.Any();
+            if (hasValidSensors)
+                invalidOffCountdown.Reset(); //valid, reset invalid values countdown
+            else if (invalidOffCountdown.ElapsedMilliseconds >= 2000)
+                return true; // 2+ seconds of invalid values, turn off
+            else if (invalidOffCountdown.IsRunning)
+                return false; // still counting, do not turn off yet
+            else 
+            { // first invalid value, start coutndown and do not turn off yet
+                invalidOffCountdown.Restart();
+                return false;
+            }
 
             if (ManualMode)
                 return false;
@@ -98,17 +110,11 @@ namespace CA_DataUploaderLib
             foreach (var s in _ovenSensors)
                 msg += s.Value.ToString("N0") + ", " + (LastOn > LastOff ? "" : onTemperature.ToString("N0"));
 
-            return $"{_ioconf.Name.PadRight(10)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg.PadRight(12)} {Current.Value.ToString("N1").PadRight(5)} Amp";
+            return $"{_ioconf.Name,-10} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg,-12} {Current.Value,-5:N1} Amp";
         }
 
-        public string name()
-        {
-            return _ioconf.Name.ToLower();
-        }
+        public string Name() => _ioconf.Name.ToLower();
 
-        public MCUBoard Board()
-        {
-            return _ioconf.Map.Board;
-        }
+        public MCUBoard Board() => _ioconf.Map.Board;
     }
 }

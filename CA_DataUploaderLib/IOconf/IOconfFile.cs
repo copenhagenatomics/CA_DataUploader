@@ -7,7 +7,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public static class IOconfFile
     {
-        private static List<IOconfRow> Table = new List<IOconfRow>();
+        private static readonly List<IOconfRow> Table = new List<IOconfRow>();
         public static string RawFile { get; private set; }
 
         static IOconfFile()
@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib.IOconf
             // remove empty lines and commented out lines
             var lines2 = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
             lines2.ForEach(x => Table.Add(CreateType(x, lines.IndexOf(x))));
-            CheckRules(lines2);
+            CheckRules();
         }
 
         private static IOconfRow CreateType(string row, int lineNum)
@@ -67,7 +67,7 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        private static void CheckRules(List<string> lines)
+        private static void CheckRules()
         {
             // no two rows can have the same type,name combination. 
             var groups = Table.GroupBy(x => x.UniqueKey());

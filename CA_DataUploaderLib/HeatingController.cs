@@ -17,8 +17,8 @@ namespace CA_DataUploaderLib
         private double _offTemperature = 0;
         private double _lastTemperature = 0;
         private DateTime _startTime;
-        private List<HeaterElement> _heaters = new List<HeaterElement>();
-        private List<string> _ovenHistory = new List<string>();
+        private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
+        private readonly List<string> _ovenHistory = new List<string>();
         protected CommandHandler _cmd;
 
         public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
@@ -126,7 +126,7 @@ namespace CA_DataUploaderLib
 
         public bool Heater(List<string> args)
         {
-            var heater = _heaters.SingleOrDefault(x => x.name() == args[1].ToLower());
+            var heater = _heaters.SingleOrDefault(x => x.Name() == args[1].ToLower());
             if (heater == null)
                 return false;
 
@@ -233,13 +233,13 @@ namespace CA_DataUploaderLib
                     if (heater.Current.Value <= CurrentZeroNoiseLevel && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOn(heater);
-                        CALog.LogData(LogID.A, $"on.={heater.name()}-{heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
+                        CALog.LogData(LogID.A, $"on.={heater.Name()}-{heater.MaxSensorTemperature():N0}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
 
                     if (heater.Current.Value > CurrentZeroNoiseLevel && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOff(heater);
-                        CALog.LogData(LogID.A, $"off.={heater.name()}-{heater.MaxSensorTemperature().ToString("N0")}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
+                        CALog.LogData(LogID.A, $"off.={heater.Name()}-{heater.MaxSensorTemperature():N0}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
                 }
             }
@@ -299,11 +299,11 @@ namespace CA_DataUploaderLib
         public IEnumerable<SensorSample> GetPower()
         {
             var powerValues = _heaters.Select(x => x.Current.Clone());
-            var states =_heaters.Select(x => new SensorSample(x.name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
+            var states =_heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
             var values = powerValues.Concat(states);
             if (_logLevel == CALogLevel.Debug)
             {
-                var loopTimes = _heaters.Select(x => new SensorSample(x.name() + "_LoopTime", x.Current.ReadSensor_LoopTime));
+                var loopTimes = _heaters.Select(x => new SensorSample(x.Name() + "_LoopTime", x.Current.ReadSensor_LoopTime));
                 return values.Concat(loopTimes);
             }
 
@@ -321,15 +321,15 @@ namespace CA_DataUploaderLib
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
             var list = _heaters.Select(x => new VectorDescriptionItem("double", x.Current.Name, DataTypeEnum.Input)).ToList();
-            list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_On/Off", DataTypeEnum.Output)));
+            list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_On/Off", DataTypeEnum.Output)));
             if (_logLevel == CALogLevel.Debug)
             {
-                list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.name() + "_LoopTime", DataTypeEnum.State)));
+                list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_LoopTime", DataTypeEnum.State)));
                 list.Add(new VectorDescriptionItem("double", "off_temperature", DataTypeEnum.State));
                 list.Add(new VectorDescriptionItem("double", "last_temperature", DataTypeEnum.State));
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from HeatingController");
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count,2} datapoints from HeatingController");
             return list;
         }
 
