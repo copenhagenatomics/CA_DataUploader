@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib
 
         private class SwitchBoardValues
         {
-            private const string _SwitchBoxPattern = "P1=(\\d\\.\\d\\d)A P2=(\\d\\.\\d\\d)A P3=(\\d\\.\\d\\d)A P4=(\\d\\.\\d\\d)A";
+            private const string _SwitchBoxPattern = "P1=(-?\\d\\.\\d\\d)A P2=(-?\\d\\.\\d\\d)A P3=(-?\\d\\.\\d\\d)A P4=(-?\\d\\.\\d\\d)A";
             private static readonly Regex _switchBoxCurrentsRegex = new Regex(_SwitchBoxPattern);
             private readonly MCUBoard box;
             private Match _lastValidRead = null;
