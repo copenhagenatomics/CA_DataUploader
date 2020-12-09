@@ -134,7 +134,7 @@ namespace CA_DataUploaderLib
         /// <returns>the list of doubles, otherwise <c>null</c></returns>
         protected static List<double> TryParseAsDoubleList(string row)
         {
-            if (_startsWithDigitRegex.IsMatch(row))
+            if (!_startsWithDigitRegex.IsMatch(row))
                 return null;
 
             return row.Split(",".ToCharArray())
