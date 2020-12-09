@@ -23,6 +23,7 @@ namespace UnitTests
         [DataRow("Alert;MyName;Sensorx;<=;123", 123d)]
         [DataRow("Alert;MyName;Sensorx;<=;123", 122d)]
         [DataRow("Alert;MyName;Sensorx;<;123", 122d)]
+        [DataRow("Alert;MyName;Sensorx < 123", 122d)]
         [DataTestMethod]
         public void AlertTriggers(string row, double value) 
         {
