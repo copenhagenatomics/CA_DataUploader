@@ -75,6 +75,13 @@ namespace UnitTests
         [DataRow("Alert;MyName;Sensorx;<=;123", 122d, 122d)]
         [DataRow("Alert;MyName;Sensorx;<;123", 121d, 122d)]
         [DataRow("Alert;MyName;Sensorx;nan", double.NaN, double.NaN)]
+        [DataRow("Alert;MyName;Sensorx;int", 124d, 123d)]
+        [DataRow("Alert;MyName;Sensorx;int", 123d, 122d)]
+        [DataRow("Alert;MyName;Sensorx;int", 99999d, 100000d)]
+        [DataRow("Alert;MyName;Sensorx;int", 9999999d, 10000000d)]
+        [DataRow("Alert;MyName;Sensorx;int", 0d, 1d)]
+        [DataRow("Alert;MyName;Sensorx;int", -2d, -1d)]
+        [DataRow("Alert;MyName;Sensorx;int", -9999999d, -10000000d)]
         [DataTestMethod]
         public void AlertDoesNotTriggersWhenOldValueMatched(string row, double oldValue, double value)
         {
