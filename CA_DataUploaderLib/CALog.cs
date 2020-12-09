@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib
     public static class CALog
     {
         private static Dictionary<LogID, DateTime> _nextSizeCheck;
-        private static string _logDir = Directory.GetCurrentDirectory();
+        private static readonly string _logDir = Directory.GetCurrentDirectory();
         public static int MaxLogSizeMB = 100;
 
         public static void LogData(LogID logID, string msg)
@@ -25,7 +25,7 @@ namespace CA_DataUploaderLib
         {
             var temp = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.Red;
-            var msg = $"{DateTime.Now.ToString("MM.dd HH:mm:ss")} - {ex.ToString()}{Environment.NewLine}";
+            var msg = $"{DateTime.Now:MM.dd HH:mm:ss} - {ex}{Environment.NewLine}";
             Console.WriteLine(msg);
             Console.ForegroundColor = temp;
             WriteToFile(logID, msg);

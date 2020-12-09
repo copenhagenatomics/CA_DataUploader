@@ -41,8 +41,10 @@ namespace CA_DataUploaderLib
             new Thread(() => this.LoopForever()).Start();
         }
 
-        protected override void ParentLoopForever()
+        protected override void ReadSensors()
         {
+            base.ReadSensors();
+
             foreach (var rpi in _values.Where(x => x.Input.GetType() == typeof(IOconfRPiTemp)))
             {
                 if (RpiVersion.IsWindows())
