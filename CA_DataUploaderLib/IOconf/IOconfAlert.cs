@@ -24,7 +24,7 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfAlert(string row, int lineNum) : base(row, lineNum, "Alert")
         {
             var list = ToList();
-            if (list[0] != "Alert" || (list.Count < 3)) throw new Exception("IOconfAlert: wrong format: " + row);
+            if (list[0] != "Alert" || list.Count < 3) throw new Exception("IOconfAlert: wrong format: " + row);
             Name = list[1];
             string comparisson;
             (Sensor, comparisson, Value) = ParseAlertExpression(list, row);
@@ -82,6 +82,8 @@ namespace CA_DataUploaderLib.IOconf
         private double LastValue;
         private readonly string MessageTemplate;
         private bool _isFirstCheck = true;
+        //expression captures groups: 1-sensor, 2-comparison, 3-value
+        //sample expression: SomeValue < 202
         private readonly Regex comparisonRegex = new Regex(@"(\w+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)");
 
         public bool CheckValue(double newValue)
