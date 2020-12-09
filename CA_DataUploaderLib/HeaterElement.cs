@@ -45,7 +45,7 @@ namespace CA_DataUploaderLib
                 return false;  // has been turned off for less than 10 seconds. 
 
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
-            var validSensors = _ovenSensors.Select(s => s.Clone()).Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000);
+            var validSensors = _ovenSensors.Select(s => s.Clone()).Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000).ToList();
             if (!validSensors.Any())
                 return false;  // no valid oven sensors 
 
@@ -59,7 +59,7 @@ namespace CA_DataUploaderLib
         public bool MustTurnOff()
         {
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
-            var validSensors = _ovenSensors.Select(s => s.Clone()).Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000);
+            var validSensors = _ovenSensors.Select(s => s.Clone()).Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000).ToList();
             var timeoutResult = CheckInvalidValuesTimeout(validSensors.Any(), 2000);
             if (timeoutResult.HasValue)
                 return timeoutResult.Value;
