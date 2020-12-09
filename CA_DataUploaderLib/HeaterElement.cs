@@ -15,7 +15,7 @@ namespace CA_DataUploaderLib
         private readonly List<SensorSample> _ovenSensors = new List<SensorSample>();    // sensors inside the oven somewhere.
         public DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
-        public Stopwatch invalidOffCountdown = new Stopwatch();
+        public readonly Stopwatch invalidValuesTime = new Stopwatch();
         private double onTemperature = 10000;
         public double lastTemperature = 10000;
         public bool IsOn;
@@ -60,18 +60,9 @@ namespace CA_DataUploaderLib
         {
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
             var validSensors = _ovenSensors.Select(s => s.Clone()).Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000);
-            var hasValidSensors = validSensors.Any();
-            if (hasValidSensors)
-                invalidOffCountdown.Reset(); //valid, reset invalid values countdown
-            else if (invalidOffCountdown.ElapsedMilliseconds >= 2000)
-                return true; // 2+ seconds of invalid values, turn off
-            else if (invalidOffCountdown.IsRunning)
-                return false; // still counting, do not turn off yet
-            else 
-            { // first invalid value, start coutndown and do not turn off yet
-                invalidOffCountdown.Restart();
-                return false;
-            }
+            var timeoutResult = CheckInvalidValuesTimeout(validSensors.Any(), 2000);
+            if (timeoutResult.HasValue)
+                return timeoutResult.Value;
 
             if (ManualMode)
                 return false;
@@ -84,6 +75,17 @@ namespace CA_DataUploaderLib
                 lastTemperature = validSensors.Max(x => x.Value);
 
             return turnOff;
+        }
+
+        /// <returns><c>true</c> if timed out with invalid values, <c>false</c> if we are waiting for the timeout and <c>null</c> if <paramref name="hasValidSensors"/> was <c>true</c></returns>
+        private bool? CheckInvalidValuesTimeout(bool hasValidSensors, int milliseconds)
+        {
+            if (hasValidSensors)
+                invalidValuesTime.Reset();
+            else if(!invalidValuesTime.IsRunning)
+                invalidValuesTime.Restart();
+
+            return hasValidSensors ? default(bool?) : invalidValuesTime.ElapsedMilliseconds >= milliseconds;
         }
 
         public double MaxSensorTemperature()
