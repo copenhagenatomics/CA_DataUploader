@@ -27,7 +27,7 @@ namespace CA_DataUploaderLib.IOconf
             if (list[0] != "Alert" || list.Count < 3) throw new Exception("IOconfAlert: wrong format: " + row);
             Name = list[1];
             string comparisson;
-            (Sensor, comparisson, Value) = ParseAlertExpression(list, row);
+            (Sensor, comparisson, Value, RateLimitMinutes) = ParseAlertExpression(list, row);
 
             MessageTemplate = Invariant($" {Name} ({Sensor}) {comparisson} {Value} (");
             if (comparisson == "int")
@@ -50,27 +50,25 @@ namespace CA_DataUploaderLib.IOconf
             };
         }
 
-        private (string Sensor, string Comparisson, double Value) ParseAlertExpression(List<string> list, string row)
+        private (string Sensor, string Comparisson, double Value, int rateLimitMinutes) ParseAlertExpression(List<string> list, string row)
         {
-            if (list.Count == 4 || list.Count == 5)
-                return ParseOldFormat(list, row);
-            else if (list.Count != 3)
-                throw new Exception("IOconfAlert: wrong format: " + row);
-
             var match = comparisonRegex.Match(list[2]);
             if (!match.Success)
-                throw new Exception("IOconfAlert: wrong format: " + row);
-
-            return (match.Groups[1].Value, match.Groups[2].Value.ToLower(), match.Groups[3].Value.ToDouble());
+                return ParseOldFormat(list, row);
+            var rateMinutes = list.Count > 3 ? list[3].ToInt() : DefaultRateLimitMinutes;
+            return (match.Groups[1].Value, match.Groups[2].Value.ToLower(), match.Groups[3].Value.ToDouble(), rateMinutes);
         }
 
-        private static (string Sensor, string Comparisson, double Value) ParseOldFormat(List<string> list, string row)
+        private static (string Sensor, string Comparisson, double Value, int rateLimitMinutes) 
+            ParseOldFormat(List<string> list, string row)
         {
+            if (list.Count < 4)
+                throw new Exception("IOconfAlert: wrong format: " + row);
             string comparisson = list[3].ToLower();
-            if (list.Count > 4 && list[4].TryToDouble(out var value))
-                return (list[2], comparisson, value);
             if (comparisson == "int" || comparisson == "nan")
-                return (list[2], list[3], 0d);
+                return (list[2], list[3], 0d, list.Count > 4 ? list[4].ToInt() : DefaultRateLimitMinutes);
+            if (list.Count > 4 && list[4].TryToDouble(out var value))
+                return (list[2], comparisson, value, list.Count > 5 ? list[5].ToInt() : DefaultRateLimitMinutes);
             throw new Exception("IOconfAlert: wrong format: " + row);
         }
 
@@ -85,6 +83,9 @@ namespace CA_DataUploaderLib.IOconf
         //expression captures groups: 1-sensor, 2-comparison, 3-value
         //sample expression: SomeValue < 202
         private readonly Regex comparisonRegex = new Regex(@"(\w+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)");
+        private readonly int RateLimitMinutes;
+        private const int DefaultRateLimitMinutes = 30; // by default fire the same alert max once every 30 mins.
+        private DateTime LastTriggered;
 
         public bool CheckValue(double newValue)
         {
@@ -93,7 +94,15 @@ namespace CA_DataUploaderLib.IOconf
             bool lastMatches = !_isFirstCheck && RawCheckValue(LastValue); // there is no lastValue to check on the first call
             _isFirstCheck = false;
             LastValue = newValue;
-            return newMatches && !lastMatches;
+            return newMatches && !lastMatches && !RateLimit();
+        }
+
+        private bool RateLimit()
+        {
+            if (DateTime.UtcNow.Subtract(LastTriggered).TotalMinutes < RateLimitMinutes)
+                return true;
+            LastTriggered = DateTime.UtcNow;
+            return false;
         }
 
         private bool RawCheckValue(double val) => type switch
