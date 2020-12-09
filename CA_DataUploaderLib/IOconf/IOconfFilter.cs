@@ -2,7 +2,6 @@
 using CA_DataUploaderLib.Extensions;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
@@ -16,11 +15,7 @@ namespace CA_DataUploaderLib.IOconf
         public List<string> SourceNames;
         public bool HideSource { get; private set; }
 
-        public IOconfFilter(string row, int lineNum) : this(row, lineNum, true)
-        {
-        }
-
-        public IOconfFilter(string row, int lineNum, bool validateSourceNames) : base(row, lineNum, "Filter")
+        public IOconfFilter(string row, int lineNum) : base(row, lineNum, "Filter")
         {
             format = "Filter;Name;FilterType;FilterLength;SourceNames;[hidesource]";
 
@@ -39,7 +34,8 @@ namespace CA_DataUploaderLib.IOconf
                 sources.Remove("hidesource");
             }
 
-            SourceNames = (validateSourceNames) ? IOconfFile.GetInputs().Select(x => x.Name).Where(sources.Contains).ToList() : sources;
+            // source validation happens later, as there is not a 1-1 relation of IOConfFile entries and values getting into the Vector i.e. oxygen has 3 values, heaters have power and state. 
+            SourceNames = sources;
         }
     }
 }

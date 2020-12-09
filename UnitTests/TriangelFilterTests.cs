@@ -15,7 +15,7 @@ namespace UnitTests
         [TestMethod]
         public void TriangleFilter1()
         {
-            var filter = new FilterSample(new IOconfFilter("Filter;MyFilter;Triangle;1;X", 0, false));
+            var filter = new FilterSample(new IOconfFilter("Filter;MyFilter;Triangle;1;X", 0));
             var now = DateTime.Now;
             filter.Input(new List<SensorSample>() { new SensorSample("X", 3) { TimeStamp = now } });
             filter.Input(new List<SensorSample>() { new SensorSample("X", 3) { TimeStamp = now.AddSeconds(0.1) } });
@@ -34,7 +34,7 @@ namespace UnitTests
         [TestMethod]
         public void TriangleFilter2()
         {
-            var filter = new FilterSample(new IOconfFilter("Filter;MyFilter;Triangle;1;X", 0, false));
+            var filter = new FilterSample(new IOconfFilter("Filter;MyFilter;Triangle;1;X", 0));
             var now = DateTime.Now;
             filter.Input(new List<SensorSample>() { new SensorSample("X", 3) { TimeStamp = now } });
             filter.Input(new List<SensorSample>() { new SensorSample("X", 3) { TimeStamp = now.AddSeconds(0.1) } });
@@ -57,7 +57,7 @@ namespace UnitTests
         [TestMethod]
         public void TriangleFilterHandlesTimeAverageWithoutPrecisionLoss()
         { // this test is a stable reproduction of an issue reproduced by test 2 that only happens with some dates, resulting in a wrong value in the original test
-            var filter = new FilterSample(new IOconfFilter("Filter;MyFilter;Triangle;1;X", 0, false));
+            var filter = new FilterSample(new IOconfFilter("Filter;MyFilter;Triangle;1;X", 0));
             var now = DateTime.ParseExact("2020-12-04T18:34:53.2064482+01:00", "o", Thread.CurrentThread.CurrentCulture);
             filter.Input(new List<SensorSample>() { new SensorSample("X", 3) { TimeStamp = now } });
             filter.Input(new List<SensorSample>() { new SensorSample("X", 3) { TimeStamp = now.AddSeconds(0.1) } });
@@ -81,7 +81,7 @@ namespace UnitTests
         [TestMethod]
         public void TriangleFilterHandlesManySamples()
         { // this test is to detect issues with averaging dates when having many samples
-            var filter = new FilterSample(new IOconfFilter("Filter;MyFilter;Triangle;1;X", 0, false));
+            var filter = new FilterSample(new IOconfFilter("Filter;MyFilter;Triangle;1;X", 0));
             var now = DateTime.Now;
             filter.Input(new List<SensorSample>() { new SensorSample("X", 3) { TimeStamp = now } });
             filter.Input(new List<SensorSample>() { new SensorSample("X", 3) { TimeStamp = now.AddSeconds(0.1) } });

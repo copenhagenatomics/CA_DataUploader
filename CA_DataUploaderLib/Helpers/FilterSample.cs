@@ -24,7 +24,7 @@ namespace CA_DataUploaderLib.Helpers
         public FilterSample(IOconfFilter filter)
         {
             Filter = filter;
-            Output = new SensorSample("Filter_" + filter.Name);
+            Output = new SensorSample(filter.Name + "_filter");
         }
 
         public IOconfFilter Filter { get; private set; }
