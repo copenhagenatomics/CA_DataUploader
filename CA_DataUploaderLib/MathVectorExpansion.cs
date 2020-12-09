@@ -8,7 +8,7 @@ namespace CA_DataUploaderLib
     public class MathVectorExpansion
     {
         public VectorDescription VectorDescription { get; private set; }
-        private List<IOconfMath> _mathStatements;
+        private readonly List<IOconfMath> _mathStatements;
 
         public MathVectorExpansion(VectorDescription vectorDescription) : this(vectorDescription, IOconfFile.GetMath) { }
         public MathVectorExpansion(VectorDescription vectorDescription, Func<IEnumerable<IOconfMath>> getMath)
@@ -40,7 +40,7 @@ namespace CA_DataUploaderLib
             var dic = new Dictionary<string, object>(VectorDescription.Length);
             for(int i = 0;i<vector.Count;i++)            
             {
-                dic.Add(VectorDescription._items[i].Descriptor, vector[i]);
+                dic.Add(VectorDescription._items[i].Descriptor, vector[i].Value);
             }
 
             return dic;
