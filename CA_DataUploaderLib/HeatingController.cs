@@ -39,7 +39,7 @@ namespace CA_DataUploaderLib
             if (!_heaters.Any())
                 return;
 
-            var unreachableBoards = heaters.Where(h => h.Map.Board == null).GroupBy(h => h.BoxName).ToList();
+            var unreachableBoards = heaters.Where(h => h.Map.Board == null).GroupBy(h => h.Map).ToList();
             foreach (var board in unreachableBoards)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Missing board {board.Key} for heaters {string.Join(",",board.Select(h=> h.Name))}");
             if (unreachableBoards.Count > 0)
