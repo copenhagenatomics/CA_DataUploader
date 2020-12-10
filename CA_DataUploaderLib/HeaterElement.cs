@@ -1,6 +1,7 @@
 ﻿using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace CA_DataUploaderLib
@@ -10,11 +11,11 @@ namespace CA_DataUploaderLib
         private int OvenTargetTemperature;
 
         public IOconfHeater _ioconf;
-        private int _area;  // -1 if not defined. 
-        private List<SensorSample> _ovenSensors = new List<SensorSample>();    // sensors inside the oven somewhere. 
-        private List<SensorSample> _heaterSensors = new List<SensorSample>();  // sensors inside the heater or directly on the surface of the heater
+        private readonly int _area;  // -1 if not defined. 
+        private readonly List<SensorSample> _ovenSensors = new List<SensorSample>();    // sensors inside the oven somewhere.
         public DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
+        public readonly Stopwatch invalidValuesTime = new Stopwatch();
         private double onTemperature = 10000;
         public double lastTemperature = 10000;
         public bool IsOn;
@@ -22,11 +23,10 @@ namespace CA_DataUploaderLib
         public SensorSample Current;  // Amps per element. 
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
 
-        public HeaterElement(int area, IOconfHeater heater, IEnumerable<SensorSample> heaterSensors, IEnumerable<SensorSample> ovenSensors)
+        public HeaterElement(int area, IOconfHeater heater, IEnumerable<SensorSample> ovenSensors)
         {
             _ioconf = heater;
             _area = area;
-            _heaterSensors = heaterSensors.ToList();
             _ovenSensors = ovenSensors.ToList();
             Current = new SensorSample(heater.AsConfInput());
         }
@@ -45,22 +45,12 @@ namespace CA_DataUploaderLib
                 return false;  // has been turned off for less than 10 seconds. 
 
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
-            var validSensors = _ovenSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
+            var validSensors = _ovenSensors.Select(s => s.Clone()).Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000).ToList();
             if (!validSensors.Any())
                 return false;  // no valid oven sensors 
 
             if (validSensors.Any(x => x.Value >= OvenTargetTemperature))
                 return false;  // at least one of the temperature sensors value is valid and above OvenTargetTemperature.  
-
-            var heaterSensors = _heaterSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
-            if (!heaterSensors.Any() && _heaterSensors.Any())
-                return false;  // no valid heater sensors 
-
-            if (heaterSensors.Any() && LastOff.AddSeconds(_ioconf.MaxOnInterval) > DateTime.UtcNow)
-                return false;
-
-            if (heaterSensors.Any(x => x.Value > _ioconf.MaxTemperature))
-                return false;  // at least one of the temperature sensors value is valid and above the heating element MaxTemperature.  
 
             onTemperature = validSensors.Max(x => x.Value);
             return true;
@@ -69,16 +59,10 @@ namespace CA_DataUploaderLib
         public bool MustTurnOff()
         {
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
-            var validSensors = _ovenSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
-            if (!validSensors.Any())
-                return true; // no valid oven sensors
-
-            var heaterSensors = _heaterSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
-            if (!heaterSensors.Any() && _heaterSensors.Any())
-                return true; // no valid heater sensors
-
-            if (heaterSensors.Any(x => x.Value > _ioconf.MaxTemperature))
-                return true; // element must never reach above the heating element MaxTemperature. 
+            var validSensors = _ovenSensors.Select(s => s.Clone()).Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000).ToList();
+            var timeoutResult = CheckInvalidValuesTimeout(validSensors.Any(), 2000);
+            if (timeoutResult.HasValue)
+                return timeoutResult.Value;
 
             if (ManualMode)
                 return false;
@@ -91,6 +75,17 @@ namespace CA_DataUploaderLib
                 lastTemperature = validSensors.Max(x => x.Value);
 
             return turnOff;
+        }
+
+        /// <returns><c>true</c> if timed out with invalid values, <c>false</c> if we are waiting for the timeout and <c>null</c> if <paramref name="hasValidSensors"/> was <c>true</c></returns>
+        private bool? CheckInvalidValuesTimeout(bool hasValidSensors, int milliseconds)
+        {
+            if (hasValidSensors)
+                invalidValuesTime.Reset();
+            else if(!invalidValuesTime.IsRunning)
+                invalidValuesTime.Restart();
+
+            return hasValidSensors ? default(bool?) : invalidValuesTime.ElapsedMilliseconds >= milliseconds;
         }
 
         public double MaxSensorTemperature()
@@ -117,17 +112,11 @@ namespace CA_DataUploaderLib
             foreach (var s in _ovenSensors)
                 msg += s.Value.ToString("N0") + ", " + (LastOn > LastOff ? "" : onTemperature.ToString("N0"));
 
-            return $"{_ioconf.Name.PadRight(10)} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg.PadRight(12)} {Current.Value.ToString("N1").PadRight(5)} Amp";
+            return $"{_ioconf.Name,-10} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg,-12} {Current.Value,-5:N1} Amp";
         }
 
-        public string name()
-        {
-            return _ioconf.Name.ToLower();
-        }
+        public string Name() => _ioconf.Name.ToLower();
 
-        public MCUBoard Board()
-        {
-            return _ioconf.Map.Board;
-        }
+        public MCUBoard Board() => _ioconf.Map.Board;
     }
 }

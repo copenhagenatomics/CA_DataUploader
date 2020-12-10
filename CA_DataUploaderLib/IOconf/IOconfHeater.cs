@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -7,15 +6,13 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfHeater(string row, int lineNum) : base(row, lineNum, "Heater")
         {
-            format = "Heater;Name;BoxName;[port number]";
+            format = "Heater;Name;BoxName;port number;MaxTemperature";
 
             var list = ToList();
-            if (!int.TryParse(list[4], out MaxTemperature)) throw new Exception("IOconfHeater: missing max temperature: " + row);
-            if (list.Count > 5 && !int.TryParse(list[5], out MaxOnInterval)) throw new Exception("IOconfHeater: bad max on interfal: " + row);
+            if (list.Count < 5 || !int.TryParse(list[4], out MaxTemperature)) throw new Exception("IOconfHeater: missing max temperature: " + row);
         }
 
         public int MaxTemperature;
-        public int MaxOnInterval = 30;
 
         public IOconfInput AsConfInput()
         {
