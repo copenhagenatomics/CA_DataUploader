@@ -39,6 +39,12 @@ namespace CA_DataUploaderLib
             if (!_heaters.Any())
                 return;
 
+            var unreachableBoards = heaters.Where(h => h.Map.Board == null).GroupBy(h => h.Map).ToList();
+            foreach (var board in unreachableBoards)
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Missing board {board.Key} for heaters {string.Join(",",board.Select(h=> h.Name))}");
+            if (unreachableBoards.Count > 0)
+                throw new NotSupportedException("Running with missing heaters is not currently supported");
+
             new Thread(() => this.LoopForever()).Start();
             cmd.AddCommand("escape", Stop);
             for (int i = 0; i < 20; i++)

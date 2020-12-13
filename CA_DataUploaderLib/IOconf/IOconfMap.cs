@@ -44,5 +44,7 @@ namespace CA_DataUploaderLib.IOconf
         public string BoxName { get; set; }
         public int BaudRate;
         public MCUBoard Board;
+
+        public override string ToString() => $"{BoxName} - ${USBPort ?? SerialNumber}";
     }
 }
