@@ -235,7 +235,7 @@ namespace CA_DataUploaderLib
                     heater.Current.Value = values[heater._ioconf.PortNumber - 1];
 
                     // this is a hot fix to make sure heaters are on/off. 
-                    const double CurrentZeroNoiseLevel = 0.15d; // this can be reduced as we confirm noise is consistently lower.
+                    const double CurrentZeroNoiseLevel = 0.1d; // this can be reduced as we confirm noise is consistently lower.
                     if (heater.Current.Value <= CurrentZeroNoiseLevel && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
                     {
                         HeaterOn(heater);
