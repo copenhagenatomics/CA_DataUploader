@@ -160,8 +160,6 @@ namespace CA_DataUploaderLib
                         reconnectLimitExceeded |= !item.Input.Map.Board.SafeReopen(expectedHeaderLines);
                     failPorts.Add(item.Input.Name);
                 }
-                else if (msSinceLastRead > maxDelay)
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"{Title} stale value detected for port: {item.Input.Name}{Environment.NewLine}{msSinceLastRead} milliseconds since last read - no action (sensor with Skip)");
             }
 
             if (reconnectLimitExceeded)
