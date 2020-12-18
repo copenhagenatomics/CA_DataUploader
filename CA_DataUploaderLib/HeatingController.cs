@@ -234,15 +234,14 @@ namespace CA_DataUploaderLib
                 {
                     heater.Current.Value = values[heater._ioconf.PortNumber - 1];
 
-                    // this is a hot fix to make sure heaters are on/off. 
-                    const double CurrentZeroNoiseLevel = 0.15d; // this can be reduced as we confirm noise is consistently lower.
-                    if (heater.Current.Value <= CurrentZeroNoiseLevel && heater.IsOn && heater.LastOn.AddSeconds(2) < DateTime.UtcNow)
+                    // this is for extra safety to make sure heaters are on/off when expected to be. 
+                    if (heater.MustResendOnCommand())
                     {
                         HeaterOn(heater);
                         CALog.LogData(LogID.A, $"on.={heater.Name()}-{heater.MaxSensorTemperature():N0}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
                     }
 
-                    if (heater.Current.Value > CurrentZeroNoiseLevel && !heater.IsOn && heater.LastOff.AddSeconds(2) < DateTime.UtcNow)
+                    if (heater.MustResendOffCommand())
                     {
                         HeaterOff(heater);
                         CALog.LogData(LogID.A, $"off.={heater.Name()}-{heater.MaxSensorTemperature():N0}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");

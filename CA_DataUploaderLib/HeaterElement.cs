@@ -106,6 +106,10 @@ namespace CA_DataUploaderLib
             return _area == ovenArea;
         }
 
+        public bool MustResendOnCommand() => !CurrentIsOn() && IsOn && LastOn.AddSeconds(2) < DateTime.UtcNow;
+        public bool MustResendOffCommand() => CurrentIsOn() && !IsOn && LastOff.AddSeconds(2) < DateTime.UtcNow;
+        private bool CurrentIsOn() => Current.Value > _ioconf.CurrentSensingNoiseTreshold;
+
         public override string ToString()
         {
             string msg = string.Empty;

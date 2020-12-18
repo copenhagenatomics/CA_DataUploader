@@ -151,12 +151,12 @@ namespace CA_DataUploaderLib
             bool reconnectLimitExceeded = false;
             foreach (var item in _values)
             {
-                maxDelay = (item.Input.Name.ToLower().Contains("luminox")) ? 10000 : 2000;
+                maxDelay = item.Input.Name.ToLower().Contains("luminox") ? 10000 : 2000;
                 var msSinceLastRead = DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds;
-                if (msSinceLastRead > maxDelay)
+                if (msSinceLastRead > maxDelay && !item.Input.Skip)
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} stale value detected for port: {item.Input.Name}{Environment.NewLine}{msSinceLastRead} milliseconds since last read - closing serial port to restablish connection");
-                    if(item.Input.Map != null)
+                    if (item.Input.Map != null)
                         reconnectLimitExceeded |= !item.Input.Map.Board.SafeReopen(expectedHeaderLines);
                     failPorts.Add(item.Input.Name);
                 }

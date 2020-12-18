@@ -102,111 +102,10 @@ namespace CA_DataUploaderLib
                     pcbVersion.IsNullOrEmpty();  
         }
         
-        public string SafeReadLine()
-        {
-            try
-            {
-                lock (this)
-                {
-                    if (IsOpen)
-                        return ReadLine();
-
-                    Thread.Sleep(100);
-                    Open();
-
-                    if (IsOpen)
-                        return ReadLine();
-                }
-            }
-            catch (Exception ex)
-            {
-                var frame = new StackTrace().GetFrame(1);
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while reading from serial port: {PortName} {productType} {serialNumber} in {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}() at line {frame.GetFileLineNumber()}{Environment.NewLine}", ex);
-                if (_safeLimit-- <= 0) throw;
-            }
-
-            return string.Empty;
-        }
-
-        public bool SafeHasDataInReadBuffer()
-        {
-            try
-            {
-                lock (this)
-                {
-                    if (IsOpen)
-                        return BytesToRead > 0;
-
-                    Thread.Sleep(100);
-                    Open();
-
-                    if (IsOpen)
-                        return BytesToRead > 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                var frame = new StackTrace().GetFrame(1);
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Error while checking serial port read buffer: {PortName} {productType} {serialNumber} {frame.GetMethod().DeclaringType.Name}.{frame.GetMethod().Name}{Environment.NewLine}", ex);
-                if (_safeLimit-- <= 0) throw;
-            }
-
-            return false;
-        }
-
-        public void SafeWriteLine(string msg)
-        {
-            try
-            {
-                lock (this)
-                {
-                    if (IsOpen)
-                    {
-                        WriteLine(msg);
-                        return;
-                    }
-
-                    Thread.Sleep(100);
-                    Open();
-
-                    if (IsOpen)
-                    {
-                        WriteLine(msg);
-                        return;
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to write to serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}");
-                if (_safeLimit-- <= 0) throw;
-            }
-        }
-
-        public string SafeReadExisting()
-        {
-            try
-            {
-                lock (this)
-                {
-                    if (IsOpen)
-                        return ReadExisting();
-
-                    Thread.Sleep(100);
-                    Open();
-
-                    if (IsOpen)
-                        return ReadExisting();
-                }
-            }
-            catch (Exception ex)
-            {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to ReadExisting() from serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}", ex);
-                if (_safeLimit-- <= 0) throw;
-            }
-
-            return string.Empty;
-        }
+        public string SafeReadLine() => RunEnsuringConnectionIsOpen("ReadLine", ReadLine) ?? string.Empty;
+        public bool SafeHasDataInReadBuffer() => RunEnsuringConnectionIsOpen("HasDataInReadBuffer", () => BytesToRead > 0);
+        public void SafeWriteLine(string msg) => RunEnsuringConnectionIsOpen("WriteLine", () => WriteLine(msg));
+        public string SafeReadExisting() => RunEnsuringConnectionIsOpen("ReadExisting", ReadExisting) ?? string.Empty;
 
         public void SafeClose()
         {
@@ -235,7 +134,8 @@ namespace CA_DataUploaderLib
         /// <summary>
         /// Reopens the connection skipping the header.
         /// </summary>
-        /// <param name="headerLines">The amount of header lines expected.</param>
+        /// <param name="expectedHeaderLines">The amount of header lines expected.</param>
+        /// <param name="secondsBetweenReopens">The amount of seconds to wait since the last reconnect attempt.</param>
         /// <returns><c>false</c> if the reconnect limit has been exceeded.</returns>
         /// <remarks>
         /// This method assumes only value lines start with numbers, 
@@ -246,7 +146,7 @@ namespace CA_DataUploaderLib
         /// 
         /// No exceptions are produced if there is a failure to reopen, although information about is added to log B.
         /// </remarks>
-        public bool SafeReopen(int expectedHeaderLines = 8)
+        public bool SafeReopen(int expectedHeaderLines = 8, int secondsBetweenReopens = 3)
         {
             var lines = new List<string>();
             var bytesToRead500ms = 0;
@@ -255,7 +155,7 @@ namespace CA_DataUploaderLib
                 lock (this)
                 {
                     TimeSpan timeSinceLastReopen = DateTime.Now.Subtract(_lastReopenTime);
-                    if (timeSinceLastReopen.TotalSeconds < 4)
+                    if (timeSinceLastReopen.TotalSeconds < secondsBetweenReopens)
                     {
                         CALog.LogData(LogID.B, $"(Reopen) skipped {PortName} {productType} {serialNumber} - time since last reopen {timeSinceLastReopen}");
                         return true;
@@ -264,7 +164,6 @@ namespace CA_DataUploaderLib
                     if (_reconnectLimit-- < 0)
                         return false;
 
-                    _lastReopenTime = DateTime.Now;
                     if (IsOpen)
                     {
                         CALog.LogData(LogID.B, $"(Reopen) Closing port {PortName} {productType} {serialNumber}");
@@ -283,14 +182,15 @@ namespace CA_DataUploaderLib
                         var line = ReadLine().Trim();
                         lines.Add(line);
                         if (_startsWithNumberRegex.IsMatch(line) && i > 0) // making sure we skip the first one, as it is something a partial line (perhaps from the last read before the restart, although pi buffer is cleared).
-                        { // we are past the header.
-                            break;
-                        }
+                            break; // we are past the header.
                     }
+
+                    _lastReopenTime = DateTime.Now;
                 }
             }
             catch (Exception ex)
             {
+                _lastReopenTime = DateTime.Now;
                 CALog.LogErrorAndConsoleLn(
                     LogID.B, 
                     $"Failure reopening port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
@@ -355,5 +255,35 @@ namespace CA_DataUploaderLib
                 }
             }
         }
+
+        private TResult RunEnsuringConnectionIsOpen<TResult>(string actionName, Func<TResult> action) 
+        {
+            try
+            {
+                lock (this)
+                {
+                    if (IsOpen)
+                        return action();
+
+                    Thread.Sleep(100);
+                    Open();
+
+                    if (IsOpen)
+                        return action();
+                }
+
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Failed to open port to {actionName}(): {PortName} {productType} {serialNumber}{Environment.NewLine}");
+            }
+            catch (Exception ex)
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to {actionName}() from serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}", ex);
+                if (_safeLimit-- <= 0) throw;
+            }
+
+            return default;
+        }
+
+        private void RunEnsuringConnectionIsOpen(string actionName, Action action) => 
+            RunEnsuringConnectionIsOpen(actionName, () => { action(); return true; });
     }
 }
