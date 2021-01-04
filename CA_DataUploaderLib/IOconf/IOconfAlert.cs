@@ -56,7 +56,7 @@ namespace CA_DataUploaderLib.IOconf
         private bool _isFirstCheck = true;
         //expression captures groups: 1-sensor, 2-comparison, 3-value
         //sample expression: SomeValue < 202
-        private readonly Regex comparisonRegex = new Regex(@"^\s*(\w+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)\s*$");
+        private readonly Regex comparisonRegex = new Regex(@"^\s*([\w%]+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)\s*$");
         private readonly int RateLimitMinutes;
         private const int DefaultRateLimitMinutes = 30; // by default fire the same alert max once every 30 mins.
         private DateTime LastTriggered;
