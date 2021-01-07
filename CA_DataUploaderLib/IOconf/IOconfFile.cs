@@ -38,6 +38,7 @@ namespace CA_DataUploaderLib.IOconf
             {
                 if (row.StartsWith("LoopName")) return new IOconfLoopName(row, lineNum);
                 if (row.StartsWith("Account")) return new IOconfAccount(row, lineNum);
+                if (row.StartsWith("SampleRates")) return new IOconfSamplingRates(row, lineNum);
                 if (row.StartsWith("Map"))    return new IOconfMap(row, lineNum);
                 if (row.StartsWith("Math")) return new IOconfMath(row, lineNum);
                 if (row.StartsWith("Alert")) return new IOconfAlert(row, lineNum);
@@ -80,11 +81,6 @@ namespace CA_DataUploaderLib.IOconf
                 CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Heater: {heater.Key.Name} occure in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}");
         }
 
-        public static string GetLoopName()
-        {
-            return ((IOconfLoopName)Table.Single(x => x.GetType() == typeof(IOconfLoopName))).Name;
-        }
-
         public static ConnectionInfo GetConnectionInfo()
         {
             try
@@ -104,6 +100,20 @@ namespace CA_DataUploaderLib.IOconf
             {
                 throw new Exception($"Did you forgot to include login information in top of {Directory.GetCurrentDirectory()}\\IO.conf ?", ex);
             }
+        }
+
+        public static string GetLoopName()
+        {
+            return ((IOconfLoopName)Table.Single(x => x.GetType() == typeof(IOconfLoopName))).Name;
+        }
+
+        public static int GetVectorUploadDelay()
+        {
+            return ((IOconfSamplingRates)Table.Single(x => x.GetType() == typeof(IOconfSamplingRates))).VectorUploadDelay;
+        }
+        public static int GetMainLoopDelay()
+        {
+            return ((IOconfSamplingRates)Table.Single(x => x.GetType() == typeof(IOconfSamplingRates))).MainLoopDelay;
         }
 
         public static CALogLevel GetOutputLevel()

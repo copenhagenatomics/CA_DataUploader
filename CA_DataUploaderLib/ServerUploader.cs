@@ -33,8 +33,6 @@ namespace CA_DataUploaderLib
         private bool _running;
         private VectorDescription _vectorDescription;
 
-        public int MillisecondsBetweenUpload { get; set; }
-
         public ServerUploader(VectorDescription vectorDescription) : this(vectorDescription, null)
         {
         }
@@ -46,7 +44,6 @@ namespace CA_DataUploaderLib
                 CheckInputData(vectorDescription);
                 var connectionInfo = GetAccountInfo();
 
-                MillisecondsBetweenUpload = 900;
                 string server = connectionInfo.Server;
                 _client.BaseAddress = new Uri(server);
                 _client.DefaultRequestHeaders.Accept.Clear();
@@ -258,7 +255,7 @@ namespace CA_DataUploaderLib
                     }
 
                     PrintBadPackagesMessage(false);
-                    Thread.Sleep(MillisecondsBetweenUpload);  // only send approx. one time per second. 
+                    Thread.Sleep(IOconfFile.GetVectorUploadDelay());  
                 }
                 catch (Exception ex)
                 {
