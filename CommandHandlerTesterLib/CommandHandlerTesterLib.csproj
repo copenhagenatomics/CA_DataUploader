@@ -5,7 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CA_DataUploaderLib\CA_DataUploaderLib.csproj" />
+	  <ProjectReference Include="..\CA_DataUploaderLib\CA_DataUploaderLib.csproj">
+		  <Private>false</Private>
+		  <ExcludeAssets>runtime</ExcludeAssets>
+	  </ProjectReference>
   </ItemGroup>
 
 </Project>

@@ -8,8 +8,8 @@ namespace CommandHandlerTesterLib
     {
         public TestClass1(CommandHandler cmd) : base(cmd)
         {
-            cmd.AddCommand("metA", MethodA);
-            cmd.AddCommand("help", HelpMenu);
+            AddCommand("metA", MethodA);
+            AddCommand("help", HelpMenu);
         }
 
         protected override void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) 

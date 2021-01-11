@@ -3,7 +3,7 @@ using Humanizer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
+using System.Runtime.Loader;
 using System.Text;
 using System.Threading;
 
@@ -20,7 +20,8 @@ namespace CA_DataUploaderLib
         private CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         private readonly List<string> AcceptedCommands = new List<string>();
         private int AcceptedCommandsIndex = -1;
-        private Dictionary<string, LoopControlExtension> _runningExtensions = new Dictionary<string, LoopControlExtension>();
+        private readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlExtension> instances)> _runningExtensions = 
+            new Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlExtension> instances)>();
 
         public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
         public bool IsRunning { get { return _running; } }
@@ -33,16 +34,25 @@ namespace CA_DataUploaderLib
             AddCommand("help", HelpMenu);
             AddCommand("up", Uptime);
             AddCommand("version", GetVersion);
-            AddCommand("RunExtension", RunExtension);
-            AddCommand("StopExtension", StopExtension);
+            AddCommand("Load", LoadExtension);
+            AddCommand("Unload", UnloadExtension);
         }
 
-        public void AddCommand(string name, Func<List<string>, bool> func)
+        /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>
+        public Action AddCommand(string name, Func<List<string>, bool> func)
         {
+            name = name.ToLower();
             if (_commands.ContainsKey(name))
                 _commands[name].Add(func);
             else
-                _commands.Add(name.ToLower(), new List<Func<List<string>, bool>>{func});
+                _commands.Add(name, new List<Func<List<string>, bool>>{func});
+
+            return () => 
+            {
+                _commands[name].Remove(func);
+                if (_commands[name].Count == 0) 
+                    _commands.Remove(name);
+            };
         }
 
         public void Execute(string command) => HandleCommand(command);
@@ -70,29 +80,31 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private bool RunExtension(List<string> args)
+        private bool LoadExtension(List<string> args)
         {
-            var typeArg = string.Join(string.Empty, args.Skip(1)); // merging back potentially split valid type names like "type, assembly"
-            Type t = Type.GetType(typeArg) ?? throw new ArgumentException("Type not found: " + typeArg);
-            if (!t.IsSubclassOf(typeof(LoopControlExtension)))
+            try
             {
-                Console.WriteLine("Type " + t.FullName + " does not derives from LoopControlExtension");
-                return false;
+                var (context, extensions) = ExtensionsLoader.Load(args[1], this);
+                var initializedExtensions = extensions.ToList(); // iterate the enumerable to create/initialize the instances
+                _runningExtensions[args[1]] = (context, initializedExtensions);
+                return true;
             }
-
-            _runningExtensions[typeArg] = (LoopControlExtension)Activator.CreateInstance(t, this);
-            return true;
-        }
-        private bool StopExtension(List<string> args)
-        {
-            var typeArg = string.Join(string.Empty, args.Skip(1)); // merging back potentially split valid type names like "type, assembly"
-            if (_runningExtensions.TryGetValue(typeArg, out var instance))
+            catch (Exception ex)
             {
-                instance.Dispose();
-                _runningExtensions.Remove(typeArg);
+                throw new ArgumentException("Error loading extensions for specified arguments", nameof(args), ex);
+            }
+        }
+        private bool UnloadExtension(List<string> args)
+        {
+            if (_runningExtensions.TryGetValue(args[1], out var entry))
+            {
+                foreach (var instance in entry.instances)
+                    instance.Dispose();
+                _runningExtensions.Remove(args[1]);
+                entry.ctx.Unload();
             }
             else
-                Console.WriteLine("specified extension is not running");
+                Console.WriteLine("no running extension with the specified assembly was found");
 
             return true;
         }

@@ -10,7 +10,6 @@ namespace CommandHandlerTester
         static void Main(string[] args)
         {
             using var cmd = new CommandHandler();
-            Console.WriteLine(typeof(CommandHandlerTesterLib.TestClass1).AssemblyQualifiedName);
             Console.WriteLine("run help for available commands");
             int i = 0;
             while (cmd.IsRunning)

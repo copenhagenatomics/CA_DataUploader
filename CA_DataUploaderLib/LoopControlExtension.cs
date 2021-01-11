@@ -1,15 +1,21 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace CA_DataUploaderLib
 {
     public class LoopControlExtension : IDisposable
     {
+        private readonly List<Action> removeCommandActions = new List<Action>();
+
         public LoopControlExtension(CommandHandler cmd)
         {
             cmd.NewVectorReceived += OnNewVectorReceived;
             this.cmd = cmd;
+
         }
 
+        protected void AddCommand(string name, Func<List<string>, bool> func) => 
+            removeCommandActions.Add(cmd.AddCommand(name, func));
         protected virtual void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) { } 
 
         private bool disposedValue;
@@ -21,6 +27,8 @@ namespace CA_DataUploaderLib
             {
                 if (cmd != null)
                     cmd.NewVectorReceived -= OnNewVectorReceived;
+                foreach (var removeAction in removeCommandActions)
+                    removeAction();
 
                 disposedValue = true;
             }

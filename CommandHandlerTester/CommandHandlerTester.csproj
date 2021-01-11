@@ -6,7 +6,6 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\CA_DataUploaderLib\CA_DataUploaderLib.csproj" />
-		<ProjectReference Include="..\CommandHandlerTesterLib\CommandHandlerTesterLib.csproj" />
 	</ItemGroup>
 	<ItemGroup>
 		<None Update="IO.conf">
