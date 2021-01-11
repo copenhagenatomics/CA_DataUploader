@@ -20,7 +20,9 @@ namespace CA_DataUploaderLib
         private CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         private readonly List<string> AcceptedCommands = new List<string>();
         private int AcceptedCommandsIndex = -1;
+        private Dictionary<string, IDisposable> _stoppableExtensions = new Dictionary<string, IDisposable>();
 
+        public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
         public bool IsRunning { get { return _running; } }
 
         public CommandHandler(SerialNumberMapper mapper = null)
@@ -31,7 +33,8 @@ namespace CA_DataUploaderLib
             AddCommand("help", HelpMenu);
             AddCommand("up", Uptime);
             AddCommand("version", GetVersion);
-            AddCommand("Run", Run);
+            AddCommand("RunExtension", RunExtension);
+            AddCommand("StopExtension", StopExtension);
         }
 
         public void AddCommand(string name, Func<List<string>, bool> func)
@@ -55,6 +58,11 @@ namespace CA_DataUploaderLib
 
             return true;
         }
+
+        public void OnNewVectorReceived(List<SensorSample> vector)
+        {
+            NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector));
+        }
         
         private bool Stop(List<string> args)
         {
@@ -62,21 +70,24 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        // later this shall take filename.nav + function name. 
-        private bool Run(List<string> args)
+        private bool RunExtension(List<string> args)
         {
-            var asm = Assembly.LoadFrom(args[1]);
-            if (asm == null) throw new ArgumentException("Argument 1 (dll) was not found: " + args[1]);
-
-            Type t = asm.GetType(args[2]);
-            if (t == null) throw new ArgumentException("Argument 2 (class) was not found: " + args[2]);
-
-            var methodInfo = t.GetMethod(args[3]);
-            if (methodInfo == null) throw new ArgumentException("Argument 3 (method) was not found: " + args[3]);
-
-            var o = Activator.CreateInstance(t, this);
-            new Thread(() => methodInfo.Invoke(o, null)).Start();
-
+            var typeArg = string.Join(string.Empty, args.Skip(1)); // merging back potentially split valid type names like "type, assembly"
+            Type t = Type.GetType(typeArg) ?? throw new ArgumentException("Type not found: " + typeArg);
+            if (Activator.CreateInstance(t, this) is IDisposable disposableExtension)
+                _stoppableExtensions[typeArg] = disposableExtension;
+            return true;
+        }
+        private bool StopExtension(List<string> args)
+        {
+            var typeArg = string.Join(string.Empty, args.Skip(1)); // merging back potentially split valid type names like "type, assembly"
+            if (_stoppableExtensions.TryGetValue(typeArg, out var instance))
+            {
+                instance.Dispose();
+                _stoppableExtensions.Remove(typeArg);
+            }
+            else
+                Console.WriteLine("specified extension is not running or does not support stopping (IDisposable)");
             return true;
         }
 

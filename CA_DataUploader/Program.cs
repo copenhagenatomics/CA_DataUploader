@@ -33,7 +33,8 @@ namespace CA_DataUploader
                     {
                         var allSensors = usb.GetValues().ToList();
                         var list = filter.Apply(allSensors);
-                        cloud.SendVector(list, allSensors.First().TimeStamp);
+                        cmd.OnNewVectorReceived(list);
+                        cloud.SendVector(list.Select(v => v.Value).ToList(), allSensors.First().TimeStamp);
                         Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
 
                         Thread.Sleep(100);
