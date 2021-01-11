@@ -96,6 +96,15 @@ namespace CA_DataUploaderLib
         }
         private bool UnloadExtension(List<string> args)
         {
+            var res = DoUnloadExtension(args);
+            if (res)
+                // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
+                GC.Collect(); 
+            return res;
+        }
+
+        private bool DoUnloadExtension(List<string> args)
+        {
             if (_runningExtensions.TryGetValue(args[1], out var entry))
             {
                 foreach (var instance in entry.instances)

@@ -17,7 +17,8 @@ namespace CA_DataUploaderLib
         static (AssemblyLoadContext context, Assembly assembly) LoadPlugin(string assemblyPath)
         {
             PluginLoadContext context = new PluginLoadContext(assemblyPath);
-            return (context, context.LoadFromAssemblyName(new AssemblyName(Path.GetFileNameWithoutExtension(assemblyPath))));
+            using var fs = new FileStream(assemblyPath, FileMode.Open, FileAccess.Read); // force no file lock
+            return (context, context.LoadFromStream(fs));
         }
 
         static IEnumerable<T> CreateInstances<T>(Assembly assembly, params object[] args)

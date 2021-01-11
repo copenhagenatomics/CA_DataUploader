@@ -5,6 +5,8 @@ namespace CA_DataUploaderLib
 {
     public class LoopControlExtension : IDisposable
     {
+        private bool disposedValue;
+        private readonly CommandHandler cmd;
         private readonly List<Action> removeCommandActions = new List<Action>();
 
         public LoopControlExtension(CommandHandler cmd)
@@ -18,18 +20,13 @@ namespace CA_DataUploaderLib
             removeCommandActions.Add(cmd.AddCommand(name, func));
         protected virtual void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) { } 
 
-        private bool disposedValue;
-        private readonly CommandHandler cmd;
-
         protected virtual void Dispose(bool disposing)
         {
             if (!disposedValue)
             {
-                if (cmd != null)
-                    cmd.NewVectorReceived -= OnNewVectorReceived;
+                cmd.NewVectorReceived -= OnNewVectorReceived;
                 foreach (var removeAction in removeCommandActions)
                     removeAction();
-
                 disposedValue = true;
             }
         }
