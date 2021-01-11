@@ -20,7 +20,7 @@ namespace CA_DataUploaderLib
         private CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         private readonly List<string> AcceptedCommands = new List<string>();
         private int AcceptedCommandsIndex = -1;
-        private Dictionary<string, IDisposable> _stoppableExtensions = new Dictionary<string, IDisposable>();
+        private Dictionary<string, LoopControlExtension> _runningExtensions = new Dictionary<string, LoopControlExtension>();
 
         public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
         public bool IsRunning { get { return _running; } }
@@ -74,20 +74,26 @@ namespace CA_DataUploaderLib
         {
             var typeArg = string.Join(string.Empty, args.Skip(1)); // merging back potentially split valid type names like "type, assembly"
             Type t = Type.GetType(typeArg) ?? throw new ArgumentException("Type not found: " + typeArg);
-            if (Activator.CreateInstance(t, this) is IDisposable disposableExtension)
-                _stoppableExtensions[typeArg] = disposableExtension;
+            if (!t.IsSubclassOf(typeof(LoopControlExtension)))
+            {
+                Console.WriteLine("Type " + t.FullName + " does not derives from LoopControlExtension");
+                return false;
+            }
+
+            _runningExtensions[typeArg] = (LoopControlExtension)Activator.CreateInstance(t, this);
             return true;
         }
         private bool StopExtension(List<string> args)
         {
             var typeArg = string.Join(string.Empty, args.Skip(1)); // merging back potentially split valid type names like "type, assembly"
-            if (_stoppableExtensions.TryGetValue(typeArg, out var instance))
+            if (_runningExtensions.TryGetValue(typeArg, out var instance))
             {
                 instance.Dispose();
-                _stoppableExtensions.Remove(typeArg);
+                _runningExtensions.Remove(typeArg);
             }
             else
-                Console.WriteLine("specified extension is not running or does not support stopping (IDisposable)");
+                Console.WriteLine("specified extension is not running");
+
             return true;
         }
 
