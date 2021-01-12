@@ -13,7 +13,7 @@ namespace CommandHandlerTesterLib
         }
 
         protected override void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) 
-            => Console.WriteLine($"Iteration: { e["IterationSensor"].Value }");
+            => Console.Write(e["IterationSensor"].Value % 2 == 0 ? "." : string.Empty);
 
         private bool HelpMenu(List<string> args)
         {

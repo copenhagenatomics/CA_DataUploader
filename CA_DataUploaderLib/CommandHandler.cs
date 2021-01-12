@@ -232,7 +232,8 @@ namespace CA_DataUploaderLib
                     {
                         if (func.Invoke(cmd))
                         {
-                            CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
+                            if (cmdString != "help")
+                                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
                             OnCommandAccepted(cmdString);
                         }
                         else
@@ -255,6 +256,9 @@ namespace CA_DataUploaderLib
 
         private void OnCommandAccepted(string cmdString)
         {
+            if (AcceptedCommands.LastOrDefault() == cmdString)
+                return;
+
             AcceptedCommands.Add(cmdString);
             AcceptedCommandsIndex = AcceptedCommands.Count;
         }

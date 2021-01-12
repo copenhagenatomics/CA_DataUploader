@@ -10,6 +10,7 @@ namespace CommandHandlerTester
         static void Main(string[] args)
         {
             using var cmd = new CommandHandler();
+            cmd.Execute("load auto");
             Console.WriteLine("run help for available commands");
             int i = 0;
             while (cmd.IsRunning)
