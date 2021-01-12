@@ -23,6 +23,7 @@ namespace CA_DataUploaderLib
         private int AcceptedCommandsIndex = -1;
         private readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlExtension> instances)> _runningExtensions = 
             new Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlExtension> instances)>();
+        private FileSystemWatcher _extensionsChangesWatches;
 
         public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
         public bool IsRunning { get { return _running; } }
@@ -83,11 +84,14 @@ namespace CA_DataUploaderLib
 
         private bool LoadExtension(List<string> args)
         {
-            if (args.Count < 2)
+            var isAuto = args.Count > 1 && args[1] == "auto";
+            if (args.Count < 2 || isAuto)
             { // load all
                 foreach (var assembly in Directory.GetFiles(".", "*.dll"))
                     LoadExtension(assembly);
 
+                if (isAuto)
+                    TrackExtensionChanges("*.dll");
                 return true;
             }
 
@@ -102,8 +106,40 @@ namespace CA_DataUploaderLib
             }
         }
 
+        readonly Dictionary<string, object> _postponedExtensionChangeLocks = new Dictionary<string, object>();
+
+        private void TrackExtensionChanges(string filepattern)
+        {
+            //created files is already handled by the changed event, while we ignore manual direct renames of the extension assemblies files
+            _extensionsChangesWatches = new FileSystemWatcher(".", filepattern);
+            _extensionsChangesWatches.Deleted += OnExtensionsAssembliesDeleted;
+            _extensionsChangesWatches.Changed += OnExtensionsAssembliesChanged;
+            _extensionsChangesWatches.EnableRaisingEvents = true;
+        }
+
+        private void OnExtensionsAssembliesDeleted(object sender, FileSystemEventArgs e) => UnloadExtension(e.FullPath);
+        private void OnExtensionsAssembliesChanged(object sender, FileSystemEventArgs e)
+        {
+            //we wait for a second to do this change, and ignore it if a new change comes during that time (because the Changed event is fired multiple times in normal situations).
+            var mylock = new object();
+            _postponedExtensionChangeLocks[e.FullPath] = mylock;
+            var timer = new Timer(DelayedChange, (mylock, path: e.FullPath), 1000, Timeout.Infinite);
+
+            void DelayedChange(object state)
+            {
+                var (myDelayedLock, path) = ((object, string))state;
+                if (!_postponedExtensionChangeLocks.TryGetValue(path, out var storedLock) || myDelayedLock != storedLock)
+                    return;
+
+                _postponedExtensionChangeLocks.Remove(path);
+                UnloadExtension(path);
+                LoadExtension(path);
+            }
+        }
+
         private void LoadExtension(string assemblyPath)
         {
+            assemblyPath = Path.GetFullPath(assemblyPath);
             var (context, extensions) = ExtensionsLoader.Load(assemblyPath, this);
             var initializedExtensions = extensions.ToList(); // iterate the enumerable to create/initialize the instances
             if (initializedExtensions.Count == 0) {
@@ -132,6 +168,7 @@ namespace CA_DataUploaderLib
 
         private bool UnloadExtension(string assemblyPath)
         {
+            assemblyPath = Path.GetFullPath(assemblyPath);
             if (!_runningExtensions.TryGetValue(assemblyPath, out var entry))
             {
                 Console.WriteLine("no running extension with the specified assembly was found");
