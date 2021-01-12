@@ -2,6 +2,7 @@
 using Humanizer;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.Loader;
 using System.Text;
@@ -13,11 +14,11 @@ namespace CA_DataUploaderLib
     {
 
         private bool _running = true;
-        private SerialNumberMapper _mapper;
+        private readonly SerialNumberMapper _mapper;
         private DateTime _start = DateTime.Now;
-        private StringBuilder inputCommand = new StringBuilder();
-        private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
-        private CALogLevel _logLevel = IOconfFile.GetOutputLevel();
+        private readonly StringBuilder inputCommand = new StringBuilder();
+        private readonly Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
+        private readonly CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         private readonly List<string> AcceptedCommands = new List<string>();
         private int AcceptedCommandsIndex = -1;
         private readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlExtension> instances)> _runningExtensions = 
@@ -82,11 +83,17 @@ namespace CA_DataUploaderLib
 
         private bool LoadExtension(List<string> args)
         {
+            if (args.Count < 2)
+            { // load all
+                foreach (var assembly in Directory.GetFiles(".", "*.dll"))
+                    LoadExtension(assembly);
+
+                return true;
+            }
+
             try
             {
-                var (context, extensions) = ExtensionsLoader.Load(args[1], this);
-                var initializedExtensions = extensions.ToList(); // iterate the enumerable to create/initialize the instances
-                _runningExtensions[args[1]] = (context, initializedExtensions);
+                LoadExtension(args[1]);
                 return true;
             }
             catch (Exception ex)
@@ -94,28 +101,49 @@ namespace CA_DataUploaderLib
                 throw new ArgumentException("Error loading extensions for specified arguments", nameof(args), ex);
             }
         }
-        private bool UnloadExtension(List<string> args)
+
+        private void LoadExtension(string assemblyPath)
         {
-            var res = DoUnloadExtension(args);
-            if (res)
-                // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
-                GC.Collect(); 
-            return res;
+            var (context, extensions) = ExtensionsLoader.Load(assemblyPath, this);
+            var initializedExtensions = extensions.ToList(); // iterate the enumerable to create/initialize the instances
+            if (initializedExtensions.Count == 0) {
+                context.Unload();
+                return;
+            }
+
+            _runningExtensions[assemblyPath] = (context, initializedExtensions);
+            Console.WriteLine($"loaded extensions from {assemblyPath} - {string.Join(",", initializedExtensions.Select(e => e.GetType().Name))}");
         }
 
-        private bool DoUnloadExtension(List<string> args)
+        private bool UnloadExtension(List<string> args)
         {
-            if (_runningExtensions.TryGetValue(args[1], out var entry))
-            {
-                foreach (var instance in entry.instances)
-                    instance.Dispose();
-                _runningExtensions.Remove(args[1]);
-                entry.ctx.Unload();
+            if (args.Count < 2)
+            { // unload all
+                foreach (var assembly in _runningExtensions)
+                    UnloadExtension(assembly.Key, assembly.Value);
+                GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
+                return true;
             }
-            else
-                Console.WriteLine("no running extension with the specified assembly was found");
 
+            var assemblyPath = args[1];
+            if (!_runningExtensions.TryGetValue(assemblyPath, out var entry))
+            {
+                Console.WriteLine("no running extension with the specified assembly was found");
+                return false;
+            }
+
+            UnloadExtension(assemblyPath, entry);
+            GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
             return true;
+        }
+
+        private void UnloadExtension(string assemblyPath, (AssemblyLoadContext ctx, IEnumerable<LoopControlExtension> instances) entry)
+        {
+            foreach (var instance in entry.instances)
+                instance.Dispose();
+            _runningExtensions.Remove(assemblyPath);
+            entry.ctx.Unload();
+            Console.WriteLine($"unloaded extensions from {assemblyPath} - {string.Join(",", entry.instances.Select(e => e.GetType().Name))}");
         }
 
         private void LoopForever()
@@ -227,17 +255,8 @@ namespace CA_DataUploaderLib
             return inputCommand.ToString();
         }
 
-        public static int GetCmdParam(List<string> cmd, int index, int defaultValue)
-        {
-            if (cmd.Count() > index)
-            {
-                int value;
-                if (int.TryParse(cmd[index], out value))
-                    return value;
-            }
-
-            return defaultValue;
-        }
+        public static int GetCmdParam(List<string> cmd, int index, int defaultValue) => 
+            cmd.Count() > index && int.TryParse(cmd[index], out int value) ? value : defaultValue;
 
         private void RestoreNextAcceptedCommand()
         {
