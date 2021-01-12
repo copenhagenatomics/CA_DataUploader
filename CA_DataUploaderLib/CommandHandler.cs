@@ -119,31 +119,31 @@ namespace CA_DataUploaderLib
         {
             if (args.Count < 2)
             { // unload all
-                foreach (var assembly in _runningExtensions)
-                    UnloadExtension(assembly.Key, assembly.Value);
+                foreach (var assembly in _runningExtensions.Keys.ToList())
+                    UnloadExtension(assembly);
                 GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
                 return true;
             }
 
-            var assemblyPath = args[1];
+            UnloadExtension(args[1]);
+            GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
+            return true;
+        }
+
+        private bool UnloadExtension(string assemblyPath)
+        {
             if (!_runningExtensions.TryGetValue(assemblyPath, out var entry))
             {
                 Console.WriteLine("no running extension with the specified assembly was found");
                 return false;
             }
 
-            UnloadExtension(assemblyPath, entry);
-            GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
-            return true;
-        }
-
-        private void UnloadExtension(string assemblyPath, (AssemblyLoadContext ctx, IEnumerable<LoopControlExtension> instances) entry)
-        {
             foreach (var instance in entry.instances)
                 instance.Dispose();
             _runningExtensions.Remove(assemblyPath);
             entry.ctx.Unload();
-            Console.WriteLine($"unloaded extensions from {assemblyPath} - {string.Join(",", entry.instances.Select(e => e.GetType().Name))}");
+            Console.WriteLine($"unloaded extensions from {assemblyPath}");
+            return true;
         }
 
         private void LoopForever()

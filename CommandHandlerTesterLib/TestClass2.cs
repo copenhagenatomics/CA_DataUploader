@@ -4,11 +4,11 @@ using System.Collections.Generic;
 
 namespace CommandHandlerTesterLib
 {
-    public class TestClass2
+    public class TestClass2 : LoopControlExtension
     {
-        public TestClass2(CommandHandler cmd)
+        public TestClass2(CommandHandler cmd) : base(cmd)
         {
-            cmd.AddCommand("metB", MethodB);
+            AddCommand("metB", MethodB);
         }
 
         private bool MethodB(List<string> args)
@@ -17,7 +17,6 @@ namespace CommandHandlerTesterLib
             Console.WriteLine(args[2]);
             return true;
         }
-
     }
 
 }
