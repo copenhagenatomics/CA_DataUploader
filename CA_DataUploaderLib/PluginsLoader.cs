@@ -6,12 +6,12 @@ using System.Runtime.Loader;
 
 namespace CA_DataUploaderLib
 {
-    public class ExtensionsLoader
+    public class PluginsLoader
     { // see https://docs.microsoft.com/en-us/dotnet/core/tutorials/creating-app-with-plugin-support
-        public static (AssemblyLoadContext context, IEnumerable<LoopControlExtension> extensions) Load(string assemblyPath, CommandHandler cmd)
+        public static (AssemblyLoadContext context, IEnumerable<LoopControlPlugin> plugins) Load(string assemblyPath, CommandHandler cmd)
         {
             var (context, assembly) = LoadPlugin(assemblyPath);
-            return (context, CreateInstances<LoopControlExtension>(assembly, cmd));
+            return (context, CreateInstances<LoopControlPlugin>(assembly, cmd));
         }
 
         static (AssemblyLoadContext context, Assembly assembly) LoadPlugin(string assemblyPath)

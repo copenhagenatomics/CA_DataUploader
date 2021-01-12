@@ -3,13 +3,13 @@ using System.Collections.Generic;
 
 namespace CA_DataUploaderLib
 {
-    public class LoopControlExtension : IDisposable
+    public class LoopControlPlugin : IDisposable
     {
         private bool disposedValue;
         private readonly CommandHandler cmd;
         private readonly List<Action> removeCommandActions = new List<Action>();
 
-        public LoopControlExtension(CommandHandler cmd)
+        public LoopControlPlugin(CommandHandler cmd)
         {
             cmd.NewVectorReceived += OnNewVectorReceived;
             this.cmd = cmd;

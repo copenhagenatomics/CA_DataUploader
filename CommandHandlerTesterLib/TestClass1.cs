@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace CommandHandlerTesterLib
 {
-    public class TestClass1 : LoopControlExtension
+    public class TestClass1 : LoopControlPlugin
     {
         public TestClass1(CommandHandler cmd) : base(cmd)
         {

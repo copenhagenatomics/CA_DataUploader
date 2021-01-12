@@ -21,9 +21,10 @@ namespace CA_DataUploaderLib
         private readonly CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         private readonly List<string> AcceptedCommands = new List<string>();
         private int AcceptedCommandsIndex = -1;
-        private readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlExtension> instances)> _runningExtensions = 
-            new Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlExtension> instances)>();
-        private FileSystemWatcher _extensionsChangesWatches;
+        private readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlPlugin> instances)> _runningPlugins = 
+            new Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlPlugin> instances)>();
+        private FileSystemWatcher _pluginChangesWatcher;
+        readonly Dictionary<string, object> _postponedPluginChangeLocks = new Dictionary<string, object>();
 
         public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
         public bool IsRunning { get { return _running; } }
@@ -36,8 +37,8 @@ namespace CA_DataUploaderLib
             AddCommand("help", HelpMenu);
             AddCommand("up", Uptime);
             AddCommand("version", GetVersion);
-            AddCommand("Load", LoadExtension);
-            AddCommand("Unload", UnloadExtension);
+            AddCommand("Load", LoadPlugin);
+            AddCommand("Unload", UnloadPlugin);
         }
 
         /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>
@@ -82,94 +83,94 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private bool LoadExtension(List<string> args)
+        private bool LoadPlugin(List<string> args)
         {
             var isAuto = args.Count > 1 && args[1] == "auto";
             if (args.Count < 2 || isAuto)
             { // load all
                 foreach (var assembly in Directory.GetFiles(".", "*.dll"))
-                    LoadExtension(assembly);
+                    LoadPlugin(assembly);
 
                 if (isAuto)
-                    TrackExtensionChanges("*.dll");
+                    TrackPluginChanges("*.dll");
                 return true;
             }
 
             try
             {
-                LoadExtension(args[1]);
+                LoadPlugin(args[1]);
                 return true;
             }
             catch (Exception ex)
             {
-                throw new ArgumentException("Error loading extensions for specified arguments", nameof(args), ex);
+                throw new ArgumentException("Error loading plugin for specified arguments", nameof(args), ex);
             }
         }
 
-        readonly Dictionary<string, object> _postponedExtensionChangeLocks = new Dictionary<string, object>();
-
-        private void TrackExtensionChanges(string filepattern)
+        private void TrackPluginChanges(string filepattern)
         {
-            //created files is already handled by the changed event, while we ignore manual direct renames of the extension assemblies files
-            _extensionsChangesWatches = new FileSystemWatcher(".", filepattern);
-            _extensionsChangesWatches.Deleted += OnExtensionsAssembliesDeleted;
-            _extensionsChangesWatches.Changed += OnExtensionsAssembliesChanged;
-            _extensionsChangesWatches.EnableRaisingEvents = true;
+            //created files is already handled by the changed event, while we ignore manual direct renames of the plugin assemblies files
+            _pluginChangesWatcher = new FileSystemWatcher(".", filepattern);
+            _pluginChangesWatcher.Deleted += OnAssembliesDeleted;
+            _pluginChangesWatcher.Changed += OnAssembliesChanged;
+            _pluginChangesWatcher.EnableRaisingEvents = true;
         }
 
-        private void OnExtensionsAssembliesDeleted(object sender, FileSystemEventArgs e) => UnloadExtension(e.FullPath);
-        private void OnExtensionsAssembliesChanged(object sender, FileSystemEventArgs e)
+        private void OnAssembliesDeleted(object sender, FileSystemEventArgs e) => UnloadPlugin(e.FullPath);
+        /// <remarks>
+        /// we wait for a second to (un)load the plugin, and ignore it if a new change comes during that time (because the Changed event is fired multiple times in normal situations).
+        /// </remarks>
+        private void OnAssembliesChanged(object sender, FileSystemEventArgs e)
         {
-            //we wait for a second to do this change, and ignore it if a new change comes during that time (because the Changed event is fired multiple times in normal situations).
             var mylock = new object();
-            _postponedExtensionChangeLocks[e.FullPath] = mylock;
+            _postponedPluginChangeLocks[e.FullPath] = mylock;
             var timer = new Timer(DelayedChange, (mylock, path: e.FullPath), 1000, Timeout.Infinite);
 
             void DelayedChange(object state)
             {
                 var (myDelayedLock, path) = ((object, string))state;
-                if (!_postponedExtensionChangeLocks.TryGetValue(path, out var storedLock) || myDelayedLock != storedLock)
+                if (!_postponedPluginChangeLocks.TryGetValue(path, out var storedLock) || myDelayedLock != storedLock)
                     return;
 
-                _postponedExtensionChangeLocks.Remove(path);
-                UnloadExtension(path);
-                LoadExtension(path);
+                _postponedPluginChangeLocks.Remove(path);
+                UnloadPlugin(path);
+                LoadPlugin(path);
             }
         }
 
-        private void LoadExtension(string assemblyPath)
+        private void LoadPlugin(string assemblyPath)
         {
             assemblyPath = Path.GetFullPath(assemblyPath);
-            var (context, extensions) = ExtensionsLoader.Load(assemblyPath, this);
-            var initializedExtensions = extensions.ToList(); // iterate the enumerable to create/initialize the instances
-            if (initializedExtensions.Count == 0) {
+            var (context, plugins) = PluginsLoader.Load(assemblyPath, this);
+            var initializedPlugins = plugins.ToList(); // iterate the enumerable to create/initialize the instances
+            if (initializedPlugins.Count == 0) {
                 context.Unload();
                 return;
             }
 
-            _runningExtensions[assemblyPath] = (context, initializedExtensions);
-            Console.WriteLine($"loaded extensions from {assemblyPath} - {string.Join(",", initializedExtensions.Select(e => e.GetType().Name))}");
+            _runningPlugins[assemblyPath] = (context, initializedPlugins);
+            Console.WriteLine($"loaded plugins from {assemblyPath} - {string.Join(",", initializedPlugins.Select(e => e.GetType().Name))}");
         }
 
-        private bool UnloadExtension(List<string> args)
+        private bool UnloadPlugin(List<string> args)
         {
             if (args.Count < 2)
             { // unload all
-                foreach (var assembly in _runningExtensions.Keys.ToList())
-                    UnloadExtension(assembly);
+                foreach (var assembly in _runningPlugins.Keys.ToList())
+                    UnloadPlugin(assembly);
                 GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
                 return true;
             }
 
-            UnloadExtension(args[1]);
+            UnloadPlugin(args[1]);
             GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
             return true;
         }
 
-        private bool UnloadExtension(string assemblyPath)
+        private bool UnloadPlugin(string assemblyPath)
         {
             assemblyPath = Path.GetFullPath(assemblyPath);
-            if (!_runningExtensions.TryGetValue(assemblyPath, out var entry))
+            if (!_runningPlugins.TryGetValue(assemblyPath, out var entry))
             {
                 Console.WriteLine("no running extension with the specified assembly was found");
                 return false;
@@ -177,9 +178,9 @@ namespace CA_DataUploaderLib
 
             foreach (var instance in entry.instances)
                 instance.Dispose();
-            _runningExtensions.Remove(assemblyPath);
+            _runningPlugins.Remove(assemblyPath);
             entry.ctx.Unload();
-            Console.WriteLine($"unloaded extensions from {assemblyPath}");
+            Console.WriteLine($"unloaded plugins from {assemblyPath}");
             return true;
         }
 
