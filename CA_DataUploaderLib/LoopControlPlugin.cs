@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
@@ -25,17 +26,31 @@ namespace CA_DataUploaderLib
 
         protected void ExecuteCommand(string command) => cmd.Execute(command);
         protected virtual void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) { }
-        protected Task<double> WhenSensorValue(string sensorName, Predicate<double> condition)
+        protected Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, int timeoutms) => WhenSensorValue(sensorName, condition, TimeSpan.FromMilliseconds(timeoutms));
+        protected async Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, TimeSpan timeout) => (await When(e => condition(e[sensorName].Value), timeout))[sensorName].Value;
+        protected async Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, CancellationToken token) => (await When(e => condition(e[sensorName].Value), token))[sensorName].Value;
+        protected async Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, TimeSpan timeout)
+        {
+            using var cts = new CancellationTokenSource(timeout);
+            return await When(condition, cts.Token);
+        }
+
+        protected Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, CancellationToken token)
         { 
-            var tcs = new TaskCompletionSource<double>();
+            var tcs = new TaskCompletionSource<NewVectorReceivedArgs>();
             cmd.NewVectorReceived += OnNewValue;
             subscribedNewVectorReceivedEvents.Add(OnNewValue);
             void OnNewValue(object sender, NewVectorReceivedArgs e)
             {
-                double value = e[sensorName].Value;
-                if (condition(value))
+                var matchesCondition = condition(e);
+                var isCancelled = token.IsCancellationRequested;
+                if (matchesCondition)
+                    tcs.TrySetResult(e);
+                else if (isCancelled)
+                    tcs.TrySetCanceled(token);
+
+                if (matchesCondition || isCancelled)
                 {
-                    tcs.TrySetResult(value);
                     cmd.NewVectorReceived -= OnNewValue;
                     subscribedNewVectorReceivedEvents.Remove(OnNewValue);
                 }
