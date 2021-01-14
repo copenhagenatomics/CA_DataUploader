@@ -88,10 +88,12 @@ namespace CA_DataUploaderLib
                 catch (TaskCanceledException)
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"{Name} aborted: timed out waiting for a sensor to reach target range");
+                    await OnCommandFailed();
                 }
                 catch (Exception ex)
                 {
                     CALog.LogException(LogID.A, ex);
+                    await OnCommandFailed();
                 }
             });
             return true;
