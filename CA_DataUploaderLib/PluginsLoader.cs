@@ -12,13 +12,12 @@ namespace CA_DataUploaderLib
     { // see https://docs.microsoft.com/en-us/dotnet/core/tutorials/creating-app-with-plugin-support
         readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlPlugin> instances)> _runningPlugins =
             new Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlPlugin> instances)>();
-        FileSystemWatcher _pluginChangesWatcher;
-        readonly Dictionary<string, object> _postponedPluginChangeLocks = new Dictionary<string, object>();
-        readonly CommandHandler handler;
+        SingleFireFileWatcher _pluginChangesWatcher;
+        readonly object[] plugingArgs;
 
         public PluginsLoader(CommandHandler handler)
         {
-            this.handler = handler;
+            plugingArgs = new[] { handler };
         }
 
         public void LoadPlugins(bool automaticallyLoadPluginChanges = true)
@@ -28,7 +27,11 @@ namespace CA_DataUploaderLib
                 LoadPlugin(assembly);
 
             if (automaticallyLoadPluginChanges)
-                TrackPluginChanges("*.dll");
+            {
+                _pluginChangesWatcher = new SingleFireFileWatcher(".", "*.dll");
+                _pluginChangesWatcher.Deleted += UnloadPlugin;
+                _pluginChangesWatcher.Changed += ReloadPlugin;
+            }
         }
 
         public void UnloadPlugins()
@@ -41,7 +44,7 @@ namespace CA_DataUploaderLib
         void LoadPlugin(string assemblyPath)
         {
             assemblyPath = Path.GetFullPath(assemblyPath);
-            var (context, plugins) = Load(assemblyPath, handler);
+            var (context, plugins) = Load(assemblyPath, plugingArgs);
             var initializedPlugins = plugins.ToList(); // iterate the enumerable to create/initialize the instances
             if (initializedPlugins.Count == 0)
             {
@@ -53,58 +56,32 @@ namespace CA_DataUploaderLib
             CALog.LogData(LogID.A, $"loaded plugins from {assemblyPath} - {string.Join(",", initializedPlugins.Select(e => e.GetType().Name))}");
         }
 
-        bool UnloadPlugin(string assemblyPath)
+        void UnloadPlugin(string assemblyPath)
         {
             assemblyPath = Path.GetFullPath(assemblyPath);
             if (!_runningPlugins.TryGetValue(assemblyPath, out var entry))
-            {
                 CALog.LogData(LogID.A, "no running extension with the specified assembly was found");
-                return false;
-            }
 
             foreach (var instance in entry.instances)
                 instance.Dispose();
             _runningPlugins.Remove(assemblyPath);
             entry.ctx.Unload();
             CALog.LogData(LogID.A, $"unloaded plugins from {assemblyPath}");
-            return true;
         }
 
-        void TrackPluginChanges(string filepattern)
-        {
-            //created files is already handled by the changed event, while we ignore manual direct renames of the plugin assemblies files
-            _pluginChangesWatcher = new FileSystemWatcher(".", filepattern);
-            _pluginChangesWatcher.Deleted += OnAssembliesDeleted;
-            _pluginChangesWatcher.Changed += OnAssembliesChanged;
-            _pluginChangesWatcher.EnableRaisingEvents = true;
-        }
-
-        void OnAssembliesDeleted(object sender, FileSystemEventArgs e) => UnloadPlugin(e.FullPath);
         /// <remarks>
         /// we wait for a second to (un)load the plugin, and ignore it if a new change comes during that time (because the Changed event is fired multiple times in normal situations).
         /// </remarks>
-        void OnAssembliesChanged(object sender, FileSystemEventArgs e)
+        void ReloadPlugin(string fullpath)
         {
-            var mylock = new object();
-            _postponedPluginChangeLocks[e.FullPath] = mylock;
-            var timer = new Timer(DelayedChange, (mylock, path: e.FullPath), 1000, Timeout.Infinite);
-
-            void DelayedChange(object state)
-            {
-                var (myDelayedLock, path) = ((object, string))state;
-                if (!_postponedPluginChangeLocks.TryGetValue(path, out var storedLock) || myDelayedLock != storedLock)
-                    return;
-
-                _postponedPluginChangeLocks.Remove(path);
-                UnloadPlugin(path);
-                LoadPlugin(path);
-            }
+            UnloadPlugin(fullpath);
+            LoadPlugin(fullpath);
         }
 
-        static (AssemblyLoadContext context, IEnumerable<LoopControlPlugin> plugins) Load(string assemblyPath, CommandHandler cmd)
+        static (AssemblyLoadContext context, IEnumerable<LoopControlPlugin> plugins) Load(string assemblyPath, params object[] args)
         {
             var (context, assembly) = LoadAssembly(assemblyPath);
-            return (context, CreateInstances<LoopControlPlugin>(assembly, cmd));
+            return (context, CreateInstances<LoopControlPlugin>(assembly, args));
         }
 
         static (AssemblyLoadContext context, Assembly assembly) LoadAssembly(string assemblyPath)
@@ -144,5 +121,43 @@ namespace CA_DataUploaderLib
             }
         }
 
+        /// <summary>a file watcher that avoids the multi fire issue of <see cref="FileSystemWatcher"/> (waits up to 1 second without changes before raising the file changed event)</summary>
+        private class SingleFireFileWatcher
+        {
+            private const int MillisecondsWithoutChanges = 1000;
+            readonly FileSystemWatcher watcher;
+            readonly Dictionary<string, object> _postponedChangeLocks = new Dictionary<string, object>();
+            public delegate void FileChangedDelegate(string fullpath);
+            public event FileChangedDelegate Changed;
+            public event FileChangedDelegate Deleted;
+            public SingleFireFileWatcher(string folderPath, string filePattern)
+            {
+                //note: we ignore manual direct renames of the plugin assemblies files
+                watcher = new FileSystemWatcher(folderPath, filePattern);
+                watcher.Deleted += OnDeleted;
+                watcher.Changed += OnChanged; // also handles creates
+                watcher.EnableRaisingEvents = true;
+            }
+
+            private void OnDeleted(object sender, FileSystemEventArgs e) => Deleted?.Invoke(e.FullPath);
+
+            private void OnChanged(object sender, FileSystemEventArgs e)
+            {
+                var mylock = new object();
+                _postponedChangeLocks[e.FullPath] = mylock;
+                var timer = new Timer(DelayedChange, (mylock, path: e.FullPath), MillisecondsWithoutChanges, Timeout.Infinite);
+            }
+
+            void DelayedChange(object state)
+            {
+                var (myDelayedLock, path) = ((object, string))state;
+                if (!_postponedChangeLocks.TryGetValue(path, out var storedLock) || myDelayedLock != storedLock)
+                    return;
+
+                _postponedChangeLocks.Remove(path);
+                Changed?.Invoke(path);
+            }
+
+        }
     }
 }
