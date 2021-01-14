@@ -73,7 +73,7 @@ namespace CA_DataUploaderLib
         }
         private bool HelpMenu(List<string> _)
         {
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{(Name + ArgsHelp).PadRight(26, '.')}- {Description}");
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{Name + ArgsHelp,-26}- {Description}");
             return true;
         }
 
