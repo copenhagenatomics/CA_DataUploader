@@ -60,7 +60,10 @@ namespace CA_DataUploaderLib
         {
             assemblyPath = Path.GetFullPath(assemblyPath);
             if (!_runningPlugins.TryGetValue(assemblyPath, out var entry))
+            {
                 CALog.LogData(LogID.A, "no running extension with the specified assembly was found");
+                return;
+            }
 
             foreach (var instance in entry.instances)
                 instance.Dispose();
