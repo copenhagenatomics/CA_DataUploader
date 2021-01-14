@@ -15,8 +15,7 @@ namespace CA_DataUploaderLib
 
         public LoopControlPlugin(CommandHandler cmd)
         {
-            cmd.NewVectorReceived += OnNewVectorReceived;
-            subscribedNewVectorReceivedEvents.Add(OnNewVectorReceived);
+            SubscribeToNewVectorReceived(cmd, OnNewVectorReceived);
             this.cmd = cmd;
 
         }
@@ -37,8 +36,7 @@ namespace CA_DataUploaderLib
         protected Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, CancellationToken token)
         { 
             var tcs = new TaskCompletionSource<NewVectorReceivedArgs>();
-            cmd.NewVectorReceived += OnNewValue;
-            subscribedNewVectorReceivedEvents.Add(OnNewValue);
+            SubscribeToNewVectorReceived(cmd, OnNewValue);
             void OnNewValue(object sender, NewVectorReceivedArgs e)
             {
                 var matchesCondition = condition(e);
@@ -49,10 +47,7 @@ namespace CA_DataUploaderLib
                     tcs.TrySetCanceled(token);
 
                 if (matchesCondition || isCancelled)
-                {
-                    cmd.NewVectorReceived -= OnNewValue;
-                    subscribedNewVectorReceivedEvents.Remove(OnNewValue);
-                }
+                    UnSubscribeToNewVectorReceived(cmd, OnNewValue);
             }
 
             return tcs.Task;
@@ -60,13 +55,23 @@ namespace CA_DataUploaderLib
         protected TimeSpan Milliseconds(double seconds) => TimeSpan.FromMilliseconds(seconds);
         protected TimeSpan Seconds(double seconds) => TimeSpan.FromSeconds(seconds);
         protected TimeSpan Minutes(double minutes) => TimeSpan.FromMinutes(minutes);
+        private void SubscribeToNewVectorReceived(CommandHandler cmd, EventHandler<NewVectorReceivedArgs> handler)
+        {
+            cmd.NewVectorReceived += handler;
+            subscribedNewVectorReceivedEvents.Add(handler);
+        }
+        private void UnSubscribeToNewVectorReceived(CommandHandler cmd, EventHandler<NewVectorReceivedArgs> handler)
+        {
+            cmd.NewVectorReceived -= handler;
+            subscribedNewVectorReceivedEvents.Remove(handler);
+        }
 
         protected virtual void Dispose(bool disposing)
         {
             if (!disposedValue)
             {
-                foreach (var subscribedEvent in subscribedNewVectorReceivedEvents)
-                    cmd.NewVectorReceived -= subscribedEvent;
+                foreach (var subscribedEvent in subscribedNewVectorReceivedEvents.ToArray())
+                    UnSubscribeToNewVectorReceived(cmd, subscribedEvent);
                 foreach (var removeAction in removeCommandActions)
                     removeAction();
                 disposedValue = true;
