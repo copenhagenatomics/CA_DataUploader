@@ -2,9 +2,7 @@
 using Humanizer;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Runtime.Loader;
 using System.Text;
 using System.Threading;
 
@@ -12,7 +10,6 @@ namespace CA_DataUploaderLib
 {
     public class CommandHandler : IDisposable
     {
-
         private bool _running = true;
         private readonly SerialNumberMapper _mapper;
         private DateTime _start = DateTime.Now;
@@ -33,7 +30,6 @@ namespace CA_DataUploaderLib
             AddCommand("help", HelpMenu);
             AddCommand("up", Uptime);
             AddCommand("version", GetVersion);
-            PluginsLoader.AddCommands(this);
         }
 
         /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>

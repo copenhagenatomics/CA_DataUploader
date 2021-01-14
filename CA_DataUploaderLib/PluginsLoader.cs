@@ -16,48 +16,12 @@ namespace CA_DataUploaderLib
         readonly Dictionary<string, object> _postponedPluginChangeLocks = new Dictionary<string, object>();
         readonly CommandHandler handler;
 
-        public static PluginsLoader AddCommands(CommandHandler handler) => new PluginsLoader(handler);
-        private PluginsLoader(CommandHandler handler)
+        public PluginsLoader(CommandHandler handler)
         {
             this.handler = handler;
-            handler.AddCommand("Load", LoadPlugin);
-            handler.AddCommand("Unload", UnloadPlugin);
         }
 
-        private bool LoadPlugin(List<string> args)
-        {
-            var isAuto = args.Count > 1 && args[1] == "auto";
-            if (args.Count < 2 || isAuto)
-            {
-                LoadPlugins(isAuto);
-                return true;
-            }
-
-            try
-            {
-                LoadPlugin(args[1]);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                throw new ArgumentException("Error loading plugin for specified arguments", nameof(args), ex);
-            }
-        }
-
-        private bool UnloadPlugin(List<string> args)
-        {
-            if (args.Count < 2)
-            { // unload all
-                UnloadPlugins();
-                return true;
-            }
-
-            UnloadPlugin(args[1]);
-            GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
-            return true;
-        }
-
-        public void LoadPlugins(bool automaticallyLoadPluginChanges)
+        public void LoadPlugins(bool automaticallyLoadPluginChanges = true)
         {
             // load all
             foreach (var assembly in Directory.GetFiles(".", "*.dll"))
@@ -67,7 +31,14 @@ namespace CA_DataUploaderLib
                 TrackPluginChanges("*.dll");
         }
 
-        public void LoadPlugin(string assemblyPath)
+        public void UnloadPlugins()
+        {
+            foreach (var assembly in _runningPlugins.Keys.ToList())
+                UnloadPlugin(assembly);
+            GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
+        }
+
+        void LoadPlugin(string assemblyPath)
         {
             assemblyPath = Path.GetFullPath(assemblyPath);
             var (context, plugins) = Load(assemblyPath, handler);
@@ -79,22 +50,15 @@ namespace CA_DataUploaderLib
             }
 
             _runningPlugins[assemblyPath] = (context, initializedPlugins);
-            Console.WriteLine($"loaded plugins from {assemblyPath} - {string.Join(",", initializedPlugins.Select(e => e.GetType().Name))}");
+            CALog.LogData(LogID.A, $"loaded plugins from {assemblyPath} - {string.Join(",", initializedPlugins.Select(e => e.GetType().Name))}");
         }
 
-        public void UnloadPlugins()
-        {
-            foreach (var assembly in _runningPlugins.Keys.ToList())
-                UnloadPlugin(assembly);
-            GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
-        }
-
-        public bool UnloadPlugin(string assemblyPath)
+        bool UnloadPlugin(string assemblyPath)
         {
             assemblyPath = Path.GetFullPath(assemblyPath);
             if (!_runningPlugins.TryGetValue(assemblyPath, out var entry))
             {
-                Console.WriteLine("no running extension with the specified assembly was found");
+                CALog.LogData(LogID.A, "no running extension with the specified assembly was found");
                 return false;
             }
 
@@ -102,7 +66,7 @@ namespace CA_DataUploaderLib
                 instance.Dispose();
             _runningPlugins.Remove(assemblyPath);
             entry.ctx.Unload();
-            Console.WriteLine($"unloaded plugins from {assemblyPath}");
+            CALog.LogData(LogID.A, $"unloaded plugins from {assemblyPath}");
             return true;
         }
 
