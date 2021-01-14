@@ -39,15 +39,14 @@ namespace CA_DataUploaderLib
             SubscribeToNewVectorReceived(cmd, OnNewValue);
             void OnNewValue(object sender, NewVectorReceivedArgs e)
             {
-                var matchesCondition = condition(e);
-                var isCancelled = token.IsCancellationRequested;
-                if (matchesCondition)
+                if (condition(e))
                     tcs.TrySetResult(e);
-                else if (isCancelled)
+                else if (token.IsCancellationRequested)
                     tcs.TrySetCanceled(token);
+                else // still waiting for condition to be met, do not unsubscribe yet
+                    return; 
 
-                if (matchesCondition || isCancelled)
-                    UnSubscribeToNewVectorReceived(cmd, OnNewValue);
+                UnSubscribeToNewVectorReceived(cmd, OnNewValue);
             }
 
             return tcs.Task;
