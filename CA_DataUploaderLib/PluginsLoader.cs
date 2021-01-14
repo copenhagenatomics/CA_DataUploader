@@ -10,8 +10,8 @@ namespace CA_DataUploaderLib
 {
     public class PluginsLoader
     { // see https://docs.microsoft.com/en-us/dotnet/core/tutorials/creating-app-with-plugin-support
-        readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlPlugin> instances)> _runningPlugins =
-            new Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlPlugin> instances)>();
+        readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances)> _runningPlugins =
+            new Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances)>();
         SingleFireFileWatcher _pluginChangesWatcher;
         readonly object[] plugingArgs;
 
@@ -81,10 +81,10 @@ namespace CA_DataUploaderLib
             LoadPlugin(fullpath);
         }
 
-        static (AssemblyLoadContext context, IEnumerable<LoopControlPlugin> plugins) Load(string assemblyPath, params object[] args)
+        static (AssemblyLoadContext context, IEnumerable<LoopControlCommand> plugins) Load(string assemblyPath, params object[] args)
         {
             var (context, assembly) = LoadAssembly(assemblyPath);
-            return (context, CreateInstances<LoopControlPlugin>(assembly, args));
+            return (context, CreateInstances<LoopControlCommand>(assembly, args));
         }
 
         static (AssemblyLoadContext context, Assembly assembly) LoadAssembly(string assemblyPath)
