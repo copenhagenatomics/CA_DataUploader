@@ -14,7 +14,7 @@ namespace CommandHandlerTesterLib
         }
 
         private bool HelpMenu(List<string> _)
-        { 
+        {
             CALog.LogInfoAndConsoleLn(LogID.A, "longaction                - runs a bit longer action");
             return true;
         }
@@ -30,11 +30,11 @@ namespace CommandHandlerTesterLib
             try
             {
                 Console.WriteLine("Waiting for the next multiple of 10 value for IterationSensor");
-                var val = await WhenSensorValue("IterationSensor", v => v % 10 == 0, TimeSpan.FromSeconds(12));
+                var val = await WhenSensorValue("IterationSensor", v => v % 10 == 0, Seconds(12));
                 Console.WriteLine($"IterationSensor = {val}. Waiting for value to increase by 3");
-                var vector = await When(e => e["IterationSensor"].Value >= val + 3, TimeSpan.FromSeconds(5)); // alt way of waiting / can target multiple sensor values too
+                var vector = await When(e => e["IterationSensor"].Value >= val + 3, Seconds(5)); // alt way of waiting / can target multiple sensor values too
                 Console.WriteLine($"IterationSensor = {vector["IterationSensor"]}. Waiting 4 seconds");
-                await Task.Delay(TimeSpan.FromSeconds(4));
+                await Task.Delay(Seconds(4));
                 Console.WriteLine($"Running the help command");
                 ExecuteCommand("help");
                 Console.WriteLine("Finished long action");

@@ -26,7 +26,6 @@ namespace CA_DataUploaderLib
 
         protected void ExecuteCommand(string command) => cmd.Execute(command);
         protected virtual void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) { }
-        protected Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, int timeoutms) => WhenSensorValue(sensorName, condition, TimeSpan.FromMilliseconds(timeoutms));
         protected async Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, TimeSpan timeout) => (await When(e => condition(e[sensorName].Value), timeout))[sensorName].Value;
         protected async Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, CancellationToken token) => (await When(e => condition(e[sensorName].Value), token))[sensorName].Value;
         protected async Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, TimeSpan timeout)
@@ -58,6 +57,9 @@ namespace CA_DataUploaderLib
 
             return tcs.Task;
         }
+        protected TimeSpan Milliseconds(double seconds) => TimeSpan.FromMilliseconds(seconds);
+        protected TimeSpan Seconds(double seconds) => TimeSpan.FromSeconds(seconds);
+        protected TimeSpan Minutes(double minutes) => TimeSpan.FromMinutes(minutes);
 
         protected virtual void Dispose(bool disposing)
         {
