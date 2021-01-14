@@ -45,7 +45,7 @@ namespace CA_DataUploaderLib.Helpers
 
         public VectorDescription VectorDescription { get { return _mathVectorExpansion.VectorDescription; } }
 
-        public List<double> Apply(List<SensorSample> vector)
+        public List<SensorSample> Apply(List<SensorSample> vector)
         {
             foreach (var filter in _values)
             {
@@ -55,7 +55,7 @@ namespace CA_DataUploaderLib.Helpers
 
             RemoveHiddenSources(vector, i => i.Name);
             _mathVectorExpansion.Expand(vector);
-            return vector.Select(x => x.Value).ToList();
+            return vector;
         }
     }
 }

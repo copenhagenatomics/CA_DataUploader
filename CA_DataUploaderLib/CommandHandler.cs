@@ -2,8 +2,9 @@
 using Humanizer;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Reflection;
+using System.Runtime.Loader;
 using System.Text;
 using System.Threading;
 
@@ -13,14 +14,19 @@ namespace CA_DataUploaderLib
     {
 
         private bool _running = true;
-        private SerialNumberMapper _mapper;
+        private readonly SerialNumberMapper _mapper;
         private DateTime _start = DateTime.Now;
-        private StringBuilder inputCommand = new StringBuilder();
-        private Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
-        private CALogLevel _logLevel = IOconfFile.GetOutputLevel();
+        private readonly StringBuilder inputCommand = new StringBuilder();
+        private readonly Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
+        private readonly CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         private readonly List<string> AcceptedCommands = new List<string>();
         private int AcceptedCommandsIndex = -1;
+        private readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlPlugin> instances)> _runningPlugins = 
+            new Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlPlugin> instances)>();
+        private FileSystemWatcher _pluginChangesWatcher;
+        readonly Dictionary<string, object> _postponedPluginChangeLocks = new Dictionary<string, object>();
 
+        public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
         public bool IsRunning { get { return _running; } }
 
         public CommandHandler(SerialNumberMapper mapper = null)
@@ -31,15 +37,25 @@ namespace CA_DataUploaderLib
             AddCommand("help", HelpMenu);
             AddCommand("up", Uptime);
             AddCommand("version", GetVersion);
-            AddCommand("Run", Run);
+            AddCommand("Load", LoadPlugin);
+            AddCommand("Unload", UnloadPlugin);
         }
 
-        public void AddCommand(string name, Func<List<string>, bool> func)
+        /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>
+        public Action AddCommand(string name, Func<List<string>, bool> func)
         {
+            name = name.ToLower();
             if (_commands.ContainsKey(name))
                 _commands[name].Add(func);
             else
-                _commands.Add(name.ToLower(), new List<Func<List<string>, bool>>{func});
+                _commands.Add(name, new List<Func<List<string>, bool>>{func});
+
+            return () => 
+            {
+                _commands[name].Remove(func);
+                if (_commands[name].Count == 0) 
+                    _commands.Remove(name);
+            };
         }
 
         public void Execute(string command) => HandleCommand(command);
@@ -55,6 +71,11 @@ namespace CA_DataUploaderLib
 
             return true;
         }
+
+        public void OnNewVectorReceived(List<SensorSample> vector)
+        {
+            NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector));
+        }
         
         private bool Stop(List<string> args)
         {
@@ -62,21 +83,104 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        // later this shall take filename.nav + function name. 
-        private bool Run(List<string> args)
+        private bool LoadPlugin(List<string> args)
         {
-            var asm = Assembly.LoadFrom(args[1]);
-            if (asm == null) throw new ArgumentException("Argument 1 (dll) was not found: " + args[1]);
+            var isAuto = args.Count > 1 && args[1] == "auto";
+            if (args.Count < 2 || isAuto)
+            { // load all
+                foreach (var assembly in Directory.GetFiles(".", "*.dll"))
+                    LoadPlugin(assembly);
 
-            Type t = asm.GetType(args[2]);
-            if (t == null) throw new ArgumentException("Argument 2 (class) was not found: " + args[2]);
+                if (isAuto)
+                    TrackPluginChanges("*.dll");
+                return true;
+            }
 
-            var methodInfo = t.GetMethod(args[3]);
-            if (methodInfo == null) throw new ArgumentException("Argument 3 (method) was not found: " + args[3]);
+            try
+            {
+                LoadPlugin(args[1]);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                throw new ArgumentException("Error loading plugin for specified arguments", nameof(args), ex);
+            }
+        }
 
-            var o = Activator.CreateInstance(t, this);
-            new Thread(() => methodInfo.Invoke(o, null)).Start();
+        private void TrackPluginChanges(string filepattern)
+        {
+            //created files is already handled by the changed event, while we ignore manual direct renames of the plugin assemblies files
+            _pluginChangesWatcher = new FileSystemWatcher(".", filepattern);
+            _pluginChangesWatcher.Deleted += OnAssembliesDeleted;
+            _pluginChangesWatcher.Changed += OnAssembliesChanged;
+            _pluginChangesWatcher.EnableRaisingEvents = true;
+        }
 
+        private void OnAssembliesDeleted(object sender, FileSystemEventArgs e) => UnloadPlugin(e.FullPath);
+        /// <remarks>
+        /// we wait for a second to (un)load the plugin, and ignore it if a new change comes during that time (because the Changed event is fired multiple times in normal situations).
+        /// </remarks>
+        private void OnAssembliesChanged(object sender, FileSystemEventArgs e)
+        {
+            var mylock = new object();
+            _postponedPluginChangeLocks[e.FullPath] = mylock;
+            var timer = new Timer(DelayedChange, (mylock, path: e.FullPath), 1000, Timeout.Infinite);
+
+            void DelayedChange(object state)
+            {
+                var (myDelayedLock, path) = ((object, string))state;
+                if (!_postponedPluginChangeLocks.TryGetValue(path, out var storedLock) || myDelayedLock != storedLock)
+                    return;
+
+                _postponedPluginChangeLocks.Remove(path);
+                UnloadPlugin(path);
+                LoadPlugin(path);
+            }
+        }
+
+        private void LoadPlugin(string assemblyPath)
+        {
+            assemblyPath = Path.GetFullPath(assemblyPath);
+            var (context, plugins) = PluginsLoader.Load(assemblyPath, this);
+            var initializedPlugins = plugins.ToList(); // iterate the enumerable to create/initialize the instances
+            if (initializedPlugins.Count == 0) {
+                context.Unload();
+                return;
+            }
+
+            _runningPlugins[assemblyPath] = (context, initializedPlugins);
+            Console.WriteLine($"loaded plugins from {assemblyPath} - {string.Join(",", initializedPlugins.Select(e => e.GetType().Name))}");
+        }
+
+        private bool UnloadPlugin(List<string> args)
+        {
+            if (args.Count < 2)
+            { // unload all
+                foreach (var assembly in _runningPlugins.Keys.ToList())
+                    UnloadPlugin(assembly);
+                GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
+                return true;
+            }
+
+            UnloadPlugin(args[1]);
+            GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
+            return true;
+        }
+
+        private bool UnloadPlugin(string assemblyPath)
+        {
+            assemblyPath = Path.GetFullPath(assemblyPath);
+            if (!_runningPlugins.TryGetValue(assemblyPath, out var entry))
+            {
+                Console.WriteLine("no running extension with the specified assembly was found");
+                return false;
+            }
+
+            foreach (var instance in entry.instances)
+                instance.Dispose();
+            _runningPlugins.Remove(assemblyPath);
+            entry.ctx.Unload();
+            Console.WriteLine($"unloaded plugins from {assemblyPath}");
             return true;
         }
 
@@ -128,7 +232,8 @@ namespace CA_DataUploaderLib
                     {
                         if (func.Invoke(cmd))
                         {
-                            CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
+                            if (cmdString != "help")
+                                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
                             OnCommandAccepted(cmdString);
                         }
                         else
@@ -151,6 +256,9 @@ namespace CA_DataUploaderLib
 
         private void OnCommandAccepted(string cmdString)
         {
+            if (AcceptedCommands.LastOrDefault() == cmdString)
+                return;
+
             AcceptedCommands.Add(cmdString);
             AcceptedCommandsIndex = AcceptedCommands.Count;
         }
@@ -189,17 +297,8 @@ namespace CA_DataUploaderLib
             return inputCommand.ToString();
         }
 
-        public static int GetCmdParam(List<string> cmd, int index, int defaultValue)
-        {
-            if (cmd.Count() > index)
-            {
-                int value;
-                if (int.TryParse(cmd[index], out value))
-                    return value;
-            }
-
-            return defaultValue;
-        }
+        public static int GetCmdParam(List<string> cmd, int index, int defaultValue) => 
+            cmd.Count() > index && int.TryParse(cmd[index], out int value) ? value : defaultValue;
 
         private void RestoreNextAcceptedCommand()
         {
