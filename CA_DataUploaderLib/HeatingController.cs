@@ -96,19 +96,18 @@ namespace CA_DataUploaderLib
         {
             _cmd.AssertArgs(args, 2);
             if (args[1] == "off")
-            {
                 _heaters.ForEach(x => x.SetTemperature(0));
-            }
             else
             {
-                var areas = IOconfFile.GetOven().GroupBy(x => x.OvenArea).OrderBy(x => x.Key);
-                int i = 1;
-                int areaTemp = 300; // default value;
-                foreach (var area in areas)
-                {
-                    areaTemp = CommandHandler.GetCmdParam(args, i++, areaTemp);
-                    _heaters.Where(x => x.IsArea(area.Key)).ToList().ForEach(x => x.SetTemperature(areaTemp));
-                }
+                var areas = IOconfFile.GetOven().Select(x => x.OvenArea).Distinct().OrderBy(x => x).ToList();
+                if (areas.Count != args.Count - 1)
+                    throw new ArgumentException($"Arguments did not match the amount of configured areas: {areas.Count}");
+
+                var targets = args.Skip(1)
+                    .Select(ParseTemperature)
+                    .SelectMany((t, i) => _heaters.Where(x => x.IsArea(areas[i])).Select(h => (h, t)));
+                foreach (var (heater, temperature) in targets)
+                    heater.SetTemperature(temperature);
             }
 
             _ovenHistory.Add(DateTime.Now.ToString("MMM dd HH:mm:ss ") + string.Join(" ", args));
@@ -118,6 +117,9 @@ namespace CA_DataUploaderLib
                 _cmd.Execute("light main off");
             return true;
         }
+
+        static int ParseTemperature(string t) =>
+            int.TryParse(t, out var v) ? v : throw new ArgumentException($"Unexpected target temperature: '{t}'");
 
         private bool OvenHistory(List<string> args)
         {
