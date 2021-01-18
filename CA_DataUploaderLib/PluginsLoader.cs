@@ -13,11 +13,12 @@ namespace CA_DataUploaderLib
         readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances)> _runningPlugins =
             new Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances)>();
         SingleFireFileWatcher _pluginChangesWatcher;
-        readonly object[] plugingArgs;
+        readonly object[] plugingArgs = {};
+        readonly CommandHandler handler;
 
         public PluginsLoader(CommandHandler handler)
         {
-            plugingArgs = new[] { handler };
+            this.handler = handler;
         }
 
         public void LoadPlugins(bool automaticallyLoadPluginChanges = true)
@@ -45,12 +46,15 @@ namespace CA_DataUploaderLib
         {
             assemblyPath = Path.GetFullPath(assemblyPath);
             var (context, plugins) = Load(assemblyPath, plugingArgs);
-            var initializedPlugins = plugins.ToList(); // iterate the enumerable to create/initialize the instances
+            var initializedPlugins = plugins.ToList();
             if (initializedPlugins.Count == 0)
             {
                 context.Unload();
                 return;
             }
+
+            foreach (var plugin in initializedPlugins)
+                plugin.Initialize(handler);
 
             _runningPlugins[assemblyPath] = (context, initializedPlugins);
             CALog.LogData(LogID.A, $"loaded plugins from {assemblyPath} - {string.Join(",", initializedPlugins.Select(e => e.GetType().Name))}");

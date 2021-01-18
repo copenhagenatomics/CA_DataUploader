@@ -9,8 +9,6 @@ namespace CommandHandlerTesterLib
     {
         public override string Name => "LongAction";
         public override string Description => "runs a bit longer action";
-
-        public TestLongActionCommand(CommandHandler cmd) : base(cmd) { }
         protected async override Task Command(List<string> args)
         {
             Console.WriteLine("Waiting for the next multiple of 10 value for IterationSensor");

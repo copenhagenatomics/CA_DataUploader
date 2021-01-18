@@ -11,8 +11,6 @@ namespace CommandHandlerTesterLib
         public override string Description => "will print the second value after metB";
         public override string ArgsHelp => "[arg1] [arg2]";
 
-        public MetBCommand(CommandHandler cmd) : base(cmd) {}
-
         protected override Task Command(List<string> args)
         {
             Console.WriteLine();

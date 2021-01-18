@@ -11,19 +11,17 @@ namespace CA_DataUploaderLib
         public abstract string Description { get; }
         public virtual string ArgsHelp => string.Empty;
         private bool disposedValue;
-        private readonly CommandHandler cmd;
+        private CommandHandler cmd;
         private readonly List<Action> removeCommandActions = new List<Action>();
         private readonly List<EventHandler<NewVectorReceivedArgs>> subscribedNewVectorReceivedEvents = 
             new List<EventHandler<NewVectorReceivedArgs>>();
 
-        public LoopControlCommand(CommandHandler cmd)
-        {
+        public void Initialize(CommandHandler cmd) {
             SubscribeToNewVectorReceived(cmd, OnNewVectorReceived);
             this.cmd = cmd;
             AddCommand(Name, Execute);
             AddCommand("help", HelpMenu);
         }
-
         protected abstract Task Command(List<string> args);
         protected virtual Task OnCommandFailed() { return Task.CompletedTask; }
 

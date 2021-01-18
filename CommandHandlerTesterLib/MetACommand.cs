@@ -7,8 +7,6 @@ namespace CommandHandlerTesterLib
 {
     public class MetACommand : LoopControlCommand
     {
-        public MetACommand(CommandHandler cmd) : base(cmd) {}
-
         public override string Name => "metA";
         public override string Description => "will print the first value after metA, try lower case too";
         public override string ArgsHelp => "[arg1]";
