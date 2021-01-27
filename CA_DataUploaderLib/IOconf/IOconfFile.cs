@@ -109,11 +109,11 @@ namespace CA_DataUploaderLib.IOconf
 
         public static int GetVectorUploadDelay()
         {
-            return ((IOconfSamplingRates)Table.Single(x => x.GetType() == typeof(IOconfSamplingRates))).VectorUploadDelay;
+            return ((IOconfSamplingRates)Table.SingleOrDefault(x => x.GetType() == typeof(IOconfSamplingRates)))?.VectorUploadDelay ?? 900;
         }
         public static int GetMainLoopDelay()
         {
-            return ((IOconfSamplingRates)Table.Single(x => x.GetType() == typeof(IOconfSamplingRates))).MainLoopDelay;
+            return ((IOconfSamplingRates)Table.SingleOrDefault(x => x.GetType() == typeof(IOconfSamplingRates)))?.MainLoopDelay ?? 200;
         }
 
         public static CALogLevel GetOutputLevel()
