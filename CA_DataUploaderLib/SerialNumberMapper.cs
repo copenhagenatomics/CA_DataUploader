@@ -7,7 +7,8 @@ using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Management;
-using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
@@ -20,6 +21,8 @@ namespace CA_DataUploaderLib
         private static ManagementEventWatcher arrival;
 
         private static ManagementEventWatcher removal;
+        private static int _detectedUnknownBoards;
+        private static int _detectedScaleBoards;
 
         public event EventHandler<PortsChangedArgs> PortsChanged;
 
@@ -28,28 +31,30 @@ namespace CA_DataUploaderLib
             if(File.Exists("IO.conf"))
                 _logLevel = IOconfFile.GetOutputLevel();
 
-            foreach (string name in _serialPorts)
+            Parallel.ForEach(_serialPorts, name =>
             {
                 try
                 {
-                    var mcu = new MCUBoard(name, 115200);
-                    if(mcu.UnableToRead)
-                        mcu = new MCUBoard(name, 9600);
+                    int baudRate = File.Exists("IO.conf") ?
+                        (IOconfFile.GetMap().SingleOrDefault(m => m.USBPort == name)?.BaudRate ?? 115200) : 
+                        115200;
+                    var mcu = new MCUBoard(name, baudRate);
+                    if (mcu.UnableToRead && mcu.BaudRate != 9600)
+                        mcu = new MCUBoard(name, 9600); // for luminox sensors not yet in IOconfFile
+                    if (mcu.serialNumber.IsNullOrEmpty() && !DetectAscale(mcu))
+                        mcu.serialNumber = "unknown" + Interlocked.Increment(ref _detectedUnknownBoards);
 
-                    SetUnknownSerialNumber(mcu);
                     McuBoards.Add(mcu);
 
                     if (mcu.productType is null)
                         mcu.productType = GetStringFromDmesg(mcu.PortName);
 
-                    if (_logLevel == CALogLevel.Debug)
-                        CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToDebugString(Environment.NewLine));
-                    else
-                        CALog.LogInfoAndConsoleLn(LogID.A, mcu.ToString());
+                    string logline = _logLevel == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
+                    CALog.LogInfoAndConsoleLn(LogID.A, logline);
 
                     MonitorDeviceChanges();
                 }
-                catch(UnauthorizedAccessException ex)
+                catch (UnauthorizedAccessException ex)
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex.Message}" + Environment.NewLine);
                 }
@@ -57,63 +62,22 @@ namespace CA_DataUploaderLib
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex.ToString()}" + Environment.NewLine);
                 }
-            }
-        }
-        
-        private void SetUnknownSerialNumber(MCUBoard mcu)
-        {
-            if (mcu.serialNumber.IsNullOrEmpty())
-            {
-                if (!IsAscale(mcu) && !IsALuminox(mcu))
-                {
-                    mcu.serialNumber = "unknown1";
-
-                    if (McuBoards.Any(x => x.serialNumber.StartsWith("unknown")))
-                        mcu.serialNumber = "unknown" + (McuBoards.Count(x => x.serialNumber.StartsWith("unknown")) + 1);
-                }
-            }
+            });
         }
 
-        private bool IsAscale(MCUBoard mcu)
+        private bool DetectAscale(MCUBoard mcu)
         {
             if (!mcu.IsOpen)
                 return false;
 
             var line = mcu.SafeReadLine();
-            if (line.StartsWith("+0") || line.StartsWith("-0"))
-            {
-                mcu.serialNumber = "Scale1";
-                mcu.productType = "Scale";
-            }
-
-            if (McuBoards.Any(x => x.serialNumber.StartsWith("Scale")))
-                mcu.serialNumber = "Scale" + (McuBoards.Count(x => x.serialNumber.StartsWith("Scale")) + 1);
-
-            return mcu.serialNumber?.StartsWith("Scale") ?? false;
-        }
-
-        // "O 0213.1 T +21.0 P 1019 % 020.92 e 0000"
-        private const string _luminoxPattern = "O (([0-9]*[.])?[0-9]+) T ([+-]?([0-9]*[.])?[0-9]+) P (([0-9]*[.])?[0-9]+) % (([0-9]*[.])?[0-9]+) e ([0-9]*)";
-
-        private bool IsALuminox(MCUBoard mcu)
-        {
-            if (!mcu.IsOpen)
+            if (!line.StartsWith("+0") && !line.StartsWith("-0"))
                 return false;
 
-            var line = mcu.SafeReadLine();
-            if (Regex.Match(line, _luminoxPattern).Success)
-            {
-                // I should implement the real command to get the serial number. 
-                mcu.serialNumber = "Oxygen1";
-                mcu.productType = "Luminox O2";
-            }
-
-            if (McuBoards.Any(x => x.serialNumber.StartsWith("Oxygen")))
-                mcu.serialNumber = "Oxygen" + (McuBoards.Count(x => x.serialNumber.StartsWith("Oxygen")) + 1);
-
-            return mcu.serialNumber?.StartsWith("Oxygen") ??false;
+            mcu.serialNumber = "Scale" + Interlocked.Increment(ref _detectedScaleBoards);
+            mcu.productType = "Scale";
+            return true;
         }
-
 
         private string GetStringFromDmesg(string portName)
         {

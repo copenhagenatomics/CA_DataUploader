@@ -39,10 +39,10 @@ namespace CA_DataUploaderLib.IOconf
             return false;
         }
 
-        private string USBPort { get; set; }
+        public string USBPort { get; private set; }
         private string SerialNumber { get; set; }
         public string BoxName { get; set; }
-        public int BaudRate;
+        public int BaudRate = 115200;
         public MCUBoard Board;
 
         public override string ToString() => $"{BoxName} - ${USBPort ?? SerialNumber}";
