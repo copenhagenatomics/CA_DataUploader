@@ -10,6 +10,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Xml.Serialization;
 
 namespace CA_DataUploaderLib
@@ -61,7 +62,7 @@ namespace CA_DataUploaderLib
                 vectorDescription.IOconf = IOconfFile.RawFile;
                 _vectorDescription = vectorDescription;
 
-                GetLoginToken();
+                GetLoginTokenWithRetries().Wait();
                 GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription));
 
                 new Thread(() => this.LoopForever()).Start();
@@ -399,12 +400,35 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private void GetLoginToken()
+        private async Task GetLoginTokenWithRetries()
         {
-            var response = _client.PostAsync("Login", new FormUrlEncodedContent(_accountInfo));
-            if (response.Result.StatusCode == System.Net.HttpStatusCode.OK && response.Result.Content != null)
+            int failureCount = 0;
+            while (true)
             {
-                var dic = response.Result.Content.ReadAsAsync<Dictionary<string, string>>().Result;
+                try
+                {
+                    await GetLoginToken();
+                    if (failureCount > 0)
+                        CALog.LogInfoAndConsoleLn(LogID.A, "Reconnected.");
+                    return;
+                }
+                catch (HttpRequestException ex)
+                {
+                    if (failureCount++ > 10)
+                        throw;
+
+                    CALog.LogErrorAndConsoleLn(LogID.A, "Failed to connect while starting, attempting to reconnect in 5 seconds.", ex);
+                    await Task.Delay(5000);
+                }
+            }
+        }
+
+        private async Task GetLoginToken()
+        {
+            var response = await _client.PostAsync("Login", new FormUrlEncodedContent(_accountInfo));
+            if (response.StatusCode == System.Net.HttpStatusCode.OK && response.Content != null)
+            {
+                var dic = response.Content.ReadAsAsync<Dictionary<string, string>>().Result;
                 if (dic["status"] == "success")
                 {
                     _loginToken = dic["message"];
@@ -420,7 +444,7 @@ namespace CA_DataUploaderLib
                 throw new Exception(dic["message"]);
             }
 
-            throw new Exception(response.Result.ReasonPhrase);                
+            throw new Exception(response.ReasonPhrase);                
         }
 
         private void CreateAccount()
