@@ -10,7 +10,7 @@ namespace CA_DataUploaderLib.IOconf
             var list = ToList();
             Name = list[1];
             BoxName = list[2];
-            SetMap(BoxName);
+            SetMap(BoxName, 9600);
         }
         
     }

@@ -45,6 +45,11 @@ namespace CA_DataUploaderLib
 
         private DateTime _lastReopenTime;
 
+        // "O 0213.1 T +21.0 P 1019 % 020.92 e 0000"
+        private static readonly Regex _luminoxRegex = new Regex(
+            "O (([0-9]*[.])?[0-9]+) T ([+-]?([0-9]*[.])?[0-9]+) P (([0-9]*[.])?[0-9]+) % (([0-9]*[.])?[0-9]+) e ([0-9]*)");
+        private static int luminoxSensorsDetected;
+
         public MCUBoard(string name, int baudrate) // : base(name, baudrate, 0, 8, 1, 0)
         {
 
@@ -203,7 +208,6 @@ namespace CA_DataUploaderLib
 
         private void ReadSerialNumber()
         {
-            // CALog.LogColor(LogID.A, ConsoleColor.Green, Environment.NewLine + "Sending Serial request");
             WriteLine("Serial");
             var stop = DateTime.Now.AddSeconds(5);
             while (IsEmpty() && DateTime.Now < stop)
@@ -213,10 +217,11 @@ namespace CA_DataUploaderLib
                 {
                     try
                     {
-                        var input = SafeReadLine();
+                        // we use the regular ReadLine to capture timeouts early 
+                        // (also only 1 thread uses the board during instance initialization)
+                        var input = ReadLine();
                         if (Debugger.IsAttached && input.Length > 0)
                         {
-                            //stop = DateTime.Now.AddMinutes(1);
                             CALog.LogColor(LogID.A, ConsoleColor.Green, input);
                         }
 
@@ -246,14 +251,30 @@ namespace CA_DataUploaderLib
 
                         if (input.Contains(MCUBoard.mcuFamilyHeader))
                             mcuFamily = input.Substring(input.IndexOf(MCUBoard.mcuFamilyHeader) + MCUBoard.mcuFamilyHeader.Length).Trim();
+
+                        if (DetectLuminoxSensor(input)) // avoid waiting for a never present serial for luminox sensors 
+                            return;
+                    }
+                    catch (TimeoutException ex)
+                    {
+                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName}: " + ex.Message);
+                        break;
                     }
                     catch (Exception ex)
                     {
                         CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName}: " + ex.Message);
                     }
-
                 }
             }
+        }
+
+        private bool DetectLuminoxSensor(string line)
+        {
+            if (!_luminoxRegex.IsMatch(line)) return false;
+            // later on we should get the actual serial number. 
+            serialNumber = "Oxygen" + (Interlocked.Increment(ref luminoxSensorsDetected) + 1);
+            productType = "Luminox O2";
+            return true;
         }
 
         private TResult RunEnsuringConnectionIsOpen<TResult>(string actionName, Func<TResult> action) 
