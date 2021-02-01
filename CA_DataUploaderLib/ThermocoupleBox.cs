@@ -10,7 +10,8 @@ namespace CA_DataUploaderLib
 {
     public class ThermocoupleBox : BaseSensorBox
     {
-        private readonly SensorSample _rpiTempSample;
+        private readonly SensorSample _rpiGpuSample;
+        private readonly SensorSample _rpiCpuSample;
         public ThermocoupleBox(CommandHandler cmd)
         {
             Title = "Thermocouples";
@@ -20,7 +21,10 @@ namespace CA_DataUploaderLib
             _values = IOconfFile.GetTypeKAndLeakage().IsInitialized().Select(x => new SensorSample(x)).ToList();
             var rpiTemp = IOconfFile.GetRPiTemp();
             if (!rpiTemp.Disabled && !RpiVersion.IsWindows())
-                _values.Add(_rpiTempSample = new SensorSample(rpiTemp));
+            {
+                _values.Add(_rpiGpuSample = new SensorSample(rpiTemp.WithName(rpiTemp.Name + "Gpu")));
+                _values.Add(_rpiCpuSample = new SensorSample(rpiTemp.WithName(rpiTemp.Name + "Cpu")));
+            }
 
             if (!_values.Any())
                 return;
@@ -49,8 +53,10 @@ namespace CA_DataUploaderLib
         {
             base.ReadSensors();
 
-            if (_rpiTempSample != null)
-                _rpiTempSample.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
+            if (_rpiGpuSample != null)
+                _rpiGpuSample.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
+            if (_rpiCpuSample != null)
+                _rpiCpuSample.Value = DULutil.ExecuteShellCommand("cat /sys/class/thermal/thermal_zone0/temp").ToDouble() / 1000;
         }
 
         private bool HelpMenu(List<string> args)

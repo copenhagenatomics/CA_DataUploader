@@ -15,5 +15,7 @@ namespace CA_DataUploaderLib.IOconf
             Disabled = list.Count > 2 && list[2] == "Disabled";
             Skip = true;
         }
+
+        public IOconfRPiTemp WithName(string name) => new IOconfRPiTemp(Row, LineNumber) {Name = name };
     }
 }
