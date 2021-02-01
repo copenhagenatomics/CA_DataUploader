@@ -10,13 +10,17 @@ namespace CA_DataUploaderLib
 {
     public class ThermocoupleBox : BaseSensorBox
     {
+        private readonly SensorSample _rpiTempSample;
         public ThermocoupleBox(CommandHandler cmd)
         {
             Title = "Thermocouples";
             _cmd = cmd;
             _logLevel = IOconfFile.GetOutputLevel();
 
-            _values = IOconfFile.GetTypeKAndLeakageAndRPiTemp().IsInitialized().Select(x => new SensorSample(x)).ToList();
+            _values = IOconfFile.GetTypeKAndLeakage().IsInitialized().Select(x => new SensorSample(x)).ToList();
+            var rpiTemp = IOconfFile.GetRPiTemp();
+            if (!rpiTemp.Disabled && !RpiVersion.IsWindows())
+                _values.Add(_rpiTempSample = new SensorSample(rpiTemp));
 
             if (!_values.Any())
                 return;
@@ -45,13 +49,8 @@ namespace CA_DataUploaderLib
         {
             base.ReadSensors();
 
-            foreach (var rpi in _values.Where(x => x.Input.GetType() == typeof(IOconfRPiTemp)))
-            {
-                if (RpiVersion.IsWindows())
-                    rpi.Value = 0;
-                else
-                    rpi.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
-            }
+            if (_rpiTempSample != null)
+                _rpiTempSample.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
         }
 
         private bool HelpMenu(List<string> args)

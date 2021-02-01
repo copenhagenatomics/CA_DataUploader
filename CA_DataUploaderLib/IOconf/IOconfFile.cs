@@ -29,22 +29,7 @@ namespace CA_DataUploaderLib.IOconf
             // remove empty lines and commented out lines
             var lines2 = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
             lines2.ForEach(x => Table.Add(CreateType(x, lines.IndexOf(x))));
-            EnsureRpiTempTableConfiguration();
             CheckRules();
-        }
-
-        /// <summary>removes disabled rpi temps & applies the default if no rpi temps lines were configured</summary>
-        private static void EnsureRpiTempTableConfiguration()
-        {
-            var temps = Table.OfType<IOconfRPiTemp>().ToList();
-            if (temps.Count == 0 && !RpiVersion.IsWindows())
-            {
-                Table.Add(IOconfRPiTemp.Default);
-                return;
-            }
-
-            foreach (var temp in temps.Where(t => t.Disabled))
-                Table.Remove(temp);
         }
 
         private static IOconfRow CreateType(string row, int lineNum)
@@ -152,10 +137,10 @@ namespace CA_DataUploaderLib.IOconf
             return Table.Where(x => x.GetType() == typeof(IOconfSaltLeakage)).Cast<IOconfSaltLeakage>();
         }
 
-        public static IEnumerable<IOconfInput> GetTypeKAndLeakageAndRPiTemp()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfTypeK) || x.GetType() == typeof(IOconfSaltLeakage) || x.GetType() == typeof(IOconfRPiTemp)).Cast<IOconfInput>();
-        }
+        public static IEnumerable<IOconfInput> GetTypeKAndLeakage() =>
+            Table.Where(x => x.GetType() == typeof(IOconfTypeK) || x.GetType() == typeof(IOconfSaltLeakage)).Cast<IOconfInput>();
+
+        public static IOconfRPiTemp GetRPiTemp() => Table.OfType<IOconfRPiTemp>().SingleOrDefault() ?? IOconfRPiTemp.Default;
 
         public static IEnumerable<IOconfOut230Vac> GetOut230Vac()
         {
