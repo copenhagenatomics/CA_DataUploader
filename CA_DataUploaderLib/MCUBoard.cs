@@ -272,7 +272,7 @@ namespace CA_DataUploaderLib
         {
             if (!_luminoxRegex.IsMatch(line)) return false;
             // later on we should get the actual serial number. 
-            serialNumber = "Oxygen" + (Interlocked.Increment(ref luminoxSensorsDetected) + 1);
+            serialNumber = "Oxygen" + Interlocked.Increment(ref luminoxSensorsDetected);
             productType = "Luminox O2";
             return true;
         }
