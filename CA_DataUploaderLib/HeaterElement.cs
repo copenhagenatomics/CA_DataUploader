@@ -67,7 +67,7 @@ namespace CA_DataUploaderLib
             if (ManualMode)
                 return false;
 
-            if (onTemperature < 10000 && validSensors.Max(x => x.Value) > onTemperature + 20)
+            if (onTemperature < 10000 && validSensors.Max(x => x.Value) > onTemperature + 3)
                 return true; // If hottest sensor is 20C higher than the temperature last time we turned on, then turn off. 
 
             var turnOff = validSensors.Any(x => x.Value > OvenTargetTemperature); // turn off, if we reached OvenTargetTemperature. 
