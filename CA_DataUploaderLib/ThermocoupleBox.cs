@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using CA_DataUploaderLib.Helpers;
+using System.Diagnostics;
 
 namespace CA_DataUploaderLib
 {
@@ -12,6 +13,7 @@ namespace CA_DataUploaderLib
     {
         private readonly SensorSample _rpiGpuSample;
         private readonly SensorSample _rpiCpuSample;
+        private readonly Stopwatch initDelayWatch;
         public ThermocoupleBox(CommandHandler cmd)
         {
             Title = "Thermocouples";
@@ -46,12 +48,16 @@ namespace CA_DataUploaderLib
                     board.WriteLine("Junction");
             }
 
+            initDelayWatch = Stopwatch.StartNew();
             new Thread(() => this.LoopForever()).Start();
         }
 
         protected override void ReadSensors()
         {
             base.ReadSensors();
+
+            if (initDelayWatch.ElapsedMilliseconds < 2000) 
+                return; // wait 10 seconds before running temp commands / attempt to avoid conflicts with systemd's main process detection due to the commands
 
             if (_rpiGpuSample != null)
                 _rpiGpuSample.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
