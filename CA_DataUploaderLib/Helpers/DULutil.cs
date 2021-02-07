@@ -51,7 +51,8 @@ namespace CA_DataUploaderLib.Helpers
             var p = Process.Start(info);
             string output = p.StandardOutput.ReadToEnd();
             string err = p.StandardError.ReadToEnd();
-            Console.WriteLine(err);
+            if (!string.IsNullOrEmpty(err))
+                Console.WriteLine(err);
             p.WaitForExit(waitForExit);
             return output;
         }

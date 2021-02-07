@@ -137,10 +137,10 @@ namespace CA_DataUploaderLib.IOconf
             return Table.Where(x => x.GetType() == typeof(IOconfSaltLeakage)).Cast<IOconfSaltLeakage>();
         }
 
-        public static IEnumerable<IOconfInput> GetTypeKAndLeakageAndRPiTemp()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfTypeK) || x.GetType() == typeof(IOconfSaltLeakage) || x.GetType() == typeof(IOconfRPiTemp)).Cast<IOconfInput>();
-        }
+        public static IEnumerable<IOconfInput> GetTypeKAndLeakage() =>
+            Table.Where(x => x.GetType() == typeof(IOconfTypeK) || x.GetType() == typeof(IOconfSaltLeakage)).Cast<IOconfInput>();
+
+        public static IOconfRPiTemp GetRPiTemp() => Table.OfType<IOconfRPiTemp>().SingleOrDefault() ?? IOconfRPiTemp.Default;
 
         public static IEnumerable<IOconfOut230Vac> GetOut230Vac()
         {

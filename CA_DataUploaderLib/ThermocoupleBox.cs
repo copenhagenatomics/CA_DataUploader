@@ -5,18 +5,28 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using CA_DataUploaderLib.Helpers;
+using System.Diagnostics;
 
 namespace CA_DataUploaderLib
 {
     public class ThermocoupleBox : BaseSensorBox
     {
+        private readonly SensorSample _rpiGpuSample;
+        private readonly SensorSample _rpiCpuSample;
+        private readonly Stopwatch initDelayWatch;
         public ThermocoupleBox(CommandHandler cmd)
         {
             Title = "Thermocouples";
             _cmd = cmd;
             _logLevel = IOconfFile.GetOutputLevel();
 
-            _values = IOconfFile.GetTypeKAndLeakageAndRPiTemp().IsInitialized().Select(x => new SensorSample(x)).ToList();
+            _values = IOconfFile.GetTypeKAndLeakage().IsInitialized().Select(x => new SensorSample(x)).ToList();
+            var rpiTemp = IOconfFile.GetRPiTemp();
+            if (!rpiTemp.Disabled && !RpiVersion.IsWindows())
+            {
+                _values.Add(_rpiGpuSample = new SensorSample(rpiTemp.WithName(rpiTemp.Name + "Gpu")));
+                _values.Add(_rpiCpuSample = new SensorSample(rpiTemp.WithName(rpiTemp.Name + "Cpu")));
+            }
 
             if (!_values.Any())
                 return;
@@ -38,6 +48,7 @@ namespace CA_DataUploaderLib
                     board.WriteLine("Junction");
             }
 
+            initDelayWatch = Stopwatch.StartNew();
             new Thread(() => this.LoopForever()).Start();
         }
 
@@ -45,13 +56,13 @@ namespace CA_DataUploaderLib
         {
             base.ReadSensors();
 
-            foreach (var rpi in _values.Where(x => x.Input.GetType() == typeof(IOconfRPiTemp)))
-            {
-                if (RpiVersion.IsWindows())
-                    rpi.Value = 0;
-                else
-                    rpi.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
-            }
+            if (initDelayWatch.ElapsedMilliseconds < 2000) 
+                return; // wait 10 seconds before running temp commands / attempt to avoid conflicts with systemd's main process detection due to the commands
+
+            if (_rpiGpuSample != null)
+                _rpiGpuSample.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
+            if (_rpiCpuSample != null)
+                _rpiCpuSample.Value = DULutil.ExecuteShellCommand("cat /sys/class/thermal/thermal_zone0/temp").ToDouble() / 1000;
         }
 
         private bool HelpMenu(List<string> args)
