@@ -73,11 +73,12 @@ namespace CA_DataUploaderLib
 
             while (_running)
             {
+                Thread.Sleep(100); //boards typically write a line every 100 ms (note we also way on exception cases)
+
                 try
                 {
                     ReadSensors();
                     CheckFails(); // check if any of the boards stopped responding. 
-                    Thread.Sleep(100);//boards typically write a line every 100 ms
                 }
                 catch (Exception ex)
                 {
