@@ -97,7 +97,8 @@ namespace CA_DataUploaderLib
 
             var p = Process.Start(info);
             var result = p.StandardOutput.ReadToEnd().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-            p.WaitForExit(1000);
+            if (!p.WaitForExit(1000))
+                CALog.LogData(LogID.B, $"timed out waiting for command to exit: sudo dmesg");
             var line = result.FirstOrDefault(x => x.EndsWith(portName));
             if (line == null)
                 return null;

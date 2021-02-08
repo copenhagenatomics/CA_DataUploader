@@ -52,7 +52,8 @@ namespace CA_DataUploaderLib.Helpers
             string err = null;
             p.ErrorDataReceived += (sender, e) => err += e.Data;
             string output = p.StandardOutput.ReadToEnd();
-            p.WaitForExit(waitForExit);
+            if (!p.WaitForExit(waitForExit))
+                CALog.LogData(LogID.B, $"timed out waiting for command to exit: {command}");
             if (!string.IsNullOrEmpty(err))
                 Console.WriteLine(err);
 
