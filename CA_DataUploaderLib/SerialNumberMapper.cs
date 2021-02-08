@@ -96,8 +96,8 @@ namespace CA_DataUploaderLib
             info.RedirectStandardError = true;
 
             var p = Process.Start(info);
-            p.WaitForExit(1000);
             var result = p.StandardOutput.ReadToEnd().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            p.WaitForExit(1000);
             var line = result.FirstOrDefault(x => x.EndsWith(portName));
             if (line == null)
                 return null;

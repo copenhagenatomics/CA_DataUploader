@@ -49,11 +49,13 @@ namespace CA_DataUploaderLib.Helpers
             };
 
             var p = Process.Start(info);
+            string err = null;
+            p.ErrorDataReceived += (sender, e) => err += e.Data;
             string output = p.StandardOutput.ReadToEnd();
-            string err = p.StandardError.ReadToEnd();
+            p.WaitForExit(waitForExit);
             if (!string.IsNullOrEmpty(err))
                 Console.WriteLine(err);
-            p.WaitForExit(waitForExit);
+
             return output;
         }
     }
