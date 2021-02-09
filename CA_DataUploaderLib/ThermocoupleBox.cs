@@ -56,8 +56,6 @@ namespace CA_DataUploaderLib
         {
             base.ReadSensors();
 
-            if (initDelayWatch.ElapsedMilliseconds < 2000) 
-                return; // wait 10 seconds before running temp commands / attempt to avoid conflicts with systemd's main process detection due to the commands
 
             if (_rpiGpuSample != null)
                 _rpiGpuSample.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
