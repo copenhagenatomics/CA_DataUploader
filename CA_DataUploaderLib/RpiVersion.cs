@@ -122,7 +122,7 @@ namespace CA_DataUploaderLib
 
             // https://elinux.org/RPi_HardwareHistory
             if (_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}' | sed 's/^1000//'").Trim();
+                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}' | sed 's/^1000//'").Trim();
 
             return "unknown";
         }
@@ -133,7 +133,7 @@ namespace CA_DataUploaderLib
             //    return "BCM2835";
 
             if (_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'Hardware' | awk '{print $3}' | sed 's/^1000//'").Trim();
+                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'Hardware' | awk '{print $3}' | sed 's/^1000//'").Trim();
 
             return Environment.Is64BitProcess ? "64 bit" : "32 bit";
         }
@@ -141,7 +141,7 @@ namespace CA_DataUploaderLib
         private static string GetSerialNumber()
         {
             if (_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'Serial' | awk '{print $3}' | sed 's/^1000//'").Trim();
+                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'Serial' | awk '{print $3}' | sed 's/^1000//'").Trim();
 
             return "unknown";
         }
@@ -149,7 +149,7 @@ namespace CA_DataUploaderLib
         private static string GetWiFi_SSID()
         {
             if (_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("sudo iwgetid").Trim();
+                return DULutil.ExecuteShellCommand("iwgetid").Trim();
 
             return "unknown";
         }
@@ -183,7 +183,7 @@ namespace CA_DataUploaderLib
         private static string GetCPU()
         {
             if (_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'model name'").Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).First().Substring(18).Trim();
+                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).First().Substring(18).Trim();
 
             return System.Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE");
         }
@@ -199,7 +199,7 @@ namespace CA_DataUploaderLib
         private static int GetNumberOfCores()
         {
             if(_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("sudo cat /proc/cpuinfo | grep 'model name'").Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).Count();
+                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).Count();
 
             return Environment.ProcessorCount;
         }
