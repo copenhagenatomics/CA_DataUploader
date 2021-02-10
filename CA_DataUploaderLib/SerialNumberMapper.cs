@@ -1,4 +1,5 @@
 ﻿using CA_DataUploaderLib.Extensions;
+using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
@@ -85,24 +86,8 @@ namespace CA_DataUploaderLib
                 return null;
 
             portName = portName.Substring(portName.LastIndexOf('/') + 1);
-            var info = new ProcessStartInfo();
-            info.FileName = "sudo";
-            info.Arguments = "dmesg";
-
-            info.UseShellExecute = false;
-            info.CreateNoWindow = true;
-
-            info.RedirectStandardOutput = true;
-            info.RedirectStandardError = true;
-
-            var p = Process.Start(info);
-            p.WaitForExit(1000);
-            var result = p.StandardOutput.ReadToEnd().Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-            var line = result.FirstOrDefault(x => x.EndsWith(portName));
-            if (line == null)
-                return null;
-
-            return line.StringBetween(": ", " to ttyUSB");
+            var result = DULutil.ExecuteShellCommand($"dmesg | grep {portName}").Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            return result.FirstOrDefault(x => x.EndsWith(portName))?.StringBetween(": ", " to ttyUSB");
         }
 
         /// <summary>

@@ -16,6 +16,8 @@ namespace CA_DataUploaderLib.IOconf
                 Server = list[3];
         }
 
+        public static IOconfLoopName Default { get; } = 
+            new IOconfLoopName($"LoopName;{ Environment.MachineName };Normal;https://www.theng.dk", 0);
         public string Name;
         public CALogLevel LogLevel;
         public string Server;

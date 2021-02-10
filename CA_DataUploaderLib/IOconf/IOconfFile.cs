@@ -81,16 +81,18 @@ namespace CA_DataUploaderLib.IOconf
                 CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Heater: {heater.Key.Name} occure in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}");
         }
 
+        private static IOconfLoopName GetLoopConfig() => Table.OfType<IOconfLoopName>().SingleOrDefault() ?? IOconfLoopName.Default;
+
         public static ConnectionInfo GetConnectionInfo()
         {
             try
             {
-                var loopName = ((IOconfLoopName)Table.Single(x => x.GetType() == typeof(IOconfLoopName)));
+                var loopConfig = GetLoopConfig();
                 var account = ((IOconfAccount)Table.Single(x => x.GetType() == typeof(IOconfAccount)));
                 return new ConnectionInfo
                 {
-                    LoopName = loopName.Name,
-                    Server = loopName.Server,
+                    LoopName = loopConfig.Name,
+                    Server = loopConfig.Server,
                     Fullname = account.Name,
                     email = account.Email,
                     password = account.Password,
@@ -102,10 +104,7 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        public static string GetLoopName()
-        {
-            return ((IOconfLoopName)Table.Single(x => x.GetType() == typeof(IOconfLoopName))).Name;
-        }
+        public static string GetLoopName() => GetLoopConfig().Name;
 
         public static int GetVectorUploadDelay()
         {
@@ -116,11 +115,7 @@ namespace CA_DataUploaderLib.IOconf
             return ((IOconfSamplingRates)Table.SingleOrDefault(x => x.GetType() == typeof(IOconfSamplingRates)))?.MainLoopDelay ?? 200;
         }
 
-        public static CALogLevel GetOutputLevel()
-        {
-            if (!Table.Any()) return CALogLevel.None;
-            return ((IOconfLoopName)Table.Single(x => x.GetType() == typeof(IOconfLoopName))).LogLevel;
-        }
+        public static CALogLevel GetOutputLevel() => GetLoopConfig().LogLevel;
 
         public static IEnumerable<IOconfMap> GetMap()
         {
