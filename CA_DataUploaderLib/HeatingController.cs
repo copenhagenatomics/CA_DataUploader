@@ -182,7 +182,7 @@ namespace CA_DataUploaderLib
                     foreach (var box in _heaters.Select(x => x.Board()).Distinct())
                     {
                         var values = SwitchBoardBase.ReadInputFromSwitchBoxes(box);
-                        GetCurrentValues(box, values);
+                        SetCurrentValues(box, values.currents, values.states);
                     }
 
                     // check if any of the boards stopped responding. 
@@ -228,13 +228,14 @@ namespace CA_DataUploaderLib
             AllOff();
         }
 
-        private void GetCurrentValues(MCUBoard board, List<double> values)
+        private void SetCurrentValues(MCUBoard board, double[] values, bool[] states)
         {
             if (values.Count() == 4)
             {
                 foreach (var heater in _heaters.Where(x => x.Board() == board))
                 {
                     heater.Current.Value = values[heater._ioconf.PortNumber - 1];
+                    heater.IsSwitchboardOn = states.Length >= heater._ioconf.PortNumber ? states[heater._ioconf.PortNumber - 1] : default;
 
                     // this is for extra safety to make sure heaters are on/off when expected to be. 
                     if (heater.MustResendOnCommand())
@@ -307,6 +308,8 @@ namespace CA_DataUploaderLib
         {
             var powerValues = _heaters.Select(x => x.Current.Clone());
             var states =_heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
+            var switchboardStates =_heaters.Select(x => new SensorSample(
+                x.Name() + "_SwitchboardOn/Off", x.IsSwitchboardOn == null ? 10000 : x.IsSwitchboardOn.Value ? 1.0 : 0.0));
             var values = powerValues.Concat(states);
             if (_logLevel == CALogLevel.Debug)
             {
@@ -329,6 +332,7 @@ namespace CA_DataUploaderLib
         {
             var list = _heaters.Select(x => new VectorDescriptionItem("double", x.Current.Name, DataTypeEnum.Input)).ToList();
             list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_On/Off", DataTypeEnum.Output)));
+            list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_SwitchboardOn/Off", DataTypeEnum.Output)));
             if (_logLevel == CALogLevel.Debug)
             {
                 list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_LoopTime", DataTypeEnum.State)));

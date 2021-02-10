@@ -21,6 +21,7 @@ namespace CA_DataUploaderLib
         public bool IsOn;
         public bool ManualMode;
         public SensorSample Current;  // Amps per element. 
+        public bool? IsSwitchboardOn;  //same as IsOn, but reported by the switchboard (null for a switchboard not reporting state)
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
 
         public HeaterElement(int area, IOconfHeater heater, IEnumerable<SensorSample> ovenSensors)
