@@ -310,7 +310,7 @@ namespace CA_DataUploaderLib
             var states =_heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
             var switchboardStates =_heaters.Select(x => new SensorSample(
                 x.Name() + "_SwitchboardOn/Off", x.IsSwitchboardOn == null ? 10000 : x.IsSwitchboardOn.Value ? 1.0 : 0.0));
-            var values = powerValues.Concat(states);
+            var values = powerValues.Concat(states).Concat(switchboardStates);
             if (_logLevel == CALogLevel.Debug)
             {
                 var loopTimes = _heaters.Select(x => new SensorSample(x.Name() + "_LoopTime", x.Current.ReadSensor_LoopTime));
