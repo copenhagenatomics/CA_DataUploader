@@ -1,11 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>netcoreapp3.0</TargetFramework>
+		<TargetFramework>net5.0</TargetFramework>
 		<ProjectGuid>{C74C4DFC-74A1-40D4-A8DB-A0546ED810FD}</ProjectGuid>
 		<TestProjectType>UnitTest</TestProjectType>
-		<!-- needed for unit tests projects as mentioned here https://github.com/dotnet/standard/issues/481 / note the extra auto binding redirects is on by default though -->
-		<GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
 		<LangVersion>8.0</LangVersion>
 	</PropertyGroup>
 

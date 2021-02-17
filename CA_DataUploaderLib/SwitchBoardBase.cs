@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using CA_DataUploaderLib.Helpers;
 
 namespace CA_DataUploaderLib
 {
@@ -27,7 +26,7 @@ namespace CA_DataUploaderLib
             private readonly MCUBoard box;
             private (double[] currents, bool[] states, double temperature) _lastRead = (new double[0], new bool[0], 10000);
             private (double[] currents, bool[] states, double temperature) _lastValidRead = (new double[0], new bool[0], 10000);
-            private readonly TimeFrequencyThrottle _switchboardReadThrottle = new TimeFrequencyThrottle(100); 
+            private Stopwatch _timeSinceLastRead = new Stopwatch();
             private Stopwatch _timeSinceLastValidRead = new Stopwatch();
             private DateTime _lastValidReadTime = DateTime.MinValue;
             private Queue<string> _debugQueue = new Queue<string>();
@@ -36,13 +35,13 @@ namespace CA_DataUploaderLib
 
             public (double[] currents, bool[] states, double temperature) ReadInputFromSwitchBoxes()
             {
-                if (!_switchboardReadThrottle.ShouldRun())
+                if (_timeSinceLastRead.IsRunning && _timeSinceLastRead.ElapsedMilliseconds < 100)
                     return _lastRead; // avoid double reads, typically from both the heatingcontroller and valvecontroller
 
                 try
                 {
                     string lines = box.SafeReadExisting();
-                    _switchboardReadThrottle.FinishedLastRun();
+                    _timeSinceLastRead.Restart();
                     TrackAndPrintLast10LinesOn300MsWithoutValidResponse(lines);
 
                     if (SwitchBoardResponseParser.TryParse(lines, out var values))

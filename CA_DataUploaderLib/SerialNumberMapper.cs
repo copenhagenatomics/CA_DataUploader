@@ -3,7 +3,6 @@ using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Linq;
@@ -115,7 +114,7 @@ namespace CA_DataUploaderLib
         // Mono: https://github.com/mono/mono/blob/master/mcs/class/System.Management/System.Management/WqlEventQuery.cs
         private void MonitorDeviceChanges()
         {
-            if (!RpiVersion.IsWindows())
+            if (!OperatingSystem.IsWindows())
                 return;
 
             try
@@ -165,15 +164,13 @@ namespace CA_DataUploaderLib
         }
 
         #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
         protected virtual void Dispose(bool disposing)
         {
-            if(arrival != null) arrival.Stop();
-            if(removal != null) removal.Stop();
-            if (!disposedValue)
-            {
-                disposedValue = true;
+            if (OperatingSystem.IsWindows()) {
+                arrival?.Stop();
+                removal?.Stop();
+                arrival = null;
+                removal = null;
             }
         }
 

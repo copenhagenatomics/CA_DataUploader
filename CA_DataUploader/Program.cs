@@ -17,6 +17,9 @@ namespace CA_DataUploader
                 Console.WriteLine("Initializing...");
                 using (var serial = new SerialNumberMapper())
                 {
+                    if (args.Length > 0 && args[0] == "-listdevices")
+                        return; // SerialNumberMapper already lists devices, no need for further output.
+
                     // close all ports which are not Hub10
                     serial.McuBoards.Where(x => !x.productType.Contains("Temperature")).ToList().ForEach(x => x.Close());
 
