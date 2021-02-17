@@ -11,7 +11,6 @@ namespace CA_DataUploaderLib
     {
         private readonly SensorSample _rpiGpuSample;
         private readonly SensorSample _rpiCpuSample;
-        private readonly TimeFrequencyThrottle _rpiTempsThrottle = new TimeFrequencyThrottle(5000); 
         public ThermocoupleBox(CommandHandler cmd)
         {
             Title = "Thermocouples";
@@ -52,13 +51,12 @@ namespace CA_DataUploaderLib
         protected override void ReadSensors()
         {
             base.ReadSensors();
-            if (_rpiGpuSample == null || _rpiCpuSample == null)
-                return;
 
-            bool shouldRun = _rpiTempsThrottle.ShouldRun(); // throttling of reads is an attempt to solve unexpected slow downs we have seen on some systems after enabling rpi temps by default
-            _rpiGpuSample.Value = shouldRun ? DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble() : _rpiGpuSample.Value;
-            _rpiCpuSample.Value = shouldRun ? DULutil.ExecuteShellCommand("cat /sys/class/thermal/thermal_zone0/temp").ToDouble() / 1000 : _rpiGpuSample.Value;
-            _rpiTempsThrottle.FinishedLastRun();
+
+            if (_rpiGpuSample != null)
+                _rpiGpuSample.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
+            if (_rpiCpuSample != null)
+                _rpiCpuSample.Value = DULutil.ExecuteShellCommand("cat /sys/class/thermal/thermal_zone0/temp").ToDouble() / 1000;
         }
 
         private bool HelpMenu(List<string> args)
