@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using CA_DataUploaderLib.Helpers;
+using System;
 
 namespace CA_DataUploaderLib
 {
@@ -19,7 +20,7 @@ namespace CA_DataUploaderLib
 
             _values = IOconfFile.GetTypeKAndLeakage().IsInitialized().Select(x => new SensorSample(x)).ToList();
             var rpiTemp = IOconfFile.GetRPiTemp();
-            if (!rpiTemp.Disabled && !RpiVersion.IsWindows())
+            if (!rpiTemp.Disabled && !OperatingSystem.IsWindows())
             {
                 _values.Add(_rpiGpuSample = new SensorSample(rpiTemp.WithName(rpiTemp.Name + "Gpu")));
                 _values.Add(_rpiCpuSample = new SensorSample(rpiTemp.WithName(rpiTemp.Name + "Cpu")));

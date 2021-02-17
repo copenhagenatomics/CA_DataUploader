@@ -40,8 +40,8 @@
     <PackageReference Include="CoreCLR-NCalc" Version="2.2.92" />
     <PackageReference Include="Humanizer.Core" Version="2.8.26" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.7" />
-    <PackageReference Include="System.IO.Ports" Version="4.7.0" />
-    <PackageReference Include="System.Management" Version="4.7.0" />
+    <PackageReference Include="System.IO.Ports" Version="5.0.0" />
+    <PackageReference Include="System.Management" Version="5.0.0" />
   </ItemGroup>
 
   <ItemGroup>

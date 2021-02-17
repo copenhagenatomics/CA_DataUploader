@@ -2,11 +2,11 @@
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace CA_DataUploaderLib
@@ -112,24 +112,18 @@ namespace CA_DataUploaderLib
 
         private static string GetHardwareKey()
         {
-            //if (Debugger.IsAttached)
-            //    return "a02082";
-
-            if (IsWindows())
+            if (OperatingSystem.IsWindows())
                 return "PC";
 
             // https://elinux.org/RPi_HardwareHistory
             if (_OS.Platform == PlatformID.Unix)
                 return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}' | sed 's/^1000//'").Trim();
 
-            return "unknown";
+            return RuntimeInformation.OSDescription;
         }
 
         private static string GetChipName()
         {
-            //if (Debugger.IsAttached)
-            //    return "BCM2835";
-
             if (_OS.Platform == PlatformID.Unix)
                 return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'Hardware' | awk '{print $3}' | sed 's/^1000//'").Trim();
 
@@ -202,9 +196,6 @@ namespace CA_DataUploaderLib
             return Environment.ProcessorCount;
         }
 
-        public static bool IsWindows()
-        {
-            return _OS.Platform.ToString().StartsWith("Win");
-        }
+        public static bool IsWindows() => OperatingSystem.IsWindows();
     }
 }
