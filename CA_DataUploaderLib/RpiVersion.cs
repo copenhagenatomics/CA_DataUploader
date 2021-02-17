@@ -53,13 +53,11 @@ namespace CA_DataUploaderLib
 
         public static string GetSoftware()
         {
-            Assembly asm = Assembly.GetExecutingAssembly();
-            FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(asm.Location);
-            return asm.GetName() + " Version : " + String.Format("{0}.{1}", fvi.ProductMajorPart, fvi.ProductMinorPart)
-                + Environment.NewLine
-                + fvi.LegalCopyright
-                + Environment.NewLine
-                + "Kernal version : " + GetKernalVersion();
+            Assembly asm = typeof(RpiVersion).Assembly;
+            var copyright = asm.GetCustomAttribute<AssemblyCopyrightAttribute>().Copyright;
+            return asm.GetName()
+                + Environment.NewLine + copyright + Environment.NewLine
+                + "Kernel version : " + GetKernalVersion();
         }
 
         public static string GetHardwareInfo()
