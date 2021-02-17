@@ -24,6 +24,7 @@ Or build the source code with the .net 5 sdk installed:
   * dotnet publish CA_DataUploader -c Release -p:PublishSingleFile=true --runtime linux-arm --self-contained
   * other options for target are: linux-x64, osx-x64, win-arm, win-x64, win-x86
 * copy the files in the listed publish folder to a new directory on the target device.
+* on linux, first run: chmod +x USBmapper.sh && sudo ./USBmapper.sh
 * run the CA_DataUploader and follow the instructions it gives
 
 ![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/CA_DataUploader.exe.png)

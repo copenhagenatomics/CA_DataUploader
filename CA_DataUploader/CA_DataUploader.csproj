@@ -10,12 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="IO.conf">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="USBmapper.sh">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+    <Content Include="USBmapper.sh;IO.conf" CopyToOutputDirectory="Always" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
 </Project>
