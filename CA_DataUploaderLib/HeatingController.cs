@@ -292,40 +292,26 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public List<SensorSample> GetStates()
-        {
-            var list = new List<SensorSample>();
-            if (_logLevel == CALogLevel.Debug)
-            {
-                list.Add(new SensorSample("off_temperature", _offTemperature));
-                list.Add(new SensorSample("last_temperature", _lastTemperature));
-            }
-
-            return list;
-        }
-
-        public IEnumerable<SensorSample> GetPower()
-        {
-            var powerValues = _heaters.Select(x => x.Current.Clone());
-            var states =_heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
-            var switchboardStates =_heaters.Select(x => new SensorSample(
-                x.Name() + "_SwitchboardOn/Off", x.IsSwitchboardOn == null ? 10000 : x.IsSwitchboardOn.Value ? 1.0 : 0.0));
-            var values = powerValues.Concat(states).Concat(switchboardStates);
-            if (_logLevel == CALogLevel.Debug)
-            {
-                var loopTimes = _heaters.Select(x => new SensorSample(x.Name() + "_LoopTime", x.Current.ReadSensor_LoopTime));
-                return values.Concat(loopTimes);
-            }
-
-            return values;
-        }
-
         /// <summary>
         /// Gets all the values in the order specified by <see cref="GetVectorDescriptionItems"/>.
         /// </summary>
         public IEnumerable<SensorSample> GetValues()
         {
-            return GetPower().Concat(GetStates());
+            var currentValues = _heaters.Select(x => x.Current.Clone());
+            var states =_heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
+            var switchboardStates =_heaters.Select(x => new SensorSample(
+                x.Name() + "_SwitchboardOn/Off", x.IsSwitchboardOn == null ? 10000 : x.IsSwitchboardOn.Value ? 1.0 : 0.0));
+            var values = currentValues.Concat(states).Concat(switchboardStates);
+            if (_logLevel == CALogLevel.Debug)
+            {
+                var loopTimes = _heaters.Select(x => new SensorSample(x.Name() + "_LoopTime", x.Current.ReadSensor_LoopTime));
+                return values
+                    .Concat(loopTimes)
+                    .Append(new SensorSample("off_temperature", _offTemperature))
+                    .Append(new SensorSample("last_temperature", _lastTemperature));
+            }
+
+            return values;
         }
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
