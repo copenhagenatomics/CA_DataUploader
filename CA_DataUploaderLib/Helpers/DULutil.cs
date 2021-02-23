@@ -54,7 +54,7 @@ namespace CA_DataUploaderLib.Helpers
             lock (SingleProcessLock)
             {
                 if (timeSinceLastProcessExit.IsRunning && timeSinceLastProcessExit.ElapsedMilliseconds < 10)
-                    Thread.Sleep(20);
+                    Thread.Sleep(10);
 
                 using (var p = Process.Start(info))
                 {
