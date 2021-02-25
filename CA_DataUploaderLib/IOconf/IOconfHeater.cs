@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             return new IOconfInput(Row, LineNumber, "Heater")
             {
-                Name = Name + "_Power"
+                Name = Name + "_current"
             };
         }
     }

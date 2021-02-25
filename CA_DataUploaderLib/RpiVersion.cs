@@ -53,11 +53,19 @@ namespace CA_DataUploaderLib
 
         public static string GetSoftware()
         {
+            var hostAssembly = Assembly.GetEntryAssembly();
+            var hostVersion = hostAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
             Assembly asm = typeof(RpiVersion).Assembly;
             var copyright = asm.GetCustomAttribute<AssemblyCopyrightAttribute>().Copyright;
-            return asm.GetName()
-                + Environment.NewLine + copyright + Environment.NewLine
-                + "Kernel version : " + GetKernalVersion();
+            string version = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
+            string newLine = Environment.NewLine;
+            return 
+$@"{hostAssembly.GetName()}
+    FileVersion {hostVersion}
+{asm.GetName()}
+    FileVersion {version}
+    copyright {copyright}
+    Kernel version {GetKernelVersion()}";
         }
 
         public static string GetHardwareInfo()
@@ -180,7 +188,7 @@ namespace CA_DataUploaderLib
             return System.Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE");
         }
 
-        private static string GetKernalVersion()
+        private static string GetKernelVersion()
         {
             if(_OS.Platform == PlatformID.Unix)
                 return DULutil.ExecuteShellCommand("uname -r").Trim();

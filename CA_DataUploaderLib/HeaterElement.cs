@@ -23,6 +23,7 @@ namespace CA_DataUploaderLib
         public SensorSample Current;  // Amps per element. 
         public bool? IsSwitchboardOn;  //same as IsOn, but reported by the switchboard (null for a switchboard not reporting state)
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
+        private Stopwatch timeSinceLastNegativeValuesWarning = new Stopwatch();
 
         public HeaterElement(int area, IOconfHeater heater, IEnumerable<SensorSample> ovenSensors)
         {
@@ -46,9 +47,9 @@ namespace CA_DataUploaderLib
                 return false;  // has been turned off for less than 10 seconds. 
 
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
-            var validSensors = _ovenSensors.Select(s => s.Clone()).Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000).ToList();
+            var validSensors = GetValidSensorsSnapshot(twoSecAgo);
             if (!validSensors.Any())
-                return false;  // no valid oven sensors 
+                return false;  // no valid oven sensors
 
             if (validSensors.Any(x => x.Value >= OvenTargetTemperature))
                 return false;  // at least one of the temperature sensors value is valid and above OvenTargetTemperature.  
@@ -60,7 +61,7 @@ namespace CA_DataUploaderLib
         public bool MustTurnOff()
         {
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
-            var validSensors = _ovenSensors.Select(s => s.Clone()).Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000).ToList();
+            var validSensors = GetValidSensorsSnapshot(twoSecAgo).ToList();
             var timeoutResult = CheckInvalidValuesTimeout(validSensors.Any(), 2000);
             if (timeoutResult.HasValue)
                 return timeoutResult.Value;
@@ -76,6 +77,24 @@ namespace CA_DataUploaderLib
                 lastTemperature = validSensors.Max(x => x.Value);
 
             return turnOff;
+        }
+
+        private List<SensorSample> GetValidSensorsSnapshot(DateTime twoSecAgo) 
+        {
+            var snapshot = _ovenSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000 && x.Value != 0).Select(s => s.Clone()).ToList();
+            if (snapshot.Count == 0)
+                return snapshot;
+
+            if (snapshot.RemoveAll(s => s.Value < 0) > 0 && 
+                (!timeSinceLastNegativeValuesWarning.IsRunning || timeSinceLastNegativeValuesWarning.Elapsed.Hours >= 1))
+            {
+                CALog.LogErrorAndConsoleLn(
+                    LogID.A, 
+                    $"detected negative values in sensors for heater {this.Name()}. Confirm thermocouples cables are not inverted");
+                timeSinceLastNegativeValuesWarning.Restart();
+            }
+
+            return snapshot;
         }
 
         /// <returns><c>true</c> if timed out with invalid values, <c>false</c> if we are waiting for the timeout and <c>null</c> if <paramref name="hasValidSensors"/> was <c>true</c></returns>

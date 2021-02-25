@@ -10,7 +10,6 @@
     <PackageProjectUrl>https://github.com/copenhagenatomics/CA_DataUploader</PackageProjectUrl>
     <PackageTags>Raspberry Pi, IOT, Data Logger</PackageTags>
     <NeutralLanguage>en</NeutralLanguage>
-    <Version>2.0</Version>
     <Copyright>Copyright © $([System.DateTime]::UtcNow.Year) Copenhagen Atomics ($([System.DateTime]::UtcNow.ToString("dd-MMM-yyyy HH:mm")))</Copyright>
     <RepositoryUrl>https://github.com/copenhagenatomics/CA_DataUploader</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -40,6 +39,10 @@
     <PackageReference Include="CoreCLR-NCalc" Version="2.2.92" />
     <PackageReference Include="Humanizer.Core" Version="2.8.26" />
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.7" />
+    <PackageReference Include="MinVer" Version="2.4.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="System.IO.Ports" Version="5.0.0" />
     <PackageReference Include="System.Management" Version="5.0.0" />
   </ItemGroup>
