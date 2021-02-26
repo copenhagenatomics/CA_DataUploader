@@ -7,7 +7,8 @@ using System.Threading;
 
 namespace CA_DataUploaderLib
 {
-    public class HeatingController : IDisposable
+
+    public class HeatingController : IDisposable, ISubsystemWithVectorData
     {
         public List<SensorSample> ValidHatSensors { get; private set; }
         public double Voltage = 230;
@@ -20,6 +21,7 @@ namespace CA_DataUploaderLib
         private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
         private readonly List<string> _ovenHistory = new List<string>();
         protected CommandHandler _cmd;
+        public string Title => "Heating";
 
         public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
         {
@@ -32,7 +34,7 @@ namespace CA_DataUploaderLib
             foreach (var heater in heaters)
             {
                 var ovenSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name)?.TypeK.Name;
-                int area = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.OvenArea > 0)?.OvenArea??-1;
+                int area = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.OvenArea > 0)?.OvenArea ?? -1;
                 _heaters.Add(new HeaterElement(area, heater, sensors.Where(x => x.Input.Name == ovenSensor)));
             }
 
@@ -41,7 +43,7 @@ namespace CA_DataUploaderLib
 
             var unreachableBoards = heaters.Where(h => h.Map.Board == null).GroupBy(h => h.Map).ToList();
             foreach (var board in unreachableBoards)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Missing board {board.Key} for heaters {string.Join(",",board.Select(h=> h.Name))}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Missing board {board.Key} for heaters {string.Join(",", board.Select(h => h.Name))}");
             if (unreachableBoards.Count > 0)
                 throw new NotSupportedException("Running with missing heaters is not currently supported");
 
@@ -216,7 +218,7 @@ namespace CA_DataUploaderLib
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
                     AllOff();
-                    _heaters.Clear(); 
+                    _heaters.Clear();
                 }
                 catch (Exception ex)
                 {
@@ -283,7 +285,7 @@ namespace CA_DataUploaderLib
             {
                 heater.LastOn = DateTime.UtcNow;
                 heater.Board().SafeWriteLine($"p{heater._ioconf.PortNumber} on {HeaterOnTimeout}");
-                if(_logLevel == CALogLevel.Debug)
+                if (_logLevel == CALogLevel.Debug)
                     CALog.LogData(LogID.B, $"wrote p{heater._ioconf.PortNumber} on {HeaterOnTimeout} to {heater.Board().BoxName}");
             }
             catch (TimeoutException)
@@ -298,9 +300,9 @@ namespace CA_DataUploaderLib
         public IEnumerable<SensorSample> GetValues()
         {
             var currentValues = _heaters.Select(x => x.Current.Clone());
-            var states =_heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
-            var switchboardStates =_heaters.Select(x => new SensorSample(
-                x.Name() + "_SwitchboardOn/Off", x.IsSwitchboardOn == null ? 10000 : x.IsSwitchboardOn.Value ? 1.0 : 0.0));
+            var states = _heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
+            var switchboardStates = _heaters.Select(x => new SensorSample(
+                 x.Name() + "_SwitchboardOn/Off", x.IsSwitchboardOn == null ? 10000 : x.IsSwitchboardOn.Value ? 1.0 : 0.0));
             var values = currentValues.Concat(states).Concat(switchboardStates);
             if (_logLevel == CALogLevel.Debug)
             {
