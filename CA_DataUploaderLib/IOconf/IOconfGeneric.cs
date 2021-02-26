@@ -2,9 +2,9 @@ using System;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOConfGeneric : IOconfInput
+    public class IOconfGeneric : IOconfInput
     {
-        public IOConfGeneric(string row, int lineNum) : base(row, lineNum, "GenericSensor")
+        public IOconfGeneric(string row, int lineNum) : base(row, lineNum, "GenericSensor")
         {
             format = "GenericSensor;Name;BoxName;[port number]";
             var list = ToList();

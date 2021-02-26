@@ -2,9 +2,9 @@
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOConfGeiger : IOconfInput
+    public class IOconfGeiger : IOconfInput
     { 
-        public IOConfGeiger(string row, int lineNum) : base(row, lineNum, "Geiger")
+        public IOconfGeiger(string row, int lineNum) : base(row, lineNum, "Geiger")
         {
             format = "Geiger;Name;BoxName;[port number]";
 
