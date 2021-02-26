@@ -122,6 +122,7 @@ namespace CA_DataUploaderLib.IOconf
             return Table.Where(x => x.GetType() == typeof(IOconfMap)).Cast<IOconfMap>();
         }
 
+        public static IEnumerable<IOConfGeneric> GetGeneric() => Table.OfType<IOConfGeneric>();
         public static IEnumerable<IOconfTypeK> GetTypeK()
         {
             return Table.Where(x => x.GetType() == typeof(IOconfTypeK)).Cast<IOconfTypeK>();
