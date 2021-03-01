@@ -260,6 +260,7 @@ namespace CA_DataUploaderLib
                         {
                             WriteLine("Serial");
                             CALog.LogInfoAndConsoleLn(LogID.A, $"Received misread without any serial on port {PortName} - re-sending serial command");
+                            sentSerialCommandTwice = true;
                         }
                     }
                     catch (TimeoutException ex)
