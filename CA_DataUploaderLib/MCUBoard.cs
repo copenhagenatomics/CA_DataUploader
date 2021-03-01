@@ -210,6 +210,7 @@ namespace CA_DataUploaderLib
         {
             WriteLine("Serial");
             var stop = DateTime.Now.AddSeconds(5);
+            bool sentSerialCommandTwice = false;
             while (IsEmpty() && DateTime.Now < stop)
             {
 
@@ -254,6 +255,12 @@ namespace CA_DataUploaderLib
 
                         if (DetectLuminoxSensor(input)) // avoid waiting for a never present serial for luminox sensors 
                             return;
+
+                        if (input.Contains("MISREAD") && !sentSerialCommandTwice && serialNumber == null)
+                        {
+                            WriteLine("Serial");
+                            CALog.LogInfoAndConsoleLn(LogID.A, $"Received misread without any serial on port {PortName} - re-sending serial command");
+                        }
                     }
                     catch (TimeoutException ex)
                     {
