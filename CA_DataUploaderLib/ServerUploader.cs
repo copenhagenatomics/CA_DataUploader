@@ -33,6 +33,7 @@ namespace CA_DataUploaderLib
         private string _loginToken;
         private bool _running;
         private VectorDescription _vectorDescription;
+        private readonly CommandHandler _cmd;
 
         public ServerUploader(VectorDescription vectorDescription) : this(vectorDescription, null)
         {
@@ -50,7 +51,7 @@ namespace CA_DataUploaderLib
                 _client.DefaultRequestHeaders.Accept.Clear();
                 _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 _loopName = IOconfFile.GetLoopName();
-                _alerts = GetAlerts(vectorDescription);
+                _alerts = GetAlerts(vectorDescription, cmd);
                 _keyFilename = "Key" + _loopName + ".bin";
                 CALog.LogInfoAndConsoleLn(LogID.A, _loopName);
 
@@ -66,6 +67,7 @@ namespace CA_DataUploaderLib
                 GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription));
 
                 new Thread(() => this.LoopForever()).Start();
+                _cmd = cmd;
                 cmd?.AddCommand("escape", Stop);
             }
             catch (Exception ex)
@@ -75,7 +77,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private static List<IOconfAlert> GetAlerts(VectorDescription vectorDesc)
+        private static List<IOconfAlert> GetAlerts(VectorDescription vectorDesc, CommandHandler cmd)
         {
             var alerts = IOconfFile.GetAlerts().ToList();
             var alertsWithoutItem = alerts.Where(a => !vectorDesc.HasItem(a.Sensor)).ToList();
@@ -83,6 +85,8 @@ namespace CA_DataUploaderLib
                 CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Alert: {alert.Name} points to missing sensor: {alert.Sensor}");
             if (alertsWithoutItem.Count > 0)
                 throw new InvalidOperationException("Misconfigured alerts detected");
+            if (alerts.Any(a => a.TriggersEmergencyShutdown) && cmd == null)
+                throw new InvalidOperationException("Alert with emergency shutdown is configured, but command handler is not available to trigger it");
             return alerts;
         }
 
@@ -111,35 +115,32 @@ namespace CA_DataUploaderLib
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescription.Length}");
 
             foreach (var a in _alerts)
-            {
-                if (a.CheckValue(GetVectorValue(vector, a.Sensor)))
-                {
-                    lock (_alertQueue)
-                    {
-                        if (_alertQueue.Count < 10000)  // if problems then drop packages. 
-                        {
-                            _alertQueue.Enqueue(timestamp.ToString("yyyy.MM.dd HH:mm:ss") + a.Message);
-                        }
-                    }
-                }
-            }
+                CheckAndTriggerAlert(vector, timestamp, a);
 
             lock (_queue)
-            {
-                if (_queue.Count < 10000)  // if problems then drop packages. 
+                if (_queue.Count < 10000 && _lastTimestamp < timestamp)  // if problems then drop packages. 
                 {
-                    if (_lastTimestamp < timestamp)
+                    _queue.Enqueue(new DataVector
                     {
-                        _queue.Enqueue(new DataVector
-                        {
-                            timestamp = timestamp,
-                            vector = vector
-                        });
+                        timestamp = timestamp,
+                        vector = vector
+                    });
 
-                        _lastTimestamp = timestamp;
-                    }
+                    _lastTimestamp = timestamp;
                 }
-            }
+        }
+
+        private void CheckAndTriggerAlert(List<double> vector, DateTime timestamp, IOconfAlert a)
+        {
+            if (!a.CheckValue(GetVectorValue(vector, a.Sensor))) return;
+
+            CALog.LogErrorAndConsoleLn(LogID.A, timestamp.ToString("yyyy.MM.dd HH:mm:ss") + a.Message);
+            if (a.TriggersEmergencyShutdown)
+                _cmd.Execute("emergencyshutdown");
+
+            lock (_alertQueue)
+                if (_alertQueue.Count < 10000)  // if problems then drop packages. 
+                    _alertQueue.Enqueue(timestamp.ToString("yyyy.MM.dd HH:mm:ss") + a.Message);
         }
 
         // service method, that makes it easy to control the duration of each loop in (milliseconds)

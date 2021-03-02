@@ -25,7 +25,7 @@ namespace CA_DataUploaderLib.IOconf
             if (list[0] != "Alert" || list.Count < 3) throw new Exception("IOconfAlert: wrong format: " + row);
             Name = list[1];
             string comparisson;
-            (Sensor, comparisson, Value, RateLimitMinutes) = ParseAlertExpression(list, row);
+            (Sensor, comparisson, Value, RateLimitMinutes, TriggersEmergencyShutdown) = ParseAlertExpression(list, row);
 
             MessageTemplate = Invariant($" {Name} ({Sensor}) {comparisson} {Value} (");
             if (comparisson == "int")
@@ -49,6 +49,7 @@ namespace CA_DataUploaderLib.IOconf
         public string Name { get; set; }
         public string Sensor { get; set; }
         public string Message { get; private set; }
+        public bool TriggersEmergencyShutdown { get; private set; }
         private readonly AlertCompare type;
         private readonly double Value;
         private double LastValue;
@@ -90,13 +91,22 @@ namespace CA_DataUploaderLib.IOconf
             _ => throw new Exception("IOconfAlert: this should never happen"),
         };
 
-        private (string Sensor, string Comparisson, double Value, int rateLimitMinutes) ParseAlertExpression(List<string> list, string row)
+        private (string Sensor, string Comparisson, double Value, int rateLimitMinutes, bool triggersEmergencyShutdown) 
+            ParseAlertExpression(List<string> list, string row)
         {
             var match = comparisonRegex.Match(list[2]);
             if (!match.Success)
-                throw new Exception("IOconfAlert: wrong format: " + row + ". Format: Alert;Name;SensorName comparisson value. Supported comparissons: =,!=, >, <, >=, <=");
-            var rateMinutes = list.Count > 3 ? list[3].ToInt() : DefaultRateLimitMinutes;
-            return (match.Groups[1].Value, match.Groups[2].Value.ToLower(), match.Groups[3].Value.ToDouble(), rateMinutes);
+                throw new Exception("IOconfAlert: wrong format: " + row + ". Format: Alert;Name;SensorName comparisson value;[rateMinutes];[emergencyshutdown]. Supported comparissons: =,!=, >, <, >=, <=");
+            var sensor = match.Groups[1].Value;
+            var comparison = match.Groups[2].Value.ToLower();
+            var value = match.Groups[3].Value.ToDouble();
+            if (list.Count <= 3)
+                return (sensor, comparison, value, DefaultRateLimitMinutes, false);
+            var hasEmergencyShutdown = 
+                list[3] == "emergencyshutdown" || list.Count > 4 && list[4] == "emergencyshutdown";
+            var rateLimit = !hasEmergencyShutdown || list.Count > 4 ?
+                list[3].ToInt() : DefaultRateLimitMinutes;
+            return (sensor, comparison, value, DefaultRateLimitMinutes, true);;
         }
 
     }
