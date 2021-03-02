@@ -114,9 +114,9 @@ namespace CA_DataUploaderLib
 
             _ovenHistory.Add(DateTime.Now.ToString("MMM dd HH:mm:ss ") + string.Join(" ", args));
             if (_heaters.Any(x => x.IsActive))
-                _cmd.Execute("light main on");
+                _cmd.Execute("light main on", false);
             else
-                _cmd.Execute("light main off");
+                _cmd.Execute("light main off", false);
             return true;
         }
 

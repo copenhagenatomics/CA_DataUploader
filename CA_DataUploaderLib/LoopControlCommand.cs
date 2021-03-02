@@ -9,6 +9,7 @@ namespace CA_DataUploaderLib
     {
         public abstract string Name { get; }
         public abstract string Description { get; }
+        public virtual bool IsHiddenCommand => false;
         public virtual string ArgsHelp => string.Empty;
         private bool disposedValue;
         private CommandHandler cmd;
@@ -20,15 +21,16 @@ namespace CA_DataUploaderLib
             SubscribeToNewVectorReceived(cmd, OnNewVectorReceived);
             this.cmd = cmd;
             AddCommand(Name, Execute);
-            AddCommand("help", HelpMenu);
+            if (!IsHiddenCommand)
+                AddCommand("help", HelpMenu);
         }
         protected abstract Task Command(List<string> args);
         protected virtual Task OnCommandFailed() { return Task.CompletedTask; }
 
-        private void AddCommand(string name, Func<List<string>, bool> func) => 
+        protected void AddCommand(string name, Func<List<string>, bool> func) => 
             removeCommandActions.Add(cmd.AddCommand(name, func));
 
-        protected void ExecuteCommand(string command) => cmd.Execute(command);
+        protected void ExecuteCommand(string command) => cmd.Execute(command, false);
         protected virtual void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) { }
         protected async Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, TimeSpan timeout) => (await When(e => condition(e[sensorName].Value), timeout))[sensorName].Value;
         protected async Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, CancellationToken token) => (await When(e => condition(e[sensorName].Value), token))[sensorName].Value;

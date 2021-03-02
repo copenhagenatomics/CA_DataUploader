@@ -82,7 +82,7 @@ namespace UnitTests
         public void AlertRejectsInvalidConfiguration(string row)
         {
             var ex = Assert.ThrowsException<Exception>(() => new IOconfAlert(row, 0));
-            Assert.AreEqual($"IOconfAlert: wrong format: {row}. Format: Alert;Name;SensorName comparisson value. Supported comparissons: =,!=, >, <, >=, <=", ex.Message);
+            Assert.AreEqual($"IOconfAlert: wrong format: {row}. Format: Alert;Name;SensorName comparison value;[rateMinutes];[emergencyshutdown]. Supported comparisons: =,!=, >, <, >=, <=", ex.Message);
         }
     }
 }

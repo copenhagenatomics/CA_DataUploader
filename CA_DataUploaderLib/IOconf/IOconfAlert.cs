@@ -24,26 +24,26 @@ namespace CA_DataUploaderLib.IOconf
             var list = ToList();
             if (list[0] != "Alert" || list.Count < 3) throw new Exception("IOconfAlert: wrong format: " + row);
             Name = list[1];
-            string comparisson;
-            (Sensor, comparisson, Value, RateLimitMinutes, TriggersEmergencyShutdown) = ParseAlertExpression(list, row);
-
-            MessageTemplate = Invariant($" {Name} ({Sensor}) {comparisson} {Value} (");
-            if (comparisson == "int")
-                MessageTemplate = $" {Name} ({Sensor}) is an integer (";
-            if (comparisson == "nan")
-                MessageTemplate = $" {Name} ({Sensor}) is not a number (";
-
+            (Sensor, Value, MessageTemplate, type) = ParseExpression(
+                Name, list[2], "IOconfAlert: wrong format: " + row + ". Format: Alert;Name;SensorName comparison value;[rateMinutes];[emergencyshutdown].");
             Message = MessageTemplate;
-            type = comparisson switch
+            if (list.Count <= 3)
+                (RateLimitMinutes, TriggersEmergencyShutdown) = (DefaultRateLimitMinutes, false);
+            else 
             {
-                "=" => AlertCompare.EqualTo,
-                "!=" => AlertCompare.NotEqualTo,
-                ">" => AlertCompare.BiggerThan,
-                "<" => AlertCompare.SmallerThan,
-                ">=" => AlertCompare.BiggerOrEqualTo,
-                "<=" => AlertCompare.SmallerOrEqualTo,
-                _ => throw new Exception("IOconfAlert: wrong format: " + row),
-            };
+                TriggersEmergencyShutdown = list[3] == "emergencyshutdown" || list.Count > 4 && list[4] == "emergencyshutdown";
+                RateLimitMinutes = !TriggersEmergencyShutdown || list.Count > 4 ? list[3].ToInt() : DefaultRateLimitMinutes;
+            }
+        }
+
+        public IOconfAlert(string name, string expression, int? rateLimit = DefaultRateLimitMinutes, bool triggersEmergencyShutdown = true) : base("DynamicAlert", 0, "DynamicAlert")
+        {
+            Name = name;
+            (Sensor, Value, MessageTemplate, type) = ParseExpression(
+                name, expression, "alert expression - wrong format: " + expression + ". Expression format: SensorName comparison value.");
+            Message = MessageTemplate;
+            RateLimitMinutes = rateLimit ?? DefaultRateLimitMinutes;
+            TriggersEmergencyShutdown = triggersEmergencyShutdown;
         }
 
         public string Name { get; set; }
@@ -57,7 +57,7 @@ namespace CA_DataUploaderLib.IOconf
         private bool _isFirstCheck = true;
         //expression captures groups: 1-sensor, 2-comparison, 3-value
         //sample expression: SomeValue < 202
-        private readonly Regex comparisonRegex = new Regex(@"^\s*([\w%]+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)\s*$");
+        private static readonly Regex comparisonRegex = new Regex(@"^\s*([\w%]+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)\s*$");
         private readonly int RateLimitMinutes;
         private const int DefaultRateLimitMinutes = 30; // by default fire the same alert max once every 30 mins.
         private DateTime LastTriggered;
@@ -91,23 +91,27 @@ namespace CA_DataUploaderLib.IOconf
             _ => throw new Exception("IOconfAlert: this should never happen"),
         };
 
-        private (string Sensor, string Comparisson, double Value, int rateLimitMinutes, bool triggersEmergencyShutdown) 
-            ParseAlertExpression(List<string> list, string row)
+        private static (string sensor, double value, string messageTemplate, AlertCompare type) ParseExpression(string name, string expression, string formatErrorMessage)
         {
-            var match = comparisonRegex.Match(list[2]);
+            var match = comparisonRegex.Match(expression);
             if (!match.Success)
-                throw new Exception("IOconfAlert: wrong format: " + row + ". Format: Alert;Name;SensorName comparisson value;[rateMinutes];[emergencyshutdown]. Supported comparissons: =,!=, >, <, >=, <=");
+                throw new Exception(formatErrorMessage + " Supported comparisons: =,!=, >, <, >=, <=");
             var sensor = match.Groups[1].Value;
             var comparison = match.Groups[2].Value.ToLower();
             var value = match.Groups[3].Value.ToDouble();
-            if (list.Count <= 3)
-                return (sensor, comparison, value, DefaultRateLimitMinutes, false);
-            var hasEmergencyShutdown = 
-                list[3] == "emergencyshutdown" || list.Count > 4 && list[4] == "emergencyshutdown";
-            var rateLimit = !hasEmergencyShutdown || list.Count > 4 ?
-                list[3].ToInt() : DefaultRateLimitMinutes;
-            return (sensor, comparison, value, DefaultRateLimitMinutes, true);;
-        }
+            string messageTemplate = Invariant($" {name} ({sensor}) {comparison} {value} (");
+            var type = comparison switch
+            {
+                "=" => AlertCompare.EqualTo,
+                "!=" => AlertCompare.NotEqualTo,
+                ">" => AlertCompare.BiggerThan,
+                "<" => AlertCompare.SmallerThan,
+                ">=" => AlertCompare.BiggerOrEqualTo,
+                "<=" => AlertCompare.SmallerOrEqualTo,
+                _ => throw new Exception("alert expression - wrong format: " + expression),
+            };
 
+            return (sensor, value, messageTemplate, type);
+        }
     }
 }
