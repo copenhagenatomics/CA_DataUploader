@@ -30,17 +30,17 @@ namespace CA_DataUploaderLib
         protected void AddCommand(string name, Func<List<string>, bool> func) => 
             removeCommandActions.Add(cmd.AddCommand(name, func));
 
-        protected void ExecuteCommand(string command) => cmd.Execute(command, false);
-        protected virtual void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) { }
-        protected async Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, TimeSpan timeout) => (await When(e => condition(e[sensorName].Value), timeout))[sensorName].Value;
-        protected async Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, CancellationToken token) => (await When(e => condition(e[sensorName].Value), token))[sensorName].Value;
-        protected async Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, TimeSpan timeout)
+        public void ExecuteCommand(string command) => cmd.Execute(command, false);
+        public virtual void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) { }
+        public async Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, TimeSpan timeout) => (await When(e => condition(e[sensorName].Value), timeout))[sensorName].Value;
+        public async Task<double> WhenSensorValue(string sensorName, Predicate<double> condition, CancellationToken token) => (await When(e => condition(e[sensorName].Value), token))[sensorName].Value;
+        public async Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, TimeSpan timeout)
         {
             using var cts = new CancellationTokenSource(timeout);
             return await When(condition, cts.Token);
         }
 
-        protected Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, CancellationToken token)
+        public Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, CancellationToken token)
         { 
             var tcs = new TaskCompletionSource<NewVectorReceivedArgs>();
             SubscribeToNewVectorReceived(cmd, OnNewValue);
@@ -58,9 +58,9 @@ namespace CA_DataUploaderLib
 
             return tcs.Task;
         }
-        protected TimeSpan Milliseconds(double seconds) => TimeSpan.FromMilliseconds(seconds);
-        protected TimeSpan Seconds(double seconds) => TimeSpan.FromSeconds(seconds);
-        protected TimeSpan Minutes(double minutes) => TimeSpan.FromMinutes(minutes);
+        public TimeSpan Milliseconds(double seconds) => TimeSpan.FromMilliseconds(seconds);
+        public TimeSpan Seconds(double seconds) => TimeSpan.FromSeconds(seconds);
+        public TimeSpan Minutes(double minutes) => TimeSpan.FromMinutes(minutes);
         private void SubscribeToNewVectorReceived(CommandHandler cmd, EventHandler<NewVectorReceivedArgs> handler)
         {
             cmd.NewVectorReceived += handler;

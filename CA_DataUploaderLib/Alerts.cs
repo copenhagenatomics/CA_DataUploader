@@ -61,7 +61,7 @@ namespace CA_DataUploaderLib
             return Task.CompletedTask;
         }
 
-        protected override void OnNewVectorReceived(object sender, NewVectorReceivedArgs e)
+        public override void OnNewVectorReceived(object sender, NewVectorReceivedArgs e)
         {
             var timestamp = DateTime.UtcNow.ToString("yyyy.MM.dd HH:mm:ss");
             var (alertsToTrigger, noSensorAlerts) = GetAlertsToTrigger(e); // we gather alerts separately from triggering, to reduce time locking the _alerts list

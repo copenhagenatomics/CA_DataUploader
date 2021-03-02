@@ -11,7 +11,7 @@ namespace CommandHandlerTesterLib
         public override string Description => "will print the first value after metA, try lower case too";
         public override string ArgsHelp => "[arg1]";
 
-        protected override void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) 
+        public override void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) 
             => Console.Write(e["IterationSensor"].Value % 2 == 0 ? "." : string.Empty);
 
         protected override Task Command(List<string> args)
