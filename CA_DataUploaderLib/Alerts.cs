@@ -66,7 +66,7 @@ namespace CA_DataUploaderLib
             var timestamp = DateTime.UtcNow.ToString("yyyy.MM.dd HH:mm:ss");
             var (alertsToTrigger, noSensorAlerts) = GetAlertsToTrigger(e); // we gather alerts separately from triggering, to reduce time locking the _alerts list
             
-            foreach (var a in alertsToTrigger)
+            foreach (var a in alertsToTrigger ?? Enumerable.Empty<IOconfAlert>())
                 TriggerAlert(a, timestamp, a.Message);
 
             foreach (var a in noSensorAlerts)
@@ -76,7 +76,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private (List<IOconfAlert> alertsToTrigger, List<IOconfAlert> noSensorAlerts) GetAlertsToTrigger(NewVectorReceivedArgs e)
+        private (IEnumerable<IOconfAlert> alertsToTrigger, IEnumerable<IOconfAlert> noSensorAlerts) GetAlertsToTrigger(NewVectorReceivedArgs e)
         {
             // we only create the lists later to avoid unused lists on every call
             List<IOconfAlert> alertsToTrigger = null;
@@ -91,7 +91,9 @@ namespace CA_DataUploaderLib
                         EnsureInitialized(ref alertsToTrigger).Add(a);
                 }
             
-            return (alertsToTrigger, noSensorAlerts);
+            return (
+                alertsToTrigger ?? Enumerable.Empty<IOconfAlert>(), 
+                noSensorAlerts ?? Enumerable.Empty<IOconfAlert>());
         }
 
         private void TriggerAlert(IOconfAlert a, string timestamp, string message)
