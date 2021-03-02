@@ -22,7 +22,6 @@ namespace CA_DataUploaderLib
         private Queue<DataVector> _queue = new Queue<DataVector>();
         private Queue<string> _alertQueue = new Queue<string>();
         private List<DateTime> _badPackages = new List<DateTime>();
-        private List<IOconfAlert> _alerts;
         private Dictionary<string, string> _accountInfo;
         private int _plotID;
         private string _plotname;
@@ -33,6 +32,7 @@ namespace CA_DataUploaderLib
         private string _loginToken;
         private bool _running;
         private VectorDescription _vectorDescription;
+        private readonly CommandHandler _cmd;
 
         public ServerUploader(VectorDescription vectorDescription) : this(vectorDescription, null)
         {
@@ -50,7 +50,6 @@ namespace CA_DataUploaderLib
                 _client.DefaultRequestHeaders.Accept.Clear();
                 _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 _loopName = IOconfFile.GetLoopName();
-                _alerts = GetAlerts(vectorDescription);
                 _keyFilename = "Key" + _loopName + ".bin";
                 CALog.LogInfoAndConsoleLn(LogID.A, _loopName);
 
@@ -66,6 +65,7 @@ namespace CA_DataUploaderLib
                 GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription));
 
                 new Thread(() => this.LoopForever()).Start();
+                _cmd = cmd;
                 cmd?.AddCommand("escape", Stop);
             }
             catch (Exception ex)
@@ -75,15 +75,11 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private static List<IOconfAlert> GetAlerts(VectorDescription vectorDesc)
+        internal void SendAlert(string message)
         {
-            var alerts = IOconfFile.GetAlerts().ToList();
-            var alertsWithoutItem = alerts.Where(a => !vectorDesc.HasItem(a.Sensor)).ToList();
-            foreach (var alert in alertsWithoutItem)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Alert: {alert.Name} points to missing sensor: {alert.Sensor}");
-            if (alertsWithoutItem.Count > 0)
-                throw new InvalidOperationException("Misconfigured alerts detected");
-            return alerts;
+            lock (_alertQueue)
+                if (_alertQueue.Count < 10000)  // if problems then drop packages. 
+                    _alertQueue.Enqueue(message);
         }
 
         private static void CheckInputData(VectorDescription vectorDescription)
@@ -110,36 +106,17 @@ namespace CA_DataUploaderLib
             if (vector.Count() != _vectorDescription.Length)
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescription.Length}");
 
-            foreach (var a in _alerts)
-            {
-                if (a.CheckValue(GetVectorValue(vector, a.Sensor)))
-                {
-                    lock (_alertQueue)
-                    {
-                        if (_alertQueue.Count < 10000)  // if problems then drop packages. 
-                        {
-                            _alertQueue.Enqueue(timestamp.ToString("yyyy.MM.dd HH:mm:ss") + a.Message);
-                        }
-                    }
-                }
-            }
-
             lock (_queue)
-            {
-                if (_queue.Count < 10000)  // if problems then drop packages. 
+                if (_queue.Count < 10000 && _lastTimestamp < timestamp)  // if problems then drop packages. 
                 {
-                    if (_lastTimestamp < timestamp)
+                    _queue.Enqueue(new DataVector
                     {
-                        _queue.Enqueue(new DataVector
-                        {
-                            timestamp = timestamp,
-                            vector = vector
-                        });
+                        timestamp = timestamp,
+                        vector = vector
+                    });
 
-                        _lastTimestamp = timestamp;
-                    }
+                    _lastTimestamp = timestamp;
                 }
-            }
         }
 
         // service method, that makes it easy to control the duration of each loop in (milliseconds)
@@ -463,12 +440,6 @@ namespace CA_DataUploaderLib
             }
            
             throw new Exception(response.Result.ReasonPhrase);
-        }
-
-        private double GetVectorValue(List<double> values, string name)
-        {
-            var index = _vectorDescription._items.IndexOf(_vectorDescription._items.Single(x => x.Descriptor == name));
-            return values[index];
         }
 
         #region IDisposable Support

@@ -49,8 +49,8 @@ namespace CA_DataUploaderLib.IOconf
                 if (row.StartsWith("Light")) return new IOconfLight(row, lineNum);
                 if (row.StartsWith("Motor")) return new IOconfMotor(row, lineNum);
                 if (row.StartsWith("Oven")) return new IOconfOven(row, lineNum);
-                if (row.StartsWith("Pressure")) return new IOConfPressure(row, lineNum);
-                if (row.StartsWith("Geiger")) return new IOConfGeiger(row, lineNum);
+                if (row.StartsWith("Pressure")) return new IOconfPressure(row, lineNum);
+                if (row.StartsWith("Geiger")) return new IOconfGeiger(row, lineNum);
                 if (row.StartsWith("Scale")) return new IOconfScale(row, lineNum);
                 if (row.StartsWith("Tank")) return new IOconfTank(row, lineNum);
                 if (row.StartsWith("Valve")) return new IOconfValve(row, lineNum);
@@ -58,6 +58,7 @@ namespace CA_DataUploaderLib.IOconf
                 if (row.StartsWith("RPiTemp")) return new IOconfRPiTemp(row, lineNum);
                 if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row, lineNum);
                 if (row.StartsWith("Oxygen")) return new IOconfOxygen(row, lineNum);
+                if (row.StartsWith("GenericSensor")) return new IOconfGeneric(row, lineNum);
 
                 return new IOconfRow(row, lineNum, "Unknown");
             }
@@ -81,7 +82,7 @@ namespace CA_DataUploaderLib.IOconf
                 CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Heater: {heater.Key.Name} occure in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}");
         }
 
-        private static IOconfLoopName GetLoopConfig() => Table.OfType<IOconfLoopName>().SingleOrDefault() ?? IOconfLoopName.Default;
+        private static IOconfLoopName GetLoopConfig() => GetEntries<IOconfLoopName>().SingleOrDefault() ?? IOconfLoopName.Default;
 
         public static ConnectionInfo GetConnectionInfo()
         {
@@ -105,108 +106,31 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public static string GetLoopName() => GetLoopConfig().Name;
-
-        public static int GetVectorUploadDelay()
-        {
-            return ((IOconfSamplingRates)Table.SingleOrDefault(x => x.GetType() == typeof(IOconfSamplingRates)))?.VectorUploadDelay ?? 900;
-        }
-        public static int GetMainLoopDelay()
-        {
-            return ((IOconfSamplingRates)Table.SingleOrDefault(x => x.GetType() == typeof(IOconfSamplingRates)))?.MainLoopDelay ?? 200;
-        }
-
+        public static int GetVectorUploadDelay() => GetEntries<IOconfSamplingRates>().SingleOrDefault()?.VectorUploadDelay ?? 900;
+        public static int GetMainLoopDelay() => GetEntries<IOconfSamplingRates>().SingleOrDefault()?.MainLoopDelay ?? 200;
         public static CALogLevel GetOutputLevel() => GetLoopConfig().LogLevel;
-
-        public static IEnumerable<IOconfMap> GetMap()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfMap)).Cast<IOconfMap>();
-        }
-
-        public static IEnumerable<IOconfTypeK> GetTypeK()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfTypeK)).Cast<IOconfTypeK>();
-        }
-
-        public static IEnumerable<IOconfSaltLeakage> GetSaltLeakage()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfSaltLeakage)).Cast<IOconfSaltLeakage>();
-        }
-
+        public static IEnumerable<IOconfMap> GetMap() => GetEntries<IOconfMap>();
+        public static IEnumerable<IOconfGeneric> GetGeneric()  => GetEntries<IOconfGeneric>();
+        public static IEnumerable<IOconfTypeK> GetTypeK() => GetEntries<IOconfTypeK>();
+        public static IEnumerable<IOconfSaltLeakage> GetSaltLeakage() => GetEntries<IOconfSaltLeakage>();
         public static IEnumerable<IOconfInput> GetTypeKAndLeakage() =>
             Table.Where(x => x.GetType() == typeof(IOconfTypeK) || x.GetType() == typeof(IOconfSaltLeakage)).Cast<IOconfInput>();
 
-        public static IOconfRPiTemp GetRPiTemp() => Table.OfType<IOconfRPiTemp>().SingleOrDefault() ?? IOconfRPiTemp.Default;
-
-        public static IEnumerable<IOconfOut230Vac> GetOut230Vac()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfOut230Vac)).Cast<IOconfOut230Vac>();
-        }
-
-        public static IEnumerable<IOconfInput> GetPressure()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOConfPressure)).Cast<IOconfInput>();
-        }
-
-        public static IEnumerable<IOconfInput> GetGeiger()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOConfGeiger)).Cast<IOconfInput>();
-        }
-
-        public static IEnumerable<IOconfInput> GetAirFlow()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfAirFlow)).Cast<IOconfInput>();
-        }
-
-        public static IEnumerable<IOconfMotor> GetMotor()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfMotor)).Cast<IOconfMotor>();
-        }
-
-        public static IEnumerable<IOconfScale> GetScale()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfScale)).Cast<IOconfScale>();
-        }
-
-        public static IEnumerable<IOconfValve> GetValve()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfValve)).Cast<IOconfValve>();
-        }
-
-        public static IEnumerable<IOconfHeater> GetHeater()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfHeater)).Cast<IOconfHeater>();
-        }
-
-        public static IEnumerable<IOconfLight> GetLight()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfLight)).Cast<IOconfLight>();
-        }
-
-        public static IEnumerable<IOconfOxygen> GetOxygen()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfOxygen)).Cast<IOconfOxygen>();
-        }
-
-        public static IEnumerable<IOconfOven> GetOven()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfOven)).Cast<IOconfOven>();
-        }
-
-        public static IEnumerable<IOconfAlert> GetAlerts()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfAlert)).Cast<IOconfAlert>();
-        }
-
-        public static IEnumerable<IOconfMath> GetMath()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfMath)).Cast<IOconfMath>();
-        }
-
-        public static IEnumerable<IOconfFilter> GetFilters()
-        {
-            return Table.Where(x => x.GetType() == typeof(IOconfFilter)).Cast<IOconfFilter>();  
-        }
-
-        public static IEnumerable<IOconfInput> GetInputs() => Table.OfType<IOconfInput>();
+        public static IOconfRPiTemp GetRPiTemp() => GetEntries<IOconfRPiTemp>().SingleOrDefault() ?? IOconfRPiTemp.Default;
+        public static IEnumerable<IOconfInput> GetPressure()=> GetEntries<IOconfPressure>();
+        public static IEnumerable<IOconfInput> GetGeiger()=> GetEntries<IOconfGeiger>();
+        public static IEnumerable<IOconfInput> GetAirFlow()=> GetEntries<IOconfAirFlow>();
+        public static IEnumerable<IOconfMotor> GetMotor()=> GetEntries<IOconfMotor>();
+        public static IEnumerable<IOconfScale> GetScale() => GetEntries<IOconfScale>();
+        public static IEnumerable<IOconfValve> GetValve()=> GetEntries<IOconfValve>();
+        public static IEnumerable<IOconfHeater> GetHeater() => GetEntries<IOconfHeater>();
+        public static IEnumerable<IOconfLight> GetLight() => GetEntries<IOconfLight>();
+        public static IEnumerable<IOconfOxygen> GetOxygen() => GetEntries<IOconfOxygen>();
+        public static IEnumerable<IOconfOven> GetOven() => GetEntries<IOconfOven>();
+        public static IEnumerable<IOconfAlert> GetAlerts()=> GetEntries<IOconfAlert>();
+        public static IEnumerable<IOconfMath> GetMath() => GetEntries<IOconfMath>();
+        public static IEnumerable<IOconfFilter> GetFilters() => GetEntries<IOconfFilter>();
+        public static IEnumerable<IOconfInput> GetInputs() => GetEntries<IOconfInput>();
+        private static IEnumerable<T> GetEntries<T>() => Table.OfType<T>();
     }
 }

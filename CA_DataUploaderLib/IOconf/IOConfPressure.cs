@@ -2,9 +2,9 @@
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOConfPressure : IOconfInput
+    public class IOconfPressure : IOconfInput
     { 
-        public IOConfPressure(string row, int lineNum) : base(row, lineNum, "Pressure")
+        public IOconfPressure(string row, int lineNum) : base(row, lineNum, "Pressure")
         {
             format = "Pressure;Name;BoxName;[port number];[skip]";
 

@@ -49,14 +49,14 @@ namespace CA_DataUploaderLib
             };
         }
 
-        public void Execute(string command) => HandleCommand(command);
+        public void Execute(string command, bool addToCommandHistory = true) => HandleCommand(command, addToCommandHistory);
 
         public bool AssertArgs(List<string> args, int minimumLen)
         {
             if (args.Count() < minimumLen)
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, "Too few arguments for this command");
-                Execute("help");
+                Execute("help", false);
                 return false;
             }
 
@@ -82,7 +82,7 @@ namespace CA_DataUploaderLib
                 try
                 {
                     var cmd = GetCommand();
-                    HandleCommand(cmd);
+                    HandleCommand(cmd, true);
                 }
                 catch (Exception ex)
                 {
@@ -93,7 +93,7 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.Now.Subtract(_start).Humanize(5));
         }
 
-        private void HandleCommand(string cmdString)
+        private void HandleCommand(string cmdString, bool addToCommandHistory)
         {
             if (cmdString == null)  // no NewLine
             {
@@ -124,7 +124,7 @@ namespace CA_DataUploaderLib
                         {
                             if (cmdString != "help")
                                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
-                            OnCommandAccepted(cmdString);
+                            OnCommandAccepted(cmdString, addToCommandHistory);
                         }
                         else
                             CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command");
@@ -144,9 +144,9 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private void OnCommandAccepted(string cmdString)
+        private void OnCommandAccepted(string cmdString, bool addToCommandHistory)
         {
-            if (AcceptedCommands.LastOrDefault() == cmdString)
+            if (!addToCommandHistory || AcceptedCommands.LastOrDefault() == cmdString)
                 return;
 
             AcceptedCommands.Add(cmdString);

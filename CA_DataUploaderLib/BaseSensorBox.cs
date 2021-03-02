@@ -12,7 +12,7 @@ using CA_DataUploaderLib.Extensions;
 
 namespace CA_DataUploaderLib
 {
-    public class BaseSensorBox : IDisposable
+    public class BaseSensorBox : IDisposable, ISubsystemWithVectorData
     {
         protected bool _running = true;
         public string Title { get; protected set; }

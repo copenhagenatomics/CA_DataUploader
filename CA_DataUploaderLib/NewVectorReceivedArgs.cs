@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace CA_DataUploaderLib
@@ -11,6 +12,7 @@ namespace CA_DataUploaderLib
         }
 
         public IReadOnlyCollection<SensorSample> Vector { get; }
-        public SensorSample this[string sensorName] => Vector.Single(v => v.Name == sensorName);
+        public SensorSample this[string sensorName] => TryGetValue(sensorName) ?? throw new IndexOutOfRangeException("Failed to find sensor " + sensorName);
+        public SensorSample TryGetValue(string sensorName) => Vector.SingleOrDefault(v => v.Name == sensorName);
     }
 }
