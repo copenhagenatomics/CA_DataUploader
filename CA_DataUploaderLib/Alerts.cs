@@ -38,6 +38,9 @@ namespace CA_DataUploaderLib
 
         private bool RemoveAlert(List<string> args)
         {
+            if (args.Count < 2)
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected format for Removing dynamic alert: {string.Join(',', args)}. Format: removealert AlertName");
+
             lock (_alerts) 
                 _alerts.RemoveAll(a => a.Name == args[1]);
             return true;
