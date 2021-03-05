@@ -27,7 +27,7 @@ namespace CA_DataUploaderLib
         public Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, CancellationToken token)
         {
             var tcs = new TaskCompletionSource<NewVectorReceivedArgs>();
-            SubscribeToNewVectorReceived(cmd, OnNewValue);
+            NewVectorReceived += OnNewValue;
             void OnNewValue(object sender, NewVectorReceivedArgs e)
             {
                 if (condition(e))
@@ -37,7 +37,7 @@ namespace CA_DataUploaderLib
                 else // still waiting for condition to be met, do not unsubscribe yet
                     return; 
 
-                UnSubscribeToNewVectorReceived(cmd, OnNewValue);
+                NewVectorReceived -= OnNewValue;
             }
 
             return tcs.Task;
@@ -45,19 +45,9 @@ namespace CA_DataUploaderLib
         public void Dispose()
         {
             foreach (var subscribedEvent in subscribedNewVectorReceivedEvents.ToArray())
-                UnSubscribeToNewVectorReceived(cmd, subscribedEvent);
+                NewVectorReceived -= subscribedEvent;
             foreach (var removeAction in removeCommandActions)
                 removeAction();
-        }
-        private void SubscribeToNewVectorReceived(CommandHandler cmd, EventHandler<NewVectorReceivedArgs> handler)
-        {
-            cmd.NewVectorReceived += handler;
-            subscribedNewVectorReceivedEvents.Add(handler);
-        }
-        private void UnSubscribeToNewVectorReceived(CommandHandler cmd, EventHandler<NewVectorReceivedArgs> handler)
-        {
-            cmd.NewVectorReceived -= handler;
-            subscribedNewVectorReceivedEvents.Remove(handler);
         }
     }
 }
