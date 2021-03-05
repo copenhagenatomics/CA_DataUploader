@@ -1,4 +1,4 @@
-﻿using CA_DataUploaderLib;
+﻿using CA.LoopControlPluginBase;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -12,7 +12,7 @@ namespace CommandHandlerTesterLib
         public override string ArgsHelp => "[arg1]";
 
         public override void OnNewVectorReceived(object sender, NewVectorReceivedArgs e) 
-            => Console.Write(e["IterationSensor"].Value % 2 == 0 ? "." : string.Empty);
+            => Console.Write(e["IterationSensor"] % 2 == 0 ? "." : string.Empty);
 
         protected override Task Command(List<string> args)
         {

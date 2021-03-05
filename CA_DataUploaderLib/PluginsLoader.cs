@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Threading;
+using CA.LoopControlPluginBase;
 
 namespace CA_DataUploaderLib
 {
@@ -54,7 +55,7 @@ namespace CA_DataUploaderLib
             }
 
             foreach (var plugin in initializedPlugins)
-                plugin.Initialize(handler);
+                plugin.Initialize(new PluginsCommandHandler(handler), new PluginsLogger(plugin.Name)); 
 
             _runningPlugins[assemblyPath] = (context, initializedPlugins);
             CALog.LogData(LogID.A, $"loaded plugins from {assemblyPath} - {string.Join(",", initializedPlugins.Select(e => e.GetType().Name))}");
