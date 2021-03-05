@@ -14,6 +14,7 @@
     <RepositoryUrl>https://github.com/copenhagenatomics/CA_DataUploader</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <LangVersion>8.0</LangVersion>
+    <MinVerTagPrefix>plugins</MinVerTagPrefix>
   </PropertyGroup>
   <ItemGroup>
     <None Include="MIT license.txt">
