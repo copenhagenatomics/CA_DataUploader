@@ -40,6 +40,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TemperatureUnit10pin", "Tem
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommandHandlerTesterLib", "CommandHandlerTesterLib\CommandHandlerTesterLib.csproj", "{CAF9DD5A-36B1-4395-BA4A-CF8AD198E85E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CA.LoopControlPluginBase", "CA.LoopControlPluginBase\CA.LoopControlPluginBase.csproj", "{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -66,6 +68,10 @@ Global
 		{CAF9DD5A-36B1-4395-BA4A-CF8AD198E85E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CAF9DD5A-36B1-4395-BA4A-CF8AD198E85E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CAF9DD5A-36B1-4395-BA4A-CF8AD198E85E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

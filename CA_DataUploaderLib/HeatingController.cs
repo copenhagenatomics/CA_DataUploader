@@ -102,10 +102,16 @@ namespace CA_DataUploaderLib
             else
             {
                 var areas = IOconfFile.GetOven().Select(x => x.OvenArea).Distinct().OrderBy(x => x).ToList();
-                if (areas.Count != args.Count - 1)
+                var tempArgs = args.Skip(1).ToList();
+                if (areas.Count != tempArgs.Count && tempArgs.Count == 1) // if a single temp was provided, use that for all areas
+                    tempArgs = tempArgs.SelectMany(t => Enumerable.Range(0, areas.Count).Select(_ => t)).ToList();
+                else if (areas.Count != tempArgs.Count) 
+                {
+                    CALog.LogInfoAndConsoleLn(LogID.A, "Expected oven command format: oven " + string.Join(' ', Enumerable.Range(1, areas.Count).Select(i => $"tempForArea{i}")));
                     throw new ArgumentException($"Arguments did not match the amount of configured areas: {areas.Count}");
+                }
 
-                var targets = args.Skip(1)
+                var targets = tempArgs
                     .Select(ParseTemperature)
                     .SelectMany((t, i) => _heaters.Where(x => x.IsArea(areas[i])).Select(h => (h, t)));
                 foreach (var (heater, temperature) in targets)

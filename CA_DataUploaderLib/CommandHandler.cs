@@ -1,4 +1,5 @@
-﻿using CA_DataUploaderLib.IOconf;
+﻿using CA.LoopControlPluginBase;
+using CA_DataUploaderLib.IOconf;
 using Humanizer;
 using System;
 using System.Collections.Generic;
@@ -63,10 +64,8 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public void OnNewVectorReceived(List<SensorSample> vector)
-        {
-            NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector));
-        }
+        public void OnNewVectorReceived(List<SensorSample> vector) =>
+            NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector.ToDictionary(v => v.Name, v => v.Value)));
         
         private bool Stop(List<string> args)
         {

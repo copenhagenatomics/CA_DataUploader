@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Company>Copenhagen Atomics</Company>
+    <Authors>Copenhagen Atomics</Authors>
+    <Description>Base library to implement plugins for CA_DataUploaderLib</Description>
+    <PackageLicenseFile>MIT license.txt</PackageLicenseFile>
+    <PackageProjectUrl>https://github.com/copenhagenatomics/CA_DataUploader</PackageProjectUrl>
+    <PackageTags>Raspberry Pi, IOT, Data Logger</PackageTags>
+    <NeutralLanguage>en</NeutralLanguage>
+    <Copyright>Copyright © $([System.DateTime]::UtcNow.Year) Copenhagen Atomics ($([System.DateTime]::UtcNow.ToString("dd-MMM-yyyy HH:mm")))</Copyright>
+    <RepositoryUrl>https://github.com/copenhagenatomics/CA_DataUploader</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <LangVersion>8.0</LangVersion>
+    <MinVerTagPrefix>plugins</MinVerTagPrefix>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="MIT license.txt">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MinVer" Version="2.4.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>

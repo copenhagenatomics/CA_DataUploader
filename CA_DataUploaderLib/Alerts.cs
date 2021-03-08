@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
@@ -17,18 +18,19 @@ namespace CA_DataUploaderLib
 
         public Alerts(VectorDescription vectorDescription, CommandHandler cmd, ServerUploader uploader) : base()
         {
-            Initialize(cmd);
-            AddCommand("removealert", RemoveAlert);
+            var cmdPlugins = new PluginsCommandHandler(cmd);
+            Initialize(cmdPlugins, new PluginsLogger("Alerts")); // TODO: use a real handler or change the design
+            cmdPlugins.AddCommand("removealert", RemoveAlert);
             _uploader = uploader;
             _alerts = GetAlerts(vectorDescription, cmd);
         }
 
-        private static List<IOconfAlert> GetAlerts(VectorDescription vectorDesc, CommandHandler cmd)
+        private List<IOconfAlert> GetAlerts(VectorDescription vectorDesc, CommandHandler cmd)
         {
             var alerts = IOconfFile.GetAlerts().ToList();
             var alertsWithoutItem = alerts.Where(a => !vectorDesc.HasItem(a.Sensor)).ToList();
             foreach (var alert in alertsWithoutItem)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Alert: {alert.Name} points to missing sensor: {alert.Sensor}");
+                logger.LogError($"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Alert: {alert.Name} points to missing sensor: {alert.Sensor}");
             if (alertsWithoutItem.Count > 0)
                 throw new InvalidOperationException("Misconfigured alerts detected");
             if (alerts.Any(a => a.TriggersEmergencyShutdown) && cmd == null)
@@ -39,7 +41,7 @@ namespace CA_DataUploaderLib
         private bool RemoveAlert(List<string> args)
         {
             if (args.Count < 2)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected format for Removing dynamic alert: {string.Join(',', args)}. Format: removealert AlertName");
+                logger.LogError($"Unexpected format for Removing dynamic alert: {string.Join(',', args)}. Format: removealert AlertName");
 
             lock (_alerts) 
                 _alerts.RemoveAll(a => a.Name == args[1]);
@@ -49,7 +51,7 @@ namespace CA_DataUploaderLib
         protected override Task Command(List<string> args)
         {
             if (args.Count < 3)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected format for Dynamic alert: {string.Join(',', args)}. Format: addalert AlertName SensorName comparison value");
+                logger.LogError($"Unexpected format for Dynamic alert: {string.Join(',', args)}. Format: addalert AlertName SensorName comparison value");
 
             var alert = new IOconfAlert(args[1], string.Join(' ', args.Skip(2)));
             lock (_alerts) 
@@ -84,10 +86,9 @@ namespace CA_DataUploaderLib
             lock (_alerts)
                 foreach (var a in _alerts)
                 {
-                    var sample = e.TryGetValue(a.Sensor);
-                    if (sample == null)
+                    if (!e.TryGetValue(a.Sensor, out var val))
                         EnsureInitialized(ref noSensorAlerts).Add(a);
-                    else if (a.CheckValue(sample.Value))
+                    else if (a.CheckValue(val))
                         EnsureInitialized(ref alertsToTrigger).Add(a);
                 }
             
@@ -99,7 +100,7 @@ namespace CA_DataUploaderLib
         private void TriggerAlert(IOconfAlert a, string timestamp, string message)
         {
             message = timestamp + message;
-            CALog.LogErrorAndConsoleLn(LogID.A, message);
+            logger.LogError(message);
             if (a.TriggersEmergencyShutdown)
                 ExecuteCommand("emergencyshutdown");
 
