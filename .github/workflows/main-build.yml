@@ -48,44 +48,20 @@ jobs:
       with:
         dotnet-version: 5.0.x
     - name: Generate DataUploader - linux-x64
-      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/linux-x64 -r linux-x64 -p:PublishSingleFile=true
+      run: dotnet publish CA_DataUploader -c Release -o out/uploader/linux-x64 -r linux-x64 -p:PublishSingleFile=true
     - name: Generate DataUploader - linux-arm
-      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/linux-arm -r linux-arm -p:PublishSingleFile=true
+      run: dotnet publish CA_DataUploader -c Release -o out/uploader/linux-arm -r linux-arm -p:PublishSingleFile=true
     - name: Generate DataUploader - osx-x64
-      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/osx-x64 -r osx-x64 -p:PublishSingleFile=true
+      run: dotnet publish CA_DataUploader -c Release -o out/uploader/osx-x64 -r osx-x64 -p:PublishSingleFile=true
     - name: Generate DataUploader - win-arm
-      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/win-arm -r win-arm -p:PublishSingleFile=true
+      run: dotnet publish CA_DataUploader -c Release -o out/uploader/win-arm -r win-arm -p:PublishSingleFile=true
     - name: Generate DataUploader - win-x64
-      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/win-x64 -r win-x64 -p:PublishSingleFile=true
+      run: dotnet publish CA_DataUploader -c Release -o out/uploader/win-x64 -r win-x64 -p:PublishSingleFile=true
     - name: Generate DataUploader - win-x86
-      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/win-x86 -r win-x86 -p:PublishSingleFile=true
-    - name: Zip - linux-x64
-      uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
-      with:
-        args: zip -qq -r CA_DataUploader-linux-x64.zip tmp/uploader/linux-x64
-    - name: Zip - linux-arm
-      uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
-      with:
-        args: zip -qq -r CA_DataUploader-linux-arm.zip tmp/uploader/linux-arm
-    - name: Zip - osx-x64
-      uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
-      with:
-        args: zip -qq -r CA_DataUploader-osx-x64.zip tmp/uploader/osx-x64
-    - name: Zip - win-arm
-      uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
-      with:
-        args: zip -qq -r CA_DataUploader-win-arm.zip tmp/uploader/win-arm
-    - name: Zip - win-x64
-      uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
-      with:
-        args: zip -qq -r CA_DataUploader-win-x64.zip tmp/uploader/win-x64
-    - name: Zip - win-x86
-      uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
-      with:
-        args: zip -qq -r CA_DataUploader-win-x86.zip tmp/uploader/win-x86
+      run: dotnet publish CA_DataUploader -c Release -o out/uploader/win-x86 -r win-x86 -p:PublishSingleFile=true
     - name: upload zip file as workflow artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: zipfiles
-        path: '*.zip'
+        name: datauploader
+        path: out
         retention-days: 5 #make sure these don't stay a long time around, final output is the release
