@@ -90,9 +90,9 @@ jobs:
         args: zip -qq -r CA_DataUploader-win-x86.zip uploader
         working-directory: out/win-x86
     - name: Release
-        uses: softprops/action-gh-release@b7e450da2a4b4cb4bfbae528f788167786cfcedf
-        with:
-          files: 'out/**/*.zip'
-          draft: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@b7e450da2a4b4cb4bfbae528f788167786cfcedf
+      with:
+        files: 'out/**/*.zip'
+        draft: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
