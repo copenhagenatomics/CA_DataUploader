@@ -31,7 +31,7 @@ jobs:
     - name: Pack CA_DataUploaderLib
       run: dotnet pack CA_DataUploaderLib -c Release -o out
     - name: Push generated package to GitHub registry
-      if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') || startsWith(github.ref, 'refs/tags) }}
+      if: ${{ github.event_name == 'push' }}
       run: dotnet nuget push out/*.nupkg -s https://api.nuget.org/v3/index.json
       #run: dotnet nuget push out/*.nupkg -s https://api.nuget.org/v3/index.json -k ${{ secrets.CA_NUGET_PACKAGES_KEY }}
 
