@@ -1,11 +1,13 @@
-name: build
+name: build plugins
 
 on:
   push:
-    tags-ignore: 'plugins*'
+    tags: 'plugins*'
+    paths: 'CA.LoopControlPluginBase/**'
     branches: [ master ]
   pull_request:
     branches: [ master ]
+    paths: 'CA.LoopControlPluginBase/**'
 
 jobs:
   build:
@@ -21,15 +23,13 @@ jobs:
       with:
         dotnet-version: 5.0.x
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore CA.LoopControlPluginBase
     - name: Build
-      run: dotnet build -c Release --no-restore
+      run: dotnet build CA.LoopControlPluginBase -c Release --no-restore
     - name: Test
-      run: dotnet test -c Release --no-build --verbosity normal
+      run: dotnet test CA.LoopControlPluginBase -c Release --no-build --verbosity normal
     - name: Pack CA.LoopControlPluginBase
       run: dotnet pack CA.LoopControlPluginBase -c Release -o out
-    - name: Pack CA_DataUploaderLib
-      run: dotnet pack CA_DataUploaderLib -c Release -o out
     - name: make generated nuget packages available as workflow artifacts too
       uses: actions/upload-artifact@v2
       with:
