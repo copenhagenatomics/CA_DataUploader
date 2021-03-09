@@ -70,12 +70,10 @@ namespace CA.LoopControlPluginBase
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposedValue)
-            {
-                cmd?.Dispose();
-                cmd = null;
-                disposedValue = true;
-            }
+            if (disposedValue) return;
+            cmd?.Dispose();
+            cmd = null;
+            disposedValue = true;
         }
 
         public void Dispose()
