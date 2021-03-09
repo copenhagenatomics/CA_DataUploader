@@ -47,20 +47,18 @@ jobs:
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: 5.0.x
-    - name: Restore dependencies
-      run: dotnet restore
     - name: Generate DataUploader - linux-x64
-      run: dotnet publish CA_DataUploader -c Release --no-restore -o tmp/uploader/linux-x64 -r linux-x64 -p:PublishSingleFile=true
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/linux-x64 -r linux-x64 -p:PublishSingleFile=true
     - name: Generate DataUploader - linux-arm
-      run: dotnet publish CA_DataUploader -c Release --no-restore -o tmp/uploader/linux-arm -r linux-arm -p:PublishSingleFile=true
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/linux-arm -r linux-arm -p:PublishSingleFile=true
     - name: Generate DataUploader - osx-x64
-      run: dotnet publish CA_DataUploader -c Release --no-restore -o tmp/uploader/osx-x64 -r osx-x64 -p:PublishSingleFile=true
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/osx-x64 -r osx-x64 -p:PublishSingleFile=true
     - name: Generate DataUploader - win-arm
-      run: dotnet publish CA_DataUploader -c Release --no-restore -o tmp/uploader/win-arm -r win-arm -p:PublishSingleFile=true
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/win-arm -r win-arm -p:PublishSingleFile=true
     - name: Generate DataUploader - win-x64
-      run: dotnet publish CA_DataUploader -c Release --no-restore -o tmp/uploader/win-x64 -r win-x64 -p:PublishSingleFile=true
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/win-x64 -r win-x64 -p:PublishSingleFile=true
     - name: Generate DataUploader - win-x86
-      run: dotnet publish CA_DataUploader -c Release --no-restore -o tmp/uploader/win-x86 -r win-x86 -p:PublishSingleFile=true
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/win-x86 -r win-x86 -p:PublishSingleFile=true
     - name: Zip - linux-x64
       uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
       with:
