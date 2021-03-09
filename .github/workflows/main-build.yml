@@ -87,5 +87,5 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: zipfiles
-        path: *.zip
+        path: '*.zip'
         retention-days: 5 #make sure these don't stay a long time around, final output is the release
