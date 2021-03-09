@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    tags: '*'
+    tags-ignore: 'plugins*'
     branches: [ master ]
   pull_request:
     branches: [ master ]
