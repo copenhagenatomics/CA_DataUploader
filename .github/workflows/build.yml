@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        fetch-depth: 50
+        fetch-depth: 100
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
@@ -25,9 +25,9 @@ jobs:
       run: dotnet build -c Release --no-restore
     - name: Test
       run: dotnet test -c Release --no-build --verbosity normal
-    - name: Pack CA_DataUploaderLib
-      run: dotnet pack CA_DataUploaderLib -c Release -o out
     - name: Pack CA.LoopControlPluginBase
       run: dotnet pack CA.LoopControlPluginBase -c Release -o out
+    - name: Pack CA_DataUploaderLib
+      run: dotnet pack CA_DataUploaderLib -c Release -o out
     #- name: Push generated package to GitHub registry
     #  run: dotnet nuget push out/*.nupkg -s https://api.nuget.org/v3/index.json -k ${{ secrets.CA_NUGET_PACKAGES_KEY }}
