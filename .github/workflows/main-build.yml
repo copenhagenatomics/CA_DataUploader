@@ -61,34 +61,34 @@ jobs:
       run: dotnet publish CA_DataUploader -c Release -o out/win-x86/uploader -r win-x86 -p:PublishSingleFile=true
     - name: Zip - linux-x64
       uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
+      working-directory: out/linux-x64
       with:
         args: zip -qq -r CA_DataUploader-linux-x64.zip uploader
-        working-directory: out/linux-x64
     - name: Zip - linux-arm
       uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
+      working-directory: out/linux-arm
       with:
         args: zip -qq -r CA_DataUploader-linux-arm.zip uploader
-        working-directory: out/linux-arm
     - name: Zip - osx-x64
       uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
+      working-directory: out/osx-x64
       with:
         args: zip -qq -r CA_DataUploader-osx-x64.zip uploader
-        working-directory: out/osx-x64
     - name: Zip - win-arm
       uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
+      working-directory: out/win-arm
       with:
         args: zip -qq -r CA_DataUploader-win-arm.zip uploader
-        working-directory: out/win-arm
     - name: Zip - win-x64
       uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
+      working-directory: out/win-x64
       with:
         args: zip -qq -r CA_DataUploader-win-x64.zip uploader
-        working-directory: out/win-x64
     - name: Zip - win-x86
       uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
+      working-directory: out/win-x86
       with:
         args: zip -qq -r CA_DataUploader-win-x86.zip uploader
-        working-directory: out/win-x86
     - name: Release
       uses: softprops/action-gh-release@b7e450da2a4b4cb4bfbae528f788167786cfcedf
       with:
