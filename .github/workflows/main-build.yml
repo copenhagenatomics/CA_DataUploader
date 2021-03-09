@@ -30,6 +30,22 @@ jobs:
       run: dotnet test -c Release --no-build --verbosity normal
     - name: Pack CA_DataUploaderLib
       run: dotnet pack CA_DataUploaderLib -c Release -o out
+    - name: Generate DataUploader - linux-x64
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/linux-x64 -r linux-x64 -p:PublishSingleFile=true
+    - name: Generate DataUploader - linux-arm
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/linux-arm -r linux-arm -p:PublishSingleFile=true
+    - name: Generate DataUploader - osx-x64
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/osx-x64 -r osx-x64 -p:PublishSingleFile=true
+    - name: Generate DataUploader - win-arm
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/win-arm -r win-arm -p:PublishSingleFile=true
+    - name: Generate DataUploader - win-x64
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/win-x64 -r win-x64 -p:PublishSingleFile=true
+    - name: Generate DataUploader - win-x86
+      run: dotnet publish CA_DataUploader -c Release -o tmp/uploader/win-x86 -r win-x86 -p:PublishSingleFile=true
+    - name: Generate DataUploader zip
+      uses: montudor/action-zip@c25e01d7489d0274569440a2f0281b4569df16bc
+      with:
+        args: zip -qq -r out/CA_DataUploader.zip tmp/uploader
     - name: make generated nuget packages available as workflow artifacts too
       uses: actions/upload-artifact@v2
       with:
@@ -38,4 +54,4 @@ jobs:
     - name: Push generated package to nuget
       if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') || startsWith(github.ref, 'refs/tags') }}
       run: dotnet nuget push out/*.nupkg -s https://api.nuget.org/v3/index.json -k ${{ secrets.CA_NUGET_PACKAGES_KEY }}
-
+      
