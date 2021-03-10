@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 
 namespace CA_DataUploaderLib
-{
+{ 
     public enum LogID
     {
         A, B, C, D, E, F, G, H
