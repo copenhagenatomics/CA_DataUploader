@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace CA.LoopControlPluginBase
 {
     public abstract class LoopControlCommand : IDisposable
-    {
+    { 
         public abstract string Name { get; }
         public abstract string Description { get; }
         public virtual bool IsHiddenCommand => false;
