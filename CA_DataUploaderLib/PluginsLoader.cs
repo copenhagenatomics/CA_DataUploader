@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Threading;
+using System.Threading.Tasks;
 using CA.LoopControlPluginBase;
 
 namespace CA_DataUploaderLib
@@ -16,10 +17,69 @@ namespace CA_DataUploaderLib
         SingleFireFileWatcher _pluginChangesWatcher;
         readonly object[] plugingArgs = {};
         readonly CommandHandler handler;
+        Func<(string pluginName, string targetFolder), Task> pluginDownloader;
 
-        public PluginsLoader(CommandHandler handler)
+        public PluginsLoader(CommandHandler handler, Func<(string pluginName, string targetFolder), Task> pluginDownloader = null)
         {
             this.handler = handler;
+            this.pluginDownloader = pluginDownloader;
+            if (pluginDownloader != null)
+                handler.AddCommand("updateplugins", UpdatePlugins);
+        }
+
+        private bool UpdatePlugins(List<string> arg)
+        {
+            if (arg.Count > 1)
+                UpdatePlugin(arg[1]);
+            else
+                UpdateAllPlugins();
+
+            return true;
+        }
+
+        private void UpdateAllPlugins()
+        {
+            Task.Run(async () =>
+            {
+                try
+                {
+                    foreach (var plugin in _runningPlugins.Keys)
+                    {
+                        var pluginName = Path.GetFileName(plugin);
+                        CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
+                        await pluginDownloader((pluginName, "."));
+                    }
+
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"unloading running plugins");
+                    UnloadPlugins();
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"loading plugins");
+                    LoadPlugins();
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"plugins updated");
+                }
+                catch (Exception ex)
+                {
+                    CALog.LogException(LogID.A, ex);
+                }
+            });
+        }
+
+        private void UpdatePlugin(string pluginName)
+        {
+            Task.Run(async () =>
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
+                await pluginDownloader((pluginName, "."));
+                var assemblyPath = Path.GetFullPath(pluginName + ".dll");
+                if (_runningPlugins.TryGetValue(assemblyPath, out var plugin)) 
+                {
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"unloading plugin: {pluginName}");
+                    UnloadPlugin(assemblyPath, plugin);
+                }
+
+                CALog.LogInfoAndConsoleLn(LogID.A, $"loading plugin: {pluginName}");
+                LoadPlugin(assemblyPath);
+                CALog.LogInfoAndConsoleLn(LogID.A, $"plugins updated");
+            });
         }
 
         public void LoadPlugins(bool automaticallyLoadPluginChanges = true)
@@ -38,8 +98,8 @@ namespace CA_DataUploaderLib
 
         public void UnloadPlugins()
         {
-            foreach (var assembly in _runningPlugins.Keys.ToList())
-                UnloadPlugin(assembly);
+            foreach (var entry in _runningPlugins.ToList())
+                UnloadPlugin(entry.Key, entry.Value);
             GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
         }
 
@@ -64,12 +124,14 @@ namespace CA_DataUploaderLib
         void UnloadPlugin(string assemblyPath)
         {
             assemblyPath = Path.GetFullPath(assemblyPath);
-            if (!_runningPlugins.TryGetValue(assemblyPath, out var entry))
-            {
+            if (!_runningPlugins.TryGetValue(assemblyPath, out var runningPluginEntry))
                 CALog.LogData(LogID.A, "no running extension with the specified assembly was found");
-                return;
-            }
+            else
+                UnloadPlugin(assemblyPath, runningPluginEntry);
+        }
 
+        private void UnloadPlugin(string assemblyPath, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances) entry)
+        {
             foreach (var instance in entry.instances)
                 instance.Dispose();
             _runningPlugins.Remove(assemblyPath);
