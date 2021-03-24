@@ -26,7 +26,7 @@ namespace CA_DataUploaderLib
                 this.updatePluginsCommand = new UpdatePluginsCommand(handler, pluginDownloader, this);
         }
 
-        public IEnumerable<string> GetRunningPluginsNames() => _runningPlugins.Keys.Select(v => Path.GetFileName(v));
+        public IEnumerable<string> GetRunningPluginsNames() => _runningPlugins.Keys.Select(v => Path.GetFileNameWithoutExtension(v));
 
         public void LoadPlugins(bool automaticallyLoadPluginChanges = true)
         {
@@ -71,7 +71,7 @@ namespace CA_DataUploaderLib
         {
             assemblyPath = Path.GetFullPath(assemblyPath);
             if (!_runningPlugins.TryGetValue(assemblyPath, out var runningPluginEntry))
-                CALog.LogData(LogID.A, $"running plugin not found: {Path.GetFileName(assemblyPath)}");
+                CALog.LogData(LogID.A, $"running plugin not found: {Path.GetFileNameWithoutExtension(assemblyPath)}");
             else
                 UnloadPlugin(assemblyPath, runningPluginEntry);
         }
@@ -198,9 +198,8 @@ namespace CA_DataUploaderLib
 
             private async Task UpdateAllPlugins()
             {
-                foreach (var plugin in loader.GetRunningPluginsNames())
+                foreach (var pluginName in loader.GetRunningPluginsNames())
                 {
-                    var pluginName = Path.GetFileName(plugin);
                     CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
                     await pluginDownloader((pluginName, "."));
                 }
