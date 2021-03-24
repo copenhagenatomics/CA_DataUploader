@@ -178,7 +178,6 @@ namespace CA_DataUploaderLib
 
         private class UpdatePluginsCommand : LoopControlCommand
         {
-            private readonly CommandHandler handler;
             private readonly Func<(string pluginName, string targetFolder), Task> pluginDownloader;
             private readonly PluginsLoader loader;
 
@@ -190,8 +189,7 @@ namespace CA_DataUploaderLib
 
             public UpdatePluginsCommand(CommandHandler cmd, Func<(string pluginName, string targetFolder), Task> pluginDownloader, PluginsLoader loader)
             {
-                var cmdPlugins = new PluginsCommandHandler(cmd);
-                Initialize(cmdPlugins, new PluginsLogger("PluginsUpdater"));
+                Initialize(new PluginsCommandHandler(cmd), new PluginsLogger("PluginsUpdater"));
                 this.pluginDownloader = pluginDownloader;
                 this.loader = loader;
             }
