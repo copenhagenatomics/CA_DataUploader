@@ -17,70 +17,16 @@ namespace CA_DataUploaderLib
         SingleFireFileWatcher _pluginChangesWatcher;
         readonly object[] plugingArgs = {};
         readonly CommandHandler handler;
-        Func<(string pluginName, string targetFolder), Task> pluginDownloader;
+        UpdatePluginsCommand updatePluginsCommand;
 
         public PluginsLoader(CommandHandler handler, Func<(string pluginName, string targetFolder), Task> pluginDownloader = null)
         {
             this.handler = handler;
-            this.pluginDownloader = pluginDownloader;
             if (pluginDownloader != null)
-                handler.AddCommand("updateplugins", UpdatePlugins);
+                this.updatePluginsCommand = new UpdatePluginsCommand(handler, pluginDownloader, this);
         }
 
-        private bool UpdatePlugins(List<string> arg)
-        {
-            if (arg.Count > 1)
-                UpdatePlugin(arg[1]);
-            else
-                UpdateAllPlugins();
-
-            return true;
-        }
-
-        private void UpdateAllPlugins()
-        {
-            Task.Run(async () =>
-            {
-                try
-                {
-                    foreach (var plugin in _runningPlugins.Keys)
-                    {
-                        var pluginName = Path.GetFileName(plugin);
-                        CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
-                        await pluginDownloader((pluginName, "."));
-                    }
-
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"unloading running plugins");
-                    UnloadPlugins();
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"loading plugins");
-                    LoadPlugins();
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"plugins updated");
-                }
-                catch (Exception ex)
-                {
-                    CALog.LogException(LogID.A, ex);
-                }
-            });
-        }
-
-        private void UpdatePlugin(string pluginName)
-        {
-            Task.Run(async () =>
-            {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
-                await pluginDownloader((pluginName, "."));
-                var assemblyPath = Path.GetFullPath(pluginName + ".dll");
-                if (_runningPlugins.TryGetValue(assemblyPath, out var plugin)) 
-                {
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"unloading plugin: {pluginName}");
-                    UnloadPlugin(assemblyPath, plugin);
-                }
-
-                CALog.LogInfoAndConsoleLn(LogID.A, $"loading plugin: {pluginName}");
-                LoadPlugin(assemblyPath);
-                CALog.LogInfoAndConsoleLn(LogID.A, $"plugins updated");
-            });
-        }
+        public IEnumerable<string> GetRunningPluginsNames() => _runningPlugins.Keys.Select(v => Path.GetFileName(v));
 
         public void LoadPlugins(bool automaticallyLoadPluginChanges = true)
         {
@@ -125,12 +71,12 @@ namespace CA_DataUploaderLib
         {
             assemblyPath = Path.GetFullPath(assemblyPath);
             if (!_runningPlugins.TryGetValue(assemblyPath, out var runningPluginEntry))
-                CALog.LogData(LogID.A, "no running extension with the specified assembly was found");
+                CALog.LogData(LogID.A, $"running plugin not found: {Path.GetFileName(assemblyPath)}");
             else
                 UnloadPlugin(assemblyPath, runningPluginEntry);
         }
 
-        private void UnloadPlugin(string assemblyPath, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances) entry)
+        void UnloadPlugin(string assemblyPath, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances) entry)
         {
             foreach (var instance in entry.instances)
                 instance.Dispose();
@@ -228,6 +174,57 @@ namespace CA_DataUploaderLib
                 Changed?.Invoke(path);
             }
 
+        }
+
+        private class UpdatePluginsCommand : LoopControlCommand
+        {
+            private readonly CommandHandler handler;
+            private readonly Func<(string pluginName, string targetFolder), Task> pluginDownloader;
+            private readonly PluginsLoader loader;
+
+            public override string Name => "updateplugins";
+
+            public override string Description => "when no name is given it updates all existing plugins, otherwise adds/updates the specified plugin";
+
+            public override bool IsHiddenCommand => true;
+
+            public UpdatePluginsCommand(CommandHandler cmd, Func<(string pluginName, string targetFolder), Task> pluginDownloader, PluginsLoader loader)
+            {
+                var cmdPlugins = new PluginsCommandHandler(cmd);
+                Initialize(cmdPlugins, new PluginsLogger("PluginsUpdater"));
+                this.pluginDownloader = pluginDownloader;
+                this.loader = loader;
+            }
+
+            protected override Task Command(List<string> args) => args.Count > 1 ? UpdatePlugin(args[1]) : UpdateAllPlugins();
+
+            private async Task UpdateAllPlugins()
+            {
+                foreach (var plugin in loader.GetRunningPluginsNames())
+                {
+                    var pluginName = Path.GetFileName(plugin);
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
+                    await pluginDownloader((pluginName, "."));
+                }
+
+                CALog.LogInfoAndConsoleLn(LogID.A, $"unloading running plugins");
+                loader.UnloadPlugins();
+                CALog.LogInfoAndConsoleLn(LogID.A, $"loading plugins");
+                loader.LoadPlugins();
+                CALog.LogInfoAndConsoleLn(LogID.A, $"plugins updated");
+            }
+
+            private async Task UpdatePlugin(string pluginName)
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
+                await pluginDownloader((pluginName, "."));
+                var assemblyPath = Path.GetFullPath(pluginName + ".dll");
+                CALog.LogInfoAndConsoleLn(LogID.A, $"unloading plugin: {pluginName}");
+                loader.UnloadPlugin(assemblyPath);
+                CALog.LogInfoAndConsoleLn(LogID.A, $"loading plugin: {pluginName}");
+                loader.LoadPlugin(assemblyPath);
+                CALog.LogInfoAndConsoleLn(LogID.A, $"plugins updated");
+            }
         }
     }
 }

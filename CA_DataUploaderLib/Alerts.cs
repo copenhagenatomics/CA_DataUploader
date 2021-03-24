@@ -19,7 +19,7 @@ namespace CA_DataUploaderLib
         public Alerts(VectorDescription vectorDescription, CommandHandler cmd, ServerUploader uploader) : base()
         {
             var cmdPlugins = new PluginsCommandHandler(cmd);
-            Initialize(cmdPlugins, new PluginsLogger("Alerts")); // TODO: use a real handler or change the design
+            Initialize(cmdPlugins, new PluginsLogger("Alerts"));
             cmdPlugins.AddCommand("removealert", RemoveAlert);
             _uploader = uploader;
             _alerts = GetAlerts(vectorDescription, cmd);
