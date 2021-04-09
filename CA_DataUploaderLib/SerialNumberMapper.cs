@@ -22,7 +22,6 @@ namespace CA_DataUploaderLib
 
         private static ManagementEventWatcher removal;
         private static int _detectedUnknownBoards;
-        private static int _detectedScaleBoards;
 
         public event EventHandler<PortsChangedArgs> PortsChanged;
 
@@ -40,8 +39,8 @@ namespace CA_DataUploaderLib
                         115200;
                     var mcu = new MCUBoard(name, baudRate);
                     if (mcu.UnableToRead && mcu.BaudRate != 9600)
-                        mcu = new MCUBoard(name, 9600); // for luminox sensors not yet in IOconfFile
-                    if (mcu.serialNumber.IsNullOrEmpty() && !DetectAscale(mcu))
+                        mcu = new MCUBoard(name, 9600); // for luminox & scale sensors not yet in IOconfFile / or that moved usb ports due to (un)plugged devices
+                    if (mcu.serialNumber.IsNullOrEmpty())
                         mcu.serialNumber = "unknown" + Interlocked.Increment(ref _detectedUnknownBoards);
 
                     McuBoards.Add(mcu);
@@ -63,20 +62,6 @@ namespace CA_DataUploaderLib
                     CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex.ToString()}" + Environment.NewLine);
                 }
             });
-        }
-
-        private bool DetectAscale(MCUBoard mcu)
-        {
-            if (!mcu.IsOpen)
-                return false;
-
-            var line = mcu.SafeReadLine();
-            if (!line.StartsWith("+0") && !line.StartsWith("-0"))
-                return false;
-
-            mcu.serialNumber = "Scale" + Interlocked.Increment(ref _detectedScaleBoards);
-            mcu.productType = "Scale";
-            return true;
         }
 
         private string GetStringFromDmesg(string portName)
