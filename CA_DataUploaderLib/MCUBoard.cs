@@ -231,37 +231,29 @@ namespace CA_DataUploaderLib
                         UnableToRead = input.Length < 2;
                         if (input.Contains(MCUBoard.serialNumberHeader))
                             serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
-
-                        if (input.Contains(MCUBoard.boardFamilyHeader))
+                        else if (input.Contains(MCUBoard.boardFamilyHeader))
                             productType = input.Substring(input.IndexOf(MCUBoard.boardFamilyHeader) + MCUBoard.boardFamilyHeader.Length).Trim();
-                        if (input.Contains(MCUBoard.productTypeHeader))
+                        else if (input.Contains(MCUBoard.productTypeHeader))
                             productType = input.Substring(input.IndexOf(MCUBoard.productTypeHeader) + MCUBoard.productTypeHeader.Length).Trim();
-
-                        if (input.Contains(MCUBoard.boardVersionHeader))
+                        else if (input.Contains(MCUBoard.boardVersionHeader))
                             pcbVersion = input.Substring(input.IndexOf(MCUBoard.boardVersionHeader) + MCUBoard.boardVersionHeader.Length).Trim();
-                        if (input.Contains(MCUBoard.pcbVersionHeader))
+                        else if (input.Contains(MCUBoard.pcbVersionHeader))
                             pcbVersion = input.Substring(input.IndexOf(MCUBoard.pcbVersionHeader) + MCUBoard.pcbVersionHeader.Length).Trim();
-
-                        if (input.Contains(MCUBoard.boardSoftwareHeader))
+                        else if (input.Contains(MCUBoard.boardSoftwareHeader))
                             softwareCompileDate = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
-                        if (input.Contains(MCUBoard.softwareCompileDateHeader))
+                        else if (input.Contains(MCUBoard.softwareCompileDateHeader))
                             softwareCompileDate = input.Substring(input.IndexOf(MCUBoard.softwareCompileDateHeader) + MCUBoard.softwareCompileDateHeader.Length).Trim();
-
-                        if (input.Contains(MCUBoard.boardSoftwareHeader))
+                        else if (input.Contains(MCUBoard.boardSoftwareHeader))
                             softwareVersion = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
-                        if (input.Contains(MCUBoard.softwareVersionHeader))
+                        else if (input.Contains(MCUBoard.softwareVersionHeader))
                             softwareVersion = input.Substring(input.IndexOf(MCUBoard.softwareVersionHeader) + MCUBoard.softwareVersionHeader.Length).Trim();
-
-                        if (input.Contains(MCUBoard.mcuFamilyHeader))
+                        else if (input.Contains(MCUBoard.mcuFamilyHeader))
                             mcuFamily = input.Substring(input.IndexOf(MCUBoard.mcuFamilyHeader) + MCUBoard.mcuFamilyHeader.Length).Trim();
-
-                        if (DetectLuminoxSensor(input)) // avoid waiting for a never present serial for luminox sensors 
+                        else if (DetectLuminoxSensor(input)) // avoid waiting for a never present serial for luminox sensors 
                             return;
-
-                        if (DetectAscale(input))
+                        else if (DetectAscale(input))
                             return;
-
-                        if (input.Contains("MISREAD") && !sentSerialCommandTwice && serialNumber == null)
+                        else if (input.Contains("MISREAD") && !sentSerialCommandTwice && serialNumber == null)
                         {
                             WriteLine("Serial");
                             CALog.LogInfoAndConsoleLn(LogID.A, $"Received misread without any serial on port {PortName} - re-sending serial command");
