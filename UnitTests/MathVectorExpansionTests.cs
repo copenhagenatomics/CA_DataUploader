@@ -25,7 +25,7 @@ namespace UnitTests
             static IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
             var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
             var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
-            var values = new List<SensorSample>() { new SensorSample(new IOconfInput("KType;MyName", 1, "KType"), 0.2) };
+            var values = new List<SensorSample>() { new SensorSample(new IOconfInput("KType;MyName", 1, "KType", false, false, null), 0.2) };
             math.Expand(values);
             CollectionAssert.AreEqual(new[] { 0.2, 2.2 }, values.Select(v => v.Value).ToArray());
         }
@@ -37,8 +37,8 @@ namespace UnitTests
             var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
             var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
             var values = new List<SensorSample>() {
-                new SensorSample(new IOconfInput("KType;MyName", 1, "KType"), 0.2),
-                new SensorSample(new IOconfInput("KType;UnexpectedValue", 1, "KType"), 3)
+                new SensorSample(new IOconfInput("KType;MyName", 1, "KType", false, false, null), 0.2),
+                new SensorSample(new IOconfInput("KType;UnexpectedValue", 1, "KType", false, false, null), 3)
             };
             var ex = Assert.ThrowsException<ArgumentException>(() => math.Expand(values));
             Assert.AreEqual("wrong vector length (input, expected): 2 <> 1", ex.Message);
@@ -51,7 +51,7 @@ namespace UnitTests
             IEnumerable<IOconfMath> GetTestMath() => ioconfEntries;
             var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
             var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
-            var values = new List<SensorSample>() { new SensorSample(new IOconfInput("KType;MyName", 1, "KType"), 0.2) };
+            var values = new List<SensorSample>() { new SensorSample(new IOconfInput("KType;MyName", 1, "KType", false, false, null), 0.2) };
 
             ioconfEntries = new[] { new IOconfMath("Math;MyMath;MyName + 2", 2), new IOconfMath("Math;MyMath2;MyName + 3", 2) };
             math.Expand(values);
