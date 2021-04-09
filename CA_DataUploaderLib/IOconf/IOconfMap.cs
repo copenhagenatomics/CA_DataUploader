@@ -10,17 +10,12 @@ namespace CA_DataUploaderLib.IOconf
 
             var list = ToList();
             if (list[0] != "Map") throw new Exception($"IOconfMap: wrong format: {row} {format}");
-            if (RpiVersion.IsWindows())
-            {
-                if (list[1].StartsWith("COM"))
-                    USBPort = list[1];
-            }
+            bool isWindows = RpiVersion.IsWindows();
+            if (isWindows && list[1].StartsWith("COM"))
+                USBPort = list[1];
+            else if (!isWindows && list[1].StartsWith("USB"))
+                USBPort = "/dev/" + list[1];
             else
-            {
-                if (list[1].StartsWith("USB"))
-                    USBPort = "/dev/" + list[1];
-            }
-            if(USBPort == null)
                 SerialNumber = list[1];
 
             BoxName = list[2];

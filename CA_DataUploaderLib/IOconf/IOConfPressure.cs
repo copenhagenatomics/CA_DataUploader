@@ -4,24 +4,14 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfPressure : IOconfInput
     { 
-        public IOconfPressure(string row, int lineNum) : base(row, lineNum, "Pressure")
+        public IOconfPressure(string row, int lineNum) : base(row, lineNum, "Pressure", false, true, null)
         {
-            format = "Pressure;Name;BoxName;[port number];[skip]";
-
+            format = "Pressure;Name;BoxName;[port number / skip]";
             var list = ToList();
-            Name = list[1];
-            BoxName = list[2];
-            SetMap(BoxName);
-            if (list[3].ToLower() == "skip")
-            {
+            if ("skip".Equals(list[3].ToLower(), StringComparison.InvariantCultureIgnoreCase))
                 Skip = true;
-            }
-            else
-            {
-                if (!int.TryParse(list[3], out PortNumber)) throw new Exception("IOConfPressure: wrong port number: " + row);
-            }
-
-
+            else if (!int.TryParse(list[3], out PortNumber)) 
+                throw new Exception("IOConfPressure: wrong port number: " + row);
         }
     }
 }

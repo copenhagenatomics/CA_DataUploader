@@ -6,14 +6,11 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfMath : IOconfInput
     {
-        public IOconfMath(string row, int lineNum) : base(row, lineNum, "Math")
+        public IOconfMath(string row, int lineNum) : base(row, lineNum, "Math", false, false, null)
         {
             format = "Math;Name;math expression";
 
             var list = ToList();
-            if (list[0] != "Math") throw new Exception("IOconfMath: wrong format: " + row);
-            
-            Name = list[1];
 
             try
             {

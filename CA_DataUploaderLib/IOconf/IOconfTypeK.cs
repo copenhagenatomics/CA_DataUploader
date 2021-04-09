@@ -5,14 +5,11 @@ namespace CA_DataUploaderLib.IOconf
     public class IOconfTypeK : IOconfInput
     {
         public bool AllJunction { get; private set; }
-        public IOconfTypeK(string row, int lineNum) : base(row, lineNum, "TypeK")
+        public IOconfTypeK(string row, int lineNum) : base(row, lineNum, "TypeK", false, true, null)
         {
             format = "TypeK;Name;BoxName;[port number];[skip/all]";
 
             var list = ToList();
-            Name = list[1];
-            BoxName = list[2];
-            SetMap(BoxName);
             AllJunction = false;
             if (list[3].ToLower() == "skip")
             {
@@ -29,6 +26,5 @@ namespace CA_DataUploaderLib.IOconf
                 if (PortNumber < 0 || PortNumber > 33) throw new Exception("IOconfTypeK: invalid port number: " + row);
             }
         }
-
     }
 }
