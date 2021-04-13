@@ -79,12 +79,7 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private double GetAvgLoopTime()
-        {
-            return _values.Average(x => x.ReadSensor_LoopTime);
-        }
-
-        protected virtual void ParentLoopForever() { }
+        private double GetAvgLoopTime() => _values.Average(x => x.ReadSensor_LoopTime);
 
         private static readonly Regex _startsWithDigitRegex = new Regex(@"^\s*(-|\d+)\s*");
 
@@ -234,11 +229,6 @@ namespace CA_DataUploaderLib
                     sensor.Value = 0d; // no leakage
                 }
             }
-        }
-
-        protected int GetHubID(SensorSample sensor)
-        {
-            return _values.GroupBy(x => x.Input.BoxName).Select(x => x.Key).ToList().IndexOf(sensor.Input.BoxName);
         }
 
         private bool HelpMenu(List<string> args)
