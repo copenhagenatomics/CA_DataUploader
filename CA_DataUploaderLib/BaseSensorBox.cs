@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Globalization;
 using System.Text;
 using CA_DataUploaderLib.IOconf;
 using System.Text.RegularExpressions;
@@ -22,8 +21,31 @@ namespace CA_DataUploaderLib
         protected List<SensorSample> _values = new List<SensorSample>();
         protected List<MCUBoard> _boards = new List<MCUBoard>();
         protected int expectedHeaderLines = 8;
+        private string commandHelp;
 
-        public BaseSensorBox() { }
+        public BaseSensorBox(CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values) 
+        { 
+            Title = commandName;
+            _cmd = cmd;
+            _logLevel = IOconfFile.GetOutputLevel();
+            _values = values.IsInitialized().Select(x => new SensorSample(x)).ToList();
+            if (!_values.Any())
+                return;  // no data
+
+            if (cmd != null)
+            {
+                commandHelp = $"{commandName.ToLower() + " " + commandArgsHelp,-22}- {commandDescription}";
+                cmd.AddCommand(commandName.ToLower(), ShowQueue);
+                cmd.AddCommand("help", HelpMenu);
+                cmd.AddCommand("escape", Stop);
+            }
+
+            _boards = _values.Where(x => !x.Input.Skip).Select(x => x.Input.Map.Board).Distinct().ToList();
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{commandName} boards: {_boards.Count()} values: {_values.Count()}");
+
+            _running = true;
+            new Thread(() => LoopForever()).Start();
+        }
 
         public SensorSample GetValueByTitle(string title) =>
                 _values.SingleOrDefault(x => x.Input.Name == title) ??
@@ -112,18 +134,18 @@ namespace CA_DataUploaderLib
                 while (board.SafeHasDataInReadBuffer() && timeInLoop.ElapsedMilliseconds < 100)
                 {
                     hadDataAvailable = true;
-                    var row = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
+                    var line = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
                     try
                     {
-                        var numbers = TryParseAsDoubleList(row);
+                        var numbers = TryParseAsDoubleList(line);
                         if (numbers != null)
                             ProcessLine(numbers, board);
                         else // mostly responses to commands or headers on reconnects.
-                            CALog.LogInfoAndConsoleLn(LogID.B, "Unhandled board response " + board.ToString() + " line: " + row);
+                            CALog.LogInfoAndConsoleLn(LogID.B, "Unhandled board response " + board.ToString() + " line: " + line);
                     }
                     catch (Exception ex)
                     {
-                        CALog.LogErrorAndConsoleLn(LogID.B, "Failed handling board response " + board.ToString() + " line: " + row, ex);
+                        CALog.LogErrorAndConsoleLn(LogID.B, "Failed handling board response " + board.ToString() + " line: " + line, ex);
                     }
                 }
 
@@ -134,12 +156,12 @@ namespace CA_DataUploaderLib
         }
 
         /// <returns>the list of doubles, otherwise <c>null</c></returns>
-        protected static List<double> TryParseAsDoubleList(string row)
+        protected virtual List<double> TryParseAsDoubleList(string line)
         {
-            if (!_startsWithDigitRegex.IsMatch(row))
+            if (!_startsWithDigitRegex.IsMatch(line))
                 return null;
 
-            return row.Split(",".ToCharArray())
+            return line.Split(",".ToCharArray())
                 .Select(x => x.Trim())
                 .Where(x => x.Length > 0)
                 .Select(x => x.ToDouble())
@@ -217,6 +239,12 @@ namespace CA_DataUploaderLib
         protected int GetHubID(SensorSample sensor)
         {
             return _values.GroupBy(x => x.Input.BoxName).Select(x => x.Key).ToList().IndexOf(sensor.Input.BoxName);
+        }
+
+        private bool HelpMenu(List<string> args)
+        {
+            CALog.LogInfoAndConsoleLn(LogID.A, commandHelp);
+            return true;
         }
 
         public void Dispose()

@@ -1,13 +1,20 @@
 ﻿
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfOutput : IOconfRow
     {
-        public IOconfOutput(string row, int lineNum, string type) : base(row, lineNum, type) { }
+        public IOconfOutput(string row, int lineNum, string type, bool parsePort = true) : base(row, lineNum, type) 
+        { 
+            format = $"{type};Name;BoxName;[port number]";
+            var list = ToList();
+            Name = list[1];
+            BoxName = list[2];
+            SetMap(BoxName); 
+            if (parsePort && !int.TryParse(list[3], out PortNumber)) throw new Exception($"{type}: wrong port number: {row}");
+        }
 
         public string Name { get; set; }
         public string BoxName { get; set; }

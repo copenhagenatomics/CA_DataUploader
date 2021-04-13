@@ -20,10 +20,7 @@ namespace CA_DataUploaderLib.IOconf
         protected int LineNumber;
         protected string format;
 
-        public List<string> ToList()
-        {
-            return RowWithoutComment().Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
-        }
+        public List<string> ToList() => RowWithoutComment().Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
 
         public string UniqueKey()
         {

@@ -2,7 +2,6 @@
 using System.Globalization;
 using static System.FormattableString;
 using CA_DataUploaderLib.Extensions;
-using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 namespace CA_DataUploaderLib.IOconf

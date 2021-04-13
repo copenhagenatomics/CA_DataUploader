@@ -52,7 +52,6 @@ namespace CA_DataUploaderLib.IOconf
                 if (row.StartsWith("Pressure")) return new IOconfPressure(row, lineNum);
                 if (row.StartsWith("Geiger")) return new IOconfGeiger(row, lineNum);
                 if (row.StartsWith("Scale")) return new IOconfScale(row, lineNum);
-                if (row.StartsWith("Tank")) return new IOconfTank(row, lineNum);
                 if (row.StartsWith("Valve")) return new IOconfValve(row, lineNum);
                 if (row.StartsWith("Filter")) return new IOconfFilter(row, lineNum);
                 if (row.StartsWith("RPiTemp")) return new IOconfRPiTemp(row, lineNum);
