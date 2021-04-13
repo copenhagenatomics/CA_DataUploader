@@ -134,18 +134,18 @@ namespace CA_DataUploaderLib
                 while (board.SafeHasDataInReadBuffer() && timeInLoop.ElapsedMilliseconds < 100)
                 {
                     hadDataAvailable = true;
-                    var row = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
+                    var line = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
                     try
                     {
-                        var numbers = TryParseAsDoubleList(row);
+                        var numbers = TryParseAsDoubleList(line);
                         if (numbers != null)
                             ProcessLine(numbers, board);
                         else // mostly responses to commands or headers on reconnects.
-                            CALog.LogInfoAndConsoleLn(LogID.B, "Unhandled board response " + board.ToString() + " line: " + row);
+                            CALog.LogInfoAndConsoleLn(LogID.B, "Unhandled board response " + board.ToString() + " line: " + line);
                     }
                     catch (Exception ex)
                     {
-                        CALog.LogErrorAndConsoleLn(LogID.B, "Failed handling board response " + board.ToString() + " line: " + row, ex);
+                        CALog.LogErrorAndConsoleLn(LogID.B, "Failed handling board response " + board.ToString() + " line: " + line, ex);
                     }
                 }
 
@@ -155,14 +155,13 @@ namespace CA_DataUploaderLib
             }
         }
 
-        // TODO: allow to override the parsing so that we can parse the ScaleBox line that has kg at the end.
         /// <returns>the list of doubles, otherwise <c>null</c></returns>
-        protected static List<double> TryParseAsDoubleList(string row)
+        protected virtual List<double> TryParseAsDoubleList(string line)
         {
-            if (!_startsWithDigitRegex.IsMatch(row))
+            if (!_startsWithDigitRegex.IsMatch(line))
                 return null;
 
-            return row.Split(",".ToCharArray())
+            return line.Split(",".ToCharArray())
                 .Select(x => x.Trim())
                 .Where(x => x.Length > 0)
                 .Select(x => x.ToDouble())
