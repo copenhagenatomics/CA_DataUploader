@@ -244,7 +244,7 @@ namespace CA_DataUploaderLib
 
         private bool HelpMenu(List<string> args)
         {
-            CALog.LogInfoAndConsoleLn(LogID.A, $"flows                 - show all flows in input queue");
+            CALog.LogInfoAndConsoleLn(LogID.A, commandHelp);
             return true;
         }
 
