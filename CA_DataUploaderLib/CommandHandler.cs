@@ -113,34 +113,54 @@ namespace CA_DataUploaderLib
             }
 
             inputCommand.Clear();
-            if (_commands.ContainsKey(cmd.First().ToLower()))
-            {
-                foreach (var func in _commands[cmd.First().ToLower()])
-                {
-                    try
-                    {
-                        if (func.Invoke(cmd))
-                        {
-                            if (cmdString != "help")
-                                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
-                            OnCommandAccepted(cmdString, addToCommandHistory);
-                        }
-                        else
-                            CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command");
-                    }
-                    catch (ArgumentException ex)
-                    {
-                        CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - invalid arguments", ex);
-                    }
-                }
-
-                if (cmd.First().ToLower() == "help")
-                    CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");  // end help menu divider
-            }
-            else
+            string commandName = cmd.First().ToLower();
+            if (!_commands.TryGetValue(commandName, out var commandFunctions))
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - unknown command");
+                return;
             }
+
+            List<bool> executionResults = RunCommandFunctions(cmdString, addToCommandHistory, cmd, commandFunctions);
+
+            if (commandName == "help")
+                CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");  // end help menu divider
+            else
+                LogAndDisplayCommandResults(cmdString, executionResults);
+        }
+
+        private List<bool> RunCommandFunctions(string cmdString, bool addToCommandHistory, List<string> cmd, List<Func<List<string>, bool>> commandFunctions)
+        {
+            List<bool> executionResults = new List<bool>(commandFunctions.Count);
+            foreach (var func in commandFunctions)
+            {
+                try
+                {
+                    bool accepted;
+                    executionResults.Add(accepted = func.Invoke(cmd));
+                    if (accepted)
+                        OnCommandAccepted(cmdString, addToCommandHistory); // track it in the history if at least one execution accepted the command
+                    else
+                        break; // avoid running the command on another subsystem when it was already rejected
+                }
+                catch (ArgumentException ex)
+                {
+                    executionResults.Add(false);
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - invalid arguments", ex);
+                    break; // avoid running the command on another subsystem when it was already rejected
+                }
+            }
+
+            return executionResults;
+        }
+
+        private static void LogAndDisplayCommandResults(string cmdString, List<bool> executionResults)
+        {
+            if (executionResults.All(r => r))
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
+            else if (executionResults.All(r => !r))
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command");
+            else
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command / accepted by some subsystems");
         }
 
         private void OnCommandAccepted(string cmdString, bool addToCommandHistory)
