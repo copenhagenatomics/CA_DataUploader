@@ -9,7 +9,7 @@ using System.Threading;
 
 namespace CA_DataUploaderLib
 {
-    public class CommandHandler : IDisposable
+    public sealed class CommandHandler : IDisposable
     {
         private bool _running = true;
         private readonly SerialNumberMapper _mapper;
@@ -177,7 +177,10 @@ namespace CA_DataUploaderLib
 
             if (info.Key == ConsoleKey.Escape)
             {
-                return "escape";
+                CALog.LogInfoAndConsoleLn(LogID.A, "You are about to stop the control program, type y if you want to continue");
+                var confirmedStop = Console.ReadKey().KeyChar == 'y';
+                CALog.LogInfoAndConsoleLn(LogID.A, confirmedStop ? "Stop sequence initiated" : "Stop sequence aborted");
+                return confirmedStop ? "escape" : null;
             }
 
             if (info.Key != ConsoleKey.Enter)
@@ -241,26 +244,9 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-            _running = false;
-            if (!disposedValue)
-            {
-                disposedValue = true;
-            }
-        }
-
-        // This code added to correctly implement the disposable pattern.
         public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(true);
+        { // class is sealed without unmanaged resources, no need for the full disposable pattern.
+            _running = false;
         }
-
-        #endregion
-
     }
 }
