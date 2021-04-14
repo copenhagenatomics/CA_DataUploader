@@ -65,9 +65,6 @@ namespace CA_DataUploaderLib
 
         protected bool ShowQueue(List<string> args)
         {
-            if (_values.Count == 0)
-                return false;
-
             var sb = new StringBuilder($"NAME      {GetAvgLoopTime(),4:N0}           ");
             sb.AppendLine();
             foreach (var t in _values)
