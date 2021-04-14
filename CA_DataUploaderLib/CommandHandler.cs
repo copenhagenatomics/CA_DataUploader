@@ -9,7 +9,7 @@ using System.Threading;
 
 namespace CA_DataUploaderLib
 {
-    public class CommandHandler : IDisposable
+    public sealed class CommandHandler : IDisposable
     {
         private bool _running = true;
         private readonly SerialNumberMapper _mapper;
@@ -113,34 +113,54 @@ namespace CA_DataUploaderLib
             }
 
             inputCommand.Clear();
-            if (_commands.ContainsKey(cmd.First().ToLower()))
-            {
-                foreach (var func in _commands[cmd.First().ToLower()])
-                {
-                    try
-                    {
-                        if (func.Invoke(cmd))
-                        {
-                            if (cmdString != "help")
-                                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
-                            OnCommandAccepted(cmdString, addToCommandHistory);
-                        }
-                        else
-                            CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command");
-                    }
-                    catch (ArgumentException ex)
-                    {
-                        CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - invalid arguments", ex);
-                    }
-                }
-
-                if (cmd.First().ToLower() == "help")
-                    CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");  // end help menu divider
-            }
-            else
+            string commandName = cmd.First().ToLower();
+            if (!_commands.TryGetValue(commandName, out var commandFunctions))
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - unknown command");
+                return;
             }
+
+            List<bool> executionResults = RunCommandFunctions(cmdString, addToCommandHistory, cmd, commandFunctions);
+
+            if (commandName == "help")
+                CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");  // end help menu divider
+            else
+                LogAndDisplayCommandResults(cmdString, executionResults);
+        }
+
+        private List<bool> RunCommandFunctions(string cmdString, bool addToCommandHistory, List<string> cmd, List<Func<List<string>, bool>> commandFunctions)
+        {
+            List<bool> executionResults = new List<bool>(commandFunctions.Count);
+            foreach (var func in commandFunctions)
+            {
+                try
+                {
+                    bool accepted;
+                    executionResults.Add(accepted = func.Invoke(cmd));
+                    if (accepted)
+                        OnCommandAccepted(cmdString, addToCommandHistory); // track it in the history if at least one execution accepted the command
+                    else
+                        break; // avoid running the command on another subsystem when it was already rejected
+                }
+                catch (ArgumentException ex)
+                {
+                    executionResults.Add(false);
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - invalid arguments", ex);
+                    break; // avoid running the command on another subsystem when it was already rejected
+                }
+            }
+
+            return executionResults;
+        }
+
+        private static void LogAndDisplayCommandResults(string cmdString, List<bool> executionResults)
+        {
+            if (executionResults.All(r => r))
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
+            else if (executionResults.All(r => !r))
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command");
+            else
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command / accepted by some subsystems");
         }
 
         private void OnCommandAccepted(string cmdString, bool addToCommandHistory)
@@ -177,7 +197,10 @@ namespace CA_DataUploaderLib
 
             if (info.Key == ConsoleKey.Escape)
             {
-                return "escape";
+                CALog.LogInfoAndConsoleLn(LogID.A, "You are about to stop the control program, type y if you want to continue");
+                var confirmedStop = Console.ReadKey().KeyChar == 'y';
+                CALog.LogInfoAndConsoleLn(LogID.A, confirmedStop ? "Stop sequence initiated" : "Stop sequence aborted");
+                return confirmedStop ? "escape" : null;
             }
 
             if (info.Key != ConsoleKey.Enter)
@@ -241,26 +264,9 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-            _running = false;
-            if (!disposedValue)
-            {
-                disposedValue = true;
-            }
-        }
-
-        // This code added to correctly implement the disposable pattern.
         public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(true);
+        { // class is sealed without unmanaged resources, no need for the full disposable pattern.
+            _running = false;
         }
-
-        #endregion
-
     }
 }

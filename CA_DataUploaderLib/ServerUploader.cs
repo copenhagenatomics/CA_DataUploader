@@ -15,7 +15,7 @@ using System.Xml.Serialization;
 
 namespace CA_DataUploaderLib
 {
-    public class ServerUploader : IDisposable
+    public sealed class ServerUploader : IDisposable
     {
         private HttpClient _client = new HttpClient();
         private RSACryptoServiceProvider _rsaWriter = new RSACryptoServiceProvider(1024);
@@ -442,31 +442,9 @@ namespace CA_DataUploaderLib
             throw new Exception(response.Result.ReasonPhrase);
         }
 
-        #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposedValue)
-            {
-                if (disposing)
-                {
-                    _running = false;
-                }
-
-                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
-                // TODO: set large fields to null.
-
-                disposedValue = true;
-            }
-        }
-
-        // This code added to correctly implement the disposable pattern.
         public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(true);
+        { // class is sealed so don't need full blown IDisposable pattern.
+            _running = false;
         }
-        #endregion
     }
 }

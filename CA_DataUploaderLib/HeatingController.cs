@@ -8,7 +8,7 @@ using System.Threading;
 namespace CA_DataUploaderLib
 {
 
-    public class HeatingController : IDisposable, ISubsystemWithVectorData
+    public sealed class HeatingController : IDisposable, ISubsystemWithVectorData
     {
         public List<SensorSample> ValidHatSensors { get; private set; }
         public double Voltage = 230;
@@ -19,8 +19,7 @@ namespace CA_DataUploaderLib
         private double _lastTemperature = 0;
         private DateTime _startTime;
         private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
-        private readonly List<string> _ovenHistory = new List<string>();
-        protected CommandHandler _cmd;
+        private CommandHandler _cmd;
         public string Title => "Heating";
 
         public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
@@ -60,8 +59,6 @@ namespace CA_DataUploaderLib
                     if (oven.Any())
                     {
                         cmd.AddCommand("oven", Oven);
-                        if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
-                            cmd.AddCommand("ovenhistory", OvenHistory);
                     }
 
                     break; // exit the for loop
@@ -81,7 +78,6 @@ namespace CA_DataUploaderLib
             if (_heaters.Any(x => !x.IsArea(-1)))
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, $"oven [0 - 800] [0 - 800]  - where the integer value is the oven temperature top and bottom region");
-                if (_logLevel == CALogLevel.Debug) CALog.LogInfoAndConsoleLn(LogID.A, $"ovenhistory [x]           - Show a list of the last x oven commands");
             }
 
             return true;
@@ -118,7 +114,6 @@ namespace CA_DataUploaderLib
                     heater.SetTemperature(temperature);
             }
 
-            _ovenHistory.Add(DateTime.Now.ToString("MMM dd HH:mm:ss ") + string.Join(" ", args));
             if (_heaters.Any(x => x.IsActive))
                 _cmd.Execute("light main on", false);
             else
@@ -129,22 +124,15 @@ namespace CA_DataUploaderLib
         static int ParseTemperature(string t) =>
             int.TryParse(t, out var v) ? v : throw new ArgumentException($"Unexpected target temperature: '{t}'");
 
-        private bool OvenHistory(List<string> args)
-        {
-            if (_ovenHistory.Count == 0)
-                return false;
-
-            int nlines = Math.Min(_ovenHistory.Count, CommandHandler.GetCmdParam(args, 1, 1000000000));
-            int nSkip = _ovenHistory.Count - nlines;
-            _ovenHistory.Skip(nSkip).ToList().ForEach(x => CALog.LogInfoAndConsoleLn(LogID.A, x));
-            return true;
-        }
-
         public bool Heater(List<string> args)
         {
-            var heater = _heaters.SingleOrDefault(x => x.Name() == args[1].ToLower());
+            var name = args[1].ToLower();
+            var heater = _heaters.SingleOrDefault(x => x.Name() == name);
             if (heater == null)
-                return false;
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Invalid heater name {name}. Heaters: ${string.Join(',', _heaters.Select(x => x.Name()))}");
+                return false; 
+            }
 
             if (args[2].ToLower() == "on")
             {
@@ -270,7 +258,7 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, "All heaters are off");
         }
 
-        protected virtual void HeaterOff(HeaterElement heater)
+        private void HeaterOff(HeaterElement heater)
         {
             try
             {
@@ -285,7 +273,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected virtual void HeaterOn(HeaterElement heater)
+        private void HeaterOn(HeaterElement heater)
         {
             try
             {
@@ -338,28 +326,9 @@ namespace CA_DataUploaderLib
             return list;
         }
 
-        #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-            _running = false;
-            if (!disposedValue)
-            {
-                disposedValue = true;
-            }
-        }
-
-        // This code added to correctly implement the disposable pattern.
         public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(true);
+        { // class is sealed without unmanaged resources, no need for the full disposable pattern.
+            _running = false;
         }
-
-        #endregion
-
-
-
     }
 }

@@ -22,6 +22,7 @@ namespace CA_DataUploaderLib
         protected List<MCUBoard> _boards = new List<MCUBoard>();
         protected int expectedHeaderLines = 8;
         private string commandHelp;
+        private bool disposed;
 
         public BaseSensorBox(CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values) 
         { 
@@ -65,9 +66,6 @@ namespace CA_DataUploaderLib
 
         protected bool ShowQueue(List<string> args)
         {
-            if (_values.Count == 0)
-                return false;
-
             var sb = new StringBuilder($"NAME      {GetAvgLoopTime(),4:N0}           ");
             sb.AppendLine();
             foreach (var t in _values)
@@ -79,12 +77,7 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private double GetAvgLoopTime()
-        {
-            return _values.Average(x => x.ReadSensor_LoopTime);
-        }
-
-        protected virtual void ParentLoopForever() { }
+        private double GetAvgLoopTime() => _values.Average(x => x.ReadSensor_LoopTime);
 
         private static readonly Regex _startsWithDigitRegex = new Regex(@"^\s*(-|\d+)\s*");
 
@@ -236,30 +229,40 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected int GetHubID(SensorSample sensor)
-        {
-            return _values.GroupBy(x => x.Input.BoxName).Select(x => x.Key).ToList().IndexOf(sensor.Input.BoxName);
-        }
-
         private bool HelpMenu(List<string> args)
         {
             CALog.LogInfoAndConsoleLn(LogID.A, commandHelp);
             return true;
         }
 
-        public void Dispose()
+        protected virtual void Dispose(bool disposing)
         {
-            _running = false;
-            for (int i = 0; i < 100; i++)
-            {
-                foreach(var board in _boards)
-                    if (board != null && board.IsOpen)
-                            Thread.Sleep(10);
+            if (disposed)
+                return;
+
+            if (disposing)
+            { // dispose managed state
+                _running = false;
+                for (int i = 0; i < 100; i++)
+                {
+                    foreach(var board in _boards)
+                        if (board != null && board.IsOpen)
+                                Thread.Sleep(10);
+                }
+
+                foreach (var board in _boards)
+                    if(board != null)
+                        ((IDisposable)board).Dispose();
             }
 
-            foreach (var board in _boards)
-                if(board != null)
-                    ((IDisposable)board).Dispose();
+            disposed = true;
+        }
+        
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method. See https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/implementing-dispose#dispose-and-disposebool
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }
