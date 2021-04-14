@@ -22,6 +22,7 @@ namespace CA_DataUploaderLib
         protected List<MCUBoard> _boards = new List<MCUBoard>();
         protected int expectedHeaderLines = 8;
         private string commandHelp;
+        private bool disposed;
 
         public BaseSensorBox(CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values) 
         { 
@@ -234,19 +235,34 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public void Dispose()
+        protected virtual void Dispose(bool disposing)
         {
-            _running = false;
-            for (int i = 0; i < 100; i++)
-            {
-                foreach(var board in _boards)
-                    if (board != null && board.IsOpen)
-                            Thread.Sleep(10);
+            if (disposed)
+                return;
+
+            if (disposing)
+            { // dispose managed state
+                _running = false;
+                for (int i = 0; i < 100; i++)
+                {
+                    foreach(var board in _boards)
+                        if (board != null && board.IsOpen)
+                                Thread.Sleep(10);
+                }
+
+                foreach (var board in _boards)
+                    if(board != null)
+                        ((IDisposable)board).Dispose();
             }
 
-            foreach (var board in _boards)
-                if(board != null)
-                    ((IDisposable)board).Dispose();
+            disposed = true;
+        }
+        
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method. See https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/implementing-dispose#dispose-and-disposebool
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }

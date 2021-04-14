@@ -8,7 +8,7 @@ using System.Threading;
 namespace CA_DataUploaderLib
 {
 
-    public class HeatingController : IDisposable, ISubsystemWithVectorData
+    public sealed class HeatingController : IDisposable, ISubsystemWithVectorData
     {
         public List<SensorSample> ValidHatSensors { get; private set; }
         public double Voltage = 230;
@@ -19,7 +19,7 @@ namespace CA_DataUploaderLib
         private double _lastTemperature = 0;
         private DateTime _startTime;
         private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
-        protected CommandHandler _cmd;
+        private CommandHandler _cmd;
         public string Title => "Heating";
 
         public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
@@ -258,7 +258,7 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, "All heaters are off");
         }
 
-        protected virtual void HeaterOff(HeaterElement heater)
+        private void HeaterOff(HeaterElement heater)
         {
             try
             {
@@ -273,7 +273,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected virtual void HeaterOn(HeaterElement heater)
+        private void HeaterOn(HeaterElement heater)
         {
             try
             {
@@ -326,28 +326,9 @@ namespace CA_DataUploaderLib
             return list;
         }
 
-        #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-            _running = false;
-            if (!disposedValue)
-            {
-                disposedValue = true;
-            }
-        }
-
-        // This code added to correctly implement the disposable pattern.
         public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(true);
+        { // class is sealed without unmanaged resources, no need for the full disposable pattern.
+            _running = false;
         }
-
-        #endregion
-
-
-
     }
 }

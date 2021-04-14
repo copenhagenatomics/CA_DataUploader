@@ -78,7 +78,7 @@ namespace CA.LoopControlPluginBase
 
         public void Dispose()
         {
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method. See https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/implementing-dispose#dispose-and-disposebool
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }

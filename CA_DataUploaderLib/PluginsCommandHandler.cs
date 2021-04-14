@@ -42,8 +42,9 @@ namespace CA_DataUploaderLib
 
             return tcs.Task;
         }
+
         public void Dispose()
-        {
+        {// class is sealed without unmanaged resources, no need for the full disposable pattern.
             foreach (var subscribedEvent in subscribedNewVectorReceivedEvents.ToArray())
                 NewVectorReceived -= subscribedEvent;
             foreach (var removeAction in removeCommandActions)

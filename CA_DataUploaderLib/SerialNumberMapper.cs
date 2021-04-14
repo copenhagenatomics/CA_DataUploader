@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
-    public class SerialNumberMapper : IDisposable
+    public sealed class SerialNumberMapper : IDisposable
     {
         public List<MCUBoard> McuBoards = new List<MCUBoard>();
         private static string[] _serialPorts = RpiVersion.GetUSBports();
@@ -148,25 +148,14 @@ namespace CA_DataUploaderLib
             }
         }
 
-        #region IDisposable Support
-        protected virtual void Dispose(bool disposing)
-        {
-            if (OperatingSystem.IsWindows()) {
-                arrival?.Stop();
-                removal?.Stop();
-                arrival = null;
-                removal = null;
-            }
-        }
-
-        // This code added to correctly implement the disposable pattern.
         public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(true);
+        { // class is sealed without unmanaged resources, no need for the full disposable pattern.
+            if (!OperatingSystem.IsWindows()) return;
+            arrival?.Stop();
+            removal?.Stop();
+            arrival = null;
+            removal = null;
         }
-
-        #endregion
     }
 
     public enum EventType
