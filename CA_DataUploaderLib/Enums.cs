@@ -11,47 +11,6 @@ namespace CA_DataUploaderLib
         Output = 3
     }
 
-    public enum FlowDirection
-    {
-        Unknown = 0,
-        In = 1,
-        Out = 2
-    }
-
-    public enum SafeValue
-    {
-        Off = 0, 
-        On = 1
-    }
-
-    public enum PowerPhase
-    {
-        Null = 0,
-        Phase1 = 1,
-        Phase2 = 2,
-        Phase3 = 3,
-        All = 4
-    }
-
-    public enum PowerType
-    {
-        Kanthal = 1,
-        Calrod = 2,
-        SolonoideValve = 3,
-        PumpMotor = 4,
-        Aux = 5
-    }
-
-    public enum LoopStates
-    {
-        Paused = 0,
-        PairSensorsAndActuators = 1,
-        LoopThroughOut230V = 2,
-        SaltTargetTemperature = 3,
-        ManuelPairSensor = 4,
-        OnlyRecordSensorValues = 5
-    }
-
     public enum CALogLevel     // see also Syste.LogLevel
     {
         None = 0,   // silent
