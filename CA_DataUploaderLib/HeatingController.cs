@@ -10,8 +10,6 @@ namespace CA_DataUploaderLib
 
     public sealed class HeatingController : IDisposable, ISubsystemWithVectorData
     {
-        public List<SensorSample> ValidHatSensors { get; private set; }
-        public double Voltage = 230;
         public int HeaterOnTimeout = 60;
         private bool _running = true;
         private CALogLevel _logLevel = CALogLevel.Normal;
@@ -114,10 +112,8 @@ namespace CA_DataUploaderLib
                     heater.SetTemperature(temperature);
             }
 
-            if (_heaters.Any(x => x.IsActive))
-                _cmd.Execute("light main on", false);
-            else
-                _cmd.Execute("light main off", false);
+            var lightState = _heaters.Any(x => x.IsActive) ? "on" : "off";
+            _cmd.Execute($"light main {lightState}", false);
             return true;
         }
 
@@ -134,18 +130,11 @@ namespace CA_DataUploaderLib
                 return false; 
             }
 
-            if (args[2].ToLower() == "on")
-            {
-                heater.IsOn = true;
-                heater.ManualMode = true;
+            heater.ManualMode = heater.IsOn = args[2].ToLower() == "on";
+            if (heater.IsOn)
                 HeaterOn(heater);
-            }
             else
-            {
-                heater.IsOn = false;
-                heater.ManualMode = false;
                 HeaterOff(heater);
-            }
 
             return true;
         }
