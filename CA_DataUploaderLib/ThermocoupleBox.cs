@@ -11,8 +11,8 @@ namespace CA_DataUploaderLib
     {
         private readonly SensorSample _rpiGpuSample;
         private readonly SensorSample _rpiCpuSample;
-        public ThermocoupleBox(CommandHandler cmd) : base(cmd, "Temperatures", string.Empty, "show all temperatures in input queue", IOconfFile.GetTypeKAndLeakage()) 
-        {
+        public ThermocoupleBox(CommandHandler cmd) : base(cmd, "Temperatures", string.Empty, "show all temperatures in input queue", GetSensors()) 
+        { // these are null when its not windows, see GetSensors
             _rpiGpuSample = _values.FirstOrDefault(x => x.Name.EndsWith("Gpu"));
             _rpiCpuSample = _values.FirstOrDefault(x => x.Name.EndsWith("Cpu"));
         }
@@ -27,7 +27,7 @@ namespace CA_DataUploaderLib
                 _rpiCpuSample.Value = DULutil.ExecuteShellCommand("cat /sys/class/thermal/thermal_zone0/temp").ToDouble() / 1000;
         }
 
-        private IEnumerable<IOconfInput> GetSensors()
+        private static IEnumerable<IOconfInput> GetSensors()
         {
             var values = IOconfFile.GetTypeKAndLeakage();
             var rpiTemp = IOconfFile.GetRPiTemp();
