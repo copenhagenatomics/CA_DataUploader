@@ -1,5 +1,4 @@
-﻿using CA_DataUploaderLib.IOconf;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -21,9 +20,6 @@ namespace CA_DataUploaderLib
         public string GetVectorItemTypes() { return string.Join(Environment.NewLine, _items.Select(x => x.DataType)); }
         public string GetVectorInputOutput() { return string.Join(Environment.NewLine, _items.Select(x => x.DirectionType.ToString())); }
 
-        /// <summary>Returns a copy of the vector description with additional entries</summary>
-        /// <remarks>While this leaves the current instance unmodified, we are pretending the entries are immutable for now.</remarks>
-        
         public bool HasItem(string descriptor) => _items.Any(i => i.Descriptor == descriptor);
 
         public override string ToString()
