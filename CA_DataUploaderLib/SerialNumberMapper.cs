@@ -4,9 +4,7 @@ using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Ports;
 using System.Linq;
-using System.Management;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,23 +12,16 @@ namespace CA_DataUploaderLib
 {
     public sealed class SerialNumberMapper : IDisposable
     {
-        public List<MCUBoard> McuBoards = new List<MCUBoard>();
-        private static string[] _serialPorts = RpiVersion.GetUSBports();
-        private CALogLevel _logLevel = CALogLevel.Normal;
-
-        private static ManagementEventWatcher arrival;
-
-        private static ManagementEventWatcher removal;
+        public readonly List<MCUBoard> McuBoards = new List<MCUBoard>();
+        private readonly CALogLevel _logLevel = CALogLevel.Normal;
         private static int _detectedUnknownBoards;
-
-        public event EventHandler<PortsChangedArgs> PortsChanged;
 
         public SerialNumberMapper()
         {
             if(File.Exists("IO.conf"))
                 _logLevel = IOconfFile.GetOutputLevel();
 
-            Parallel.ForEach(_serialPorts, name =>
+            Parallel.ForEach(RpiVersion.GetUSBports(), name =>
             {
                 try
                 {
@@ -45,13 +36,10 @@ namespace CA_DataUploaderLib
 
                     McuBoards.Add(mcu);
 
-                    if (mcu.productType is null)
-                        mcu.productType = GetStringFromDmesg(mcu.PortName);
+                    mcu.productType = mcu.productType ?? GetStringFromDmesg(mcu.PortName);
 
                     string logline = _logLevel == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
                     CALog.LogInfoAndConsoleLn(LogID.A, logline);
-
-                    MonitorDeviceChanges();
                 }
                 catch (UnauthorizedAccessException ex)
                 {
@@ -79,101 +67,11 @@ namespace CA_DataUploaderLib
         /// </summary>
         /// <param name="productType">type of boards to look for. (Case sensitive)</param>
         /// <returns></returns>
-        public List<MCUBoard> ByProductType(string productType)
-        {
-            return McuBoards.Where(x => x.productType != null && x.productType.Contains(productType)).ToList();
-        }
-
-        /// <summary>
-        /// Return a list of MCU boards where IOconfName contains the input string. 
-        /// </summary>
-        /// <param name="boxname">then name of boards to look for. (Case sensitive)</param>
-        /// <returns></returns>
-        public List<MCUBoard> ByIOconfName(string boxname)
-        {
-            return McuBoards.Where(x => x.BoxName != null && x.BoxName.Contains(boxname)).ToList();
-        }
-
-        // Mono: Exception: System.NotImplementedException: The method or operation is not implemented.
-        // Mono: /build/mono-5.18.0.268/mcs/class/System.Management/System.Management/EventQuery.cs:38
-        // Mono: https://github.com/mono/mono/blob/master/mcs/class/System.Management/System.Management/WqlEventQuery.cs
-        private void MonitorDeviceChanges()
-        {
-            if (!OperatingSystem.IsWindows())
-                return;
-
-            try
-            {
-                var deviceArrivalQuery = new WqlEventQuery("SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 2");
-                var deviceRemovalQuery = new WqlEventQuery("SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 3");
-
-                arrival = new ManagementEventWatcher(deviceArrivalQuery);
-                removal = new ManagementEventWatcher(deviceRemovalQuery);
-
-                arrival.EventArrived += (o, args) => RaisePortsChangedIfNecessary(EventType.Insertion);
-                removal.EventArrived += (sender, eventArgs) => RaisePortsChangedIfNecessary(EventType.Removal);
-
-                // Start listening for events
-                arrival.Start();
-                removal.Start();
-            }
-            catch (ManagementException)
-            {
-
-            }
-        }
-
-        private void RaisePortsChangedIfNecessary(EventType eventType)
-        {
-            try
-            {
-                lock (_serialPorts)
-                {
-                    var availableSerialPorts = SerialPort.GetPortNames();
-                    var newPorts = availableSerialPorts.Except(_serialPorts);
-                    var removedPorts = _serialPorts.Except(availableSerialPorts);
-                    if (!_serialPorts.SequenceEqual(availableSerialPorts))
-                    {
-                        _serialPorts = availableSerialPorts;
-                        if(newPorts.Any())
-                            PortsChanged?.Invoke(this, new PortsChangedArgs(eventType, McuBoards.Where(x => newPorts.Contains(x.PortName))));
-                        else
-                            PortsChanged?.Invoke(this, new PortsChangedArgs(eventType, McuBoards.Where(x => removedPorts.Contains(x.PortName))));
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Serial port error: " + ex.ToString());
-            }
-        }
+        public List<MCUBoard> ByProductType(string productType) => 
+            McuBoards.Where(x => x.productType != null && x.productType.Contains(productType)).ToList();
 
         public void Dispose()
         { // class is sealed without unmanaged resources, no need for the full disposable pattern.
-            if (!OperatingSystem.IsWindows()) return;
-            arrival?.Stop();
-            removal?.Stop();
-            arrival = null;
-            removal = null;
-        }
-    }
-
-    public enum EventType
-    {
-        Insertion,
-        Removal,
-    }
-
-    public class PortsChangedArgs : EventArgs
-    {
-        public EventType EventType { get; private set; }
-
-        public List<MCUBoard> MCUBoards { get; private set; }
-
-        public PortsChangedArgs(EventType eventType, IEnumerable<MCUBoard> mcuBoards)
-        {
-            EventType = eventType;
-            MCUBoards = mcuBoards.ToList();
         }
     }
 }
