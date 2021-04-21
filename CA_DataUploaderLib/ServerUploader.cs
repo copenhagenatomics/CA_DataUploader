@@ -17,21 +17,16 @@ namespace CA_DataUploaderLib
 {
     public sealed class ServerUploader : IDisposable
     {
-        private HttpClient _client = new HttpClient();
-        private RSACryptoServiceProvider _rsaWriter = new RSACryptoServiceProvider(1024);
-        private Queue<DataVector> _queue = new Queue<DataVector>();
-        private Queue<string> _alertQueue = new Queue<string>();
-        private List<DateTime> _badPackages = new List<DateTime>();
-        private Dictionary<string, string> _accountInfo;
-        private int _plotID;
-        private string _plotname;
+        private readonly PlotConnection _plot;
+        private readonly Signing _signing;
+        private readonly Queue<DataVector> _queue = new Queue<DataVector>();
+        private readonly Queue<string> _alertQueue = new Queue<string>();
+        private readonly List<DateTime> _badPackages = new List<DateTime>();
         private DateTime _lastTimestamp;
         private DateTime _waitTimestamp = DateTime.Now;
-        private string _keyFilename;
-        private string _loopName;
-        private string _loginToken;
+        private DateTime _waitLoopForeverTimestamp = DateTime.Now;
         private bool _running;
-        private VectorDescription _vectorDescription;
+        private readonly VectorDescription _vectorDescription;
         private readonly CommandHandler _cmd;
 
         public ServerUploader(VectorDescription vectorDescription) : this(vectorDescription, null)
@@ -42,28 +37,14 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                CheckInputData(vectorDescription);
-                var connectionInfo = GetAccountInfo();
-
-                string server = connectionInfo.Server;
-                _client.BaseAddress = new Uri(server);
-                _client.DefaultRequestHeaders.Accept.Clear();
-                _client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                _loopName = IOconfFile.GetLoopName();
-                _keyFilename = "Key" + _loopName + ".bin";
-                CALog.LogInfoAndConsoleLn(LogID.A, _loopName);
-
-                if (File.Exists(_keyFilename))
-                    _rsaWriter.ImportCspBlob(File.ReadAllBytes(_keyFilename));
-                else
-                    File.WriteAllBytes(_keyFilename, _rsaWriter.ExportCspBlob(true));
-
+                var duplicates = vectorDescription._items.GroupBy(x => x.Descriptor).Where(x => x.Count() > 1).Select(x => x.Key);
+                if (duplicates.Any())
+                    throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", duplicates));
+                var loopName = IOconfFile.GetLoopName();
+                _signing = new Signing(loopName);
                 vectorDescription.IOconf = IOconfFile.RawFile;
                 _vectorDescription = vectorDescription;
-
-                GetLoginTokenWithRetries().Wait();
-                GetPlotIDAsync(_rsaWriter.ExportCspBlob(false), GetBytes(vectorDescription));
-
+                _plot = PlotConnection.Establish(loopName, _signing.GetPublicKey(), GetSignedVectorDescription(vectorDescription)).GetAwaiter().GetResult();
                 new Thread(() => this.LoopForever()).Start();
                 _cmd = cmd;
                 cmd?.AddCommand("escape", Stop);
@@ -78,36 +59,22 @@ namespace CA_DataUploaderLib
         internal void SendAlert(string message)
         {
             lock (_alertQueue)
-                if (_alertQueue.Count < 10000)  // if problems then drop packages. 
+                if (_alertQueue.Count < 10000)  // if sending thread can't catch up, then drop packages.
                     _alertQueue.Enqueue(message);
-        }
-
-        private static void CheckInputData(VectorDescription vectorDescription)
-        {
-            var dublicates = vectorDescription._items.GroupBy(x => x.Descriptor).Where(x => x.Count() > 1).Select(x => x.Key);
-            if (dublicates.Any())
-                throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", dublicates));
-        }
-
-        private ConnectionInfo GetAccountInfo()
-        {
-            var connectionInfo = IOconfFile.GetConnectionInfo();
-            _accountInfo = new Dictionary<string, string>
-                {
-                    { "email", connectionInfo.email },
-                    { "password", connectionInfo.password },
-                    { "fullname", connectionInfo.Fullname }
-                };
-            return connectionInfo;
         }
 
         public void SendVector(List<double> vector, DateTime timestamp)
         {
             if (vector.Count() != _vectorDescription.Length)
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescription.Length}");
+            if (_lastTimestamp < timestamp)
+            {
+                CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {timestamp}");
+                return;
+            }
 
             lock (_queue)
-                if (_queue.Count < 10000 && _lastTimestamp < timestamp)  // if problems then drop packages. 
+                if (_queue.Count < 10000)  // if sending thread can't catch up, then drop packages.
                 {
                     _queue.Enqueue(new DataVector
                     {
@@ -119,86 +86,19 @@ namespace CA_DataUploaderLib
                 }
         }
 
+        // service method, that makes it easy to control the duration of each SendVector related loop in (milliseconds)
+        public int Wait(int milliseconds) => Wait(milliseconds, ref _waitTimestamp);
+
         // service method, that makes it easy to control the duration of each loop in (milliseconds)
-        public int Wait(int milliseconds)
+        private static int Wait(int milliseconds, ref DateTime lastWaitDate)
         {
-            int wait = milliseconds - (int)DateTime.Now.Subtract(_waitTimestamp).TotalMilliseconds;
+            int wait = milliseconds - (int)DateTime.Now.Subtract(lastWaitDate).TotalMilliseconds;
             Thread.Sleep(Math.Max(0, wait));
-            _waitTimestamp = DateTime.Now;
+            lastWaitDate = DateTime.Now;
             return wait;
         }
 
-        public async void UploadSensorMatch(string newDescription)
-        {
-            try
-            {
-                string query = $"api/LoopApi?plotnameID={_plotID}";
-                HttpResponseMessage response = await _client.PutAsJsonAsync(query, SignedMessage(newDescription));
-                response.EnsureSuccessStatusCode();
-            }
-            catch (Exception ex)
-            {
-                OnError("failed uploading sensor match", ex);
-                throw;
-            }
-        }
-
-        public string GetPlotUrl()
-        {
-            return "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plotname;
-        }
-
-        public string PrintMyPlots()
-        {
-            var sb = new StringBuilder(Environment.NewLine);
-            foreach (var x in ListMyPlots())
-                sb.AppendLine(x.Value);
-
-            sb.AppendLine();
-            return sb.ToString();
-        }
-
-        public Dictionary<string, string> ListMyPlots()
-        {
-            try
-            {
-                string query = $"plots/ListMyPlots?token={_loginToken}";
-                var result = _client.GetStringAsync(query).Result;
-                var startPos = result.IndexOf("Table\":[{") + 9;
-                result = result.Substring(startPos); // remove LoggedIn + Table "header"
-                result = result.Substring(0, result.Length - 2); // remove squar brackets. 
-                List<string> list = FormatPlotList(result);
-                return list.ToDictionary(x => x.StringBetween("\"PlotNameId\":\"", "\",\""), x => x);
-            }
-            catch (Exception ex)
-            {
-                OnError("failed listing plots", ex);
-                throw;
-            }
-        }
-
-        private static List<string> FormatPlotList(string result)
-        {
-            var list = result.Split("{".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).ToList();
-            var maxPos = list.Max(x => x.IndexOf("PlotName"));
-            list = list.Select(x => FormatPlotList(x, maxPos, "\"PlotName")).ToList();
-            maxPos = list.Max(x => x.IndexOf("VectorLength"));
-            list = list.Select(x => FormatPlotList(x, maxPos, "\"VectorLength")).ToList();
-            return list;
-        }
-
-        private static string FormatPlotList(string str, int maxPos, string padBefore)
-        {
-            if (str.EndsWith("},"))
-                str = str.Substring(0, str.Length - 2);
-            if(str.EndsWith("}"))
-                str = str.Substring(0, str.Length - 1);
-
-            while (str.IndexOf(padBefore) < maxPos)
-                str = str.Replace(padBefore, " " + padBefore);
-
-            return str;
-        }
+        public string GetPlotUrl() => "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plot.PlotName;
 
         private void LoopForever()
         {
@@ -207,33 +107,16 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    List<DataVector> list = new List<DataVector>();
-                    lock (_queue)
-                    {
-                        while (_queue.Any())  // dequeue all. 
-                        {
-                            list.Add(_queue.Dequeue());
-                        }
-                    }
+                    var list = DequeueAllEntries(_queue);
+                    if (list != null)
+                        PostVectorAsync(GetSignedVectors(list), list.First().timestamp);
 
-                    if (list.Any())
-                    {
-                        byte[] listLen = BitConverter.GetBytes((ushort)list.Count());
-                        var theData = list.SelectMany(a => a.buffer).ToArray();
-                        var buffer = Compress(listLen.Concat(theData).ToArray());
-                        PostVectorAsync(buffer, list.First().timestamp);
-                    }
-
-                    lock (_alertQueue)
-                    {
-                        while (_alertQueue.Any())  // dequeue all. 
-                        {
-                            PostAlertAsync(_alertQueue.Dequeue());
-                        }
-                    }
+                    var alerts = DequeueAllEntries(_alertQueue);
+                    foreach (var alert in alerts)
+                        PostAlertAsync(alert);
 
                     PrintBadPackagesMessage(false);
-                    Thread.Sleep(IOconfFile.GetVectorUploadDelay());  
+                    Wait(IOconfFile.GetVectorUploadDelay(), ref _waitLoopForeverTimestamp);
                 }
                 catch (Exception ex)
                 {
@@ -244,8 +127,22 @@ namespace CA_DataUploaderLib
             PrintBadPackagesMessage(true);
         }
 
-        private byte[] Compress(byte[] buffer)
+        List<T> DequeueAllEntries<T>(Queue<T> queue)
         {
+            List<T> list = null; // delayed initialization to avoid creating lists when there is no data.
+            lock (queue)
+                while (queue.Any())  // dequeue all. 
+                {
+                    list = list ?? new List<T>(); // ensure initialized
+                    list.Add(queue.Dequeue());
+                }
+
+            return list;
+        }
+
+        /// <returns>a signature of the original data followed by the data compressed with gzip.</returns>
+        private byte[] SignAndCompress(byte[] buffer)
+        { 
             using (var memory = new MemoryStream())
             {
                 using (var gzip = new GZipStream(memory, CompressionMode.Compress))
@@ -253,65 +150,30 @@ namespace CA_DataUploaderLib
                     gzip.Write(buffer, 0, buffer.Length);
                 }
 
-                // create and prepend the signature. 
-                byte[] signature = _rsaWriter.SignData(buffer, new SHA1CryptoServiceProvider());
-                return signature.Concat(memory.ToArray()).ToArray();
+                return _signing.GetSignature(buffer).Concat(memory.ToArray()).ToArray();
             }
         }
 
-        private byte[] GetBytes(VectorDescription vectorDescription)
+        private byte[] GetSignedVectorDescription(VectorDescription vectorDescription)
         {
             var xmlserializer = new XmlSerializer(typeof(VectorDescription));
+            using var msXml = new MemoryStream();
+            xmlserializer.Serialize(msXml, vectorDescription);
+            var buffer = msXml.ToArray();
+            return SignAndCompress(buffer);
+        }
 
-            using (var msXml = new MemoryStream())
-            using (var msZip = new MemoryStream())
-            {
-                xmlserializer.Serialize(msXml, vectorDescription);
-                var buffer = msXml.ToArray();
-                using (var gzip = new GZipStream(msZip, CompressionMode.Compress))
-                {
-                    gzip.Write(buffer, 0, buffer.Length);
-                }                
-
-                // create and prepend the signature. 
-                byte[] signature = _rsaWriter.SignData(buffer, new SHA1CryptoServiceProvider());
-                return signature.Concat(msZip.ToArray()).ToArray();
-            }
+        private byte[] GetSignedVectors(List<DataVector> vectors) 
+        {
+            byte[] listLen = BitConverter.GetBytes((ushort)vectors.Count());
+            var theData = vectors.SelectMany(a => a.buffer).ToArray();
+            return SignAndCompress(listLen.Concat(theData).ToArray());
         }
 
         private byte[] SignedMessage(string message)
         {
             var buffer = Encoding.UTF8.GetBytes(message);
-            // create and prepend the signature. 
-            byte[] signature = _rsaWriter.SignData(buffer, new SHA1CryptoServiceProvider());
-            return signature.Concat(buffer).ToArray();
-        }
-
-
-        private void GetPlotIDAsync(byte[] publicKey, byte[] vectorDescription)
-        {
-            HttpResponseMessage response = null;
-            try
-            {
-                string query = $"api/LoopApi?LoopName={_loopName}&ticks={DateTime.UtcNow.Ticks}&loginToken={_loginToken}";
-                response = _client.PutAsJsonAsync(query, publicKey.Concat(vectorDescription)).Result;
-                response.EnsureSuccessStatusCode();
-                var result = response.Content.ReadAsAsync<string>().Result;
-                _plotID = result.StringBefore(" ").ToInt();
-                _plotname = result.StringAfter(" ");
-            }
-            catch (Exception ex)
-            {
-                if (ex.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'" || ex.InnerException?.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'")
-                    throw new HttpRequestException("Check your internet connection", ex);
-
-                var error = response?.Content?.ReadAsStringAsync()?.Result;
-                if (!string.IsNullOrEmpty(error))
-                    throw new Exception(error);
-
-                OnError("failed getting plot id", ex);
-                throw;
-            }
+            return _signing.GetSignature(buffer).Concat(buffer).ToArray();
         }
 
         private static void OnError(string message, Exception ex) => CALog.LogErrorAndConsoleLn(LogID.A, message, ex);
@@ -320,9 +182,7 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                string query = $"api/LoopApi?plotnameID={_plotID}&Ticks={timestamp.Ticks}&loginToken={_loginToken}";
-                HttpResponseMessage response = await _client.PutAsJsonAsync(query, buffer);
-                response.EnsureSuccessStatusCode();
+                await _plot.PostVectorAsync(buffer, timestamp);
             }
             catch (Exception ex)
             {
@@ -338,10 +198,7 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                string query = $"api/LoopApi/AlertMessage?plotnameID={_plotID}";
-
-                HttpResponseMessage response = await _client.PutAsJsonAsync(query, SignedMessage(message));
-                response.EnsureSuccessStatusCode();
+                await _plot.PostAlertAsync(SignedMessage(message));
             }
             catch (Exception ex)
             {
@@ -377,74 +234,147 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private async Task GetLoginTokenWithRetries()
-        {
-            int failureCount = 0;
-            while (true)
-            {
-                try
-                {
-                    await GetLoginToken();
-                    if (failureCount > 0)
-                        CALog.LogInfoAndConsoleLn(LogID.A, "Reconnected.");
-                    return;
-                }
-                catch (HttpRequestException ex)
-                {
-                    if (failureCount++ > 10)
-                        throw;
-
-                    CALog.LogErrorAndConsoleLn(LogID.A, "Failed to connect while starting, attempting to reconnect in 5 seconds.", ex);
-                    await Task.Delay(5000);
-                }
-            }
-        }
-
-        private async Task GetLoginToken()
-        {
-            var response = await _client.PostAsync("Login", new FormUrlEncodedContent(_accountInfo));
-            if (response.StatusCode == System.Net.HttpStatusCode.OK && response.Content != null)
-            {
-                var dic = response.Content.ReadAsAsync<Dictionary<string, string>>().Result;
-                if (dic["status"] == "success")
-                {
-                    _loginToken = dic["message"];
-                    return;
-                }
-
-                if (dic["message"] == "email or password does not match")
-                {
-                    CreateAccount();
-                    return;
-                }
-
-                throw new Exception(dic["message"]);
-            }
-
-            throw new Exception(response.ReasonPhrase);                
-        }
-
-        private void CreateAccount()
-        {
-            var response = _client.PostAsync("Login/CreateAccount", new FormUrlEncodedContent(_accountInfo));
-            if (response.Result.StatusCode == System.Net.HttpStatusCode.OK && response.Result.Content != null)
-            {
-                var dic = response.Result.Content.ReadAsAsync<Dictionary<string, string>>().Result;
-                if (dic["status"] == "success")
-                {
-                    _loginToken = dic["message"];
-                    return;
-                }
-
-                throw new Exception(dic["message"]);
-            }
-           
-            throw new Exception(response.Result.ReasonPhrase);
-        }
-
         public void Dispose()
         { // class is sealed so don't need full blown IDisposable pattern.
             _running = false;
+        }
+
+        private class PlotConnection
+        {
+            readonly HttpClient _client;
+            readonly int _plotID;
+            private PlotConnection(HttpClient client, int plotID, string plotname)
+            {
+                _client = client;
+                _plotID = plotID;
+                PlotName = plotname;
+            }
+
+            public string PlotName { get; private set; }
+            public async Task PostVectorAsync(byte[] buffer, DateTime timestamp) 
+            {
+                string query = $"api/LoopApi?plotnameID={_plotID}&Ticks={timestamp.Ticks}";
+                var response = await _client.PutAsJsonAsync(query, buffer);
+                response.EnsureSuccessStatusCode();
+            }
+
+            public async Task PostAlertAsync(byte[] signedMessage)
+            {
+                string query = $"api/LoopApi/AlertMessage?plotnameID={_plotID}";
+                var response = await _client.PutAsJsonAsync(query, signedMessage);
+                response.EnsureSuccessStatusCode();
+            }
+
+            public static async Task<PlotConnection> Establish(string loopName, byte[] publicKey, byte[] signedVectorDescription)
+            {
+                var connectionInfo = IOconfFile.GetConnectionInfo();
+                var client = NewClient(connectionInfo.Server);
+                var token = await GetLoginTokenWithRetries(client, connectionInfo); // retries here are important as its the first connection so running after a restart can run into the connection not being initialized
+                var (plotId, plotName) = await GetPlotIDAsync(loopName, client, token, publicKey, signedVectorDescription);
+                return new PlotConnection(client, plotId, plotName);
+            }
+
+            private static async Task<(int plotId, string plotName)> GetPlotIDAsync(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription)
+            {
+                HttpResponseMessage response = null;
+                try
+                {
+                    string query = $"api/LoopApi?LoopName={loopName}&ticks={DateTime.UtcNow.Ticks}&loginToken={loginToken}";
+                    response = await client.PutAsJsonAsync(query, publicKey.Concat(signedVectorDescription));
+                    response.EnsureSuccessStatusCode();
+                    var result = response.Content.ReadAsAsync<string>().Result;
+                    return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
+                }
+                catch (Exception ex)
+                {
+                    if (ex.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'" || ex.InnerException?.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'")
+                        throw new HttpRequestException("Check your internet connection", ex);
+
+                    var contentTask = response?.Content?.ReadAsStringAsync();
+                    var error = contentTask != null ? await contentTask : null;
+                    if (!string.IsNullOrEmpty(error))
+                        throw new Exception(error);
+
+                    OnError("failed getting plot id", ex);
+                    throw;
+                }
+            }
+
+            private static async Task<string> GetLoginTokenWithRetries(HttpClient client, ConnectionInfo info)
+            {
+                var accountInfo = new Dictionary<string, string> { { "email", info.email }, { "password", info.password }, { "fullname", info.Fullname } };
+                int failureCount = 0;
+                while (true)
+                {
+                    try
+                    {
+                        var token = await GetLoginToken(client, accountInfo);
+                        if (failureCount > 0)
+                            CALog.LogInfoAndConsoleLn(LogID.A, "Reconnected.");
+                        return token;
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        if (failureCount++ > 10)
+                            throw;
+
+                        CALog.LogErrorAndConsoleLn(LogID.A, "Failed to connect while starting, attempting to reconnect in 5 seconds.", ex);
+                        await Task.Delay(5000);
+                    }
+                }
+            }
+
+            private static async Task<string> GetLoginToken(HttpClient client, Dictionary<string, string> accountInfo)
+            {
+                var (status, message) = await Post(client, accountInfo, "Login");
+                if (message == "email or password does not match")
+                    (status, message) = await Post(client, accountInfo, "Login/CreateAccount"); // attempt to create account assuming it did not exist
+                if (status == "success")
+                    return message;
+
+                throw new Exception(message);
+            }
+            
+            private static async Task<(string status, string message)> Post(HttpClient client, Dictionary<string, string> accountInfo, string requestUri)
+            {
+                var response = client.PostAsync(requestUri, new FormUrlEncodedContent(accountInfo));
+                if (response.Result.StatusCode == System.Net.HttpStatusCode.OK && response.Result.Content != null)
+                {
+                    var dic = await response.Result.Content.ReadAsAsync<Dictionary<string, string>>();
+                    return (dic["status"], dic["message"]);
+                }
+            
+                throw new Exception(response.Result.ReasonPhrase);
+            }
+
+            private static HttpClient NewClient(string server)
+            {
+                var client = new HttpClient();
+                client.BaseAddress = new Uri(server);
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                return client;
+            }
+        }
+
+        private class Signing
+        {
+            private RSACryptoServiceProvider _rsaWriter = new RSACryptoServiceProvider(1024);
+
+            public Signing(string loopName)
+            {
+                var keyFilename = "Key" + loopName + ".bin";
+                CALog.LogInfoAndConsoleLn(LogID.A, loopName);
+
+                if (File.Exists(keyFilename))
+                    _rsaWriter.ImportCspBlob(File.ReadAllBytes(keyFilename));
+                else
+                    File.WriteAllBytes(keyFilename, _rsaWriter.ExportCspBlob(true));
+            }
+
+            public byte[] GetPublicKey() => _rsaWriter.ExportCspBlob(false);
+
+            public byte[] GetSignature(byte[] data) => _rsaWriter.SignData(data, new SHA1CryptoServiceProvider());
         }
     }
 }

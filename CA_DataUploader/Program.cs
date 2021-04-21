@@ -39,8 +39,7 @@ namespace CA_DataUploader
                         cmd.OnNewVectorReceived(list);
                         cloud.SendVector(list.Select(v => v.Value).ToList(), allSensors.First().TimeStamp);
                         Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
-
-                        Thread.Sleep(100);
+                        cloud.Wait(100);
                         if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
                     }
                 }
