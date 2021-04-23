@@ -40,7 +40,7 @@ namespace CA_DataUploaderLib.IOconf
             Map = maps.SingleOrDefault(x => x.BoxName == boxName);
             if (Map == null) 
                 throw new Exception($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
-            if (skipBoardSettings)
+            if (!skipBoardSettings)
                 Map.BoardSettings = settings;
         }
     }
