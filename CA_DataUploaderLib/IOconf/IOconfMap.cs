@@ -56,6 +56,6 @@ namespace CA_DataUploaderLib.IOconf
         public MCUBoard Board;
         private BoardSettings _boardSettings = BoardSettings.Default;
 
-        public override string ToString() => $"{BoxName} - ${USBPort ?? SerialNumber}";
+        public override string ToString() => $"{BoxName} - {USBPort ?? SerialNumber}";
     }
 }
