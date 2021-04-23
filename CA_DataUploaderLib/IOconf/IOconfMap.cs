@@ -47,14 +47,13 @@ namespace CA_DataUploaderLib.IOconf
             set
             {
                 _boardSettings = value ?? BoardSettings.Default;
-                if (_baudRate == 0) _baudRate = _boardSettings.DefaultBaudRate;
+                if (BaudRate == 0) BaudRate = _boardSettings.DefaultBaudRate;
             }
         }
         /// <summary>the baud rate as specified in configuration and otherwise 0</summary>
         /// <remarks>check <see cref="BoardSettings" /> for additional baud rate set by configurations</remarks>
         public int BaudRate { get; private set; }
         public MCUBoard Board;
-        private int _baudRate;
         private BoardSettings _boardSettings = BoardSettings.Default;
 
         public override string ToString() => $"{BoxName} - ${USBPort ?? SerialNumber}";
