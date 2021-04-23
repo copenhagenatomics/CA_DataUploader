@@ -47,7 +47,7 @@ namespace CA_DataUploaderLib.IOconf
             set
             {
                 _boardSettings = value ?? BoardSettings.Default;
-                if (_baudRate == 0) _baudRate = value.DefaultBaudRate;
+                if (_baudRate == 0) _baudRate = _boardSettings.DefaultBaudRate;
             }
         }
         /// <summary>the baud rate as specified in configuration and otherwise 0</summary>
