@@ -50,7 +50,7 @@ namespace CA_DataUploaderLib
                         return _lastRead = _lastValidRead = values;
                     }
                     
-                    CALog.LogData(LogID.B, $"board {box.ToString()} without valid reads since {_timeSinceLastValidRead} ms - latest invalid response: {lines}");
+                    CALog.LogData(LogID.B, $"board {box.ToString()} without valid reads since {_timeSinceLastValidRead.ElapsedMilliseconds} ms - latest invalid response: {lines}");
                     if (_timeSinceLastValidRead.IsRunning && _timeSinceLastValidRead.ElapsedMilliseconds < 300)
                         return _lastRead = _lastValidRead;
                 }
