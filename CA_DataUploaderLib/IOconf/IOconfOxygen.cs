@@ -31,7 +31,7 @@ namespace CA_DataUploaderLib.IOconf
             new IOconfOxygen($"Oxygen_Error;{Name};{BoxName}", LineNumber) { PortNumber = 4}
             };
 
-        private class LineParser : BoardSettings.LineParser
+        public class LineParser : BoardSettings.LineParser
         {
             // "O 0213.1 T +21.0 P 1019 % 020.92 e 0000"
             private const string _luminoxPattern = "O ((?:[0-9]*[.])?[0-9]+) T ([+-]?(?:[0-9]*[.])?[0-9]+) P ((?:[0-9]*[.])?[0-9]+) % ((?:[0-9]*[.])?[0-9]+) e ([0-9]*)";
@@ -41,7 +41,7 @@ namespace CA_DataUploaderLib.IOconf
             // returns partial pressure, temperature, pressure, oxygen %, error code
             public override List<double> TryParseAsDoubleList(string line)
             {
-                var match = _luminoxRegex.Match(_luminoxPattern);
+                var match = _luminoxRegex.Match(line);
                 if (!match.Success) 
                     return null; 
 
