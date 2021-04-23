@@ -16,7 +16,7 @@ namespace CA_DataUploaderLib.IOconf
                 AllJunction = true;   // all => special command to show all junction temperatures including the first as average (used for calibration)
                 PortNumber = 0;
             }
-            else if (!Skip && HasPort)
+            else if (!Skip && !HasPort)
                 throw new Exception("IOconfTypeK: wrong port number: " + row);
             else if (!Skip && (PortNumber < 0 || PortNumber > 33)) 
                 throw new Exception("IOconfTypeK: invalid port number: " + row);
