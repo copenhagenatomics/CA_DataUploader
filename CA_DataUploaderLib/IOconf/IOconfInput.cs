@@ -16,7 +16,7 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception($"{type}: wrong port number: {row}");
             if (list.Count > 3 && !(HasPort = int.TryParse(list[3], out PortNumber)) && parsePortRequired) 
                 throw new Exception($"{type}: wrong port number: {row}");
-            if (list.Count > 3 && list[3] == "Skip") 
+            if (list.Count > 3 && "skip".Equals(list[3], StringComparison.InvariantCultureIgnoreCase)) 
                 Skip = true;
 
             if (parseBoxName) 
