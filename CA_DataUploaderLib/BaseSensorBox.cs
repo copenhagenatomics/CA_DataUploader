@@ -86,7 +86,9 @@ namespace CA_DataUploaderLib
             DateTime start = DateTime.Now;
             int badRow = 0;
             // normally all boards have the same ms between reads, so for now just use the minimum value.
-            var msBetweenReads = _boards.Min(b => b.ConfigSettings.MillisecondsBetweenReads); 
+            // we reach here without boxes when the values are all Skip (a.k.a don't use usb boards),
+            // such like rpi temps in the ThermocoupleBox and pressure/temperature of the oxygen sensors.
+            var msBetweenReads = _boards.Count > 0 ? _boards.Min(b => b.ConfigSettings.MillisecondsBetweenReads) : 1000; 
 
             while (_running)
             {
