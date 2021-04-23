@@ -103,8 +103,10 @@ namespace CA_DataUploaderLib
         private void LoopForever()
         {
             _running = true;
+            var vectorUploadDelay = IOconfFile.GetVectorUploadDelay();
             while (_running)
             {
+                Wait(vectorUploadDelay, ref _waitLoopForeverTimestamp);
                 try
                 {
                     var list = DequeueAllEntries(_queue);
@@ -116,7 +118,6 @@ namespace CA_DataUploaderLib
                         PostAlertAsync(alert);
 
                     PrintBadPackagesMessage(false);
-                    Wait(IOconfFile.GetVectorUploadDelay(), ref _waitLoopForeverTimestamp);
                 }
                 catch (Exception ex)
                 {
