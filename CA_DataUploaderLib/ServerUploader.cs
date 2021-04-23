@@ -67,7 +67,7 @@ namespace CA_DataUploaderLib
         {
             if (vector.Count() != _vectorDescription.Length)
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescription.Length}");
-            if (_lastTimestamp < timestamp)
+            if (timestamp <= _lastTimestamp)
             {
                 CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {timestamp}");
                 return;
