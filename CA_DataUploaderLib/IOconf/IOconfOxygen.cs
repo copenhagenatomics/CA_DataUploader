@@ -26,9 +26,9 @@ namespace CA_DataUploaderLib.IOconf
         /// <summary>get expanded conf entries that include the oxygen %, oxygen partial pressure and error</summary>
         /// <remarks>the returned entries have port numbers that correspond to the ones returned by the LineParser</remarks>
         public IEnumerable<IOconfOxygen> GetExpandedConf() => new [] {
-            new IOconfOxygen($"Oxygen_Oxygen%;{Name};{BoxName}", LineNumber) { PortNumber = 3},
-            new IOconfOxygen($"Oxygen_OxygenPartialPressure;{Name};{BoxName}", LineNumber) { PortNumber = 0},
-            new IOconfOxygen($"Oxygen_Error;{Name};{BoxName}", LineNumber) { PortNumber = 4}
+            new IOconfOxygen($"Oxygen;Oxygen_Oxygen%;{Name};{BoxName}", LineNumber) { PortNumber = 3},
+            new IOconfOxygen($"Oxygen;Oxygen_OxygenPartialPressure;{Name};{BoxName}", LineNumber) { PortNumber = 0},
+            new IOconfOxygen($"Oxygen;Oxygen_Error;{Name};{BoxName}", LineNumber) { PortNumber = 4}
             };
 
         public class LineParser : BoardSettings.LineParser
