@@ -308,12 +308,12 @@ namespace CA_DataUploaderLib
                     }
                     catch (TimeoutException ex)
                     {
-                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName}: " + ex.Message);
+                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({BaudRate}): " + ex.Message);
                         break;
                     }
                     catch (Exception ex)
                     {
-                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName}: " + ex.Message);
+                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({BaudRate}): " + ex.Message);
                     }
                 }
             }
