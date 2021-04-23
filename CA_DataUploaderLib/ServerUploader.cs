@@ -114,8 +114,11 @@ namespace CA_DataUploaderLib
                         PostVectorAsync(GetSignedVectors(list), list.First().timestamp);
 
                     var alerts = DequeueAllEntries(_alertQueue);
-                    foreach (var alert in alerts)
-                        PostAlertAsync(alert);
+                    if (alerts != null)
+                    {
+                        foreach (var alert in alerts)
+                            PostAlertAsync(alert);
+                    }
 
                     PrintBadPackagesMessage(false);
                 }
