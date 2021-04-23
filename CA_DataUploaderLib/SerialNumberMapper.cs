@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
@@ -14,7 +13,6 @@ namespace CA_DataUploaderLib
     {
         public readonly List<MCUBoard> McuBoards = new List<MCUBoard>();
         private readonly CALogLevel _logLevel = CALogLevel.Normal;
-        private static int _detectedUnknownBoards;
 
         public SerialNumberMapper()
         {
@@ -25,19 +23,9 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    int baudRate = File.Exists("IO.conf") ?
-                        (IOconfFile.GetMap().SingleOrDefault(m => m.USBPort == name)?.BaudRate ?? 115200) : 
-                        115200;
-                    var mcu = new MCUBoard(name, baudRate);
-                    if (mcu.UnableToRead && mcu.BaudRate != 9600)
-                        mcu = new MCUBoard(name, 9600); // for luminox & scale sensors not yet in IOconfFile / or that moved usb ports due to (un)plugged devices
-                    if (mcu.serialNumber.IsNullOrEmpty())
-                        mcu.serialNumber = "unknown" + Interlocked.Increment(ref _detectedUnknownBoards);
-
+                    var mcu = MCUBoard.OpenDeviceConnection(name);
                     McuBoards.Add(mcu);
-
                     mcu.productType = mcu.productType ?? GetStringFromDmesg(mcu.PortName);
-
                     string logline = _logLevel == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
                     CALog.LogInfoAndConsoleLn(LogID.A, logline);
                 }

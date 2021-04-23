@@ -19,8 +19,12 @@ namespace CA_DataUploaderLib.IOconf
                 SerialNumber = list[1];
 
             BoxName = list[2];
-            if (list.Count > 3 && !int.TryParse(list[3], out BaudRate))
-                BaudRate = 115200; // default baud rate. 
+            if (list.Count <= 3)
+                return;
+            if (!int.TryParse(list[3], out var baudrate))
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Failed to parse the baud rate for the board: {BoxName}. Attempting with defaults.");
+            else
+                BaudRate = baudrate;
         }
 
         public bool SetMCUboard(MCUBoard board)
@@ -37,8 +41,21 @@ namespace CA_DataUploaderLib.IOconf
         public string USBPort { get; private set; }
         private string SerialNumber { get; set; }
         public string BoxName { get; set; }
-        public int BaudRate = 115200;
+        public BoardSettings BoardSettings
+        {
+            get => _boardSettings; 
+            set
+            {
+                _boardSettings = value ?? BoardSettings.Default;
+                if (_baudRate == 0) _baudRate = value.DefaultBaudRate;
+            }
+        }
+        /// <summary>the baud rate as specified in configuration and otherwise 0</summary>
+        /// <remarks>check <see cref="BoardSettings" /> for additional baud rate set by configurations</remarks>
+        public int BaudRate { get; private set; }
         public MCUBoard Board;
+        private int _baudRate;
+        private BoardSettings _boardSettings = BoardSettings.Default;
 
         public override string ToString() => $"{BoxName} - ${USBPort ?? SerialNumber}";
     }

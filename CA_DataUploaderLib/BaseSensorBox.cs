@@ -20,9 +20,9 @@ namespace CA_DataUploaderLib
         protected CommandHandler _cmd;
         protected List<SensorSample> _values = new List<SensorSample>();
         protected List<MCUBoard> _boards = new List<MCUBoard>();
-        protected int expectedHeaderLines = 8;
         private string commandHelp;
         private bool disposed;
+        private HashSet<MCUBoard> _lostBoards = new HashSet<MCUBoard>();
 
         public BaseSensorBox(CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values) 
         { 
@@ -85,14 +85,16 @@ namespace CA_DataUploaderLib
         {
             DateTime start = DateTime.Now;
             int badRow = 0;
+            // normally all boards have the same ms between reads, so for now just use the minimum value.
+            var msBetweenReads = _boards.Min(b => b.ConfigSettings.MillisecondsBetweenReads); 
 
             while (_running)
             {
+                Thread.Sleep(msBetweenReads);
                 try
                 {
                     ReadSensors();
                     CheckFails(); // check if any of the boards stopped responding. 
-                    Thread.Sleep(100); //boards typically write a line every 100 ms
                 }
                 catch (Exception ex)
                 {
@@ -103,8 +105,6 @@ namespace CA_DataUploaderLib
                         _cmd?.Execute("escape");
                         _running = false;
                     }
-                    else
-                        Thread.Sleep(100); //boards typically write a line every 100 ms
                 }
             }
 
@@ -130,7 +130,7 @@ namespace CA_DataUploaderLib
                     var line = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
                     try
                     {
-                        var numbers = TryParseAsDoubleList(line);
+                        var numbers = TryParseAsDoubleList(board, line);
                         if (numbers != null)
                             ProcessLine(numbers, board);
                         else // mostly responses to commands or headers on reconnects.
@@ -149,41 +149,52 @@ namespace CA_DataUploaderLib
         }
 
         /// <returns>the list of doubles, otherwise <c>null</c></returns>
-        protected virtual List<double> TryParseAsDoubleList(string line)
-        {
-            if (!_startsWithDigitRegex.IsMatch(line))
-                return null;
-
-            return line.Split(",".ToCharArray())
-                .Select(x => x.Trim())
-                .Where(x => x.Length > 0)
-                .Select(x => x.ToDouble())
-                .ToList();
-        }
+        protected virtual List<double> TryParseAsDoubleList(MCUBoard board, string line) => 
+            board.ConfigSettings.Parser.TryParseAsDoubleList(line);
 
         private void CheckFails()
         {
-            List<string> failPorts = new List<string>();
-            int maxDelay = 2000;
-            bool reconnectLimitExceeded = false;
+            // late initialization for these 2, avoiding instance when there are no failures
+            List<string> failedPorts = null;
+            HashSet<MCUBoard> lostConnectionBoards = null; 
             foreach (var item in _values)
             {
-                maxDelay = item.Input.Name.ToLower().Contains("luminox") ? 10000 : 2000;
                 var msSinceLastRead = DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds;
-                if (msSinceLastRead > maxDelay && !item.Input.Skip)
-                {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} stale value detected for port: {item.Input.Name}{Environment.NewLine}{msSinceLastRead} milliseconds since last read - closing serial port to restablish connection");
-                    if (item.Input.Map != null)
-                        reconnectLimitExceeded |= !item.Input.Map.Board.SafeReopen(expectedHeaderLines);
-                    failPorts.Add(item.Input.Name);
-                }
+                if (_lostBoards.Contains(item.Input.Map?.Board) || (lostConnectionBoards?.Contains(item.Input.Map?.Board) ?? false)) 
+                    continue; // ignore boards already reported as lost
+                var settings = item.Input.Map?.Board?.ConfigSettings ?? BoardSettings.Default;
+                if (msSinceLastRead <= settings.MaxMillisecondsWithoutNewValues || item.Input.Skip)
+                    continue;
+                CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} stale value detected for port: {item.Input.Name}{Environment.NewLine}{msSinceLastRead} milliseconds since last read - closing serial port to restablish connection");
+                if (item.Input.Map == null || item.Input.Map.Board.SafeReopen()) 
+                    continue;
+                LateInit(ref lostConnectionBoards).Add(item.Input.Map.Board);
+                LateInit(ref failedPorts).Add(item.Input.Name);
             }
 
-            if (reconnectLimitExceeded)
+            if (lostConnectionBoards != null)
+                HandleLostConnectionToBoards(lostConnectionBoards, failedPorts);
+        }
+
+        private void HandleLostConnectionToBoards(HashSet<MCUBoard> lostConnectionBoards, List<string> failedPorts)
+        {
+            var stopWhenLosingSensor = lostConnectionBoards.Any(b => b.ConfigSettings.StopWhenLosingSensor);
+            if (stopWhenLosingSensor)
             {
                 _cmd.Execute("escape");
                 _running = false;
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Shutting down: {Title} unable to read from port: {string.Join(", ", failPorts)}{Environment.NewLine}Reconnection limit exceeded, latest valid read was more than {maxDelay} seconds old");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Shutting down: {Title} unable to read from port: {string.Join(", ", failedPorts)}{Environment.NewLine}Reconnection limit exceeded");
+                return;
+            }
+
+            var lostBoardsNames = string.Join(Environment.NewLine, lostConnectionBoards);
+            CALog.LogErrorAndConsoleLn(LogID.A, $"{Title}: reconnect limit exceeded, these boards will be ignored: {Environment.NewLine}{lostBoardsNames}");
+            _boards.RemoveAll(lostConnectionBoards.Contains);
+            _lostBoards.UnionWith(lostConnectionBoards);
+            foreach (var board in lostConnectionBoards)
+            {
+                try { board.Dispose(); }
+                catch (Exception e) { CALog.LogException(LogID.A, e); }
             }
         }
 
@@ -193,7 +204,7 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public void ProcessLine(IEnumerable<double> numbers, MCUBoard board)
+        public virtual void ProcessLine(IEnumerable<double> numbers, MCUBoard board)
         {
             int i = 0;
             var timestamp = DateTime.UtcNow;
@@ -210,6 +221,9 @@ namespace CA_DataUploaderLib
                 i++;
             }
         }
+
+        private T LateInit<T>(ref T value) where T : new()
+            => value = value ?? new T();
 
         private void HandleSaltLeakage(SensorSample sensor)
         {
