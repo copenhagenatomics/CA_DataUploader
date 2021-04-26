@@ -2,6 +2,7 @@
 {
     public class IOconfAirFlow : IOconfInput
     {
-        public IOconfAirFlow(string row, int lineNum) : base(row, lineNum, "AirFlow") { }
+        public IOconfAirFlow(string row, int lineNum) : 
+            base(row, lineNum, "AirFlow", true, true, new BoardSettings() { ExpectedHeaderLines = 12 }) { }
     }
 }

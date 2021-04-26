@@ -8,9 +8,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             format = "Pressure;Name;BoxName;[port number / skip]";
             var list = ToList();
-            if ("skip".Equals(list[3].ToLower(), StringComparison.InvariantCultureIgnoreCase))
-                Skip = true;
-            else if (!int.TryParse(list[3], out PortNumber)) 
+            if (!Skip && !HasPort)
                 throw new Exception("IOConfPressure: wrong port number: " + row);
         }
     }

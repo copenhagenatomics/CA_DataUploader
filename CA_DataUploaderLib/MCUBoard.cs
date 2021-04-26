@@ -7,6 +7,7 @@ using CA_DataUploaderLib.IOconf;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace CA_DataUploaderLib
 {
@@ -39,7 +40,7 @@ namespace CA_DataUploaderLib
         public string mcuFamily = null;
         public const string mcuFamilyHeader = "MCU Family: ";
         private readonly Regex _startsWithNumberRegex = new Regex(@"^(-|\d+)");
-        public bool UnableToRead = true;
+        public bool InitialConnectionSucceeded {get;} = false;
 
         public DateTime PortOpenTimeStamp;
 
@@ -51,10 +52,12 @@ namespace CA_DataUploaderLib
         private static int _luminoxSensorsDetected;
         private static readonly Regex _scaleRegex = new Regex("[+-](([0-9]*[.])?[0-9]+) kg"); // "+0000.00 kg"
         private static int _detectedScaleBoards;
+        private static int _detectedUnknownBoards;
 
-        public MCUBoard(string name, int baudrate) // : base(name, baudrate, 0, 8, 1, 0)
+        public BoardSettings ConfigSettings { get; set; } = BoardSettings.Default;
+
+        private MCUBoard(string name, int baudrate, bool skipBoardAutoDetection) 
         {
-
             try
             {
                 if(IsOpen)
@@ -75,14 +78,20 @@ namespace CA_DataUploaderLib
 
                 Open();
 
-                ReadSerialNumber();
+                if (skipBoardAutoDetection)
+                    InitialConnectionSucceeded = true;
+                else
+                    InitialConnectionSucceeded = ReadSerialNumber();
 
                 if (File.Exists("IO.conf"))
-                {
+                { // note that unlike the discovery at MCUBoard.OpenDeviceConnection that only considers the usb port, in here we can find the boards by the serial number too.
                     foreach (var ioconfMap in IOconfFile.GetMap())
                     {
                         if (ioconfMap.SetMCUboard(this))
+                        {
                             BoxName = ioconfMap.BoxName;
+                            ConfigSettings = ioconfMap.BoardSettings;
+                        }
                     }
                 }
             }
@@ -91,7 +100,7 @@ namespace CA_DataUploaderLib
                 CALog.LogException(LogID.A, ex);
             }
 
-            if (UnableToRead)
+            if (!InitialConnectionSucceeded)
             {
                 Close();
                 Thread.Sleep(100);
@@ -153,7 +162,7 @@ namespace CA_DataUploaderLib
         /// 
         /// No exceptions are produced if there is a failure to reopen, although information about is added to log B.
         /// </remarks>
-        public bool SafeReopen(int expectedHeaderLines = 8, int secondsBetweenReopens = 3)
+        public bool SafeReopen()
         {
             var lines = new List<string>();
             var bytesToRead500ms = 0;
@@ -162,7 +171,7 @@ namespace CA_DataUploaderLib
                 lock (this)
                 {
                     TimeSpan timeSinceLastReopen = DateTime.Now.Subtract(_lastReopenTime);
-                    if (timeSinceLastReopen.TotalSeconds < secondsBetweenReopens)
+                    if (timeSinceLastReopen.TotalSeconds < ConfigSettings.SecondsBetweenReopens)
                     {
                         CALog.LogData(LogID.B, $"(Reopen) skipped {PortName} {productType} {serialNumber} - time since last reopen {timeSinceLastReopen}");
                         return true;
@@ -182,16 +191,9 @@ namespace CA_DataUploaderLib
                     Open();
                     Thread.Sleep(500);
 
-                    CALog.LogData(LogID.B, $"(Reopen) skipping {expectedHeaderLines} header lines for port {PortName} {productType} {serialNumber} ");
                     bytesToRead500ms = BytesToRead;
-                    for (int i = 0; i < expectedHeaderLines; i++)
-                    {
-                        var line = ReadLine().Trim();
-                        lines.Add(line);
-                        if (_startsWithNumberRegex.IsMatch(line) && i > 0) // making sure we skip the first one, as it is something a partial line (perhaps from the last read before the restart, although pi buffer is cleared).
-                            break; // we are past the header.
-                    }
-
+                    CALog.LogData(LogID.B, $"(Reopen) skipping {ConfigSettings.ExpectedHeaderLines} header lines for port {PortName} {productType} {serialNumber} ");
+                    lines = SkipExtraHeaders(ConfigSettings.ExpectedHeaderLines);
                     _lastReopenTime = DateTime.Now;
                 }
             }
@@ -208,11 +210,55 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private void ReadSerialNumber()
+        public static MCUBoard OpenDeviceConnection(string name)
+        {
+            // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
+            var map = File.Exists("IO.conf") ? IOconfFile.GetMap().SingleOrDefault(m => m.USBPort == name) : null;
+            var initialBaudrate = map != null && map.BaudRate != 0 ? map.BaudRate : 115200;
+            var mcu = new MCUBoard(name, initialBaudrate, (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection);
+            if (!mcu.InitialConnectionSucceeded)
+                mcu = OpenWithAutoDetection(name, initialBaudrate);
+            if (mcu.serialNumber.IsNullOrEmpty())
+                mcu.serialNumber = "unknown" + Interlocked.Increment(ref _detectedUnknownBoards);
+            if (mcu.InitialConnectionSucceeded && map != null && map.BaudRate != 0 && mcu.BaudRate != map.BaudRate)
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected baud rate for {map}. Board info {mcu}");
+            if (mcu.ConfigSettings.ExpectedHeaderLines > 8)
+                mcu.SkipExtraHeaders(mcu.ConfigSettings.ExpectedHeaderLines - 8);
+            return mcu;
+        }
+
+        private List<string> SkipExtraHeaders(int extraHeaderLinesToSkip)
+        {
+            var lines = new List<string>(extraHeaderLinesToSkip);
+            for (int i = 0; i < ConfigSettings.ExpectedHeaderLines; i++)
+            {
+                var line = ReadLine().Trim();
+                lines.Add(line);
+                if (ConfigSettings.Parser.MatchesValuesFormat(line))
+                    break; // we are past the header.
+            }
+
+            return lines;
+        }
+
+        private static MCUBoard OpenWithAutoDetection(string name, int previouslyAttemptedBaudRate)
+        { 
+            var skipAutoDetection = false;
+            if (previouslyAttemptedBaudRate == 115200)
+                return new MCUBoard(name, 9600, skipAutoDetection);
+            if (previouslyAttemptedBaudRate == 9600)
+                return new MCUBoard(name, 115200, skipAutoDetection);
+            var mcu = new MCUBoard(name, 115200, skipAutoDetection);
+            return mcu.InitialConnectionSucceeded ? mcu : new MCUBoard(name, 9600, skipAutoDetection);
+        }
+
+        /// <returns><c>true</c> if we were able to read</returns>
+        private bool ReadSerialNumber()
         {
             WriteLine("Serial");
             var stop = DateTime.Now.AddSeconds(5);
             bool sentSerialCommandTwice = false;
+            bool ableToRead = false;
             while (IsEmpty() && DateTime.Now < stop)
             {
 
@@ -228,7 +274,7 @@ namespace CA_DataUploaderLib
                             CALog.LogColor(LogID.A, ConsoleColor.Green, input);
                         }
 
-                        UnableToRead = input.Length < 2;
+                        ableToRead = input.Length >= 2;
                         if (input.Contains(MCUBoard.serialNumberHeader))
                             serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
                         else if (input.Contains(MCUBoard.boardFamilyHeader))
@@ -250,9 +296,9 @@ namespace CA_DataUploaderLib
                         else if (input.Contains(MCUBoard.mcuFamilyHeader))
                             mcuFamily = input.Substring(input.IndexOf(MCUBoard.mcuFamilyHeader) + MCUBoard.mcuFamilyHeader.Length).Trim();
                         else if (DetectLuminoxSensor(input)) // avoid waiting for a never present serial for luminox sensors 
-                            return;
+                            return true;
                         else if (DetectAscale(input))
-                            return;
+                            return true;
                         else if (input.Contains("MISREAD") && !sentSerialCommandTwice && serialNumber == null)
                         {
                             WriteLine("Serial");
@@ -262,15 +308,17 @@ namespace CA_DataUploaderLib
                     }
                     catch (TimeoutException ex)
                     {
-                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName}: " + ex.Message);
+                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({BaudRate}): " + ex.Message);
                         break;
                     }
                     catch (Exception ex)
                     {
-                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName}: " + ex.Message);
+                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({BaudRate}): " + ex.Message);
                     }
                 }
             }
+
+            return ableToRead;
         }
 
         private bool DetectLuminoxSensor(string line)
