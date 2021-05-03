@@ -11,8 +11,7 @@ namespace CA_DataUploaderLib.IOconf
             var list = ToList();
             Name = list[1];
             if(!Enum.TryParse<CALogLevel>(list[2], out LogLevel)) throw new Exception("IOconfLoopName: wrong LogLevel: " + row);
-            if(list.Count > 3)
-                Server = list[3];
+            Server = list.Count > 3 ? list[3] : "https://www.theng.dk";
         }
 
         public static IOconfLoopName Default { get; } = 
