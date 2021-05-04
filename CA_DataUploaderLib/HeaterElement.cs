@@ -21,7 +21,7 @@ namespace CA_DataUploaderLib
         public bool IsOn;
         public bool ManualMode;
         public SensorSample Current;  // Amps per element. 
-        public bool? IsSwitchboardOn;  //same as IsOn, but reported by the switchboard (null for a switchboard not reporting state)
+        public double SwitchboardOnState;  //same as IsOn, but reported by the switchboard (null for a switchboard not reporting state)
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
         private Stopwatch timeSinceLastNegativeValuesWarning = new Stopwatch();
 
@@ -40,8 +40,8 @@ namespace CA_DataUploaderLib
 
         public bool CanTurnOn()
         {
-            if (ManualMode)
-                return false;
+            if (IsOn) return false;
+            if (ManualMode) return false;
 
             if (LastOff > DateTime.UtcNow.AddSeconds(-10))
                 return false;  // has been turned off for less than 10 seconds. 
@@ -54,31 +54,51 @@ namespace CA_DataUploaderLib
             if (validSensors.Any(x => x.Value >= OvenTargetTemperature))
                 return false;  // at least one of the temperature sensors value is valid and above OvenTargetTemperature.  
 
-            onTemperature = validSensors.Max(x => x.Value);
-            return true;
+            return SetOnProperties(validSensors);
         }
 
         public bool MustTurnOff()
         {
+            if (!IsOn) return false;
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
             var validSensors = GetValidSensorsSnapshot(twoSecAgo).ToList();
             var timeoutResult = CheckInvalidValuesTimeout(validSensors.Any(), 2000);
-            if (timeoutResult.HasValue)
-                return timeoutResult.Value;
+            if (timeoutResult.HasValue && timeoutResult.Value)
+                return SetOffProperties();
+            else if (timeoutResult.HasValue)
+                return false;
 
             if (ManualMode)
                 return false;
 
             if (onTemperature < 10000 && validSensors.Max(x => x.Value) > onTemperature + 20)
-                return true; // If hottest sensor is 20C higher than the temperature last time we turned on, then turn off. 
+                return SetOffProperties(); // If hottest sensor is 20C higher than the temperature last time we turned on, then turn off. 
 
-            var turnOff = validSensors.Any(x => x.Value > OvenTargetTemperature); // turn off, if we reached OvenTargetTemperature. 
-            if(!turnOff)
-                lastTemperature = validSensors.Max(x => x.Value);
+            if (validSensors.Any(x => x.Value > OvenTargetTemperature)) 
+                return SetOffProperties(); //if we reached OvenTargetTemperature, then turn off.
 
-            return turnOff;
+            lastTemperature = validSensors.Max(x => x.Value);
+            return false;
         }
 
+        // returns true to simplify MustTurnOff
+        private bool SetOffProperties()
+        {
+            IsOn = false;
+            LastOff = DateTime.UtcNow;
+            return true;
+        }
+
+        // returns true to simplify MustTurnOn
+        private bool SetOnProperties(IEnumerable<SensorSample> validSensors)
+        {
+            onTemperature = validSensors.Max(x => x.Value);
+            IsOn = true;
+            LastOn = DateTime.UtcNow;
+            return true;
+        }
+
+        public void SetManualMode(bool turnOn) => ManualMode = IsOn = turnOn;
         private List<SensorSample> GetValidSensorsSnapshot(DateTime twoSecAgo) 
         {
             var snapshot = _ovenSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000 && x.Value != 0).Select(s => s.Clone()).ToList();
@@ -126,9 +146,25 @@ namespace CA_DataUploaderLib
             return _area == ovenArea;
         }
 
-        public bool MustResendOnCommand() => !CurrentIsOn() && IsOn && LastOn.AddSeconds(2) < DateTime.UtcNow;
-        public bool MustResendOffCommand() => CurrentIsOn() && !IsOn && LastOff.AddSeconds(2) < DateTime.UtcNow;
+        // resends the on command every 5 seconds as there is no current or signs of not reaching the switchbox.
+        public bool MustResendOnCommand()
+        { 
+            if (!IsOn || DateTime.UtcNow < LastOn.AddSeconds(5)) return false;
+            if (CurrentIsOn() || IsCurrentStale()) return false; 
+            LogRepeatCommand("on");
+            return true;
+        }
+
+        // resends the off command every 5 seconds as long as there is current or signs of not reaching the switchbox.
+        public bool MustResendOffCommand() 
+        { 
+            if (IsOn || DateTime.UtcNow < LastOff.AddSeconds(5)) return false;
+            if (!CurrentIsOn() && !IsCurrentStale()) return false; 
+            LogRepeatCommand("off");
+            return true;
+        }
         private bool CurrentIsOn() => Current.Value > _ioconf.CurrentSensingNoiseTreshold;
+        private bool IsCurrentStale() => Current.TimeStamp < DateTime.UtcNow.AddSeconds(-10);
 
         public override string ToString()
         {
@@ -142,5 +178,7 @@ namespace CA_DataUploaderLib
         public string Name() => _ioconf.Name.ToLower();
 
         public MCUBoard Board() => _ioconf.Map.Board;
+        private void LogRepeatCommand(string command) => 
+            CALog.LogData(LogID.A, $"{command}.={Name()}-{MaxSensorTemperature():N0}, v#={Current}, switch-on/off={SwitchboardOnState}, currents-time={Current.TimeStamp} WB={Board().BytesToWrite}{Environment.NewLine}");
     }
 }

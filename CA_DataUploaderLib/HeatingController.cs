@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
@@ -11,6 +12,7 @@ namespace CA_DataUploaderLib
     public sealed class HeatingController : IDisposable, ISubsystemWithVectorData
     {
         public int HeaterOnTimeout = 60;
+        public string Title => "Heating";
         private bool _running = true;
         private CALogLevel _logLevel = CALogLevel.Normal;
         private double _offTemperature = 0;
@@ -18,7 +20,8 @@ namespace CA_DataUploaderLib
         private DateTime _startTime;
         private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
         private CommandHandler _cmd;
-        public string Title => "Heating";
+        private SwitchBoardController _switchboardController;        
+        private readonly TaskCompletionSource _stopped = new TaskCompletionSource();
 
         public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
         {
@@ -44,24 +47,16 @@ namespace CA_DataUploaderLib
             if (unreachableBoards.Count > 0)
                 throw new NotSupportedException("Running with missing heaters is not currently supported");
 
+            _switchboardController = SwitchBoardController.GetOrCreate(cmd);
+            _switchboardController.Stopping += WaitForLoopStopped;
             new Thread(() => this.LoopForever()).Start();
             cmd.AddCommand("escape", Stop);
-            for (int i = 0; i < 20; i++)
-            {
-                Thread.Sleep(200); // waiting for temperature date to arrive, this ensure only valid heating elements are created. 
-                if (_heaters.Any())
-                {
-                    cmd.AddCommand("help", HelpMenu);
-                    cmd.AddCommand("emergencyshutdown", EmergencyShutdown);
-                    cmd.AddCommand("heater", Heater);
-                    if (oven.Any())
-                    {
-                        cmd.AddCommand("oven", Oven);
-                    }
-
-                    break; // exit the for loop
-                }
-            }
+            Thread.Sleep(200); // avoid heater actions before we get the temperature data
+            cmd.AddCommand("help", HelpMenu);
+            cmd.AddCommand("emergencyshutdown", EmergencyShutdown);
+            cmd.AddCommand("heater", Heater);
+            if (oven.Any())
+                cmd.AddCommand("oven", Oven);
         }
 
         private bool EmergencyShutdown(List<string> arg)
@@ -130,7 +125,7 @@ namespace CA_DataUploaderLib
                 return false; 
             }
 
-            heater.ManualMode = heater.IsOn = args[2].ToLower() == "on";
+            heater.SetManualMode(args[2].ToLower() == "on");
             if (heater.IsOn)
                 HeaterOn(heater);
             else
@@ -143,108 +138,89 @@ namespace CA_DataUploaderLib
         {
             _startTime = DateTime.UtcNow;
             _logLevel = IOconfFile.GetOutputLevel();
-            var loopStart = DateTime.UtcNow;
+            
             while (_running)
             {
                 try
                 {
-                    foreach (var heater in _heaters)
-                    {
-                        if (heater.IsOn && heater.MustTurnOff())
-                        {
-                            _offTemperature = heater.MaxSensorTemperature();
-                            _lastTemperature = heater.lastTemperature;
-                            heater.IsOn = false;
-                            HeaterOff(heater);
-                        }
-                        else if (!heater.IsOn && heater.CanTurnOn())
-                        {
-                            heater.IsOn = true;
-                            HeaterOn(heater);
-                        }
-                    }
-
-                    foreach (var box in _heaters.Select(x => x.Board()).Distinct())
-                    {
-                        var values = SwitchBoardBase.ReadInputFromSwitchBoxes(box);
-                        SetCurrentValues(box, values.currents, values.states);
-                    }
-
-                    // check if any of the boards stopped responding. 
-                    bool reconnectLimitExceeded = false;
-                    foreach (var heater in _heaters)
-                    {
-                        if (heater._ioconf.BoxName == "ArduinoHack")
-                            continue;
-
-                        if (DateTime.UtcNow.Subtract(heater.Current.TimeStamp).TotalMilliseconds > 2000)
-                        {
-                            reconnectLimitExceeded |= !heater._ioconf.Map.Board.SafeReopen();
-                        }
-                    }
-
-                    if (reconnectLimitExceeded)
-                    {
-                        _cmd.Execute("escape");
-                        _running = false;
-                        CALog.LogErrorAndConsoleLn(LogID.A, "Shutting down: HeatingController unable to read from port");
-                    }
-
-                    Thread.Sleep(150); // if we read too often, then we will not get a full line, thus no match. 
-                }
-                catch (ArgumentException ex)
-                {
-                    CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
-                    _running = false;
-                }
-                catch (TimeoutException ex)
-                {
-                    CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
-                    AllOff();
-                    _heaters.Clear();
+                    Thread.Sleep(100); // we wait before the actions, so that errors are also throttled.
+                    SetHeatersInputs();
+                    DoHeatersActions();
                 }
                 catch (Exception ex)
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
+                    if (ex is TimeoutException)
+                        AllOff();
                 }
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting HeatingController.LoopForever() " + DateTime.UtcNow.Subtract(_startTime).Humanize(5));
-            AllOff();
+            try
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, "Exiting HeatingController.LoopForever() " + DateTime.UtcNow.Subtract(_startTime).Humanize(5));
+                AllOff();
+            }
+            finally
+            {
+                _stopped.TrySetResult();
+            }
         }
 
-        private void SetCurrentValues(MCUBoard board, double[] values, bool[] states)
+        private void WaitForLoopStopped(object sender, EventArgs args)
         {
-            if (values.Count() == 4)
-            {
-                foreach (var heater in _heaters.Where(x => x.Board() == board))
+            CALog.LogData(LogID.A, "waiting for heaters loop to stop heater actions and turn off the heaters");
+            _stopped.Task.Wait();
+            CALog.LogData(LogID.A, "finished waiting for heaters loop");
+        }
+
+        private void DoHeatersActions()
+        {
+            foreach (var heater in _heaters)
+            { // careful consideration must be taken if changing the order of this if/else chain.
+                if (heater.MustTurnOff())
                 {
-                    heater.Current.Value = values[heater._ioconf.PortNumber - 1];
-                    heater.IsSwitchboardOn = states.Length >= heater._ioconf.PortNumber ? states[heater._ioconf.PortNumber - 1] : default;
-
-                    // this is for extra safety to make sure heaters are on/off when expected to be. 
-                    if (heater.MustResendOnCommand())
-                    {
-                        HeaterOn(heater);
-                        CALog.LogData(LogID.A, $"on.={heater.Name()}-{heater.MaxSensorTemperature():N0}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
-                    }
-
-                    if (heater.MustResendOffCommand())
-                    {
-                        HeaterOff(heater);
-                        CALog.LogData(LogID.A, $"off.={heater.Name()}-{heater.MaxSensorTemperature():N0}, v#={string.Join(", ", values)}, WB={board.BytesToWrite}{Environment.NewLine}");
-                    }
+                    _offTemperature = heater.MaxSensorTemperature();
+                    _lastTemperature = heater.lastTemperature;
+                    HeaterOff(heater);
                 }
+                else if (heater.CanTurnOn())
+                    HeaterOn(heater);
+                else if (heater.MustResendOnCommand())
+                    HeaterOn(heater);
+                else if (heater.MustResendOffCommand())
+                    HeaterOff(heater);
+            }
+        }
+
+        private void SetHeatersInputs()
+        {
+            var values = _switchboardController.GetReadInput().ToArray();
+            foreach (var heater in _heaters)
+            {
+                var current = values.SingleOrDefault(s => s.Name == heater._ioconf.CurrentSensorName)
+                    ?? throw new InvalidOperationException($"missing heater current from switchboard controller: {heater._ioconf.CurrentSensorName}");
+                var switchboardOnOffState = values.SingleOrDefault(s => s.Name == heater._ioconf.SwitchboardOnOffSensorName)
+                    ?? throw new InvalidOperationException($"missing switchboard on/off state from switchboard controller: {heater._ioconf.SwitchboardOnOffSensorName}");
+                heater.Current.SetValueWithoutTimestamp(current.Value);
+                heater.Current.TimeStamp = current.TimeStamp; // keeping the original timestamp as it can be used to detect stale values in the HeaterElement MustResend* logic
+                heater.SwitchboardOnState = switchboardOnOffState.Value;
             }
         }
 
         private void AllOff()
         {
-            _heaters.ForEach(x => x.SetTemperature(0));
-            foreach (var box in _heaters.Select(x => x.Board()).Where(x => x != null).Distinct())
-                box.SafeWriteLine("off");
+            try
+            {
+                _heaters.ForEach(x => x.SetTemperature(0));
+                foreach (var box in _heaters.Select(x => x.Board()).Where(x => x != null).Distinct())
+                    box.SafeWriteLine("off");
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "All heaters are off");
+                CALog.LogInfoAndConsoleLn(LogID.A, "All heaters are off");                
+            }
+            catch (Exception ex)
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, "Error detected while attempting to turn off all heaters", ex);
+            }
         }
 
         private void HeaterOff(HeaterElement heater)
@@ -284,8 +260,7 @@ namespace CA_DataUploaderLib
         {
             var currentValues = _heaters.Select(x => x.Current.Clone());
             var states = _heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
-            var switchboardStates = _heaters.Select(x => new SensorSample(
-                 x.Name() + "_SwitchboardOn/Off", x.IsSwitchboardOn == null ? 10000 : x.IsSwitchboardOn.Value ? 1.0 : 0.0));
+            var switchboardStates = _heaters.Select(x => new SensorSample(x._ioconf.SwitchboardOnOffSensorName, x.SwitchboardOnState));
             var values = currentValues.Concat(states).Concat(switchboardStates);
             if (_logLevel == CALogLevel.Debug)
             {
@@ -303,7 +278,7 @@ namespace CA_DataUploaderLib
         {
             var list = _heaters.Select(x => new VectorDescriptionItem("double", x.Current.Name, DataTypeEnum.Input)).ToList();
             list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_On/Off", DataTypeEnum.Output)));
-            list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_SwitchboardOn/Off", DataTypeEnum.Output)));
+            list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x._ioconf.SwitchboardOnOffSensorName, DataTypeEnum.Output)));
             if (_logLevel == CALogLevel.Debug)
             {
                 list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_LoopTime", DataTypeEnum.State)));

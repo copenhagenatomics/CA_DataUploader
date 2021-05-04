@@ -22,6 +22,7 @@ namespace CA_DataUploaderLib
             set { ReadSensor_LoopTime = value.Subtract(_timeStamp).TotalMilliseconds; _timeStamp = value; }
         } 
         public double ReadSensor_LoopTime { get; private set; }  // in miliseconds. 
+        public void SetValueWithoutTimestamp(double value) => _value = value;
 
         public SensorSample(IOconfInput input, double value = 0)
         {
