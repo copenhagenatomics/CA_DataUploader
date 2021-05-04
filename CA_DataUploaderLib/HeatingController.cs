@@ -293,6 +293,7 @@ namespace CA_DataUploaderLib
         public void Dispose()
         { // class is sealed without unmanaged resources, no need for the full disposable pattern.
             _running = false;
+            _switchboardController.Dispose();
         }
     }
 }
