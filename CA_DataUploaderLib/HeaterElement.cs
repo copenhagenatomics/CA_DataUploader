@@ -42,6 +42,7 @@ namespace CA_DataUploaderLib
         {
             if (IsOn) return false;
             if (ManualMode) return false;
+            if (OvenTargetTemperature <= 0) return false; // disallows heating from negative temperatures / typically means wrong thermocouple connectors wiring
 
             if (LastOff > DateTime.UtcNow.AddSeconds(-10))
                 return false;  // has been turned off for less than 10 seconds. 
@@ -60,6 +61,8 @@ namespace CA_DataUploaderLib
         public bool MustTurnOff()
         {
             if (!IsOn) return false;
+            if (OvenTargetTemperature <= 0) // disallows heating from negative temperatures / typically means wrong thermocouple connectors wiring
+                return SetOffProperties();
             var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
             var validSensors = GetValidSensorsSnapshot(twoSecAgo).ToList();
             var timeoutResult = CheckInvalidValuesTimeout(validSensors.Any(), 2000);
@@ -93,12 +96,24 @@ namespace CA_DataUploaderLib
         private bool SetOnProperties(IEnumerable<SensorSample> validSensors)
         {
             onTemperature = validSensors.Max(x => x.Value);
+            return SetOnProperties();
+        }
+
+        private bool SetOnProperties()
+        {
             IsOn = true;
             LastOn = DateTime.UtcNow;
             return true;
         }
 
-        public void SetManualMode(bool turnOn) => ManualMode = IsOn = turnOn;
+        public void SetManualMode(bool turnOn)
+        { 
+            ManualMode = IsOn = turnOn;
+            if (turnOn)
+                SetOnProperties();
+            else
+                SetOffProperties();
+        }
         private List<SensorSample> GetValidSensorsSnapshot(DateTime twoSecAgo) 
         {
             var snapshot = _ovenSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000 && x.Value != 0).Select(s => s.Clone()).ToList();

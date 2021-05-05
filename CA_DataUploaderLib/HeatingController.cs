@@ -1,4 +1,5 @@
-﻿using CA_DataUploaderLib.IOconf;
+﻿using CA.LoopControlPluginBase;
+using CA_DataUploaderLib.IOconf;
 using Humanizer;
 using System;
 using System.Collections.Generic;
@@ -8,12 +9,12 @@ using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
-
     public sealed class HeatingController : IDisposable, ISubsystemWithVectorData
     {
-        public int HeaterOnTimeout = 60;
         public string Title => "Heating";
+        private static int HeaterOnTimeout = 60;
         private bool _running = true;
+        private bool _disposed = false;
         private CALogLevel _logLevel = CALogLevel.Normal;
         private double _offTemperature = 0;
         private double _lastTemperature = 0;
@@ -22,6 +23,8 @@ namespace CA_DataUploaderLib
         private CommandHandler _cmd;
         private SwitchBoardController _switchboardController;        
         private readonly TaskCompletionSource _stopped = new TaskCompletionSource();
+        private readonly OvenCommand _ovenCmd;
+        private readonly HeaterCommand _heaterCmd;
 
         public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
         {
@@ -52,11 +55,12 @@ namespace CA_DataUploaderLib
             new Thread(() => this.LoopForever()).Start();
             cmd.AddCommand("escape", Stop);
             Thread.Sleep(200); // avoid heater actions before we get the temperature data
-            cmd.AddCommand("help", HelpMenu);
-            cmd.AddCommand("emergencyshutdown", EmergencyShutdown);
-            cmd.AddCommand("heater", Heater);
-            if (oven.Any())
-                cmd.AddCommand("oven", Oven);
+            cmd.AddCommand("emergencyshutdown", EmergencyShutdown);     
+            var cmdPlugins = new PluginsCommandHandler(cmd);
+            _heaterCmd = new HeaterCommand(_heaters);
+            _heaterCmd.Initialize(cmdPlugins, new PluginsLogger("heater"));
+            _ovenCmd = new OvenCommand(_heaters, oven.Any());
+            _ovenCmd.Initialize(cmdPlugins, new PluginsLogger("oven"));
         }
 
         private bool EmergencyShutdown(List<string> arg)
@@ -65,72 +69,9 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private bool HelpMenu(List<string> args)
-        {
-            CALog.LogInfoAndConsoleLn(LogID.A, $"heater [name] on/off      - turn the heater with the given name in IO.conf on and off");
-            if (_heaters.Any(x => !x.IsArea(-1)))
-            {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"oven [0 - 800] [0 - 800]  - where the integer value is the oven temperature top and bottom region");
-            }
-
-            return true;
-        }
-
         private bool Stop(List<string> args)
         {
             _running = false;
-            return true;
-        }
-
-        // usage: oven 200 220 400
-        private bool Oven(List<string> args)
-        {
-            _cmd.AssertArgs(args, 2);
-            if (args[1] == "off")
-                _heaters.ForEach(x => x.SetTemperature(0));
-            else
-            {
-                var areas = IOconfFile.GetOven().Select(x => x.OvenArea).Distinct().OrderBy(x => x).ToList();
-                var tempArgs = args.Skip(1).ToList();
-                if (areas.Count != tempArgs.Count && tempArgs.Count == 1) // if a single temp was provided, use that for all areas
-                    tempArgs = tempArgs.SelectMany(t => Enumerable.Range(0, areas.Count).Select(_ => t)).ToList();
-                else if (areas.Count != tempArgs.Count) 
-                {
-                    CALog.LogInfoAndConsoleLn(LogID.A, "Expected oven command format: oven " + string.Join(' ', Enumerable.Range(1, areas.Count).Select(i => $"tempForArea{i}")));
-                    throw new ArgumentException($"Arguments did not match the amount of configured areas: {areas.Count}");
-                }
-
-                var targets = tempArgs
-                    .Select(ParseTemperature)
-                    .SelectMany((t, i) => _heaters.Where(x => x.IsArea(areas[i])).Select(h => (h, t)));
-                foreach (var (heater, temperature) in targets)
-                    heater.SetTemperature(temperature);
-            }
-
-            var lightState = _heaters.Any(x => x.IsActive) ? "on" : "off";
-            _cmd.Execute($"light main {lightState}", false);
-            return true;
-        }
-
-        static int ParseTemperature(string t) =>
-            int.TryParse(t, out var v) ? v : throw new ArgumentException($"Unexpected target temperature: '{t}'");
-
-        public bool Heater(List<string> args)
-        {
-            var name = args[1].ToLower();
-            var heater = _heaters.SingleOrDefault(x => x.Name() == name);
-            if (heater == null)
-            {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Invalid heater name {name}. Heaters: ${string.Join(',', _heaters.Select(x => x.Name()))}");
-                return false; 
-            }
-
-            heater.SetManualMode(args[2].ToLower() == "on");
-            if (heater.IsOn)
-                HeaterOn(heater);
-            else
-                HeaterOff(heater);
-
             return true;
         }
 
@@ -223,14 +164,11 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private void HeaterOff(HeaterElement heater)
+        private static void HeaterOff(HeaterElement heater)
         {
             try
             {
-                heater.LastOff = DateTime.UtcNow;
                 heater.Board().SafeWriteLine($"p{heater._ioconf.PortNumber} off");
-                if (_logLevel == CALogLevel.Debug)
-                    CALog.LogData(LogID.B, $"wrote p{heater._ioconf.PortNumber} off to {heater.Board().BoxName}");
             }
             catch (TimeoutException)
             {
@@ -238,14 +176,11 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private void HeaterOn(HeaterElement heater)
+        private static void HeaterOn(HeaterElement heater)
         {
             try
             {
-                heater.LastOn = DateTime.UtcNow;
                 heater.Board().SafeWriteLine($"p{heater._ioconf.PortNumber} on {HeaterOnTimeout}");
-                if (_logLevel == CALogLevel.Debug)
-                    CALog.LogData(LogID.B, $"wrote p{heater._ioconf.PortNumber} on {HeaterOnTimeout} to {heater.Board().BoxName}");
             }
             catch (TimeoutException)
             {
@@ -292,8 +227,108 @@ namespace CA_DataUploaderLib
 
         public void Dispose()
         { // class is sealed without unmanaged resources, no need for the full disposable pattern.
+            if (_disposed) return;
+            _disposed = true;
             _running = false;
             _switchboardController.Dispose();
+            _ovenCmd.Dispose();
+            _heaterCmd.Dispose();
+        }
+
+        // usage: oven 200 220 400
+        private class OvenCommand : LoopControlCommand
+        {
+            public override string Name => "oven";
+            public override string ArgsHelp => " [0 - 800] [0 - 800]";
+            public override string Description => "where the integer value is the oven temperature top and bottom region";
+            private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
+
+            public override bool IsHiddenCommand {get; }
+
+            public OvenCommand(List<HeaterElement> heaters, bool hidden)
+            {
+                _heaters = heaters;
+                IsHiddenCommand = hidden;
+            }
+
+            protected override Task Command(List<string> args)
+            { 
+                if (args.Count < 2)
+                {
+                    logger.LogError($"Unexpected format: {string.Join(',', args)}. Format: oven temparea1 temparea2 ...");
+                    return Task.CompletedTask;
+                }
+
+                if (args[1] == "off")
+                {
+                    _heaters.ForEach(x => x.SetTemperature(0));
+                }
+                else
+                {
+                    var areas = IOconfFile.GetOven().Select(x => x.OvenArea).Distinct().OrderBy(x => x).ToList();
+                    var tempArgs = args.Skip(1).ToList();
+                    if (areas.Count != tempArgs.Count && tempArgs.Count == 1) // if a single temp was provided, use that for all areas
+                        tempArgs = tempArgs.SelectMany(t => Enumerable.Range(0, areas.Count).Select(_ => t)).ToList();
+                    else if (areas.Count != tempArgs.Count) 
+                    {
+                        CALog.LogInfoAndConsoleLn(LogID.A, "Expected oven command format: oven " + string.Join(' ', Enumerable.Range(1, areas.Count).Select(i => $"tempForArea{i}")));
+                        throw new ArgumentException($"Arguments did not match the amount of configured areas: {areas.Count}");
+                    }
+
+                    var targets = tempArgs
+                        .Select(ParseTemperature)
+                        .SelectMany((t, i) => _heaters.Where(x => x.IsArea(areas[i])).Select(h => (h, t)));
+                    foreach (var (heater, temperature) in targets)
+                        heater.SetTemperature(temperature);
+                }
+
+                var lightState = _heaters.Any(x => x.IsActive) ? "on" : "off";
+                ExecuteCommand($"light main {lightState}");
+                return Task.CompletedTask;
+            }
+
+            static int ParseTemperature(string t) => int.TryParse(t, out var v) ? v : throw new ArgumentException($"Unexpected target temperature: '{t}'");
+        }
+
+        // usage: heater heaterName on
+        private class HeaterCommand : LoopControlCommand
+        {
+            public override string Name => "heater";
+            public override string ArgsHelp => " [name] on/off";
+            public override string Description => "turn the heater with the given name in IO.conf on and off";
+            private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
+
+            public HeaterCommand(List<HeaterElement> heaters)
+            {
+                _heaters = heaters;
+            }
+
+            protected override Task Command(List<string> args)
+            { 
+                if (args.Count < 3)
+                {
+                    logger.LogError($"Unexpected format: {string.Join(',', args)}. Format: heater heaterName on");
+                    return Task.CompletedTask;
+                }
+
+                var name = args[1].ToLower();
+                var heater = _heaters.SingleOrDefault(x => x.Name() == name);
+                if (heater == null)
+                {
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"Invalid heater name {name}. Heaters: ${string.Join(',', _heaters.Select(x => x.Name()))}");
+                    return Task.CompletedTask; 
+                }
+
+                heater.SetManualMode(args[2].ToLower() == "on");
+                if (heater.IsOn)
+                    HeaterOn(heater);
+                else
+                    HeaterOff(heater);
+
+                return Task.CompletedTask;
+            }
+
+            static int ParseTemperature(string t) => int.TryParse(t, out var v) ? v : throw new ArgumentException($"Unexpected target temperature: '{t}'");
         }
     }
 }

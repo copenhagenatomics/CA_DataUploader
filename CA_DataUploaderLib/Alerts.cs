@@ -41,7 +41,10 @@ namespace CA_DataUploaderLib
         private bool RemoveAlert(List<string> args)
         {
             if (args.Count < 2)
+            {
                 logger.LogError($"Unexpected format for Removing dynamic alert: {string.Join(',', args)}. Format: removealert AlertName");
+                return true;
+            }
 
             lock (_alerts) 
                 _alerts.RemoveAll(a => a.Name == args[1]);
@@ -51,7 +54,10 @@ namespace CA_DataUploaderLib
         protected override Task Command(List<string> args)
         {
             if (args.Count < 3)
+            {
                 logger.LogError($"Unexpected format for Dynamic alert: {string.Join(',', args)}. Format: addalert AlertName SensorName comparison value");
+                return Task.CompletedTask;
+            }
 
             var alert = new IOconfAlert(args[1], string.Join(' ', args.Skip(2)));
             lock (_alerts) 

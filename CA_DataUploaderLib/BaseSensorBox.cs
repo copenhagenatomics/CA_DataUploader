@@ -342,7 +342,7 @@ namespace CA_DataUploaderLib
             Connecting = 1,
             ReadError = 2,
             NoDataAvailable = 3,
-            ReturningNonValues = 4,
+            ReturningNonValues = 4, // we are getting data from the box, but these are not values lines
             Connected = 5,
         }
     }
