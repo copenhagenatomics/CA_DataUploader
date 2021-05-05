@@ -13,13 +13,12 @@ namespace CA_DataUploaderLib
         public IOconfHeater _ioconf;
         private readonly int _area;  // -1 if not defined. 
         private readonly List<SensorSample> _ovenSensors = new List<SensorSample>();    // sensors inside the oven somewhere.
-        public DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
-        public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
-        public readonly Stopwatch invalidValuesTime = new Stopwatch();
+        private DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
+        private DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
+        private readonly Stopwatch invalidValuesTime = new Stopwatch();
         private double onTemperature = 10000;
-        public double lastTemperature = 10000;
         public bool IsOn;
-        public bool ManualMode;
+        private bool ManualMode;
         public SensorSample Current;  // Amps per element. 
         public double SwitchboardOnState;  //same as IsOn, but reported by the switchboard (null for a switchboard not reporting state)
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
@@ -80,7 +79,6 @@ namespace CA_DataUploaderLib
             if (validSensors.Any(x => x.Value > OvenTargetTemperature)) 
                 return SetOffProperties(); //if we reached OvenTargetTemperature, then turn off.
 
-            lastTemperature = validSensors.Max(x => x.Value);
             return false;
         }
 

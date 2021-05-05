@@ -13,10 +13,12 @@ namespace CA_DataUploaderLib.IOconf
         {
             CurrentSensorName = Name + "_current";
             SwitchboardOnOffSensorName = Name + "_SwitchboardOn/Off";
+            BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
         }
 
         public string CurrentSensorName { get; }
         public string SwitchboardOnOffSensorName { get; }
+        public string BoardStateSensorName { get; } 
         public IEnumerable<IOconfInput> GetExpandedInputConf()
         { // note "_On/Off" is not included as its not an input but the current expected on/off state as seen by the control loop.
             yield return NewPortInput(CurrentSensorName, 0 + PortNumber);
