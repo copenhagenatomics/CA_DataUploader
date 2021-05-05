@@ -13,7 +13,6 @@ namespace CA_DataUploaderLib
     {
         public string Title => "Heating";
         private static int HeaterOnTimeout = 60;
-        private bool _running = true;
         private bool _disposed = false;
         private CALogLevel _logLevel = CALogLevel.Normal;
         private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
@@ -67,7 +66,7 @@ namespace CA_DataUploaderLib
 
         private bool Stop(List<string> args)
         {
-            _running = false;
+            _ovenCmd.Dispose();
             return true;
         }
 
@@ -130,7 +129,6 @@ namespace CA_DataUploaderLib
         public void Dispose()
         { // class is sealed without unmanaged resources, no need for the full disposable pattern.
             if (_disposed) return;
-            _running = false;
             _switchboardController.Dispose();
             _ovenCmd.Dispose();
             _heaterCmd.Dispose();
@@ -264,7 +262,7 @@ namespace CA_DataUploaderLib
                     if (!vector.TryGetValue(heater._ioconf.CurrentSensorName, out var current))
                         throw new InvalidOperationException($"missing heater current from switchboard controller: {heater._ioconf.CurrentSensorName}");
                     if (!vector.TryGetValue(heater._ioconf.SwitchboardOnOffSensorName, out var switchboardOnOffState))
-                        ?? throw new InvalidOperationException($"missing switchboard on/off state from switchboard controller: {heater._ioconf.SwitchboardOnOffSensorName}");
+                        throw new InvalidOperationException($"missing switchboard on/off state from switchboard controller: {heater._ioconf.SwitchboardOnOffSensorName}");
                     heater.Current.SetValueWithoutTimestamp(current);
                     if (vector[heater._ioconf.BoardStateSensorName] == (int)BaseSensorBox.ConnectionState.Connected)
                         heater.Current.TimeStamp = DateTime.UtcNow; // only set when we get fresh values, as it is used to detect stale values in HeaterElement.MustResend*
