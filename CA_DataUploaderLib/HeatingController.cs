@@ -205,7 +205,7 @@ namespace CA_DataUploaderLib
             {
                 if (token.IsCancellationRequested)
                     return;
-                var action = heater.MakeNextActionDecision(vector, heater);
+                var action = heater.MakeNextActionDecision(vector);
                 switch (action)
                 {
                     case HeaterAction.TurnOn: HeaterOn(heater); break;

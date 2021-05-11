@@ -20,8 +20,6 @@ namespace CA_DataUploaderLib
         private double onTemperature = 10000;
         public bool IsOn;
         private bool ManualMode;
-        public double Current;  // Amps per element. 
-        public double SwitchboardOnState;  //same as IsOn, but reported by the switchboard (null for a switchboard not reporting state)
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
         private Stopwatch timeSinceLastNegativeValuesWarning = new Stopwatch();
 
@@ -30,24 +28,21 @@ namespace CA_DataUploaderLib
             _ioconf = heater;
             _area = area;
             _ovenSensors = ovenSensors.ToList();
-            Current = 0;
         }
 
-        public HeaterAction MakeNextActionDecision(NewVectorReceivedArgs vector, HeaterElement heater)
+        public HeaterAction MakeNextActionDecision(NewVectorReceivedArgs vector)
         {
             if (!TryGetHeaterInputsFromVector(vector, out var current, out var switchboardOnOffState)) 
                     return HeaterAction.None; // not connected, we skip this heater and act again when the connection is re-established
-            heater.Current = current;
-            heater.SwitchboardOnState = switchboardOnOffState;
             // Careful consideration must be taken if changing the order of the below statements.
             // Note that even though we received indication the board is connected above, 
             // if the connection is lost after we return the action, the control program can still fail to act on the heater. 
             // When it happens, the MustResend* methods will resend the expected action after 5 seconds.
             return 
-                heater.MustTurnOff() ? HeaterAction.TurnOff :
-                heater.CanTurnOn() ? HeaterAction.TurnOn :
-                heater.MustResendOnCommand() ? HeaterAction.TurnOn : 
-                heater.MustResendOffCommand() ? HeaterAction.TurnOff :
+                MustTurnOff() ? HeaterAction.TurnOff :
+                CanTurnOn() ? HeaterAction.TurnOn :
+                MustResendOnCommand(current, switchboardOnOffState) ? HeaterAction.TurnOn : 
+                MustResendOffCommand(current, switchboardOnOffState) ? HeaterAction.TurnOff :
                 HeaterAction.None;
         }
 
@@ -179,21 +174,21 @@ namespace CA_DataUploaderLib
         }
 
         // resends the on command every 5 seconds as long as there is no current.
-        public bool MustResendOnCommand()
+        public bool MustResendOnCommand(double current, double switchboardOnOffState)
         { 
-            if (!IsOn || DateTime.UtcNow < LastOn.AddSeconds(5) || CurrentIsOn()) return false;
-            LogRepeatCommand("on");
+            if (!IsOn || DateTime.UtcNow < LastOn.AddSeconds(5) || CurrentIsOn(current)) return false;
+            LogRepeatCommand("on", current, switchboardOnOffState);
             return true;
         }
 
         // resends the off command every 5 seconds as long as there is current.
-        public bool MustResendOffCommand() 
+        public bool MustResendOffCommand(double current, double switchboardOnOffState) 
         { 
-            if (IsOn || DateTime.UtcNow < LastOff.AddSeconds(5) || !CurrentIsOn()) return false;
-            LogRepeatCommand("off");
+            if (IsOn || DateTime.UtcNow < LastOff.AddSeconds(5) || !CurrentIsOn(current)) return false;
+            LogRepeatCommand("off", current, switchboardOnOffState);
             return true;
         }
-        private bool CurrentIsOn() => Current > _ioconf.CurrentSensingNoiseTreshold;
+        private bool CurrentIsOn(double current) => current > _ioconf.CurrentSensingNoiseTreshold;
 
         public override string ToString()
         {
@@ -201,14 +196,14 @@ namespace CA_DataUploaderLib
             foreach (var s in _ovenSensors)
                 msg += s.Value.ToString("N0") + ", " + (LastOn > LastOff ? "" : onTemperature.ToString("N0"));
 
-            return $"{_ioconf.Name,-10} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg,-12} {Current,-5:N1} Amp";
+            return $"{_ioconf.Name,-10} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg,-12}";
         }
 
         public string Name() => _ioconf.Name.ToLower();
 
         public MCUBoard Board() => _ioconf.Map.Board;
-        private void LogRepeatCommand(string command) => 
-            CALog.LogData(LogID.A, $"{command}.={Name()}-{MaxSensorTemperature():N0}, v#={Current}, switch-on/off={SwitchboardOnState}, WB={Board().BytesToWrite}{Environment.NewLine}");
+        private void LogRepeatCommand(string command, double current, double switchboardOnOffState) => 
+            CALog.LogData(LogID.A, $"{command}.={Name()}-{MaxSensorTemperature():N0}, v#={current}, switch-on/off={switchboardOnOffState}, WB={Board().BytesToWrite}{Environment.NewLine}");
 
         private bool TryGetHeaterInputsFromVector(NewVectorReceivedArgs vector, out double current, out double switchboardOnOffState)
         {
