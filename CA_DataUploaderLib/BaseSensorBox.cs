@@ -61,9 +61,6 @@ namespace CA_DataUploaderLib
             .Select(s => s.Clone())
             .Concat(_allBoardsState.Select(b => new SensorSample(b.sensorName, (int)b.State)));
 
-        /// <remarks>Unlike <see cref="GetValues"/>, the instances returned by this method are updated as we get new data from the sensors.</remarks>
-        public IEnumerable<SensorSample> GetAutoUpdatedValues() => _values;
-
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
             var list = _values.Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input)).ToList();

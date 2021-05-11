@@ -23,19 +23,15 @@ namespace CA_DataUploaderLib
         {
             _cmd = cmd;
 
-            // map all heaters, sensors and ovens. 
             var heaters = IOconfFile.GetHeater().ToList();
-            var oven = IOconfFile.GetOven().ToList();
-            var sensors = caThermalBox.GetAutoUpdatedValues().ToList();
-            foreach (var heater in heaters)
-            {
-                var ovenSensor = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name)?.TypeK.Name;
-                int area = oven.SingleOrDefault(x => x.HeatingElement.Name == heater.Name && x.OvenArea > 0)?.OvenArea ?? -1;
-                _heaters.Add(new HeaterElement(area, heater, sensors.Where(x => x.Input.Name == ovenSensor).Select(x => x.Name)));
-            }
-
             if (!_heaters.Any())
                 return;
+
+            var ovens = IOconfFile.GetOven().ToList();
+            foreach (var heater in heaters)
+                _heaters.Add(new HeaterElement(
+                    heater, 
+                    ovens.SingleOrDefault(x => x.HeatingElement.Name == heater.Name)));
 
             var unreachableBoards = heaters.Where(h => h.Map.Board == null).GroupBy(h => h.Map).ToList();
             foreach (var board in unreachableBoards)
@@ -50,7 +46,7 @@ namespace CA_DataUploaderLib
             var cmdPlugins = new PluginsCommandHandler(cmd);
             _heaterCmd = new HeaterCommand(_heaters);
             _heaterCmd.Initialize(cmdPlugins, new PluginsLogger("heater"));
-            _ovenCmd = new OvenCommand(_heaters, oven.Any());
+            _ovenCmd = new OvenCommand(_heaters, ovens.Any());
             _ovenCmd.Initialize(cmdPlugins, new PluginsLogger("oven"));
             cmd.Execute("oven off", false); // by executing this, the oven command will ensure the heaters stay off
         }

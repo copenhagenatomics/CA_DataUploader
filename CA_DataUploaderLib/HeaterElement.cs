@@ -1,4 +1,5 @@
 ﻿using CA.LoopControlPluginBase;
+using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
@@ -11,8 +12,8 @@ namespace CA_DataUploaderLib
         public int PortNumber => _ioconf.PortNumber;
         private int OvenTargetTemperature;
         private IOconfHeater _ioconf;
-        private readonly int _area;  // -1 if not defined. 
-        private readonly List<string> _ovenSensors;    // sensors inside the oven somewhere.
+        private readonly int _area = -1;  // -1 if not defined. 
+        private readonly List<string> _ovenSensors = new List<string>();    // sensors inside the oven somewhere.
         private DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         private DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         private readonly Stopwatch invalidValuesTime = new Stopwatch();
@@ -22,11 +23,18 @@ namespace CA_DataUploaderLib
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
         private Stopwatch timeSinceLastNegativeValuesWarning = new Stopwatch();
 
-        public HeaterElement(int area, IOconfHeater heater, IEnumerable<string> ovenSensors)
+        public HeaterElement(IOconfHeater heater, IOconfOven oven)
         {
             _ioconf = heater;
-            _area = area;
-            _ovenSensors = new List<string>(ovenSensors);
+            if (oven == null)
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heater.Name}"));
+            else if (!oven.TypeK.IsInitialized())
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Warn: disabled oven for heater {heater.Name} - missing temperature board");
+            else
+            {
+                _area = oven.OvenArea;
+                _ovenSensors = new List<string> { oven.TypeK.Name };
+            }
         }
 
         public HeaterAction MakeNextActionDecision(NewVectorReceivedArgs vector)
@@ -54,7 +62,7 @@ namespace CA_DataUploaderLib
         public bool CanTurnOn(bool hasValidTemperatures, double maxTemperatureInTargetSensors)
         {
             if (IsOn) return false; // already on
-            if (ManualMode) return false; // avoid auto on/off when running in manual mode
+            if (ManualMode) return false; // avoid auto on when manual mode is on.
             if (OvenTargetTemperature <= 0) return false; // oven's command is off, skip any extra checks
             if (hasValidTemperatures) return false; // no valid oven sensors
 

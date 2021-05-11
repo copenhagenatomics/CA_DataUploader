@@ -14,9 +14,10 @@ namespace CA_DataUploaderLib.Extensions
 
         // only return IOconfInput rows where the MCUBoard was initialized. 
         public static IEnumerable<T> IsInitialized<T>(this IEnumerable<T> theObject) where T : IOconfInput
-        {
-            return theObject.Where(x => x.Skip || x.Map.Board != null);
-        }
+            => theObject.Where(IsInitialized);
+
+        public static bool IsInitialized<T>(this T theObject) where T : IOconfInput
+            => theObject.Skip || theObject.Map.Board != null;
 
         public static DateTime AverageTime(this IEnumerable<long> input)
         {
