@@ -24,23 +24,25 @@ namespace CA_DataUploaderLib
         }
         public void AddCommand(string name, Func<List<string>, bool> func) => removeCommandActions.Add(cmd.AddCommand(name, func));
         public void Execute(string command, bool addToCommandHistory) => cmd.Execute(command, addToCommandHistory);
-        public Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, CancellationToken token)
+        public async Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, CancellationToken token)
         {
             var tcs = new TaskCompletionSource<NewVectorReceivedArgs>();
             NewVectorReceived += OnNewValue;
-            void OnNewValue(object sender, NewVectorReceivedArgs e)
+            try
             {
-                if (condition(e))
-                    tcs.TrySetResult(e);
-                else if (token.IsCancellationRequested)
-                    tcs.TrySetCanceled(token);
-                else // still waiting for condition to be met, do not unsubscribe yet
-                    return; 
-
+                using (CancellationTokenRegistration cancellationTokenRegistration = token.Register(OnCancelled))
+                    return await tcs.Task;                
+            }
+            finally
+            {
                 NewVectorReceived -= OnNewValue;
             }
 
-            return tcs.Task;
+            void OnCancelled() => tcs.TrySetCanceled(token);
+            void OnNewValue(object sender, NewVectorReceivedArgs e)
+            {
+                if (condition(e)) tcs.TrySetResult(e);
+            }
         }
 
         public void Dispose()
