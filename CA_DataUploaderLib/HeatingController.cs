@@ -177,10 +177,10 @@ namespace CA_DataUploaderLib
                     CALog.LogInfoAndConsoleLn(LogID.A, "Expected oven command format: oven " + string.Join(' ', Enumerable.Range(1, areas.Count).Select(i => $"tempForArea{i}")));
                     throw new ArgumentException($"Arguments did not match the amount of configured areas: {areas.Count}");
                 }
-
-                var targets = temperatures.SelectMany((t, i) => _heaters.Where(x => x.IsArea(areas[i])).Select(h => (h, t)));
-                foreach (var (heater, temperature) in targets)
-                    heater.SetTargetTemperature(temperature);
+                
+                var targets = areas.Select((i, a) => (a, temperatures[i]));
+                foreach (var heater in _heaters)
+                    heater.SetTargetTemperature(targets);
             }
 
             protected override void Dispose(bool disposing)
@@ -291,8 +291,6 @@ namespace CA_DataUploaderLib
 
                 return Task.CompletedTask;
             }
-
-            static int ParseTemperature(string t) => int.TryParse(t, out var v) ? v : throw new ArgumentException($"Unexpected target temperature: '{t}'");
         }
     }
 }

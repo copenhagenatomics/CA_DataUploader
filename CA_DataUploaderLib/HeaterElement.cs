@@ -54,12 +54,17 @@ namespace CA_DataUploaderLib
                 HeaterAction.None;
         }
 
-        public void SetTargetTemperature(int value)
+        public void SetTargetTemperature(int value) => OvenTargetTemperature = Math.Min(value, _ioconf.MaxTemperature);
+        public void SetTargetTemperature(IEnumerable<(int area, int temperature)> values)
         {
-            OvenTargetTemperature = Math.Min(value, _ioconf.MaxTemperature);
+            if (_area == -1) return; // temperature control is not enabled for the heater (no oven or missing temperature hub)
+
+            foreach (var (area, temperature) in values)
+                if (_area == area)
+                    SetTargetTemperature(temperature);
         }
 
-        public bool CanTurnOn(bool hasValidTemperature, double temperature)
+        private bool CanTurnOn(bool hasValidTemperature, double temperature)
         {
             if (IsOn) return false; // already on
             if (ManualMode) return false; // avoid auto on when manual mode is on.
@@ -76,7 +81,7 @@ namespace CA_DataUploaderLib
             return SetOnProperties();
         }
 
-        public bool MustTurnOff(bool hasValidTemperature, double temperature)
+        private bool MustTurnOff(bool hasValidTemperature, double temperature)
         {
             if (!IsOn) return false; // already off
             if (OvenTargetTemperature <= 0 && !ManualMode)
@@ -123,15 +128,6 @@ namespace CA_DataUploaderLib
                 SetOffProperties();
         }
 
-        private double Max(Span<double> values) 
-        {
-            var val = values[0];
-            for (int i = 1; i < values.Length; i++)
-                if (values[i] > val)
-                    val = values[i];
-            return val;
-        }
-
         private (bool hasValidTemperature, double temp) GetOvenTemperatureFromVector(NewVectorReceivedArgs vector) 
         {
             if (_ovenSensor == null) return (false, double.MaxValue);
@@ -165,9 +161,8 @@ namespace CA_DataUploaderLib
             return hasValidSensors ? default(bool?) : invalidValuesTime.ElapsedMilliseconds >= milliseconds;
         }
 
-        public bool IsArea(int ovenArea) => _area == ovenArea;
         // resends the on command every 5 seconds as long as there is no current.
-        public bool MustResendOnCommand(double temp, double current, double switchboardOnOffState)
+        private bool MustResendOnCommand(double temp, double current, double switchboardOnOffState)
         { 
             if (!IsOn || DateTime.UtcNow < LastOn.AddSeconds(5) || CurrentIsOn(current)) return false;
             LogRepeatCommand("on", temp, current, switchboardOnOffState);
@@ -175,7 +170,7 @@ namespace CA_DataUploaderLib
         }
 
         // resends the off command every 5 seconds as long as there is current.
-        public bool MustResendOffCommand(double temp, double current, double switchboardOnOffState) 
+        private bool MustResendOffCommand(double temp, double current, double switchboardOnOffState) 
         { 
             if (IsOn || DateTime.UtcNow < LastOff.AddSeconds(5) || !CurrentIsOn(current)) return false;
             LogRepeatCommand("off", temp, current, switchboardOnOffState);
