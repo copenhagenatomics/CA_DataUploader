@@ -53,8 +53,8 @@ namespace CA_DataUploaderLib.IOconf
             private static List<double> GetValuesFromGroups(GroupCollection groups)
             {
                 var data = new List<double>(9);
-                var valueGroups = groups.Cast<Group>().Skip(1).ToList();
-                data.AddRange(valueGroups.Take(4).Select(x => x.Value.ToDouble())); // when there is a match we always have 4 groups
+                var valueGroups = groups.Cast<Group>().Skip(1).ToList(); 
+                data.AddRange(valueGroups.Take(4).Select(x => x.Value.ToDouble())); 
                 data.AddRange(valueGroups.Skip(4).Take(4).Select(x => x.Success ? (double)x.Value.ToInt() : 10000d)); 
                 data.Add(valueGroups[8].Success ? valueGroups[8].Value.ToDouble() : 10000d);
                 return data;
