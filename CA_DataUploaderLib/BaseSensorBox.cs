@@ -313,7 +313,7 @@ namespace CA_DataUploaderLib
                     yield return (_sensorNames[i], _states[i]);
             }
 
-            public void SetReadSensorsExceptionState(MCUBoard board) => _states[_boardsIndexes[board]] = ConnectionState.ReadError;
+            public void SetReadSensorsExceptionState(MCUBoard board) => SetState(board, ConnectionState.ReadError);
             public void SetAttemptingReconnectState(MCUBoard board) => SetState(board, ConnectionState.Connecting);
             public void SetDisconnectedState(MCUBoard board) => SetState(board, ConnectionState.Disconnected);
             public void SetReadSensorsState(MCUBoard board, bool hadDataAvailable, bool receivedValues)
