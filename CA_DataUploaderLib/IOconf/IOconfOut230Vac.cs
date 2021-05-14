@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using CA_DataUploaderLib.Extensions;
 
@@ -49,14 +47,11 @@ namespace CA_DataUploaderLib.IOconf
             }
 
             public override bool MatchesValuesFormat(string line) => _switchBoxCurrentsRegex.IsMatch(line);
-
             private static List<double> GetValuesFromGroups(GroupCollection groups)
             {
                 var data = new List<double>(9);
-                var valueGroups = groups.Cast<Group>().Skip(1).ToList(); 
-                data.AddRange(valueGroups.Take(4).Select(x => x.Value.ToDouble())); 
-                data.AddRange(valueGroups.Skip(4).Take(4).Select(x => x.Success ? (double)x.Value.ToInt() : 10000d)); 
-                data.Add(valueGroups[8].Success ? valueGroups[8].Value.ToDouble() : 10000d);
+                for (int i = 1; i < 10; i++)
+                    data.Add(groups[i].Success ? groups[i].Value.ToDouble() : 10000d);
                 return data;
             }
         }
