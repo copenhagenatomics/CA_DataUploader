@@ -121,7 +121,7 @@ namespace CA_DataUploaderLib
 
         public void SetManualMode(bool turnOn)
         { 
-            ManualMode = IsOn = turnOn;
+            ManualMode = turnOn;
             if (turnOn)
                 SetOnProperties();
             else
