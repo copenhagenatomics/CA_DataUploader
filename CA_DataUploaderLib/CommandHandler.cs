@@ -1,4 +1,5 @@
 ﻿using CA.LoopControlPluginBase;
+using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using Humanizer;
 using System;
@@ -18,7 +19,9 @@ namespace CA_DataUploaderLib
         private readonly Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
         private readonly CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         private readonly List<string> AcceptedCommands = new List<string>();
+        private readonly List<ISubsystemWithVectorData> _subsystems = new List<ISubsystemWithVectorData>();
         private int AcceptedCommandsIndex = -1;
+        private Lazy<VectorFilterAndMath> _fullsystemFilterAndMath;
 
         public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
         public bool IsRunning { get { return _running; } }
@@ -26,6 +29,7 @@ namespace CA_DataUploaderLib
         public CommandHandler(SerialNumberMapper mapper = null)
         {
             _mapper = mapper;
+            _fullsystemFilterAndMath = new Lazy<VectorFilterAndMath>(GetFullSystemFilterAndMath);
             new Thread(() => this.LoopForever()).Start();
             AddCommand("escape", Stop);
             AddCommand("help", HelpMenu);
@@ -52,6 +56,16 @@ namespace CA_DataUploaderLib
 
         public void Execute(string command, bool addToCommandHistory = true) => HandleCommand(command, addToCommandHistory);
 
+        public void AddSubsystem(ISubsystemWithVectorData subsystem) => _subsystems.Add(subsystem);
+        public VectorDescription GetFullSystemVectorDescription() => _fullsystemFilterAndMath.Value.VectorDescription;
+        public List<SensorSample> GetFullSystemVectorValues() => 
+            _fullsystemFilterAndMath.Value.Apply(_subsystems.SelectMany(s => s.GetValues()).ToList());
+        private VectorFilterAndMath GetFullSystemFilterAndMath() => 
+            new VectorFilterAndMath(
+                new VectorDescription(
+                    _subsystems.SelectMany(s => s.GetVectorDescriptionItems()).ToList(),
+                    RpiVersion.GetHardware(),
+                    RpiVersion.GetSoftware()));
         public bool AssertArgs(List<string> args, int minimumLen)
         {
             if (args.Count() < minimumLen)

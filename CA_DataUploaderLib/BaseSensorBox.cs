@@ -43,6 +43,7 @@ namespace CA_DataUploaderLib
                 cmd.AddCommand(commandName.ToLower(), ShowQueue);
                 cmd.AddCommand("help", HelpMenu);
                 cmd.AddCommand("escape", Stop);
+                cmd.AddSubsystem(this);
             }
 
             _boards = _values.Where(x => !x.Input.Skip).Select(x => x.Input.Map.Board).Distinct().ToList();

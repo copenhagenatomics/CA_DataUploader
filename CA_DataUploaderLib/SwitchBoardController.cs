@@ -13,8 +13,6 @@ namespace CA_DataUploaderLib
         private readonly BaseSensorBox _reader;
         private static readonly object ControllerInitializationLock = new object();
         private static SwitchBoardController _instance;
-        public IEnumerable<SensorSample> GetReadInput() => _reader.GetValues();
-        public List<VectorDescriptionItem> GetReadInputVectorDescriptionItems() => _reader.GetVectorDescriptionItems();
 
         private SwitchBoardController(CommandHandler cmd) 
         {

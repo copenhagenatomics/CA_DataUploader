@@ -42,7 +42,8 @@ namespace CA_DataUploaderLib
             _switchboardController = SwitchBoardController.GetOrCreate(cmd);
             _switchboardController.Stopping += WaitForLoopStopped;
             cmd.AddCommand("escape", Stop);
-            cmd.AddCommand("emergencyshutdown", EmergencyShutdown);     
+            cmd.AddCommand("emergencyshutdown", EmergencyShutdown);    
+            cmd.AddSubsystem(this);
             var cmdPlugins = new PluginsCommandHandler(cmd);
             _heaterCmd = new HeaterCommand(_heaters);
             _heaterCmd.Initialize(cmdPlugins, new PluginsLogger("heater"));
@@ -74,14 +75,11 @@ namespace CA_DataUploaderLib
         /// Gets all the values in the order specified by <see cref="GetVectorDescriptionItems"/>.
         /// </summary>
         public IEnumerable<SensorSample> GetValues() =>
-            _switchboardController
-                .GetReadInput()
-                .Concat(_heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0)));
+            _heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
 
         public List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
-            var list = _switchboardController.GetReadInputVectorDescriptionItems();
-            list.AddRange(_heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_On/Off", DataTypeEnum.Output)));
+            var list = _heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_On/Off", DataTypeEnum.Output)).ToList();
             CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count,2} datapoints from HeatingController");
             return list;
         }
