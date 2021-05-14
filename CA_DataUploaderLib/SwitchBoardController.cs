@@ -20,7 +20,7 @@ namespace CA_DataUploaderLib
             var ports = heaters.Concat(IOconfFile.GetValve()).Where(p => p.Map.Board != null);
             var boardsTemperatures = ports.GroupBy(p => p.BoxName).Select(b => b.Select(p => p.GetBoardTemperatureInputConf()).FirstOrDefault());
             var inputs = ports.SelectMany(p => p.GetExpandedInputConf()).Concat(boardsTemperatures);
-            _reader = new BaseSensorBox(cmd, "switchboards", string.Empty, "", inputs);
+            _reader = new BaseSensorBox(cmd, "switchboards", string.Empty, "show switchboards inputs", inputs);
             _reader.Stopping += OnStopping;
         }
 
