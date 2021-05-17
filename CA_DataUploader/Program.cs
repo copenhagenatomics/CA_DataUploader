@@ -3,7 +3,6 @@ using CA_DataUploaderLib.Helpers;
 using System;
 using System.Data;
 using System.Linq;
-using System.Threading;
 
 namespace CA_DataUploader
 {
@@ -27,17 +26,15 @@ namespace CA_DataUploader
 
                     using var cmd = new CommandHandler(serial);
                     using var usb = new ThermocoupleBox(cmd);
-                    var filter = new VectorFilterAndMath(GetVectorDescription(usb));
-                    using var cloud = new ServerUploader(filter.VectorDescription, cmd);
+                    using var cloud = new ServerUploader(cmd.GetFullSystemVectorDescription(), cmd);
                     CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
 
                     int i = 0;
                     while (cmd.IsRunning)
                     {
-                        var allSensors = usb.GetValues().ToList();
-                        var list = filter.Apply(allSensors);
-                        cmd.OnNewVectorReceived(list);
-                        cloud.SendVector(list.Select(v => v.Value).ToList(), allSensors.First().TimeStamp);
+                        var sensorsSamples = cmd.GetFullSystemVectorValues();
+                        cmd.OnNewVectorReceived(sensorsSamples);
+                        cloud.SendVector(sensorsSamples.Select(v => v.Value).ToList(), sensorsSamples.First().TimeStamp);
                         Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
                         cloud.Wait(100);
                         if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
@@ -74,13 +71,6 @@ namespace CA_DataUploader
             {
                 CALog.LogException(LogID.A, ex);
             }
-        }
-
-        private static VectorDescription GetVectorDescription(ThermocoupleBox usb)
-        {
-            var list = usb.GetVectorDescriptionItems();
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count.ToString().PadLeft(2)} datapoints from {usb.Title}");
-            return new VectorDescription(list, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
         }
     }
 }

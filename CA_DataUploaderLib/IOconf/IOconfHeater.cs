@@ -18,10 +18,5 @@ namespace CA_DataUploaderLib.IOconf
         /// <summary>the heater is considered off below this current level (in amps)</summary>
         /// <remarks>at the time of writting, this can not be lowered for the current version of the AC switchboard</remarks>
         public readonly double CurrentSensingNoiseTreshold = 0.4;
-
-        public IOconfInput AsConfInput() => new IOconfInput(Row, LineNumber, "Heater")
-        {
-            Name = Name + "_current"
-        };
     }
 }

@@ -1,100 +1,153 @@
-﻿using CA_DataUploaderLib.IOconf;
+﻿using CA.LoopControlPluginBase;
+using CA_DataUploaderLib.Extensions;
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 
 namespace CA_DataUploaderLib
 {
     public class HeaterElement
     {
+        public int PortNumber => _ioconf.PortNumber;
         private int OvenTargetTemperature;
-
-        public IOconfHeater _ioconf;
-        private readonly int _area;  // -1 if not defined. 
-        private readonly List<SensorSample> _ovenSensors = new List<SensorSample>();    // sensors inside the oven somewhere.
-        public DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
-        public DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
-        public readonly Stopwatch invalidValuesTime = new Stopwatch();
+        private IOconfHeater _ioconf;
+        private readonly int _area = -1;  // -1 if not defined. 
+        private readonly string _ovenSensor; // sensor inside the oven somewhere.
+        private DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
+        private DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
+        private readonly Stopwatch invalidValuesTime = new Stopwatch();
         private double onTemperature = 10000;
-        public double lastTemperature = 10000;
         public bool IsOn;
-        public bool ManualMode;
-        public SensorSample Current;  // Amps per element. 
-        public bool? IsSwitchboardOn;  //same as IsOn, but reported by the switchboard (null for a switchboard not reporting state)
+        private bool ManualMode;
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
         private Stopwatch timeSinceLastNegativeValuesWarning = new Stopwatch();
 
-        public HeaterElement(int area, IOconfHeater heater, IEnumerable<SensorSample> ovenSensors)
+        public HeaterElement(IOconfHeater heater, IOconfOven oven)
         {
             _ioconf = heater;
-            _area = area;
-            _ovenSensors = ovenSensors.ToList();
-            Current = new SensorSample(heater.AsConfInput());
+            if (oven == null)
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heater.Name}");
+            else if (!oven.TypeK.IsInitialized())
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Warn: disabled oven for heater {heater.Name} - missing temperature board");
+            else
+            {
+                _area = oven.OvenArea;
+                _ovenSensor = oven.TypeK.Name;
+            }
         }
 
-        public void SetTemperature(int value)
+        public HeaterAction MakeNextActionDecision(NewVectorReceivedArgs vector)
         {
-            OvenTargetTemperature = Math.Min(value, _ioconf.MaxTemperature);
+            if (!TryGetSwitchboardInputsFromVector(vector, out var current, out var switchboardOnOffState)) 
+                return HeaterAction.None; // not connected, we skip this heater and act again when the connection is re-established
+            var (hasValidTemperature, temp) = GetOvenTemperatureFromVector(vector);
+            // Careful consideration must be taken if changing the order of the below statements.
+            // Note that even though we received indication the board is connected above, 
+            // if the connection is lost after we return the action, the control program can still fail to act on the heater. 
+            // When it happens, the MustResend* methods will resend the expected action after 5 seconds.
+            return 
+                MustTurnOff(hasValidTemperature, temp) ? HeaterAction.TurnOff :
+                CanTurnOn(hasValidTemperature, temp) ? HeaterAction.TurnOn :
+                MustResendOnCommand(temp, current, switchboardOnOffState) ? HeaterAction.TurnOn : 
+                MustResendOffCommand(temp, current, switchboardOnOffState) ? HeaterAction.TurnOff :
+                HeaterAction.None;
         }
 
-        public bool CanTurnOn()
+        public void SetTargetTemperature(int value) => OvenTargetTemperature = Math.Min(value, _ioconf.MaxTemperature);
+        public void SetTargetTemperature(IEnumerable<(int area, int temperature)> values)
         {
-            if (ManualMode)
-                return false;
+            if (_area == -1) return; // temperature control is not enabled for the heater (no oven or missing temperature hub)
+
+            foreach (var (area, temperature) in values)
+                if (_area == area)
+                    SetTargetTemperature(temperature);
+        }
+
+        private bool CanTurnOn(bool hasValidTemperature, double temperature)
+        {
+            if (IsOn) return false; // already on
+            if (ManualMode) return false; // avoid auto on when manual mode is on.
+            if (OvenTargetTemperature <= 0) return false; // oven's command is off, skip any extra checks
+            if (hasValidTemperature) return false; // no valid oven sensors
 
             if (LastOff > DateTime.UtcNow.AddSeconds(-10))
-                return false;  // has been turned off for less than 10 seconds. 
+                return false;  // less than 10 seconds since we last turned it off
 
-            var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
-            var validSensors = GetValidSensorsSnapshot(twoSecAgo);
-            if (!validSensors.Any())
-                return false;  // no valid oven sensors
+            if (temperature >= OvenTargetTemperature)
+                return false; // already at target temperature. 
 
-            if (validSensors.Any(x => x.Value >= OvenTargetTemperature))
-                return false;  // at least one of the temperature sensors value is valid and above OvenTargetTemperature.  
+            onTemperature = temperature;
+            return SetOnProperties();
+        }
 
-            onTemperature = validSensors.Max(x => x.Value);
+        private bool MustTurnOff(bool hasValidTemperature, double temperature)
+        {
+            if (!IsOn) return false; // already off
+            if (OvenTargetTemperature <= 0 && !ManualMode)
+                return SetOffProperties(); // turn off: oven's command is off, skip any extra checks
+            var timeoutResult = CheckInvalidValuesTimeout(hasValidTemperature, 2000);
+            if (timeoutResult.HasValue && timeoutResult.Value)
+                return SetOffProperties(); // turn off: 2 seconds without valid temperatures (even if running with manual mode)
+            else if (timeoutResult.HasValue)
+                return false; // no valid temperatures, waiting up to 2 seconds before turn off
+
+            if (ManualMode) 
+                return false; // avoid auto on/off when running in manual mode (except the 2 seconds without valid reads earlier)
+
+            if (onTemperature < 10000 && temperature > onTemperature + 20)
+                return SetOffProperties(); // turn off: already 20C higher than the last time we turned on
+
+            if (temperature > OvenTargetTemperature)
+                return SetOffProperties(); //turn off: already at target temperature
+
+            return false;
+        }
+
+        // returns true to simplify MustTurnOff
+        private bool SetOffProperties()
+        {
+            IsOn = false;
+            LastOff = DateTime.UtcNow;
             return true;
         }
 
-        public bool MustTurnOff()
+        private bool SetOnProperties()
         {
-            var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
-            var validSensors = GetValidSensorsSnapshot(twoSecAgo).ToList();
-            var timeoutResult = CheckInvalidValuesTimeout(validSensors.Any(), 2000);
-            if (timeoutResult.HasValue)
-                return timeoutResult.Value;
-
-            if (ManualMode)
-                return false;
-
-            if (onTemperature < 10000 && validSensors.Max(x => x.Value) > onTemperature + 20)
-                return true; // If hottest sensor is 20C higher than the temperature last time we turned on, then turn off. 
-
-            var turnOff = validSensors.Any(x => x.Value > OvenTargetTemperature); // turn off, if we reached OvenTargetTemperature. 
-            if(!turnOff)
-                lastTemperature = validSensors.Max(x => x.Value);
-
-            return turnOff;
+            IsOn = true;
+            LastOn = DateTime.UtcNow;
+            return true;
         }
 
-        private List<SensorSample> GetValidSensorsSnapshot(DateTime twoSecAgo) 
+        public void SetManualMode(bool turnOn)
+        { 
+            ManualMode = turnOn;
+            if (turnOn)
+                SetOnProperties();
+            else
+                SetOffProperties();
+        }
+
+        private (bool hasValidTemperature, double temp) GetOvenTemperatureFromVector(NewVectorReceivedArgs vector) 
         {
-            var snapshot = _ovenSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 10000 && x.Value != 0).Select(s => s.Clone()).ToList();
-            if (snapshot.Count == 0)
-                return snapshot;
+            if (_ovenSensor == null) return (false, double.MaxValue);
+            if (vector.TryGetValue(_ovenSensor, out var val))
+                throw new InvalidOperationException($"missing temperature for oven control: {_ovenSensor}");
+            if (val <= 10000 && val > 0) // we only use valid positive values. Note some temperature hubs alternate between 10k+ and 0 for errors.
+                return (true, val);
+            else if (val < 0)
+                WarnNegativeTemperatures(_ovenSensor, val);
+            return (false, double.MaxValue);
+        }
 
-            if (snapshot.RemoveAll(s => s.Value < 0) > 0 && 
-                (!timeSinceLastNegativeValuesWarning.IsRunning || timeSinceLastNegativeValuesWarning.Elapsed.Hours >= 1))
-            {
-                CALog.LogErrorAndConsoleLn(
-                    LogID.A, 
-                    $"detected negative values in sensors for heater {this.Name()}. Confirm thermocouples cables are not inverted");
-                timeSinceLastNegativeValuesWarning.Restart();
-            }
-
-            return snapshot;
+        private void WarnNegativeTemperatures(string name, double val)
+        {
+            if (timeSinceLastNegativeValuesWarning.IsRunning && timeSinceLastNegativeValuesWarning.Elapsed.Hours < 1)
+                return;
+            CALog.LogErrorAndConsoleLn(
+                LogID.A,
+                $"detected negative values in sensors for heater {this.Name()}. Confirm thermocouples cables are not inverted");
+            timeSinceLastNegativeValuesWarning.Restart();
         }
 
         /// <returns><c>true</c> if timed out with invalid values, <c>false</c> if we are waiting for the timeout and <c>null</c> if <paramref name="hasValidSensors"/> was <c>true</c></returns>
@@ -108,39 +161,50 @@ namespace CA_DataUploaderLib
             return hasValidSensors ? default(bool?) : invalidValuesTime.ElapsedMilliseconds >= milliseconds;
         }
 
-        public double MaxSensorTemperature()
-        {
-            var twoSecAgo = DateTime.UtcNow.AddSeconds(-2);
-            var validSensors = _ovenSensors.Where(x => x.TimeStamp > twoSecAgo && x.Value < 6000);
-            if(validSensors.Any())
-                return validSensors.Max(x => x.Value);
-
-            if (!_ovenSensors.Any())
-                return 0;
-
-            return _ovenSensors.First().Value;
+        // resends the on command every 5 seconds as long as there is no current.
+        private bool MustResendOnCommand(double temp, double current, double switchboardOnOffState)
+        { 
+            if (!IsOn || DateTime.UtcNow < LastOn.AddSeconds(5) || CurrentIsOn(current)) return false;
+            LogRepeatCommand("on", temp, current, switchboardOnOffState);
+            return true;
         }
 
-        public bool IsArea(int ovenArea)
-        {
-            return _area == ovenArea;
+        // resends the off command every 5 seconds as long as there is current.
+        private bool MustResendOffCommand(double temp, double current, double switchboardOnOffState) 
+        { 
+            if (IsOn || DateTime.UtcNow < LastOff.AddSeconds(5) || !CurrentIsOn(current)) return false;
+            LogRepeatCommand("off", temp, current, switchboardOnOffState);
+            return true;
         }
-
-        public bool MustResendOnCommand() => !CurrentIsOn() && IsOn && LastOn.AddSeconds(2) < DateTime.UtcNow;
-        public bool MustResendOffCommand() => CurrentIsOn() && !IsOn && LastOff.AddSeconds(2) < DateTime.UtcNow;
-        private bool CurrentIsOn() => Current.Value > _ioconf.CurrentSensingNoiseTreshold;
-
-        public override string ToString()
-        {
-            string msg = string.Empty;
-            foreach (var s in _ovenSensors)
-                msg += s.Value.ToString("N0") + ", " + (LastOn > LastOff ? "" : onTemperature.ToString("N0"));
-
-            return $"{_ioconf.Name,-10} is {(LastOn > LastOff ? "ON,  " : "OFF, ")}{msg,-12} {Current.Value,-5:N1} Amp";
-        }
-
+        private bool CurrentIsOn(double current) => current > _ioconf.CurrentSensingNoiseTreshold;
         public string Name() => _ioconf.Name.ToLower();
-
         public MCUBoard Board() => _ioconf.Map.Board;
+        private void LogRepeatCommand(string command, double  temp, double current, double switchboardOnOffState) => 
+            CALog.LogData(LogID.A, $"{command}.={Name()}-{temp:N0}, v#={current}, switch-on/off={switchboardOnOffState}, WB={Board().BytesToWrite}{Environment.NewLine}");
+
+        private bool TryGetSwitchboardInputsFromVector(
+            NewVectorReceivedArgs vector, out double current, out double switchboardOnOffState)
+        {
+            if (!vector.TryGetValue(_ioconf.BoardStateSensorName, out var state))
+                throw new InvalidOperationException($"missing heater's board connection state: {_ioconf.BoardStateSensorName}");
+            if (state != (int)BaseSensorBox.ConnectionState.Connected)
+            {
+                current = switchboardOnOffState = 0;
+                return false;
+            }
+
+            if (!vector.TryGetValue(_ioconf.CurrentSensorName, out current))
+                throw new InvalidOperationException($"missing heater current: {_ioconf.CurrentSensorName}");
+            if (!vector.TryGetValue(_ioconf.SwitchboardOnOffSensorName, out switchboardOnOffState))
+                throw new InvalidOperationException($"missing switchboard on/off state: {_ioconf.SwitchboardOnOffSensorName}");
+            return true;
+        }
+    }
+
+    public enum HeaterAction
+    {
+        None,
+        TurnOff,
+        TurnOn
     }
 }

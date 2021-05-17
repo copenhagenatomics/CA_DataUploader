@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using Humanizer;
 using System.Diagnostics;
 using CA_DataUploaderLib.Extensions;
+using System.Collections;
 
 namespace CA_DataUploaderLib
 {
@@ -15,16 +16,19 @@ namespace CA_DataUploaderLib
     {
         protected bool _running = true;
         public string Title { get; protected set; }
+        /// <summary>runs when the subsystem is about to stop running, but before all boards are closed</summary>
+        /// <remarks>some boards might be closed, specially if the system is stopping due to losing connection to one of the boards</remarks>
+        public event EventHandler Stopping;
+        private readonly CALogLevel _logLevel;
+        private readonly CommandHandler _cmd;
+        protected readonly List<SensorSample> _values = new List<SensorSample>();
+        protected readonly List<MCUBoard> _boards = new List<MCUBoard>();
+        protected readonly AllBoardsState _allBoardsState;
+        private readonly string commandHelp;
+        private readonly HashSet<MCUBoard> _lostBoards = new HashSet<MCUBoard>();
 
-        protected CALogLevel _logLevel;
-        protected CommandHandler _cmd;
-        protected List<SensorSample> _values = new List<SensorSample>();
-        protected List<MCUBoard> _boards = new List<MCUBoard>();
-        private string commandHelp;
-        private bool disposed;
-        private HashSet<MCUBoard> _lostBoards = new HashSet<MCUBoard>();
-
-        public BaseSensorBox(CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values) 
+        public BaseSensorBox(
+            CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values)
         { 
             Title = commandName;
             _cmd = cmd;
@@ -39,9 +43,11 @@ namespace CA_DataUploaderLib
                 cmd.AddCommand(commandName.ToLower(), ShowQueue);
                 cmd.AddCommand("help", HelpMenu);
                 cmd.AddCommand("escape", Stop);
+                cmd.AddSubsystem(this);
             }
 
             _boards = _values.Where(x => !x.Input.Skip).Select(x => x.Input.Map.Board).Distinct().ToList();
+            _allBoardsState = new AllBoardsState(_boards);
             CALog.LogInfoAndConsoleLn(LogID.A, $"{commandName} boards: {_boards.Count()} values: {_values.Count()}");
 
             _running = true;
@@ -52,15 +58,17 @@ namespace CA_DataUploaderLib
                 _values.SingleOrDefault(x => x.Input.Name == title) ??
                 throw new Exception(title + " not found in _config. Known names: " + string.Join(", ", _values.Select(x => x.Input.Name)));
 
-        public IEnumerable<SensorSample> GetValues() => _values.Select(s => s.Clone());
-
-        /// <remarks>Unlike <see cref="GetValues"/>, the instances returned by this method are updated as we get new data from the sensors.</remarks>
-        public IEnumerable<SensorSample> GetAutoUpdatedValues() => _values;
+        public IEnumerable<SensorSample> GetValues() => _values
+            .Select(s => s.Clone())
+            .Concat(_allBoardsState.Select(b => new SensorSample(b.sensorName, (int)b.State)));
 
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
         {
             var list = _values.Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input)).ToList();
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count,2} datapoints from {Title}");
+            var dataPoints = list.Count;
+            list.AddRange(_allBoardsState.Select(b => new VectorDescriptionItem("double", b.sensorName, DataTypeEnum.State)));
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{dataPoints,2} datapoints + {list.Count - dataPoints,2} boards from {Title}");
+
             return list;
         }
 
@@ -110,8 +118,12 @@ namespace CA_DataUploaderLib
                 }
             }
 
+            Stopping?.Invoke(this, EventArgs.Empty);
             foreach (var board in _boards)
+            {
                 board?.SafeClose();
+                _allBoardsState.SetDisconnectedState(board);
+            }
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.LoopForever() " + DateTime.Now.Subtract(start).Humanize(5));
         }
@@ -120,33 +132,45 @@ namespace CA_DataUploaderLib
         {
             foreach (var board in _boards)
             {
-                var hadDataAvailable = false;
-                var timeInLoop = Stopwatch.StartNew();
-                // We read all lines available. We make sure to exit within 100ms, to allow reads to other boards
-                // and to avoid being stuck when data with errors is continuously returned by the board.
-                // We use time instead of attempts as SafeHasDataInReadBuffer can continuously report there is data when a partial line is returned by a board that stalls,
-                // which then consistently times out in SafeReadLine, making each loop iteration 2 seconds.
-                while (board.SafeHasDataInReadBuffer() && timeInLoop.ElapsedMilliseconds < 100)
+                try
                 {
-                    hadDataAvailable = true;
-                    var line = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
-                    try
+                    bool hadDataAvailable = false, receivedValues = false;
+                    var timeInLoop = Stopwatch.StartNew();
+                    // We read all lines available. We make sure to exit within 100ms, to allow reads to other boards
+                    // and to avoid being stuck when data with errors is continuously returned by the board.
+                    // We use time instead of attempts as SafeHasDataInReadBuffer can continuously report there is data when a partial line is returned by a board that stalls,
+                    // which then consistently times out in SafeReadLine, making each loop iteration 2 seconds.
+                    while (board.SafeHasDataInReadBuffer() && timeInLoop.ElapsedMilliseconds < 100)
                     {
-                        var numbers = TryParseAsDoubleList(board, line);
-                        if (numbers != null)
-                            ProcessLine(numbers, board);
-                        else // mostly responses to commands or headers on reconnects.
-                            CALog.LogInfoAndConsoleLn(LogID.B, "Unhandled board response " + board.ToString() + " line: " + line);
+                        hadDataAvailable = true;
+                        var line = board.SafeReadLine(); // tries to read a full line for up to MCUBoard.ReadTimeout
+                        try
+                        {
+                            var numbers = TryParseAsDoubleList(board, line);
+                            if (numbers != null)
+                            {
+                                ProcessLine(numbers, board);
+                                receivedValues = true;
+                            }
+                            else // mostly responses to commands or headers on reconnects.
+                                CALog.LogInfoAndConsoleLn(LogID.B, "Unhandled board response " + board.ToString() + " line: " + line);
+                        }
+                        catch (Exception ex)
+                        {
+                            CALog.LogErrorAndConsoleLn(LogID.B, "Failed handling board response " + board.ToString() + " line: " + line, ex);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        CALog.LogErrorAndConsoleLn(LogID.B, "Failed handling board response " + board.ToString() + " line: " + line, ex);
-                    }
-                }
 
-                if (!hadDataAvailable) 
-                    // we expect data on every cycle (each 100 ms), as the boards normally write a line every 100 ms.
-                    CALog.LogData(LogID.B, "No data available for " + board.ToString());
+                    _allBoardsState.SetReadSensorsState(board, hadDataAvailable, receivedValues);
+                    if (!hadDataAvailable) 
+                        // we expect data on every cycle (each 100 ms), as the boards normally write a line every 100 ms.
+                        CALog.LogData(LogID.B, "No data available for " + board.ToString());
+                }
+                catch
+                {
+                    _allBoardsState.SetReadSensorsExceptionState(board);
+                    throw;
+                }
             }
         }
 
@@ -168,9 +192,13 @@ namespace CA_DataUploaderLib
                 if (msSinceLastRead <= settings.MaxMillisecondsWithoutNewValues || item.Input.Skip)
                     continue;
                 CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} stale value detected for port: {item.Input.Name}{Environment.NewLine}{msSinceLastRead} milliseconds since last read - closing serial port to restablish connection");
-                if (item.Input.Map == null || item.Input.Map.Board.SafeReopen()) 
+                if (item.Input.Map == null) continue;
+                var board = item.Input.Map.Board;
+                _allBoardsState.SetAttemptingReconnectState(board);
+                if (board.SafeReopen()) 
                     continue;
-                LateInit(ref lostConnectionBoards).Add(item.Input.Map.Board);
+                _allBoardsState.SetDisconnectedState(board);
+                LateInit(ref lostConnectionBoards).Add(board);
                 LateInit(ref failedPorts).Add(item.Input.Name);
             }
 
@@ -251,34 +279,69 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposed)
-                return;
-
-            if (disposing)
-            { // dispose managed state
-                _running = false;
-                for (int i = 0; i < 100; i++)
-                {
-                    foreach(var board in _boards)
-                        if (board != null && board.IsOpen)
-                                Thread.Sleep(10);
-                }
-
-                foreach (var board in _boards)
-                    if(board != null)
-                        ((IDisposable)board).Dispose();
-            }
-
-            disposed = true;
-        }
-        
+        protected virtual void Dispose(bool disposing) => _running = false;
         public void Dispose()
         {
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method. See https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/implementing-dispose#dispose-and-disposebool
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
+        }
+
+        protected class AllBoardsState : IEnumerable<(string sensorName, ConnectionState State)>
+        {
+            private readonly List<MCUBoard> _boards;
+            private readonly ConnectionState[] _states;
+            private readonly string[] _sensorNames;
+            private readonly Dictionary<MCUBoard, int> _boardsIndexes;
+
+            public AllBoardsState(List<MCUBoard> boards)
+            {
+                _boards = boards;
+                _states = new ConnectionState[boards.Count];
+                _sensorNames = new string[boards.Count];
+                _boardsIndexes = new Dictionary<MCUBoard, int>(boards.Count);
+                for (int i = 0; i < boards.Count; i++)
+                {
+                    _sensorNames[i] = boards[i].BoxName + "_state";
+                    _boardsIndexes[_boards[i]] = i;
+                }
+            }
+
+            public IEnumerator<(string, ConnectionState)> GetEnumerator() 
+            {
+                for (int i = 0; i < _boards.Count; i++)
+                    yield return (_sensorNames[i], _states[i]);
+            }
+
+            public void SetReadSensorsExceptionState(MCUBoard board) => SetState(board, ConnectionState.ReadError);
+            public void SetAttemptingReconnectState(MCUBoard board) => SetState(board, ConnectionState.Connecting);
+            public void SetDisconnectedState(MCUBoard board) => SetState(board, ConnectionState.Disconnected);
+            public void SetReadSensorsState(MCUBoard board, bool hadDataAvailable, bool receivedValues)
+            {
+                var lastState = GetLastState(board);
+                var newState = 
+                    receivedValues ? ConnectionState.Connected :
+                    hadDataAvailable && lastState == ConnectionState.Connecting ? ConnectionState.Connecting :
+                    hadDataAvailable ? ConnectionState.ReturningNonValues : 
+                    ConnectionState.NoDataAvailable;
+                if (lastState == newState) return;
+                SetState(board, newState);
+            }
+
+            private void SetState(MCUBoard board, ConnectionState state) => _states[_boardsIndexes[board]] = state;
+            private ConnectionState GetLastState(MCUBoard board) => _states[_boardsIndexes[board]];
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        }
+
+        public enum ConnectionState
+        {
+            Disconnected = 0,
+            Connecting = 1,
+            ReadError = 2,
+            NoDataAvailable = 3,
+            ReturningNonValues = 4, // we are getting data from the box, but these are not values lines
+            Connected = 5,
         }
     }
 }
