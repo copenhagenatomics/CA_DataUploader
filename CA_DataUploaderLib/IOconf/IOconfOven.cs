@@ -19,7 +19,7 @@ namespace CA_DataUploaderLib.IOconf
             
             HeatingElement = IOconfFile.GetHeater().Single(x => x.Name == list[2]);
             TemperatureSensorName = list[3];
-            var filter = IOconfFile.GetFilters().SingleOrDefault(x => x.Name == TemperatureSensorName);
+            var filter = IOconfFile.GetFilters().SingleOrDefault(x => x.NameInVector == TemperatureSensorName);
             if (filter != null)
             {
                 TypeKs = IOconfFile.GetTypeK().Where(x => filter.SourceNames.Contains(x.Name)).ToList();
