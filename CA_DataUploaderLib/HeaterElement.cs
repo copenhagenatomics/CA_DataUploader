@@ -29,12 +29,12 @@ namespace CA_DataUploaderLib
             _ioconf = heater;
             if (oven == null)
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heater.Name}");
-            else if (!oven.TypeK.IsInitialized())
+            else if (!oven.IsTemperatureSensorInitialized)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Warn: disabled oven for heater {heater.Name} - missing temperature board");
             else
             {
                 _area = oven.OvenArea;
-                _ovenSensor = oven.TypeK.Name;
+                _ovenSensor = oven.TemperatureSensorName;
             }
         }
 
