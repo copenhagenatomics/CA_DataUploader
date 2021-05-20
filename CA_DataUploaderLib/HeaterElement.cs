@@ -42,6 +42,8 @@ namespace CA_DataUploaderLib
             if (!TryGetSwitchboardInputsFromVector(vector, out var current, out var switchboardOnOffState)) 
                 return HeaterAction.None; // not connected, we skip this heater and act again when the connection is re-established
             var (hasValidTemperature, temp) = GetOvenTemperatureFromVector(vector);
+            if (!hasValidTemperature)
+                Console.WriteLine("heater does not have valid temperature");
             // Careful consideration must be taken if changing the order of the below statements.
             // Note that even though we received indication the board is connected above, 
             // if the connection is lost after we return the action, the control program can still fail to act on the heater. 
