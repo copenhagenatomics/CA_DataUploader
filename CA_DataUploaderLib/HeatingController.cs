@@ -49,7 +49,7 @@ namespace CA_DataUploaderLib
             cmd.AddSubsystem(this);
             _heaterCmd = new HeaterCommand(_heaters);
             _heaterCmd.Initialize(new PluginsCommandHandler(cmd), new PluginsLogger("heater"));
-            _ovenCmd = new OvenCommand(_heaters, ovens.Any());
+            _ovenCmd = new OvenCommand(_heaters, !ovens.Any());
             _ovenCmd.Initialize(new PluginsCommandHandler(cmd), new PluginsLogger("oven"));
             Task.Run(RunHeatersControlLoops);
         }
@@ -105,14 +105,6 @@ namespace CA_DataUploaderLib
                     var vector = await _cmd.When(_ => true, token);
                     foreach (var heater in _heaters)
                         DoHeaterActions(vector, heater, token);
-
-                    foreach (var heater in heaters)
-                    {
-                        var action = heater.MakeNextActionDecision(vector);
-                        if (action == HeaterAction.None) continue;
-                        else if (action != HeaterAction.TurnOn && action != HeaterAction.TurnOff) 
-                            throw new InvalidOperationException($"unexpected action received {action}");
-                    }
                 }
                 catch (Exception ex)
                 {

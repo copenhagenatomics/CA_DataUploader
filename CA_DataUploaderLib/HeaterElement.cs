@@ -22,6 +22,7 @@ namespace CA_DataUploaderLib
         private bool ManualMode;
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
         private Stopwatch timeSinceLastNegativeValuesWarning = new Stopwatch();
+        private Stopwatch timeSinceLastMissingTemperatureWarning = new Stopwatch();
 
         public HeaterElement(IOconfHeater heater, IOconfOven oven)
         {
@@ -42,8 +43,6 @@ namespace CA_DataUploaderLib
             if (!TryGetSwitchboardInputsFromVector(vector, out var current, out var switchboardOnOffState)) 
                 return HeaterAction.None; // not connected, we skip this heater and act again when the connection is re-established
             var (hasValidTemperature, temp) = GetOvenTemperatureFromVector(vector);
-            if (!hasValidTemperature)
-                Console.WriteLine("heater does not have valid temperature");
             // Careful consideration must be taken if changing the order of the below statements.
             // Note that even though we received indication the board is connected above, 
             // if the connection is lost after we return the action, the control program can still fail to act on the heater. 
@@ -133,23 +132,32 @@ namespace CA_DataUploaderLib
         private (bool hasValidTemperature, double temp) GetOvenTemperatureFromVector(NewVectorReceivedArgs vector) 
         {
             if (_ovenSensor == null) return (false, double.MaxValue);
-            if (vector.TryGetValue(_ovenSensor, out var val))
-                throw new InvalidOperationException($"missing temperature for oven control: {_ovenSensor}");
-            if (val <= 10000 && val > 0) // we only use valid positive values. Note some temperature hubs alternate between 10k+ and 0 for errors.
+            if (!vector.TryGetValue(_ovenSensor, out var val))
+                WarnMissingSensor(_ovenSensor);
+            else if (val <= 10000 && val > 0) // we only use valid positive values. Note some temperature hubs alternate between 10k+ and 0 for errors.
                 return (true, val);
             else if (val < 0)
-                WarnNegativeTemperatures(_ovenSensor, val);
+                WarnNegativeTemperatures(_ovenSensor);
             return (false, double.MaxValue);
         }
 
-        private void WarnNegativeTemperatures(string name, double val)
-        {
-            if (timeSinceLastNegativeValuesWarning.IsRunning && timeSinceLastNegativeValuesWarning.Elapsed.Hours < 1)
-                return;
-            CALog.LogErrorAndConsoleLn(
-                LogID.A,
+        private void WarnNegativeTemperatures(string sensorName) =>
+            LowFrequencyWarning(
+                timeSinceLastNegativeValuesWarning, 
+                sensorName, 
                 $"detected negative values in sensors for heater {this.Name()}. Confirm thermocouples cables are not inverted");
-            timeSinceLastNegativeValuesWarning.Restart();
+ 
+        private void WarnMissingSensor(string sensorName) =>
+            LowFrequencyWarning(
+                timeSinceLastMissingTemperatureWarning, 
+                sensorName, 
+                $"detected missing temperature sensor {sensorName} for heater {Name()}. Confirm the name is listed exactly as is in the plot.");
+        
+        private void LowFrequencyWarning(Stopwatch watch, string sensorName, string message)
+        {
+            if (watch.IsRunning && watch.Elapsed.Hours < 1) return;
+            CALog.LogErrorAndConsoleLn(LogID.A,message);
+            watch.Restart();
         }
 
         /// <returns><c>true</c> if timed out with invalid values, <c>false</c> if we are waiting for the timeout and <c>null</c> if <paramref name="hasValidSensors"/> was <c>true</c></returns>
