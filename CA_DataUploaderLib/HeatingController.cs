@@ -177,7 +177,11 @@ namespace CA_DataUploaderLib
                 
                 Console.WriteLine(string.Join(',', temperatures));
                 Console.WriteLine(string.Join(',', areas));
-                var targets = areas.Select((i, a) => (a, temperatures[i])).ToList();
+                var targets = areas.Select((i, a) => 
+                {
+                    if (i >= temperatures.Count) throw new InvalidOperationException($"unexpected index {i} / {temperatures.Count}");
+                    return (a, temperatures[i]);
+                }).ToList();
                 foreach (var heater in _heaters)
                     heater.SetTargetTemperature(targets);
             }
