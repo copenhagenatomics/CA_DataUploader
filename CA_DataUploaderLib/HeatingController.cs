@@ -1,5 +1,6 @@
 ﻿using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.IOconf;
+using Humanizer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,14 +15,16 @@ namespace CA_DataUploaderLib
         private static int HeaterOnTimeout = 60;
         private bool _disposed = false;
         private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
-        private CommandHandler _cmd;
+        private PluginsCommandHandler _cmd;
         private SwitchBoardController _switchboardController;
         private readonly OvenCommand _ovenCmd;
         private readonly HeaterCommand _heaterCmd;
+        private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
+        private readonly TaskCompletionSource _boardControlLoopsStopped = new TaskCompletionSource();
 
         public HeatingController(CommandHandler cmd)
         {
-            _cmd = cmd;
+            _cmd = new PluginsCommandHandler(cmd);
 
             var heatersConfigs = IOconfFile.GetHeater().ToList();
             if (!heatersConfigs.Any())
@@ -48,7 +51,7 @@ namespace CA_DataUploaderLib
             _heaterCmd.Initialize(new PluginsCommandHandler(cmd), new PluginsLogger("heater"));
             _ovenCmd = new OvenCommand(_heaters, ovens.Any());
             _ovenCmd.Initialize(new PluginsCommandHandler(cmd), new PluginsLogger("oven"));
-            cmd.Execute("oven off", false); // by executing this, the oven command will ensure the heaters stay off
+            Task.Run(RunHeatersControlLoops);
         }
 
         private bool EmergencyShutdown(List<string> arg)
@@ -59,14 +62,14 @@ namespace CA_DataUploaderLib
 
         private bool Stop(List<string> args)
         {
-            _ovenCmd.Dispose();
+            _boardLoopsStopTokenSource.Cancel();
             return true;
         }
 
         private void WaitForLoopStopped(object sender, EventArgs args)
         {
             CALog.LogData(LogID.A, "waiting for heaters loop to stop heater actions and turn off the heaters");
-            _ovenCmd.ActionsLoopStoppedTask.Wait();
+            _boardControlLoopsStopped.Task.Wait();
             CALog.LogData(LogID.A, "finished waiting for heaters loop");
         }
 
@@ -86,10 +89,112 @@ namespace CA_DataUploaderLib
         public void Dispose()
         { // class is sealed without unmanaged resources, no need for the full disposable pattern.
             if (_disposed) return;
+            _boardLoopsStopTokenSource.Cancel();
             _switchboardController.Dispose();
             _ovenCmd.Dispose();
             _heaterCmd.Dispose();
             _disposed = true;
+        }
+
+        private async Task BoardLoop(MCUBoard board, List<HeaterElement> heaters, CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    var vector = await _cmd.When(_ => true, token);
+                    foreach (var heater in _heaters)
+                        DoHeaterActions(vector, heater, token);
+
+                    foreach (var heater in heaters)
+                    {
+                        var action = heater.MakeNextActionDecision(vector);
+                        if (action == HeaterAction.None) continue;
+                        else if (action != HeaterAction.TurnOn && action != HeaterAction.TurnOff) 
+                            throw new InvalidOperationException($"unexpected action received {action}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
+                }
+            }
+            
+            AllOff(board, heaters);
+        }
+
+        private async Task RunHeatersControlLoops()
+        {
+            DateTime start = DateTime.Now;
+            try
+            {
+                var boardLoops = _heaters
+                    .GroupBy(v => v.Board())
+                    .Select(g => BoardLoop(g.Key, g.ToList(), _boardLoopsStopTokenSource.Token))
+                    .ToList();
+                await Task.WhenAll(boardLoops);                
+                CALog.LogInfoAndConsoleLn(LogID.A, "Exiting ValveController.LoopForever() " + DateTime.Now.Subtract(start).Humanize(5));
+            }
+            catch (Exception ex)
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
+            }
+            finally
+            {
+                _boardControlLoopsStopped.TrySetResult();
+            }
+        }
+
+        private void AllOff(MCUBoard board, List<HeaterElement> heaters)
+        {
+            try
+            {
+                heaters.ForEach(x => x.SetTargetTemperature(0));
+                board.SafeWriteLine("off"); //TODO: might want to replace with individual control, as switchboard might be shared by valves ...
+                CALog.LogInfoAndConsoleLn(LogID.A, "All heaters are off");                
+            }
+            catch (Exception ex)
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, "Error detected while attempting to turn off all heaters", ex);
+            }
+        }
+        
+        private void DoHeaterActions(NewVectorReceivedArgs vector, HeaterElement heater, CancellationToken token)
+        {
+            if (token.IsCancellationRequested)
+                return;
+            var action = heater.MakeNextActionDecision(vector);
+            switch (action)
+            {
+                case HeaterAction.TurnOn: HeaterOn(heater); break;
+                case HeaterAction.TurnOff: HeaterOff(heater); break;
+                case HeaterAction.None: break;
+                default: throw new ArgumentOutOfRangeException($"Unexpected action received: {action}");
+            }
+        }
+
+        public static void HeaterOff(HeaterElement heater)
+        {
+            try
+            {
+                heater.Board().SafeWriteLine($"p{heater.PortNumber} off");
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException($"Unable to write to {heater.Board().BoxName}");
+            }
+        }
+
+        public static void HeaterOn(HeaterElement heater)
+        {
+            try
+            {
+                heater.Board().SafeWriteLine($"p{heater.PortNumber} on {HeaterOnTimeout}");
+            }
+            catch (TimeoutException)
+            {
+                throw new TimeoutException($"Unable to write to {heater.Board().BoxName}");
+            }
         }
 
         // usage: oven 200 220 400
@@ -99,11 +204,7 @@ namespace CA_DataUploaderLib
             public override string ArgsHelp => " [0 - 800] [0 - 800]";
             public override string Description => "where the integer value is the oven temperature top and bottom region";
             public override bool IsHiddenCommand {get; }
-            public Task ActionsLoopStoppedTask => _stopped?.Task ?? Task.CompletedTask; // task that can be used to wait until this instance has stopped all actions on the ovens.
             private readonly List<HeaterElement> _heaters;
-            private CancellationTokenSource _stopTokenSource;
-            private bool _disposed = false;
-            private TaskCompletionSource _stopped;
 
             public OvenCommand(List<HeaterElement> heaters, bool hidden)
             {
@@ -111,57 +212,21 @@ namespace CA_DataUploaderLib
                 IsHiddenCommand = hidden;
             }
 
-            protected async override Task Command(List<string> args)
+            protected override Task Command(List<string> args)
             { 
                 if (args.Count < 2)
                 {
                     logger.LogError($"Unexpected format: {string.Join(',', args)}. Format: oven temparea1 temparea2 ...");
-                    return;
+                    return Task.CompletedTask;
                 }
 
-                var (cancelToken, stoppedTaskSource) = await StopPreviousRun();
-
-                try 
-                {
-                    if (args[1] == "off")
-                        _heaters.ForEach(x => x.SetTargetTemperature(0));
-                    else
-                        SetHeatersTargetTemperatures(args.Skip(1).Select(ParseTemperature).ToList());
-                    var lightState = _heaters.Any(x => x.IsActive) ? "on" : "off";
-                    ExecuteCommand($"light main {lightState}");
-                    while (!cancelToken.IsCancellationRequested)
-                    {
-                        try
-                        {
-                            var vector = await NextVector(cancelToken);
-                            foreach (var heater in _heaters)
-                                DoHeaterActions(vector, heater, cancelToken);
-                        }
-                        catch (Exception ex)
-                        {
-                            CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
-                        }
-                    }
-
-                    AllOff();
-                }
-                finally
-                {
-                    stoppedTaskSource.TrySetResult();
-                }
-            }
-
-            private async Task<(CancellationToken cancelToken, TaskCompletionSource stoppedTaskSource)> StopPreviousRun()
-            {
-                var previousRunStopToken = _stopTokenSource;
-                if (previousRunStopToken != null)
-                {
-                    previousRunStopToken.Cancel();
-                    await _stopped.Task;
-                }
-
-                var cancelToken = (_stopTokenSource = new CancellationTokenSource()).Token;
-                return (cancelToken, _stopped = new TaskCompletionSource());
+                if (args[1] == "off")
+                    _heaters.ForEach(x => x.SetTargetTemperature(0));
+                else
+                    SetHeatersTargetTemperatures(args.Skip(1).Select(ParseTemperature).ToList());
+                var lightState = _heaters.Any(x => x.IsActive) ? "on" : "off";
+                ExecuteCommand($"light main {lightState}");
+                return Task.CompletedTask;
             }
 
             private void SetHeatersTargetTemperatures(List<int> temperatures)
@@ -178,74 +243,6 @@ namespace CA_DataUploaderLib
                 var targets = areas.Select((a, i) => (a, temperatures[i])).ToList();
                 foreach (var heater in _heaters)
                     heater.SetTargetTemperature(targets);
-            }
-
-            protected override void Dispose(bool disposing)
-            {
-                if (_disposed) return;
-                if (disposing)
-                { // dispose managed state
-                    _stopTokenSource?.Cancel();
-                    _stopTokenSource?.Dispose();
-                }
-
-                base.Dispose(disposing);
-
-                _disposed = true;
-            }
-
-            private void DoHeaterActions(NewVectorReceivedArgs vector, HeaterElement heater, CancellationToken token)
-            {
-                if (token.IsCancellationRequested)
-                    return;
-                var action = heater.MakeNextActionDecision(vector);
-                switch (action)
-                {
-                    case HeaterAction.TurnOn: HeaterOn(heater); break;
-                    case HeaterAction.TurnOff: HeaterOff(heater); break;
-                    case HeaterAction.None: break;
-                    default: throw new ArgumentOutOfRangeException($"Unexpected action received: {action}");
-                }
-            }
-            private async Task<NewVectorReceivedArgs> NextVector(CancellationToken token) => await When(_ => true, token);
-            private void AllOff()
-            {
-                try
-                {
-                    _heaters.ForEach(x => x.SetTargetTemperature(0));
-                    foreach (var box in _heaters.Select(x => x.Board()).Where(x => x != null).Distinct())
-                        box.SafeWriteLine("off");
-
-                    CALog.LogInfoAndConsoleLn(LogID.A, "All heaters are off");                
-                }
-                catch (Exception ex)
-                {
-                    CALog.LogErrorAndConsoleLn(LogID.A, "Error detected while attempting to turn off all heaters", ex);
-                }
-            }
-
-            public static void HeaterOff(HeaterElement heater)
-            {
-                try
-                {
-                    heater.Board().SafeWriteLine($"p{heater.PortNumber} off");
-                }
-                catch (TimeoutException)
-                {
-                    throw new TimeoutException($"Unable to write to {heater.Board().BoxName}");
-                }
-            }
-
-            public static void HeaterOn(HeaterElement heater)
-            {
-                try
-                {
-                    heater.Board().SafeWriteLine($"p{heater.PortNumber} on {HeaterOnTimeout}");
-                }
-                catch (TimeoutException)
-                {
-                    throw new TimeoutException($"Unable to write to {heater.Board().BoxName}");
-                }
             }
 
             static int ParseTemperature(string t) => int.TryParse(t, out var v) ? v : throw new ArgumentException($"Unexpected target temperature: '{t}'");
@@ -282,9 +279,9 @@ namespace CA_DataUploaderLib
 
                 heater.SetManualMode(args[2].ToLower() == "on");
                 if (heater.IsOn)
-                    OvenCommand.HeaterOn(heater);
+                    HeaterOn(heater); // do this via the heaterElement.MakeDecision
                 else
-                    OvenCommand.HeaterOff(heater);
+                    HeaterOff(heater);
 
                 return Task.CompletedTask;
             }
