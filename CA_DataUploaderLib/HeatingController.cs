@@ -175,7 +175,9 @@ namespace CA_DataUploaderLib
                     throw new ArgumentException($"Arguments did not match the amount of configured areas: {areas.Count}");
                 }
                 
-                var targets = areas.Select((i, a) => (a, temperatures[i]));
+                Console.WriteLine(string.Join(',', temperatures));
+                Console.WriteLine(string.Join(',', areas));
+                var targets = areas.Select((i, a) => (a, temperatures[i])).ToList();
                 foreach (var heater in _heaters)
                     heater.SetTargetTemperature(targets);
             }
