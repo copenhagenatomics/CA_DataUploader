@@ -23,17 +23,17 @@ namespace CA_DataUploaderLib
         {
             _cmd = cmd;
 
-            var heaters = IOconfFile.GetHeater().ToList();
-            if (!_heaters.Any())
+            var heatersConfigs = IOconfFile.GetHeater().ToList();
+            if (heatersConfigs.Any())
                 return;
 
             var ovens = IOconfFile.GetOven().ToList();
-            foreach (var heater in heaters)
+            foreach (var heater in heatersConfigs)
                 _heaters.Add(new HeaterElement(
                     heater, 
                     ovens.SingleOrDefault(x => x.HeatingElement.Name == heater.Name)));
 
-            var unreachableBoards = heaters.Where(h => h.Map.Board == null).GroupBy(h => h.Map).ToList();
+            var unreachableBoards = heatersConfigs.Where(h => h.Map.Board == null).GroupBy(h => h.Map).ToList();
             foreach (var board in unreachableBoards)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Missing board {board.Key} for heaters {string.Join(",", board.Select(h => h.Name))}");
             if (unreachableBoards.Count > 0)
