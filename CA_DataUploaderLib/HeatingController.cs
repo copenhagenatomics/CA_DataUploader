@@ -24,7 +24,7 @@ namespace CA_DataUploaderLib
             _cmd = cmd;
 
             var heatersConfigs = IOconfFile.GetHeater().ToList();
-            if (heatersConfigs.Any())
+            if (!heatersConfigs.Any())
                 return;
 
             var ovens = IOconfFile.GetOven().ToList();
