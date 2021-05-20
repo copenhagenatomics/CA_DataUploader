@@ -19,7 +19,7 @@ namespace CA_DataUploaderLib
         private readonly OvenCommand _ovenCmd;
         private readonly HeaterCommand _heaterCmd;
 
-        public HeatingController(BaseSensorBox caThermalBox, CommandHandler cmd)
+        public HeatingController(CommandHandler cmd)
         {
             _cmd = cmd;
 
@@ -44,11 +44,10 @@ namespace CA_DataUploaderLib
             cmd.AddCommand("escape", Stop);
             cmd.AddCommand("emergencyshutdown", EmergencyShutdown);    
             cmd.AddSubsystem(this);
-            var cmdPlugins = new PluginsCommandHandler(cmd);
             _heaterCmd = new HeaterCommand(_heaters);
-            _heaterCmd.Initialize(cmdPlugins, new PluginsLogger("heater"));
+            _heaterCmd.Initialize(new PluginsCommandHandler(cmd), new PluginsLogger("heater"));
             _ovenCmd = new OvenCommand(_heaters, ovens.Any());
-            _ovenCmd.Initialize(cmdPlugins, new PluginsLogger("oven"));
+            _ovenCmd.Initialize(new PluginsCommandHandler(cmd), new PluginsLogger("oven"));
             cmd.Execute("oven off", false); // by executing this, the oven command will ensure the heaters stay off
         }
 

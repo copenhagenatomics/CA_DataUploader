@@ -7,7 +7,7 @@ namespace CA_DataUploaderLib.IOconf
     public class IOconfOut230Vac : IOconfOutput
     {
         public IOconfOut230Vac(string row, int lineNum, string type) : base(row, lineNum, type, true, 
-            new BoardSettings() { Parser = SwitchBoardResponseParser.Default }) 
+            new BoardSettings() { Parser = SwitchBoardResponseParser.Default, ValuesEndOfLineChar = "\r" }) 
         {
             CurrentSensorName = Name + "_current";
             SwitchboardOnOffSensorName = Name + "_SwitchboardOn/Off";

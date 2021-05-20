@@ -17,6 +17,7 @@ namespace CA_DataUploaderLib.IOconf
         public bool StopWhenLosingSensor { get; set; } = true;
         public bool SkipBoardAutoDetection { get; set; } = false;
         public LineParser Parser { get; set; } = LineParser.Default;
+        public string ValuesEndOfLineChar { get; set; } = "\n";
 
         public class LineParser
         {

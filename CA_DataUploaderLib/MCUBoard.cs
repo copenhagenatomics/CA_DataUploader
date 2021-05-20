@@ -91,6 +91,7 @@ namespace CA_DataUploaderLib
                         {
                             BoxName = ioconfMap.BoxName;
                             ConfigSettings = ioconfMap.BoardSettings;
+                            NewLine = ioconfMap.BoardSettings.ValuesEndOfLineChar;
                         }
                     }
                 }
@@ -215,7 +216,8 @@ namespace CA_DataUploaderLib
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
             var map = File.Exists("IO.conf") ? IOconfFile.GetMap().SingleOrDefault(m => m.USBPort == name) : null;
             var initialBaudrate = map != null && map.BaudRate != 0 ? map.BaudRate : 115200;
-            var mcu = new MCUBoard(name, initialBaudrate, (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection);
+            bool skipAutoDetection = (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;
+            var mcu = new MCUBoard(name, initialBaudrate, skipAutoDetection);
             if (!mcu.InitialConnectionSucceeded)
                 mcu = OpenWithAutoDetection(name, initialBaudrate);
             if (mcu.serialNumber.IsNullOrEmpty())
