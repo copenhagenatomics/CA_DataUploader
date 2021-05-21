@@ -161,7 +161,6 @@ namespace CA_DataUploaderLib
             if (token.IsCancellationRequested)
                 return;
             var action = heater.MakeNextActionDecision(vector);
-            Console.WriteLine($"Vector: {vector["Heater_filter"]} Action: {action}");
             switch (action)
             {
                 case HeaterAction.TurnOn: HeaterOn(heater); break;

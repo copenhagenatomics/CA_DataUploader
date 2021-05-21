@@ -67,6 +67,7 @@ namespace CA_DataUploaderLib
 
         private bool CanTurnOn(bool hasValidTemperature, double temperature)
         {
+            Console.WriteLine($"CanTurnOn: {IsOn} {ManualMode} {OvenTargetTemperature} {hasValidTemperature} {LastOff} {DateTime.UtcNow} {temperature}");
             if (IsOn) return false; // already on
             if (ManualMode) return false; // avoid auto on when manual mode is on.
             if (OvenTargetTemperature <= 0) return false; // oven's command is off, skip any extra checks
