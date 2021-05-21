@@ -39,7 +39,7 @@ namespace CA_DataUploaderLib
 
             if (cmd != null)
             {
-                commandHelp = $"{commandName.ToLower() + " " + commandArgsHelp,-22}- {commandDescription}";
+                commandHelp = $"{commandName.ToLower() + " " + commandArgsHelp,-26}- {commandDescription}";
                 cmd.AddCommand(commandName.ToLower(), ShowQueue);
                 cmd.AddCommand("help", HelpMenu);
                 cmd.AddCommand("escape", Stop);
