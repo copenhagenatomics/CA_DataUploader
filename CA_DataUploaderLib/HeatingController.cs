@@ -103,7 +103,7 @@ namespace CA_DataUploaderLib
                 try
                 {
                     var vector = await _cmd.When(_ => true, token);
-                    foreach (var heater in _heaters)
+                    foreach (var heater in heaters)
                         DoHeaterActions(vector, heater, token);
                 }
                 catch (Exception ex)
@@ -156,6 +156,7 @@ namespace CA_DataUploaderLib
             if (token.IsCancellationRequested)
                 return;
             var action = heater.MakeNextActionDecision(vector);
+            Console.WriteLine($"Vector: {vector["Heater_filter"]} Action: {action}");
             switch (action)
             {
                 case HeaterAction.TurnOn: HeaterOn(heater); break;
