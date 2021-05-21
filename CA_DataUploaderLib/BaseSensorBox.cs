@@ -61,7 +61,7 @@ namespace CA_DataUploaderLib
             .Select(s => s.Clone())
             .Concat(_allBoardsState.Select(b => new SensorSample(b.sensorName, (int)b.State)));
 
-        public virtual List<VectorDescriptionItem> GetVectorDescriptionItems =>
+        public virtual List<VectorDescriptionItem> GetVectorDescriptionItems() =>
             _values
                 .Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input))
                 .Concat(_allBoardsState.Select(b => new VectorDescriptionItem("double", b.sensorName, DataTypeEnum.State)))
