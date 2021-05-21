@@ -14,10 +14,15 @@ namespace CA_DataUploaderLib.IOconf
             
             if (parsePortRequired && list.Count < 4) 
                 throw new Exception($"{type}: wrong port number: {row}");
-            if (list.Count > 3 && !(HasPort = int.TryParse(list[3], out PortNumber)) && parsePortRequired) 
-                throw new Exception($"{type}: wrong port number: {row}");
-            if (list.Count > 3 && "skip".Equals(list[3], StringComparison.InvariantCultureIgnoreCase)) 
-                Skip = true;
+            if (list.Count > 3)
+            {
+                if (HasPort = int.TryParse(list[3], out var port))
+                    PortNumber = port; // we don't do out PortNumber above to avoid it being set to 0 when TryParse returns false.
+                else if (parsePortRequired)
+                    throw new Exception($"{type}: wrong port number: {row}");
+                if ("skip".Equals(list[3], StringComparison.InvariantCultureIgnoreCase)) 
+                    Skip = true;
+            }
             if (PortNumber < 1) throw new Exception($"{type}: port numbers must start at 1 {row}");
 
             if (parseBoxName) 
