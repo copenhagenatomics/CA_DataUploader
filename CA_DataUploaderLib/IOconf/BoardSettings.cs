@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -38,6 +39,8 @@ namespace CA_DataUploaderLib.IOconf
             }
 
             public virtual bool MatchesValuesFormat(string line) => _startsWithDigitRegex.IsMatch(line);
+
+            public virtual bool IsExpectedNonValuesLine(string line) => false;
         }
     }
 }

@@ -152,7 +152,7 @@ namespace CA_DataUploaderLib
                                 ProcessLine(numbers, board);
                                 receivedValues = true;
                             }
-                            else // mostly responses to commands or headers on reconnects.
+                            else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                                 CALog.LogInfoAndConsoleLn(LogID.B, "Unhandled board response " + board.ToString() + " line: " + line);
                         }
                         catch (Exception ex)
