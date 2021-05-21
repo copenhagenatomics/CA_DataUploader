@@ -126,7 +126,7 @@ namespace CA_DataUploaderLib
                     .Select(g => BoardLoop(g.Key, g.ToList(), _boardLoopsStopTokenSource.Token))
                     .ToList();
                 await Task.WhenAll(boardLoops);                
-                CALog.LogInfoAndConsoleLn(LogID.A, "Exiting ValveController.LoopForever() " + DateTime.Now.Subtract(start).Humanize(5));
+                CALog.LogInfoAndConsoleLn(LogID.A, "Exiting HeatingController.LoopForever() " + DateTime.Now.Subtract(start).Humanize(5));
             }
             catch (Exception ex)
             {
