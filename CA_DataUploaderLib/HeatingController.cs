@@ -11,7 +11,7 @@ namespace CA_DataUploaderLib
 {
     public sealed class HeatingController : IDisposable, ISubsystemWithVectorData
     {
-        public string Title => "Heating";
+        public string Title => "Heaters";
         private static int HeaterOnTimeout = 60;
         private bool _disposed = false;
         private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
@@ -79,7 +79,7 @@ namespace CA_DataUploaderLib
         public IEnumerable<SensorSample> GetValues() =>
             _heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
 
-        public List<VectorDescriptionItem> GetVectorDescriptionItems => 
+        public List<VectorDescriptionItem> GetVectorDescriptionItems() => 
             _heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_On/Off", DataTypeEnum.Output)).ToList();
 
         public void Dispose()
