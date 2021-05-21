@@ -106,6 +106,11 @@ namespace CA_DataUploaderLib
                     foreach (var heater in heaters)
                         DoHeaterActions(vector, heater, token);
                 }
+                catch (TaskCanceledException ex)
+                {
+                    if (!token.IsCancellationRequested)
+                        CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
+                }
                 catch (Exception ex)
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
