@@ -48,7 +48,6 @@ namespace CA_DataUploaderLib
 
             _boards = _values.Where(x => !x.Input.Skip).Select(x => x.Input.Map.Board).Distinct().ToList();
             _allBoardsState = new AllBoardsState(_boards);
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{commandName} boards: {_boards.Count()} values: {_values.Count()}");
 
             _running = true;
             new Thread(() => LoopForever()).Start();
@@ -62,15 +61,11 @@ namespace CA_DataUploaderLib
             .Select(s => s.Clone())
             .Concat(_allBoardsState.Select(b => new SensorSample(b.sensorName, (int)b.State)));
 
-        public virtual List<VectorDescriptionItem> GetVectorDescriptionItems()
-        {
-            var list = _values.Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input)).ToList();
-            var dataPoints = list.Count;
-            list.AddRange(_allBoardsState.Select(b => new VectorDescriptionItem("double", b.sensorName, DataTypeEnum.State)));
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{dataPoints,2} datapoints + {list.Count - dataPoints,2} boards from {Title}");
-
-            return list;
-        }
+        public virtual List<VectorDescriptionItem> GetVectorDescriptionItems =>
+            _values
+                .Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input))
+                .Concat(_allBoardsState.Select(b => new VectorDescriptionItem("double", b.sensorName, DataTypeEnum.State)))
+                .ToList();
 
         protected bool ShowQueue(List<string> args)
         {

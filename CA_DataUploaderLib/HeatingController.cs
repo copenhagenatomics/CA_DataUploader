@@ -79,12 +79,8 @@ namespace CA_DataUploaderLib
         public IEnumerable<SensorSample> GetValues() =>
             _heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
 
-        public List<VectorDescriptionItem> GetVectorDescriptionItems()
-        {
-            var list = _heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_On/Off", DataTypeEnum.Output)).ToList();
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{list.Count,2} datapoints from HeatingController");
-            return list;
-        }
+        public List<VectorDescriptionItem> GetVectorDescriptionItems => 
+            _heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_On/Off", DataTypeEnum.Output)).ToList();
 
         public void Dispose()
         { // class is sealed without unmanaged resources, no need for the full disposable pattern.
