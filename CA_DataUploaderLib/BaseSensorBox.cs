@@ -236,7 +236,7 @@ namespace CA_DataUploaderLib
 
         public virtual void ProcessLine(IEnumerable<double> numbers, MCUBoard board)
         {
-            int i = 0;
+            int i = 1;
             var timestamp = DateTime.UtcNow;
             foreach (var value in numbers)
             {

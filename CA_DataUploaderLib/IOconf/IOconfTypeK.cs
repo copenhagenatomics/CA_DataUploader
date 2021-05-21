@@ -14,11 +14,11 @@ namespace CA_DataUploaderLib.IOconf
             if (list[3].ToLower() == "all")
             {
                 AllJunction = true;   // all => special command to show all junction temperatures including the first as average (used for calibration)
-                PortNumber = 0;
+                PortNumber = 1;
             }
             else if (!Skip && !HasPort)
                 throw new Exception("IOconfTypeK: wrong port number: " + row);
-            else if (!Skip && (PortNumber < 0 || PortNumber > 33)) 
+            else if (!Skip && (PortNumber < 1 || PortNumber > 34)) 
                 throw new Exception("IOconfTypeK: invalid port number: " + row);
         }
     }

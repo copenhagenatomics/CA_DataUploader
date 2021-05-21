@@ -18,6 +18,7 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception($"{type}: wrong port number: {row}");
             if (list.Count > 3 && "skip".Equals(list[3], StringComparison.InvariantCultureIgnoreCase)) 
                 Skip = true;
+            if (PortNumber < 1) throw new Exception($"{type}: port numbers must start at 1 {row}");
 
             if (parseBoxName) 
             {
@@ -29,7 +30,8 @@ namespace CA_DataUploaderLib.IOconf
 
         public string Name { get; set; }
         public string BoxName { get; set; }
-        public int PortNumber;
+        /// <summary>the 1-based port number</summary>
+        public int PortNumber = 1;
         public bool Skip { get; set; }
         public IOconfMap Map { get; set; }
         protected bool HasPort { get; }

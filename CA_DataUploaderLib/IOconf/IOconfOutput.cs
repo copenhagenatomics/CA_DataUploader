@@ -14,11 +14,12 @@ namespace CA_DataUploaderLib.IOconf
             BoxName = list[2];
             SetMap(BoxName, settings); 
             if (parsePort && !int.TryParse(list[3], out PortNumber)) throw new Exception($"{type}: wrong port number: {row}");
+            if (PortNumber < 1) throw new Exception($"{type}: port numbers must start at 1 {row}");
         }
 
         public string Name { get; set; }
         public string BoxName { get; set; }
-        public int PortNumber;
+        public int PortNumber = 1;
         public IOconfMap Map { get; set; }
 
         protected void SetMap(string boxName, BoardSettings settings)
