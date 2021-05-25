@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using CA_DataUploaderLib.Extensions;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -16,11 +18,26 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception("Oven area must be a number bigger or equal to 1");
             
             HeatingElement = IOconfFile.GetHeater().Single(x => x.Name == list[2]);
-            TypeK = IOconfFile.GetTypeK().Single(x => x.Name == list[3]);
+            TemperatureSensorName = list[3];
+            var filter = IOconfFile.GetFilters().SingleOrDefault(x => x.NameInVector == TemperatureSensorName);
+            if (filter != null)
+            {
+                TypeKs = IOconfFile.GetTypeK().Where(x => filter.SourceNames.Contains(x.Name)).ToList();
+                if (TypeKs.Count == 0)
+                    throw new Exception($"Failed to find source temperature sensors in filter {TemperatureSensorName} for oven");
+            }
+            else
+            {
+                TypeKs = IOconfFile.GetTypeK().Where(x => x.Name == TemperatureSensorName).ToList();
+                if (TypeKs.Count == 0)
+                    throw new Exception($"Failed to find temperature sensor {TemperatureSensorName} for oven");
+            }
         }
 
         public int OvenArea;
         public IOconfHeater HeatingElement;
-        public IOconfTypeK TypeK;
+        public bool IsTemperatureSensorInitialized => TypeKs.All(k => k.IsInitialized());
+        public string TemperatureSensorName { get; }
+        private readonly List<IOconfTypeK> TypeKs;
     }
 }

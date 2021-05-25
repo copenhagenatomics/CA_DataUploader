@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -17,6 +18,7 @@ namespace CA_DataUploaderLib.IOconf
         public bool StopWhenLosingSensor { get; set; } = true;
         public bool SkipBoardAutoDetection { get; set; } = false;
         public LineParser Parser { get; set; } = LineParser.Default;
+        public string ValuesEndOfLineChar { get; set; } = "\n";
 
         public class LineParser
         {
@@ -37,6 +39,8 @@ namespace CA_DataUploaderLib.IOconf
             }
 
             public virtual bool MatchesValuesFormat(string line) => _startsWithDigitRegex.IsMatch(line);
+
+            public virtual bool IsExpectedNonValuesLine(string line) => false;
         }
     }
 }

@@ -11,6 +11,7 @@ namespace CA_DataUploaderLib.IOconf
         public FilterType filterType;
         public double filterLength;  // in seconds. 
         public string Name { get; set; }
+        public string NameInVector => Name + "_filter";
 
         public List<string> SourceNames;
         public bool HideSource { get; private set; }

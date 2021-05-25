@@ -60,12 +60,20 @@ namespace CA_DataUploaderLib
         public VectorDescription GetFullSystemVectorDescription() => _fullsystemFilterAndMath.Value.VectorDescription;
         public List<SensorSample> GetFullSystemVectorValues() => 
             _fullsystemFilterAndMath.Value.Apply(_subsystems.SelectMany(s => s.GetValues()).ToList());
-        private VectorFilterAndMath GetFullSystemFilterAndMath() => 
-            new VectorFilterAndMath(
-                new VectorDescription(
-                    _subsystems.SelectMany(s => s.GetVectorDescriptionItems()).ToList(),
-                    RpiVersion.GetHardware(),
-                    RpiVersion.GetSoftware()));
+        private VectorFilterAndMath GetFullSystemFilterAndMath()
+        { 
+            var items = new List<VectorDescriptionItem>(_subsystems.Count * 10);
+            foreach (var subsystem in _subsystems)
+            {
+                var subsystemItems = subsystem.GetVectorDescriptionItems();
+                CALog.LogInfoAndConsoleLn(LogID.A, $"{subsystemItems.Count,2} datapoints from {subsystem.Title}");
+                items.AddRange(subsystem.GetVectorDescriptionItems());                
+            }
+
+            return new VectorFilterAndMath(
+                new VectorDescription(items, RpiVersion.GetHardware(), RpiVersion.GetSoftware()));
+        }
+     
         public bool AssertArgs(List<string> args, int minimumLen)
         {
             if (args.Count() < minimumLen)

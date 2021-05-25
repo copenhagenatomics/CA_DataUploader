@@ -22,18 +22,19 @@ namespace CA_DataUploaderLib
         private bool ManualMode;
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
         private Stopwatch timeSinceLastNegativeValuesWarning = new Stopwatch();
+        private Stopwatch timeSinceLastMissingTemperatureWarning = new Stopwatch();
 
         public HeaterElement(IOconfHeater heater, IOconfOven oven)
         {
             _ioconf = heater;
             if (oven == null)
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heater.Name}");
-            else if (!oven.TypeK.IsInitialized())
+            else if (!oven.IsTemperatureSensorInitialized)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Warn: disabled oven for heater {heater.Name} - missing temperature board");
             else
             {
                 _area = oven.OvenArea;
-                _ovenSensor = oven.TypeK.Name;
+                _ovenSensor = oven.TemperatureSensorName;
             }
         }
 
@@ -69,7 +70,7 @@ namespace CA_DataUploaderLib
             if (IsOn) return false; // already on
             if (ManualMode) return false; // avoid auto on when manual mode is on.
             if (OvenTargetTemperature <= 0) return false; // oven's command is off, skip any extra checks
-            if (hasValidTemperature) return false; // no valid oven sensors
+            if (!hasValidTemperature) return false; // no valid oven sensors
 
             if (LastOff > DateTime.UtcNow.AddSeconds(-10))
                 return false;  // less than 10 seconds since we last turned it off
@@ -131,23 +132,32 @@ namespace CA_DataUploaderLib
         private (bool hasValidTemperature, double temp) GetOvenTemperatureFromVector(NewVectorReceivedArgs vector) 
         {
             if (_ovenSensor == null) return (false, double.MaxValue);
-            if (vector.TryGetValue(_ovenSensor, out var val))
-                throw new InvalidOperationException($"missing temperature for oven control: {_ovenSensor}");
-            if (val <= 10000 && val > 0) // we only use valid positive values. Note some temperature hubs alternate between 10k+ and 0 for errors.
+            if (!vector.TryGetValue(_ovenSensor, out var val))
+                WarnMissingSensor(_ovenSensor);
+            else if (val <= 10000 && val > 0) // we only use valid positive values. Note some temperature hubs alternate between 10k+ and 0 for errors.
                 return (true, val);
             else if (val < 0)
-                WarnNegativeTemperatures(_ovenSensor, val);
+                WarnNegativeTemperatures(_ovenSensor);
             return (false, double.MaxValue);
         }
 
-        private void WarnNegativeTemperatures(string name, double val)
-        {
-            if (timeSinceLastNegativeValuesWarning.IsRunning && timeSinceLastNegativeValuesWarning.Elapsed.Hours < 1)
-                return;
-            CALog.LogErrorAndConsoleLn(
-                LogID.A,
+        private void WarnNegativeTemperatures(string sensorName) =>
+            LowFrequencyWarning(
+                timeSinceLastNegativeValuesWarning, 
+                sensorName, 
                 $"detected negative values in sensors for heater {this.Name()}. Confirm thermocouples cables are not inverted");
-            timeSinceLastNegativeValuesWarning.Restart();
+ 
+        private void WarnMissingSensor(string sensorName) =>
+            LowFrequencyWarning(
+                timeSinceLastMissingTemperatureWarning, 
+                sensorName, 
+                $"detected missing temperature sensor {sensorName} for heater {Name()}. Confirm the name is listed exactly as is in the plot.");
+        
+        private void LowFrequencyWarning(Stopwatch watch, string sensorName, string message)
+        {
+            if (watch.IsRunning && watch.Elapsed.Hours < 1) return;
+            CALog.LogErrorAndConsoleLn(LogID.A,message);
+            watch.Restart();
         }
 
         /// <returns><c>true</c> if timed out with invalid values, <c>false</c> if we are waiting for the timeout and <c>null</c> if <paramref name="hasValidSensors"/> was <c>true</c></returns>

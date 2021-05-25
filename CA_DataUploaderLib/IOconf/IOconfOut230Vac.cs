@@ -7,7 +7,7 @@ namespace CA_DataUploaderLib.IOconf
     public class IOconfOut230Vac : IOconfOutput
     {
         public IOconfOut230Vac(string row, int lineNum, string type) : base(row, lineNum, type, true, 
-            new BoardSettings() { Parser = SwitchBoardResponseParser.Default }) 
+            new BoardSettings() { Parser = new SwitchBoardResponseParser(!row.Contains("showConfirmations")), ValuesEndOfLineChar = "\r" }) 
         {
             CurrentSensorName = Name + "_current";
             SwitchboardOnOffSensorName = Name + "_SwitchboardOn/Off";
@@ -35,7 +35,17 @@ namespace CA_DataUploaderLib.IOconf
             // the last 5 values are not there in older versions of the switchboard software.
             private const string _SwitchBoxPattern = "P1=(-?\\d\\.\\d\\d)A P2=(-?\\d\\.\\d\\d)A P3=(-?\\d\\.\\d\\d)A P4=(-?\\d\\.\\d\\d)A(?: ([01]), ([01]), ([01]), ([01])(?:, (-?\\d+.\\d\\d))?)?";
             private static readonly Regex _switchBoxCurrentsRegex = new Regex(_SwitchBoxPattern);
-            public new static SwitchBoardResponseParser Default { get; } = new SwitchBoardResponseParser();
+            private const string _commandConfirmationPattern = "p[1-4] (?:auto off)|(?:off)|(?:on(?: \\d+)?)";
+            private static readonly Regex _commandConfirmationRegex = new Regex(_commandConfirmationPattern);
+            private readonly bool _expectCommandConfirmations;
+
+            public new static SwitchBoardResponseParser Default { get; } = new SwitchBoardResponseParser(true);
+            // setting it to *not* expect command confirmations will normally cause them to be shown in the console + logs,
+            // which is mostly useful for debugging purposes.
+            public SwitchBoardResponseParser (bool expectCommandConfirmations)
+            {
+                _expectCommandConfirmations = expectCommandConfirmations;
+            }
 
             // returns currents 0-3, states 0-3, board temperature
             public override List<double> TryParseAsDoubleList(string line)
@@ -53,6 +63,13 @@ namespace CA_DataUploaderLib.IOconf
                 for (int i = 1; i < 10; i++)
                     data.Add(groups[i].Success ? groups[i].Value.ToDouble() : 10000d);
                 return data;
+            }
+            /// <summary>for now consider all command confirmations expected</summary>
+            public override bool IsExpectedNonValuesLine(string line)
+            {
+                if (line == "\n")
+                    return true; // the switchboard is currently sending \r\n\r at the end of a command confirmation (the last \r is being printed before the next current line)
+                return _expectCommandConfirmations && _commandConfirmationRegex.IsMatch(line); // note unlike for value lines where we only get \r, in these lines we get \n\r and this also ignores those
             }
         }
     }
