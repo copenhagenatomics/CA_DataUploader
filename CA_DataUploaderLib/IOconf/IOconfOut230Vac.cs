@@ -35,7 +35,7 @@ namespace CA_DataUploaderLib.IOconf
             // the last 5 values are not there in older versions of the switchboard software.
             private const string _SwitchBoxPattern = "P1=(-?\\d\\.\\d\\d)A P2=(-?\\d\\.\\d\\d)A P3=(-?\\d\\.\\d\\d)A P4=(-?\\d\\.\\d\\d)A(?: ([01]), ([01]), ([01]), ([01])(?:, (-?\\d+.\\d\\d))?)?";
             private static readonly Regex _switchBoxCurrentsRegex = new Regex(_SwitchBoxPattern);
-            private const string _commandConfirmationPattern = "p[1-4] (?:auto off)|(?:off)|(?:on(?: \\d+))";
+            private const string _commandConfirmationPattern = "p[1-4] (?:auto off)|(?:off)|(?:on(?: \\d+)?)";
             private static readonly Regex _commandConfirmationRegex = new Regex(_commandConfirmationPattern);
             private readonly bool _expectCommandConfirmations;
 
