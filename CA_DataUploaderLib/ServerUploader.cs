@@ -286,7 +286,7 @@ namespace CA_DataUploaderLib
                     string query = $"api/LoopApi?LoopName={loopName}&ticks={DateTime.UtcNow.Ticks}&loginToken={loginToken}";
                     response = await client.PutAsJsonAsync(query, publicKey.Concat(signedVectorDescription));
                     response.EnsureSuccessStatusCode();
-                    var result = response.Content.ReadAsAsync<string>().Result;
+                    var result = await response.Content.ReadAsAsync<string>();
                     return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
                 }
                 catch (Exception ex)
@@ -341,14 +341,14 @@ namespace CA_DataUploaderLib
             
             private static async Task<(string status, string message)> Post(HttpClient client, Dictionary<string, string> accountInfo, string requestUri)
             {
-                var response = client.PostAsync(requestUri, new FormUrlEncodedContent(accountInfo));
-                if (response.Result.StatusCode == System.Net.HttpStatusCode.OK && response.Result.Content != null)
+                var response = await client.PostAsync(requestUri, new FormUrlEncodedContent(accountInfo));
+                if (response.StatusCode == System.Net.HttpStatusCode.OK && response.Content != null)
                 {
-                    var dic = await response.Result.Content.ReadAsAsync<Dictionary<string, string>>();
+                    var dic = await response.Content.ReadAsAsync<Dictionary<string, string>>();
                     return (dic["status"], dic["message"]);
                 }
             
-                throw new Exception(response.Result.ReasonPhrase);
+                throw new Exception(response.ReasonPhrase);
             }
 
             private static HttpClient NewClient(string server)
