@@ -53,6 +53,7 @@ namespace CA_DataUploaderLib.IOconf
                 if (row.StartsWith("Geiger")) return new IOconfGeiger(row, lineNum);
                 if (row.StartsWith("Scale")) return new IOconfScale(row, lineNum);
                 if (row.StartsWith("Valve")) return new IOconfValve(row, lineNum);
+                if (row.StartsWith("SafeValve")) return new IOconfSafeValve(row, lineNum);
                 if (row.StartsWith("Filter")) return new IOconfFilter(row, lineNum);
                 if (row.StartsWith("RPiTemp")) return new IOconfRPiTemp(row, lineNum);
                 if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row, lineNum);
@@ -122,6 +123,7 @@ namespace CA_DataUploaderLib.IOconf
         public static IEnumerable<IOconfMotor> GetMotor()=> GetEntries<IOconfMotor>();
         public static IEnumerable<IOconfScale> GetScale() => GetEntries<IOconfScale>();
         public static IEnumerable<IOconfValve> GetValve()=> GetEntries<IOconfValve>();
+        public static IEnumerable<IOconfSafeValve> GetSafeValves()=> GetEntries<IOconfSafeValve>();
         public static IEnumerable<IOconfHeater> GetHeater() => GetEntries<IOconfHeater>();
         public static IEnumerable<IOconfLight> GetLight() => GetEntries<IOconfLight>();
         public static IEnumerable<IOconfOxygen> GetOxygen() => GetEntries<IOconfOxygen>();
