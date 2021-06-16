@@ -1,11 +1,14 @@
+using System;
 using System.Collections.Generic;
+using CA.LoopControlPluginBase;
 
 namespace CA_DataUploaderLib
 {
     public interface ISubsystemWithVectorData
     {
-        IEnumerable<SensorSample> GetValues();
-        List<VectorDescriptionItem> GetVectorDescriptionItems();
         string Title { get; }
+        List<VectorDescriptionItem> GetVectorDescriptionItems();
+        IEnumerable<SensorSample> GetInputValues();
+        IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs);
     }
 }

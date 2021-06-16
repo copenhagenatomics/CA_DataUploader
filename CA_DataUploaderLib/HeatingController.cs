@@ -1,4 +1,5 @@
 ﻿using CA.LoopControlPluginBase;
+using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 using Humanizer;
 using System;
@@ -12,7 +13,6 @@ namespace CA_DataUploaderLib
     public sealed class HeatingController : IDisposable, ISubsystemWithVectorData
     {
         public string Title => "Heaters";
-        private static int HeaterOnTimeout = 60;
         private bool _disposed = false;
         private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
         private PluginsCommandHandler _cmd;
@@ -21,6 +21,7 @@ namespace CA_DataUploaderLib
         private readonly HeaterCommand _heaterCmd;
         private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
         private readonly TaskCompletionSource _boardControlLoopsStopped = new TaskCompletionSource();
+        private readonly Dictionary<string, SwitchboardAction> _lastExecutedHeaterActions = new Dictionary<string, SwitchboardAction>();
 
         public HeatingController(CommandHandler cmd)
         {
@@ -76,9 +77,13 @@ namespace CA_DataUploaderLib
         /// <summary>
         /// Gets all the values in the order specified by <see cref="GetVectorDescriptionItems"/>.
         /// </summary>
-        public IEnumerable<SensorSample> GetValues() =>
-            _heaters.Select(x => new SensorSample(x.Name() + "_On/Off", x.IsOn ? 1.0 : 0.0));
-
+        public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
+        public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs)
+        { 
+            foreach (var heater in _heaters)
+            foreach (var sample in heater.MakeNextActionDecision(inputVectorReceivedArgs).ToVectorSamples(heater.Name()))
+                yield return sample;
+        }
         public List<VectorDescriptionItem> GetVectorDescriptionItems() => 
             _heaters.Select(x => new VectorDescriptionItem("double", x.Name() + "_On/Off", DataTypeEnum.Output)).ToList();
 
@@ -153,17 +158,19 @@ namespace CA_DataUploaderLib
         }
         
         private void DoHeaterActions(NewVectorReceivedArgs vector, HeaterElement heater, CancellationToken token)
-        {
+        { // TODO: move actions to SwitchBoardController and instead of getting the heater, get the port names & port numbers
             if (token.IsCancellationRequested)
                 return;
-            var action = heater.MakeNextActionDecision(vector);
-            switch (action)
-            {
-                case HeaterAction.TurnOn: HeaterOn(heater); break;
-                case HeaterAction.TurnOff: HeaterOff(heater); break;
-                case HeaterAction.None: break;
-                default: throw new ArgumentOutOfRangeException($"Unexpected action received: {action}");
-            }
+            var action = SwitchboardAction.FromVectorSamples(vector, heater.Name());
+            if (_lastExecutedHeaterActions.TryGetValue(heater.Name(), out var lastAction) && action.Equals(lastAction))
+                return; // no action changes has been requested since the last action taken on the heater.
+            
+            var onSeconds = action.GetRemainingOnSeconds(vector.GetVectorTime());
+            if (onSeconds == 0)
+                HeaterOff(heater);
+            else
+                HeaterOn(heater, onSeconds);
+            _lastExecutedHeaterActions[heater.Name()] = action;
         }
 
         public static void HeaterOff(HeaterElement heater)
@@ -178,11 +185,11 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public static void HeaterOn(HeaterElement heater)
+        public static void HeaterOn(HeaterElement heater, int onDuration)
         {
             try
             {
-                heater.Board().SafeWriteLine($"p{heater.PortNumber} on {HeaterOnTimeout}");
+                heater.Board().SafeWriteLine($"p{heater.PortNumber} on {onDuration}");
             }
             catch (TimeoutException)
             {
@@ -248,6 +255,7 @@ namespace CA_DataUploaderLib
             public override string ArgsHelp => " [name] on/off";
             public override string Description => "turn the heater with the given name in IO.conf on and off";
             private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
+            private static int ManualHeaterOnTimeout = 60;
 
             public HeaterCommand(List<HeaterElement> heaters)
             {
@@ -272,7 +280,7 @@ namespace CA_DataUploaderLib
 
                 heater.SetManualMode(args[2].ToLower() == "on");
                 if (heater.IsOn)
-                    HeaterOn(heater); // do this via the heaterElement.MakeDecision
+                    HeaterOn(heater, ManualHeaterOnTimeout); //TODO: do this via the heaterElement.MakeDecision?
                 else
                     HeaterOff(heater);
 

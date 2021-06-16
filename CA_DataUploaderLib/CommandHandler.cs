@@ -1,6 +1,7 @@
 ﻿using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
+using CA_DataUploaderLib.Extensions;
 using Humanizer;
 using System;
 using System.Collections.Generic;
@@ -58,8 +59,17 @@ namespace CA_DataUploaderLib
 
         public void AddSubsystem(ISubsystemWithVectorData subsystem) => _subsystems.Add(subsystem);
         public VectorDescription GetFullSystemVectorDescription() => _fullsystemFilterAndMath.Value.VectorDescription;
-        public List<SensorSample> GetFullSystemVectorValues() => 
-            _fullsystemFilterAndMath.Value.Apply(_subsystems.SelectMany(s => s.GetValues()).ToList());
+        public (List<SensorSample> samples, DateTime vectorTime) GetFullSystemVectorValues()
+        { 
+            var filterAndMath = _fullsystemFilterAndMath.Value;
+            var samples = filterAndMath.Apply(_subsystems.SelectMany(s => s.GetInputValues()).ToList());
+            var vectorTime = DateTime.UtcNow;
+            var inputVectorReceivedArgs = new NewVectorReceivedArgs(samples.WithVectorTime(vectorTime).ToDictionary(v => v.Name, v => v.Value));
+            var outputs = _subsystems.SelectMany(s => s.GetDecisionOutputs(inputVectorReceivedArgs));
+            filterAndMath.AddOutputsToInputVector(samples, outputs);
+            OnNewVectorReceived(samples.WithVectorTime(vectorTime));
+            return (samples, vectorTime);
+        }
         private VectorFilterAndMath GetFullSystemFilterAndMath()
         { 
             var items = new List<VectorDescriptionItem>(_subsystems.Count * 10);
@@ -67,7 +77,7 @@ namespace CA_DataUploaderLib
             {
                 var subsystemItems = subsystem.GetVectorDescriptionItems();
                 CALog.LogInfoAndConsoleLn(LogID.A, $"{subsystemItems.Count,2} datapoints from {subsystem.Title}");
-                items.AddRange(subsystem.GetVectorDescriptionItems());                
+                items.AddRange(subsystemItems);
             }
 
             return new VectorFilterAndMath(
@@ -86,7 +96,7 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public void OnNewVectorReceived(List<SensorSample> vector) =>
+        public void OnNewVectorReceived(IEnumerable<SensorSample> vector) =>
             NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector.ToDictionary(v => v.Name, v => v.Value)));
         
         private bool Stop(List<string> args)

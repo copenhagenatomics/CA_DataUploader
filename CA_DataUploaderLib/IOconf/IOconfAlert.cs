@@ -61,21 +61,21 @@ namespace CA_DataUploaderLib.IOconf
         private const int DefaultRateLimitMinutes = 30; // by default fire the same alert max once every 30 mins.
         private DateTime LastTriggered;
 
-        public bool CheckValue(double newValue)
+        public bool CheckValue(double newValue, DateTime vectorTime)
         {
             Message = MessageTemplate + newValue.ToString(CultureInfo.InvariantCulture) + ")";
             bool newMatches = RawCheckValue(newValue);
             bool lastMatches = !_isFirstCheck && RawCheckValue(LastValue); // there is no lastValue to check on the first call
             _isFirstCheck = false;
             LastValue = newValue;
-            return newMatches && !lastMatches && !RateLimit();
+            return newMatches && !lastMatches && !RateLimit(vectorTime);
         }
 
-        private bool RateLimit()
+        private bool RateLimit(DateTime vectorTime)
         {
-            if (DateTime.UtcNow.Subtract(LastTriggered).TotalMinutes < RateLimitMinutes)
+            if (vectorTime.Subtract(LastTriggered).TotalMinutes < RateLimitMinutes)
                 return true;
-            LastTriggered = DateTime.UtcNow;
+            LastTriggered = vectorTime;
             return false;
         }
 

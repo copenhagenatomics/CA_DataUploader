@@ -9,6 +9,7 @@ using Humanizer;
 using System.Diagnostics;
 using CA_DataUploaderLib.Extensions;
 using System.Collections;
+using CA.LoopControlPluginBase;
 
 namespace CA_DataUploaderLib
 {
@@ -57,10 +58,11 @@ namespace CA_DataUploaderLib
                 _values.SingleOrDefault(x => x.Input.Name == title) ??
                 throw new Exception(title + " not found in _config. Known names: " + string.Join(", ", _values.Select(x => x.Input.Name)));
 
-        public IEnumerable<SensorSample> GetValues() => _values
+        public IEnumerable<SensorSample> GetInputValues() => _values
             .Select(s => s.Clone())
             .Concat(_allBoardsState.Select(b => new SensorSample(b.sensorName, (int)b.State)));
 
+        public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs) => Enumerable.Empty<SensorSample>();
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems() =>
             _values
                 .Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input))

@@ -17,12 +17,14 @@ namespace CA_DataUploaderLib
         private DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         private DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         private readonly Stopwatch invalidValuesTime = new Stopwatch();
+        private DateTime invalidValuesStartedVectorTime = default;
         private double onTemperature = 10000;
         public bool IsOn;
         private bool ManualMode;
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
         private Stopwatch timeSinceLastNegativeValuesWarning = new Stopwatch();
         private Stopwatch timeSinceLastMissingTemperatureWarning = new Stopwatch();
+        private SwitchboardAction _lastAction = new SwitchboardAction(false, DateTime.UtcNow);
 
         public HeaterElement(IOconfHeater heater, IOconfOven oven)
         {
@@ -38,21 +40,23 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public HeaterAction MakeNextActionDecision(NewVectorReceivedArgs vector)
+        public SwitchboardAction MakeNextActionDecision(NewVectorReceivedArgs vector)
         {
             if (!TryGetSwitchboardInputsFromVector(vector, out var current, out var switchboardOnOffState)) 
-                return HeaterAction.None; // not connected, we skip this heater and act again when the connection is re-established
+                return _lastAction; // not connected, we skip this heater and act again when the connection is re-established
             var (hasValidTemperature, temp) = GetOvenTemperatureFromVector(vector);
             // Careful consideration must be taken if changing the order of the below statements.
             // Note that even though we received indication the board is connected above, 
             // if the connection is lost after we return the action, the control program can still fail to act on the heater. 
             // When it happens, the MustResend* methods will resend the expected action after 5 seconds.
-            return 
-                MustTurnOff(hasValidTemperature, temp) ? HeaterAction.TurnOff :
-                CanTurnOn(hasValidTemperature, temp) ? HeaterAction.TurnOn :
-                MustResendOnCommand(temp, current, switchboardOnOffState) ? HeaterAction.TurnOn : 
-                MustResendOffCommand(temp, current, switchboardOnOffState) ? HeaterAction.TurnOff :
-                HeaterAction.None;
+            var vectorTime = vector.GetVectorTime();
+            var action =
+                MustTurnOff(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(false, vectorTime):
+                CanTurnOn(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(true, vectorTime.AddSeconds(60)) : //TODO: short time outs?
+                MustResendOnCommand(temp, current, switchboardOnOffState, vectorTime) ? new SwitchboardAction(true, vectorTime.AddSeconds(60)): //TODO: short time outs? also we should not extend time to turn off here ...
+                MustResendOffCommand(temp, current, switchboardOnOffState, vectorTime) ? new SwitchboardAction(false, vectorTime) :
+                _lastAction;
+            return _lastAction = action;
         }
 
         public void SetTargetTemperature(int value) => OvenTargetTemperature = Math.Min(value, _ioconf.MaxTemperature);
@@ -65,31 +69,31 @@ namespace CA_DataUploaderLib
                     SetTargetTemperature(temperature);
         }
 
-        private bool CanTurnOn(bool hasValidTemperature, double temperature)
+        private bool CanTurnOn(bool hasValidTemperature, double temperature, DateTime vectorTime)
         {
             if (IsOn) return false; // already on
             if (ManualMode) return false; // avoid auto on when manual mode is on.
             if (OvenTargetTemperature <= 0) return false; // oven's command is off, skip any extra checks
             if (!hasValidTemperature) return false; // no valid oven sensors
 
-            if (LastOff > DateTime.UtcNow.AddSeconds(-10))
+            if (LastOff > vectorTime.AddSeconds(-10))
                 return false;  // less than 10 seconds since we last turned it off
 
             if (temperature >= OvenTargetTemperature)
                 return false; // already at target temperature. 
 
             onTemperature = temperature;
-            return SetOnProperties();
+            return SetOnProperties(vectorTime);
         }
 
-        private bool MustTurnOff(bool hasValidTemperature, double temperature)
+        private bool MustTurnOff(bool hasValidTemperature, double temperature, DateTime vectorTime)
         {
             if (!IsOn) return false; // already off
             if (OvenTargetTemperature <= 0 && !ManualMode)
-                return SetOffProperties(); // turn off: oven's command is off, skip any extra checks
-            var timeoutResult = CheckInvalidValuesTimeout(hasValidTemperature, 2000);
+                return SetOffProperties(vectorTime); // turn off: oven's command is off, skip any extra checks
+            var timeoutResult = CheckInvalidValuesTimeout(hasValidTemperature, 2000, vectorTime);
             if (timeoutResult.HasValue && timeoutResult.Value)
-                return SetOffProperties(); // turn off: 2 seconds without valid temperatures (even if running with manual mode)
+                return SetOffProperties(vectorTime); // turn off: 2 seconds without valid temperatures (even if running with manual mode)
             else if (timeoutResult.HasValue)
                 return false; // no valid temperatures, waiting up to 2 seconds before turn off
 
@@ -97,36 +101,37 @@ namespace CA_DataUploaderLib
                 return false; // avoid auto on/off when running in manual mode (except the 2 seconds without valid reads earlier)
 
             if (onTemperature < 10000 && temperature > onTemperature + 20)
-                return SetOffProperties(); // turn off: already 20C higher than the last time we turned on
+                return SetOffProperties(vectorTime); // turn off: already 20C higher than the last time we turned on
 
             if (temperature > OvenTargetTemperature)
-                return SetOffProperties(); //turn off: already at target temperature
+                return SetOffProperties(vectorTime); //turn off: already at target temperature
 
             return false;
         }
 
         // returns true to simplify MustTurnOff
-        private bool SetOffProperties()
+        private bool SetOffProperties(DateTime vectorTime)
         {
             IsOn = false;
-            LastOff = DateTime.UtcNow;
+            LastOff = vectorTime;
             return true;
         }
 
-        private bool SetOnProperties()
+        private bool SetOnProperties(DateTime vectorTime)
         {
             IsOn = true;
-            LastOn = DateTime.UtcNow;
+            LastOn = vectorTime;
             return true;
         }
 
         public void SetManualMode(bool turnOn)
         { 
+            var vectorTime = DateTime.UtcNow; // note: when running distributed decisions this needs to be the logical time like we have in the vector.
             ManualMode = turnOn;
             if (turnOn)
-                SetOnProperties();
+                SetOnProperties(vectorTime);
             else
-                SetOffProperties();
+                SetOffProperties(vectorTime);
         }
 
         private (bool hasValidTemperature, double temp) GetOvenTemperatureFromVector(NewVectorReceivedArgs vector) 
@@ -161,28 +166,28 @@ namespace CA_DataUploaderLib
         }
 
         /// <returns><c>true</c> if timed out with invalid values, <c>false</c> if we are waiting for the timeout and <c>null</c> if <paramref name="hasValidSensors"/> was <c>true</c></returns>
-        private bool? CheckInvalidValuesTimeout(bool hasValidSensors, int milliseconds)
+        private bool? CheckInvalidValuesTimeout(bool hasValidSensors, int milliseconds, DateTime vectorTime)
         {
             if (hasValidSensors)
-                invalidValuesTime.Reset();
-            else if(!invalidValuesTime.IsRunning)
-                invalidValuesTime.Restart();
+                invalidValuesStartedVectorTime = default;
+            else if(invalidValuesStartedVectorTime == default)
+                invalidValuesStartedVectorTime = vectorTime;
 
-            return hasValidSensors ? default(bool?) : invalidValuesTime.ElapsedMilliseconds >= milliseconds;
+            return hasValidSensors ? default(bool?) : (vectorTime - invalidValuesStartedVectorTime).TotalMilliseconds >= milliseconds;
         }
 
         // resends the on command every 5 seconds as long as there is no current.
-        private bool MustResendOnCommand(double temp, double current, double switchboardOnOffState)
+        private bool MustResendOnCommand(double temp, double current, double switchboardOnOffState, DateTime vectorTime)
         { 
-            if (!IsOn || DateTime.UtcNow < LastOn.AddSeconds(5) || CurrentIsOn(current)) return false;
+            if (!IsOn || vectorTime < LastOn.AddSeconds(5) || CurrentIsOn(current)) return false;
             LogRepeatCommand("on", temp, current, switchboardOnOffState);
             return true;
         }
 
         // resends the off command every 5 seconds as long as there is current.
-        private bool MustResendOffCommand(double temp, double current, double switchboardOnOffState) 
+        private bool MustResendOffCommand(double temp, double current, double switchboardOnOffState, DateTime vectorTime) 
         { 
-            if (IsOn || DateTime.UtcNow < LastOff.AddSeconds(5) || !CurrentIsOn(current)) return false;
+            if (IsOn || vectorTime < LastOff.AddSeconds(5) || !CurrentIsOn(current)) return false;
             LogRepeatCommand("off", temp, current, switchboardOnOffState);
             return true;
         }
@@ -209,12 +214,5 @@ namespace CA_DataUploaderLib
                 throw new InvalidOperationException($"missing switchboard on/off state: {_ioconf.SwitchboardOnOffSensorName}");
             return true;
         }
-    }
-
-    public enum HeaterAction
-    {
-        None,
-        TurnOff,
-        TurnOn
     }
 }

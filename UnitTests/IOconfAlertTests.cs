@@ -21,7 +21,7 @@ namespace UnitTests
         public void AlertTriggers(string row, double value) 
         {
             var alert = new IOconfAlert(row, 0);
-            Assert.IsTrue(alert.CheckValue(value));
+            Assert.IsTrue(alert.CheckValue(value, DateTime.UtcNow));
         }
 
         [DataRow("Alert;MyName;Sensorx = 123", 122d, 123d)]
@@ -41,8 +41,8 @@ namespace UnitTests
         public void AlertTriggersWhenOldValueDidNotMatch(string row, double oldValue, double value)
         {
             var alert = new IOconfAlert(row, 0);
-            alert.CheckValue(oldValue);
-            Assert.IsTrue(alert.CheckValue(value));
+            alert.CheckValue(oldValue, DateTime.UtcNow);
+            Assert.IsTrue(alert.CheckValue(value, DateTime.UtcNow));
         }
 
         [DataRow("Alert;MyName;Sensorx = 123", 122d, 123d, " MyName (Sensorx) = 123 (123)")]
@@ -51,8 +51,8 @@ namespace UnitTests
         public void AlertReturnsExpectedMessageAfterCheckingValueTwice(string row, double oldValue, double value, string expectedMessage)
         {
             var alert = new IOconfAlert(row, 0);
-            alert.CheckValue(oldValue);
-            alert.CheckValue(value);
+            alert.CheckValue(oldValue, DateTime.UtcNow);
+            alert.CheckValue(value, DateTime.UtcNow);
             Assert.AreEqual(expectedMessage, alert.Message);
         }
 
@@ -68,8 +68,8 @@ namespace UnitTests
         public void AlertDoesNotTriggersWhenOldValueMatched(string row, double oldValue, double value)
         {
             var alert = new IOconfAlert(row, 0);
-            alert.CheckValue(oldValue);
-            Assert.IsFalse(alert.CheckValue(value));
+            alert.CheckValue(oldValue, DateTime.UtcNow);
+            Assert.IsFalse(alert.CheckValue(value, DateTime.UtcNow));
         }
 
         [DataRow("Alert;MyName;Sensorx;=;123", DisplayName = "old format - no longer supported")]

@@ -32,9 +32,8 @@ namespace CA_DataUploader
                     int i = 0;
                     while (cmd.IsRunning)
                     {
-                        var sensorsSamples = cmd.GetFullSystemVectorValues();
-                        cmd.OnNewVectorReceived(sensorsSamples);
-                        cloud.SendVector(sensorsSamples.Select(v => v.Value).ToList(), sensorsSamples.First().TimeStamp);
+                        var (sensorsSamples, vectorTime) = cmd.GetFullSystemVectorValues();
+                        cloud.SendVector(sensorsSamples.Select(v => v.Value).ToList(), vectorTime);
                         Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
                         cloud.Wait(100);
                         if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
