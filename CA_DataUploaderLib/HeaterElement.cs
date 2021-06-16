@@ -16,7 +16,6 @@ namespace CA_DataUploaderLib
         private readonly string _ovenSensor; // sensor inside the oven somewhere.
         private DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
         private DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
-        private readonly Stopwatch invalidValuesTime = new Stopwatch();
         private DateTime invalidValuesStartedVectorTime = default;
         private double onTemperature = 10000;
         public bool IsOn;
@@ -52,9 +51,9 @@ namespace CA_DataUploaderLib
             var vectorTime = vector.GetVectorTime();
             var action =
                 MustTurnOff(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(false, vectorTime):
-                CanTurnOn(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(true, vectorTime.AddSeconds(60)) : //TODO: short time outs?
-                MustResendOnCommand(temp, current, switchboardOnOffState, vectorTime) ? new SwitchboardAction(true, vectorTime.AddSeconds(60)): //TODO: short time outs? also we should not extend time to turn off here ...
+                CanTurnOn(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) : 
                 MustResendOffCommand(temp, current, switchboardOnOffState, vectorTime) ? new SwitchboardAction(false, vectorTime) :
+                _lastAction.IsOn && _lastAction.GetRemainingOnSeconds(vectorTime) < 2 ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) : // re-trigger on early to avoid switching
                 _lastAction;
             return _lastAction = action;
         }
@@ -174,14 +173,6 @@ namespace CA_DataUploaderLib
                 invalidValuesStartedVectorTime = vectorTime;
 
             return hasValidSensors ? default(bool?) : (vectorTime - invalidValuesStartedVectorTime).TotalMilliseconds >= milliseconds;
-        }
-
-        // resends the on command every 5 seconds as long as there is no current.
-        private bool MustResendOnCommand(double temp, double current, double switchboardOnOffState, DateTime vectorTime)
-        { 
-            if (!IsOn || vectorTime < LastOn.AddSeconds(5) || CurrentIsOn(current)) return false;
-            LogRepeatCommand("on", temp, current, switchboardOnOffState);
-            return true;
         }
 
         // resends the off command every 5 seconds as long as there is current.
