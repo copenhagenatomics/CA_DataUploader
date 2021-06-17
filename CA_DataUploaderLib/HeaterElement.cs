@@ -183,7 +183,7 @@ namespace CA_DataUploaderLib
             return true;
         }
         private bool CurrentIsOn(double current) => current > _ioconf.CurrentSensingNoiseTreshold;
-        public string Name() => _ioconf.Name.ToLower();
+        public string Name() => _ioconf.Name;
         public MCUBoard Board() => _ioconf.Map.Board;
         private void LogRepeatCommand(string command, double  temp, double current, double switchboardOnOffState) => 
             CALog.LogData(LogID.A, $"{command}.={Name()}-{temp:N0}, v#={current}, switch-on/off={switchboardOnOffState}, WB={Board().BytesToWrite}{Environment.NewLine}");

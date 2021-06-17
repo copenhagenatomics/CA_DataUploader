@@ -29,6 +29,12 @@ namespace CA_DataUploaderLib
             yield return new SensorSample(GetTimeOffName(portName), TimeToTurnOff.ToVectorDouble());
         }
 
+        public static IEnumerable<VectorDescriptionItem> GetVectorDescriptionItems(string portName) 
+        {
+            yield return new VectorDescriptionItem("double", GetOnName(portName), DataTypeEnum.Output);
+            yield return new VectorDescriptionItem("double", GetTimeOffName(portName), DataTypeEnum.Output);
+        }
+
         public static SwitchboardAction FromVectorSamples(NewVectorReceivedArgs args, string portName)
         {
             var isOnName = GetOnName(portName);
@@ -39,7 +45,7 @@ namespace CA_DataUploaderLib
         }
 
         public override bool Equals(object obj) => 
-            obj is SwitchboardAction typedObj ?
+            obj != null && obj is SwitchboardAction typedObj ?
                 IsOn == typedObj.IsOn && TimeToTurnOff == typedObj.TimeToTurnOff :
                 false;
         public override int GetHashCode() => HashCode.Combine(IsOn, TimeToTurnOff);
