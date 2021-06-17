@@ -14,34 +14,31 @@ namespace UnitTests
         public void VectorDescriptionIncludesMath()
         {
             static IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
-            var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
-            var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
-            Assert.AreEqual("MyName" + Environment.NewLine + "MyMath", math.VectorDescription.GetVectorItemDescriptions());
+            var math = new MathVectorExpansion(GetTestMath);
+            Assert.AreEqual("MyMath", string.Join(Environment.NewLine, math.GetVectorDescriptionEntries().Select(e => e.Descriptor)));
         }
 
         [TestMethod]
         public void ExpandsVector()
         {
             static IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
-            var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
-            var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
+            var math = new MathVectorExpansion(GetTestMath);
             var values = new List<SensorSample>() { new SensorSample(new IOconfInput("KType;MyName", 1, "KType", false, false, null), 0.2) };
             math.Expand(values);
             CollectionAssert.AreEqual(new[] { 0.2, 2.2 }, values.Select(v => v.Value).ToArray());
         }
 
         [TestMethod]
-        public void RejectsUnexpectedVectorLength()
+        public void IgnoresUnusedValues()
         {
             static IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
-            var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
-            var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
+            var math = new MathVectorExpansion(GetTestMath);
             var values = new List<SensorSample>() {
                 new SensorSample(new IOconfInput("KType;MyName", 1, "KType", false, false, null), 0.2),
-                new SensorSample(new IOconfInput("KType;UnexpectedValue", 1, "KType", false, false, null), 3)
+                new SensorSample(new IOconfInput("KType;UnusedValue", 1, "KType", false, false, null), 3)
             };
-            var ex = Assert.ThrowsException<ArgumentException>(() => math.Expand(values));
-            Assert.AreEqual("wrong vector length (input, expected): 2 <> 1", ex.Message);
+            math.Expand(values);
+            CollectionAssert.AreEqual(new[] { 0.2, 3, 2.2 }, values.Select(v => v.Value).ToArray());
         }
 
         [TestMethod]
@@ -49,8 +46,7 @@ namespace UnitTests
         {
             var ioconfEntries = new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
             IEnumerable<IOconfMath> GetTestMath() => ioconfEntries;
-            var items = new List<VectorDescriptionItem> { new VectorDescriptionItem("MyType", "MyName", DataTypeEnum.Input) };
-            var math = new MathVectorExpansion(new VectorDescription(items, "my hardware", "my software"), GetTestMath);
+            var math = new MathVectorExpansion(GetTestMath);
             var values = new List<SensorSample>() { new SensorSample(new IOconfInput("KType;MyName", 1, "KType", false, false, null), 0.2) };
 
             ioconfEntries = new[] { new IOconfMath("Math;MyMath;MyName + 2", 2), new IOconfMath("Math;MyMath2;MyName + 3", 2) };

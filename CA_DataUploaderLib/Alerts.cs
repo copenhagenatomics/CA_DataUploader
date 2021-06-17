@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using CA.LoopControlPluginBase;
+using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
@@ -71,7 +72,7 @@ namespace CA_DataUploaderLib
 
         public override void OnNewVectorReceived(object sender, NewVectorReceivedArgs e)
         {
-            var timestamp = DateTime.UtcNow.ToString("yyyy.MM.dd HH:mm:ss");
+            var timestamp = e.GetVectorTime().ToString("yyyy.MM.dd HH:mm:ss");
             var (alertsToTrigger, noSensorAlerts) = GetAlertsToTrigger(e); // we gather alerts separately from triggering, to reduce time locking the _alerts list
             
             foreach (var a in alertsToTrigger ?? Enumerable.Empty<IOconfAlert>())
@@ -94,7 +95,7 @@ namespace CA_DataUploaderLib
                 {
                     if (!e.TryGetValue(a.Sensor, out var val))
                         EnsureInitialized(ref noSensorAlerts).Add(a);
-                    else if (a.CheckValue(val))
+                    else if (a.CheckValue(val, e.GetVectorTime()))
                         EnsureInitialized(ref alertsToTrigger).Add(a);
                 }
             

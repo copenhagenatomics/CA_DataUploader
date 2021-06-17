@@ -9,6 +9,7 @@ using Humanizer;
 using System.Diagnostics;
 using CA_DataUploaderLib.Extensions;
 using System.Collections;
+using CA.LoopControlPluginBase;
 
 namespace CA_DataUploaderLib
 {
@@ -57,10 +58,11 @@ namespace CA_DataUploaderLib
                 _values.SingleOrDefault(x => x.Input.Name == title) ??
                 throw new Exception(title + " not found in _config. Known names: " + string.Join(", ", _values.Select(x => x.Input.Name)));
 
-        public IEnumerable<SensorSample> GetValues() => _values
+        public IEnumerable<SensorSample> GetInputValues() => _values
             .Select(s => s.Clone())
             .Concat(_allBoardsState.Select(b => new SensorSample(b.sensorName, (int)b.State)));
 
+        public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs) => Enumerable.Empty<SensorSample>();
         public virtual List<VectorDescriptionItem> GetVectorDescriptionItems() =>
             _values
                 .Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input))
@@ -289,15 +291,16 @@ namespace CA_DataUploaderLib
             private readonly string[] _sensorNames;
             private readonly Dictionary<MCUBoard, int> _boardsIndexes;
 
-            public AllBoardsState(List<MCUBoard> boards)
+            public AllBoardsState(IEnumerable<MCUBoard> boards)
             {
-                _boards = boards;
-                _states = new ConnectionState[boards.Count];
-                _sensorNames = new string[boards.Count];
-                _boardsIndexes = new Dictionary<MCUBoard, int>(boards.Count);
-                for (int i = 0; i < boards.Count; i++)
+                // taking a copy of the list ensures we can keep reporting the state of the board, as otherwise the calling code can remove it, for example, when it decides to ignore the board
+                _boards = boards.ToList(); 
+                _states = new ConnectionState[_boards.Count];
+                _sensorNames = new string[_boards.Count];
+                _boardsIndexes = new Dictionary<MCUBoard, int>(_boards.Count);
+                for (int i = 0; i < _boards.Count; i++)
                 {
-                    _sensorNames[i] = boards[i].BoxName + "_state";
+                    _sensorNames[i] = _boards[i].BoxName + "_state";
                     _boardsIndexes[_boards[i]] = i;
                 }
             }

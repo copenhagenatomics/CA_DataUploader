@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace CA_DataUploaderLib.IOconf
+﻿namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfAccount : IOconfState
     {
