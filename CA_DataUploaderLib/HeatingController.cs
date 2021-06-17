@@ -129,7 +129,6 @@ namespace CA_DataUploaderLib
             public override string ArgsHelp => " [name] on/off";
             public override string Description => "turn the heater with the given name in IO.conf on and off";
             private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
-            private static int ManualHeaterOnTimeout = 60;
 
             public HeaterCommand(List<HeaterElement> heaters)
             {
