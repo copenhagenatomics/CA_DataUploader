@@ -153,11 +153,6 @@ namespace CA_DataUploaderLib
                 }
 
                 heater.SetManualMode(args[2].ToLower() == "on");
-                if (heater.IsOn) //TODO: do this via the heaterElement.MakeDecision?
-                    heater.Board().SafeWriteLine($"p{heater.PortNumber} on {ManualHeaterOnTimeout}");
-                else
-                    heater.Board().SafeWriteLine($"p{heater.PortNumber} off");
-
                 return Task.CompletedTask;
             }
         }
