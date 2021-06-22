@@ -114,8 +114,10 @@ namespace CA_DataUploaderLib
                     return; // no action changes has been requested since the last action taken on the heater.
                 
                 var onSeconds = action.GetRemainingOnSeconds(vector.GetVectorTime());
-                if (onSeconds == 0)
+                if (onSeconds <= 0)
                     board.SafeWriteLine($"p{port.PortNumber} off");
+                else if (onSeconds == int.MaxValue)
+                    board.SafeWriteLine($"p{port.PortNumber} on");
                 else
                     board.SafeWriteLine($"p{port.PortNumber} on {onSeconds}");
                 lastActions[port.PortNumber - 1] = action;
