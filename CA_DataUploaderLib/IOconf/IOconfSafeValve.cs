@@ -14,7 +14,7 @@ namespace CA_DataUploaderLib.IOconf
         /// <summary>max sensor value. Above this value the safe valve triggers, setting the valve to the default/safe position</summary>
         public double Max { get; }
 
-        public IOconfSafeValve(string row, int lineNum) : base(row, lineNum, "Filter")
+        public IOconfSafeValve(string row, int lineNum) : base(row, lineNum, "SafeValve")
         {
             format = "SafeValve;Name;ValveName;SensorName;Max";
 
