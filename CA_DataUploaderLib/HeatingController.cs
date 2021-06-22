@@ -1,4 +1,5 @@
 ﻿using CA.LoopControlPluginBase;
+using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
@@ -58,7 +59,7 @@ namespace CA_DataUploaderLib
         public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs)
         { 
             foreach (var heater in _heaters)
-            foreach (var sample in heater.MakeNextActionDecision(inputVectorReceivedArgs).ToVectorSamples(heater.Name()))
+            foreach (var sample in heater.MakeNextActionDecision(inputVectorReceivedArgs).ToVectorSamples(heater.Name(), inputVectorReceivedArgs.GetVectorTime()))
                 yield return sample;
         }
 
