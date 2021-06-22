@@ -9,13 +9,9 @@ namespace CA_DataUploaderLib
 {
     public class HeaterElement
     {
-        public int PortNumber => _ioconf.PortNumber;
         private int OvenTargetTemperature;
-        private IOconfHeater _ioconf;
-        private readonly int _area = -1;  // -1 if not defined. 
-        private readonly string _ovenSensor; // sensor inside the oven somewhere.
-        private DateTime LastOn = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
-        private DateTime LastOff = DateTime.UtcNow.AddSeconds(-20); // assume nothing happened in the last 20 seconds
+        private Config _config;
+        private DateTime LastOff = DateTime.MinValue; // assume there is no previous off
         private DateTime invalidValuesStartedVectorTime = default;
         private double onTemperature = 10000;
         public bool IsOn;
@@ -26,18 +22,13 @@ namespace CA_DataUploaderLib
         private Stopwatch timeSinceLastMissingTemperatureWarning = new Stopwatch();
         private SwitchboardAction _lastAction = new SwitchboardAction(false, DateTime.UtcNow);
 
-        public HeaterElement(IOconfHeater heater, IOconfOven oven)
+        public HeaterElement(IOconfHeater heater, IOconfOven oven) : this(ToConfig(heater, oven))
         {
-            _ioconf = heater;
-            if (oven == null)
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heater.Name}");
-            else if (!oven.IsTemperatureSensorInitialized)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Warn: disabled oven for heater {heater.Name} - missing temperature board");
-            else
-            {
-                _area = oven.OvenArea;
-                _ovenSensor = oven.TemperatureSensorName;
-            }
+        }
+
+        public HeaterElement(Config config)
+        {
+            _config = config;
         }
 
         public SwitchboardAction MakeNextActionDecision(NewVectorReceivedArgs vector)
@@ -78,16 +69,16 @@ namespace CA_DataUploaderLib
 
         public void SetTargetTemperature(int value)
         { 
-            OvenTargetTemperature = Math.Min(value, _ioconf.MaxTemperature);
+            OvenTargetTemperature = Math.Min(value, _config.MaxTemperature);
             if (value <= 0)
                 SetManualMode(false); // this ensures that executing oven off also turns off any manual heater.
         }
         public void SetTargetTemperature(IEnumerable<(int area, int temperature)> values)
         {
-            if (_area == -1) return; // temperature control is not enabled for the heater (no oven or missing temperature hub)
+            if (_config.Area == -1) return; // temperature control is not enabled for the heater (no oven or missing temperature hub)
 
             foreach (var (area, temperature) in values)
-                if (_area == area)
+                if (_config.Area == area)
                     SetTargetTemperature(temperature);
         }
 
@@ -110,7 +101,7 @@ namespace CA_DataUploaderLib
         private bool MustTurnOff(bool hasValidTemperature, double temperature, DateTime vectorTime)
         {
             if (!IsOn) return false; // already off
-            if (!ManualTurnOn) return false; // heater is on in manual avoid, avoid turning off
+            if (ManualTurnOn) return false; // heater is on in manual avoid, avoid turning off
             if (OvenTargetTemperature <= 0)
                 return SetOffProperties(vectorTime); // turn off: oven's command is off, skip any extra checks
             var timeoutResult = CheckInvalidValuesTimeout(hasValidTemperature, 2000, vectorTime);
@@ -139,7 +130,6 @@ namespace CA_DataUploaderLib
         private bool SetOnProperties(DateTime vectorTime)
         {
             IsOn = true;
-            LastOn = vectorTime;
             return true;
         }
 
@@ -151,13 +141,14 @@ namespace CA_DataUploaderLib
 
         private (bool hasValidTemperature, double temp) GetOvenTemperatureFromVector(NewVectorReceivedArgs vector) 
         {
-            if (_ovenSensor == null) return (false, double.MaxValue);
-            if (!vector.TryGetValue(_ovenSensor, out var val))
-                WarnMissingSensor(_ovenSensor);
+            var sensor = _config.OvenSensor;
+            if (sensor == null) return (false, double.MaxValue);
+            if (!vector.TryGetValue(sensor, out var val))
+                WarnMissingSensor(sensor);
             else if (val <= 10000 && val > 0) // we only use valid positive values. Note some temperature hubs alternate between 10k+ and 0 for errors.
                 return (true, val);
             else if (val < 0)
-                WarnNegativeTemperatures(_ovenSensor);
+                WarnNegativeTemperatures(sensor);
             return (false, double.MaxValue);
         }
 
@@ -198,28 +189,67 @@ namespace CA_DataUploaderLib
             LogRepeatCommand("off", temp, current, switchboardOnOffState);
             return true;
         }
-        private bool CurrentIsOn(double current) => current > _ioconf.CurrentSensingNoiseTreshold;
-        public string Name() => _ioconf.Name;
-        public MCUBoard Board() => _ioconf.Map.Board;
+        private bool CurrentIsOn(double current) => current > _config.CurrentSensingNoiseTreshold;
+        public string Name() => _config.Name;
         private void LogRepeatCommand(string command, double  temp, double current, double switchboardOnOffState) => 
-            CALog.LogData(LogID.A, $"{command}.={Name()}-{temp:N0}, v#={current}, switch-on/off={switchboardOnOffState}, WB={Board().BytesToWrite}{Environment.NewLine}");
+            CALog.LogData(LogID.A, $"{command}.={Name()}-{temp:N0}, v#={current}, switch-on/off={switchboardOnOffState}{Environment.NewLine}");
 
         private bool TryGetSwitchboardInputsFromVector(
             NewVectorReceivedArgs vector, out double current, out double switchboardOnOffState)
         {
-            if (!vector.TryGetValue(_ioconf.BoardStateSensorName, out var state))
-                throw new InvalidOperationException($"missing heater's board connection state: {_ioconf.BoardStateSensorName}");
+            if (!vector.TryGetValue(_config.BoardStateSensorName, out var state))
+                throw new InvalidOperationException($"missing heater's board connection state: {_config.BoardStateSensorName}");
             if (state != (int)BaseSensorBox.ConnectionState.Connected)
             {
                 current = switchboardOnOffState = 0;
                 return false;
             }
 
-            if (!vector.TryGetValue(_ioconf.CurrentSensorName, out current))
-                throw new InvalidOperationException($"missing heater current: {_ioconf.CurrentSensorName}");
-            if (!vector.TryGetValue(_ioconf.SwitchboardOnOffSensorName, out switchboardOnOffState))
-                throw new InvalidOperationException($"missing switchboard on/off state: {_ioconf.SwitchboardOnOffSensorName}");
+            if (!vector.TryGetValue(_config.CurrentSensorName, out current))
+                throw new InvalidOperationException($"missing heater current: {_config.CurrentSensorName}");
+            if (!vector.TryGetValue(_config.SwitchboardOnOffSensorName, out switchboardOnOffState))
+                throw new InvalidOperationException($"missing switchboard on/off state: {_config.SwitchboardOnOffSensorName}");
             return true;
+        }
+
+        private static Config ToConfig(IOconfHeater heater, IOconfOven oven)
+        {
+            var (area, ovenSensor) = GetOvenInfo(heater.Name, oven);
+            return new Config
+            {
+                Area = area,
+                OvenSensor = ovenSensor,
+                MaxTemperature = heater.MaxTemperature,
+                CurrentSensingNoiseTreshold = heater.CurrentSensingNoiseTreshold,
+                Name = heater.Name,
+                BoardStateSensorName = heater.BoardStateSensorName,
+                CurrentSensorName = heater.CurrentSensorName,
+                SwitchboardOnOffSensorName = heater.SwitchboardOnOffSensorName
+            };
+        }
+
+        private static (int area, string ovenSensor) GetOvenInfo(string heaterName, IOconfOven oven)
+        {
+            if (oven != null && oven.IsTemperatureSensorInitialized)
+                return (oven.OvenArea, oven.TemperatureSensorName);
+            if (oven == null)
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heaterName}");
+            else if (!oven.IsTemperatureSensorInitialized)
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Warn: disabled oven for heater {heaterName} - missing temperature board");
+
+            return (-1, default);
+        }
+
+        public class Config
+        {
+            public int Area { get; set; } = -1; // -1 when not set
+            public string OvenSensor { get; set; } // sensor inside the oven somewhere.
+            public int MaxTemperature { get; set; }
+            public double CurrentSensingNoiseTreshold { get; set; }
+            public string Name { get; set; }
+            public string BoardStateSensorName { get; set; }
+            public string CurrentSensorName { get; set; }
+            public string SwitchboardOnOffSensorName { get; set; }
         }
     }
 }
