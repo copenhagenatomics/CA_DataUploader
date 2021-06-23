@@ -12,6 +12,7 @@ namespace CA_DataUploaderLib
         private int OvenTargetTemperature;
         private Config _config;
         private DateTime LastOff = DateTime.MinValue; // assume there is no previous off
+        private DateTime LastAutoOff = DateTime.MinValue; // assume there is no previous off
         private DateTime invalidValuesStartedVectorTime = default;
         private double onTemperature = 10000;
         public bool IsOn;
@@ -59,7 +60,7 @@ namespace CA_DataUploaderLib
         public (bool manualOff, bool manualOn) MustExecuteManualMode(DateTime vectorTime)
         {
             if (!PendingManualModeExecution) return (false, false);
-            PendingManualModeExecution = true;
+            PendingManualModeExecution = false;
             if (!ManualTurnOn)
                 SetOffProperties(vectorTime);
             else
@@ -88,7 +89,7 @@ namespace CA_DataUploaderLib
             if (OvenTargetTemperature <= 0) return false; // oven's command is off, skip any extra checks
             if (!hasValidTemperature) return false; // no valid oven sensors
 
-            if (LastOff > vectorTime.AddSeconds(-10))
+            if (LastAutoOff > vectorTime.AddSeconds(-10))
                 return false;  // less than 10 seconds since we last turned it off
 
             if (temperature >= OvenTargetTemperature)
@@ -103,23 +104,29 @@ namespace CA_DataUploaderLib
             if (!IsOn) return false; // already off
             if (ManualTurnOn) return false; // heater is on in manual avoid, avoid turning off
             if (OvenTargetTemperature <= 0)
-                return SetOffProperties(vectorTime); // turn off: oven's command is off, skip any extra checks
+                return SetOffProperties(vectorTime); // turn off: oven's command is off, skip any extra checks (note its not considered an auto off so new oven commands are not hit by the 10 seconds limit)
             var timeoutResult = CheckInvalidValuesTimeout(hasValidTemperature, 2000, vectorTime);
             if (timeoutResult.HasValue && timeoutResult.Value)
-                return SetOffProperties(vectorTime); // turn off: 2 seconds without valid temperatures
+                return SetAutoOffProperties(vectorTime); // turn off: 2 seconds without valid temperatures
             else if (timeoutResult.HasValue)
                 return false; // no valid temperatures, waiting up to 2 seconds before turn off
 
             if (onTemperature < 10000 && temperature > onTemperature + 20)
-                return SetOffProperties(vectorTime); // turn off: already 20C higher than the last time we turned on
+                return SetAutoOffProperties(vectorTime); // turn off: already 20C higher than the last time we turned on
 
             if (temperature > OvenTargetTemperature)
-                return SetOffProperties(vectorTime); //turn off: already at target temperature
+                return SetAutoOffProperties(vectorTime); //turn off: already at target temperature
 
             return false;
         }
 
         // returns true to simplify MustTurnOff
+        private bool SetAutoOffProperties(DateTime vectorTime)
+        {
+            LastAutoOff = vectorTime;
+            return SetOffProperties(vectorTime);
+        }
+
         private bool SetOffProperties(DateTime vectorTime)
         {
             IsOn = false;
