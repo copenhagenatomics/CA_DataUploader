@@ -32,25 +32,13 @@ namespace UnitTests
             Assert.AreEqual(vector.GetVectorTime().AddSeconds(10), action.TimeToTurnOff);
         }
 
-        [TestMethod, Ignore("this test was only an attempt to reproduce an early turn off at 45.28 when the target was 45: https://www.copenhagenatomics.com/plots/temperatureplot.php?5vsKWnz9e6&from=1624378885646&to=1624378886872&min=44.43241132507414&max=45.64454835887571&checkmarks=dfffeebfff")]
-        public void WhenHeaterIsSlightlyAboveTempCanTurnOn()
-        { 
-            var element = new HeaterElement(NewConfig.Build());
-            element.SetTargetTemperature(45);
-            var samples = NewVectorSamples;
-            samples["temp"] = 45;
-            NewVectorReceivedArgs vector = new NewVectorReceivedArgs(samples);
-            var action = element.MakeNextActionDecision(vector);
-            Assert.AreEqual(true, action.IsOn);
-        }
-
         [TestMethod]
         public void WhenHeaterIsOverHalfDegreeAboveTempKeepsOff()
         { 
             var element = new HeaterElement(NewConfig.Build());
             element.SetTargetTemperature(45);
             var samples = NewVectorSamples;
-            samples["temp"] = 46;
+            samples["temp"] = 45.5;
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(samples);
             var action = element.MakeNextActionDecision(vector);
             Assert.AreEqual(false, action.IsOn);
@@ -68,6 +56,17 @@ namespace UnitTests
             newSamples["temp"] = 46;
             var action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
             Assert.AreEqual(false, action.IsOn);
+        }
+
+        [TestMethod]
+        public void WhenOvenWasTurnedOffAndOnHeaterCanTurnOn()
+        { 
+            var element = new HeaterElement(NewConfig.Build());
+            element.SetTargetTemperature(0);
+            element.SetTargetTemperature(45);
+            NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
+            var action = element.MakeNextActionDecision(vector); 
+            Assert.AreEqual(true, action.IsOn);
         }
 
         private class HeaterElementConfigBuilder
