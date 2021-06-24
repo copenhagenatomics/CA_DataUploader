@@ -109,7 +109,7 @@ namespace CA_DataUploaderLib
 
         }
 
-        public bool IsEmpty()
+        private bool IsEmpty()
         {
             // pcbVersion is included in this list because at the time of writting is the last value in the readEEPROM header, 
             // which avoids the rest of the header being treated as "values".
@@ -141,11 +141,6 @@ namespace CA_DataUploaderLib
         public override string ToString()
         {
             return $"{productTypeHeader}{productType,-20} {serialNumberHeader}{serialNumber,-12} Port name: {PortName}";
-        }
-
-        public string ToStringSimple(string seperator)
-        {
-            return $"{PortName}{seperator}{serialNumber}{seperator}{productType}";
         }
 
         /// <summary>
@@ -205,6 +200,7 @@ namespace CA_DataUploaderLib
                     LogID.B, 
                     $"Failure reopening port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
                     ex);
+                return true;
             }
 
             CALog.LogData(LogID.B, $"Reopened port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§", lines)}'");
@@ -350,14 +346,14 @@ namespace CA_DataUploaderLib
                     if (IsOpen)
                         return action();
 
-                    Thread.Sleep(100);
-                    Open();
+                    // Thread.Sleep(100);
+                    // Open();
 
-                    if (IsOpen)
-                        return action();
+                    // if (IsOpen)
+                    //     return action();
                 }
 
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Failed to open port to {actionName}(): {PortName} {productType} {serialNumber}{Environment.NewLine}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to {actionName}() - port closed: {PortName} {productType} {serialNumber}{Environment.NewLine}");
             }
             catch (Exception ex)
             {
