@@ -48,6 +48,8 @@ namespace CA_DataUploaderLib
                 new Thread(() => this.LoopForever()).Start();
                 _cmd = cmd;
                 cmd?.AddCommand("escape", Stop);
+                if (cmd != null)
+                    cmd.AlertFired += SendAlert;
             }
             catch (Exception ex)
             {
@@ -56,6 +58,7 @@ namespace CA_DataUploaderLib
             }
         }
 
+        private void SendAlert(object sender, AlertFiredArgs e) => SendAlert(e.Message);
         internal void SendAlert(string message)
         {
             lock (_alertQueue)

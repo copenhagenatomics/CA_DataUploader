@@ -8,14 +8,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
+    /// <remarks>
+    /// Thread safety: reading and writing from 2 different threads is supported as long as only one thread reads and the other one writes.
+    /// In addition to that, the Safe* methods must be used so that no operations run in parallel while trying to close/open the connection. 
+    /// </remarks>
     public class MCUBoard : SerialPort
     {
-        private int _safeLimit = 100;
-        private int _reconnectLimit = 100;
-
         public string BoxName = null;
         public const string BoxNameHeader = "IOconf.Map BoxName: ";
 
@@ -44,7 +46,6 @@ namespace CA_DataUploaderLib
 
         public DateTime PortOpenTimeStamp;
 
-        private DateTime _lastReopenTime;
 
         // "O 0213.1 T +21.0 P 1019 % 020.92 e 0000"
         private static readonly Regex _luminoxRegex = new Regex(
@@ -53,6 +54,9 @@ namespace CA_DataUploaderLib
         private static readonly Regex _scaleRegex = new Regex("[+-](([0-9]*[.])?[0-9]+) kg"); // "+0000.00 kg"
         private static int _detectedScaleBoards;
         private static int _detectedUnknownBoards;
+        // the "writer" for this lock are operations that close/reopens the connection, while the readers are any other operation including SafeWriteLine.
+        // This prevents operations being ran when the connections are being closed/reopened.
+        private static AsyncReaderWriterLock _reconnectionLock = new AsyncReaderWriterLock();
 
         public BoardSettings ConfigSettings { get; set; } = BoardSettings.Default;
 
@@ -119,17 +123,22 @@ namespace CA_DataUploaderLib
                     pcbVersion.IsNullOrEmpty();  
         }
         
-        public string SafeReadLine() => RunEnsuringConnectionIsOpen("ReadLine", ReadLine) ?? string.Empty;
-        public bool SafeHasDataInReadBuffer() => RunEnsuringConnectionIsOpen("HasDataInReadBuffer", () => BytesToRead > 0);
-        public void SafeWriteLine(string msg) => RunEnsuringConnectionIsOpen("WriteLine", () => WriteLine(msg));
-        public string SafeReadExisting() => RunEnsuringConnectionIsOpen("ReadExisting", ReadExisting) ?? string.Empty;
+        public async Task<string> SafeReadLine(CancellationToken token) => await RunEnsuringConnectionIsOpen("ReadLine", ReadLine, token) ?? string.Empty;
+        public Task<bool> SafeHasDataInReadBuffer(CancellationToken token) => RunEnsuringConnectionIsOpen("HasDataInReadBuffer", () => BytesToRead > 0, token);
+        public Task SafeWriteLine(string msg, CancellationToken token) => RunEnsuringConnectionIsOpen("WriteLine", () => WriteLine(msg), token);
+        public async Task<string> SafeReadExisting(CancellationToken token) => await RunEnsuringConnectionIsOpen("ReadExisting", ReadExisting, token) ?? string.Empty;
 
-        public void SafeClose()
+        public async Task SafeClose(CancellationToken token)
         {
-            lock (this)
+            await _reconnectionLock.AcquireWriterLock(token);
+            try
             {
                 if (IsOpen)
-                    Close();
+                    Close();                
+            }
+            finally
+            {
+                _reconnectionLock.ReleaseWriterLock();
             }
         }
 
@@ -147,60 +156,47 @@ namespace CA_DataUploaderLib
         /// Reopens the connection skipping the header.
         /// </summary>
         /// <param name="expectedHeaderLines">The amount of header lines expected.</param>
-        /// <param name="secondsBetweenReopens">The amount of seconds to wait since the last reconnect attempt.</param>
-        /// <returns><c>false</c> if the reconnect limit has been exceeded.</returns>
+        /// <returns><c>false</c> if the reconnect attempt failed.</returns>
         /// <remarks>
         /// This method assumes only value lines start with numbers, 
         /// so it considers such a line to be past the header.
         /// 
         /// A log entry to <see cref="LogID.B"/> is added with the skipped header 
         /// and the bytes in the receive buffer 500ms after the port was opened again.
-        /// 
-        /// No exceptions are produced if there is a failure to reopen, although information about is added to log B.
         /// </remarks>
-        public bool SafeReopen()
+        public async Task<bool> SafeReopen(CancellationToken token)
         {
             var lines = new List<string>();
             var bytesToRead500ms = 0;
+            await _reconnectionLock.AcquireWriterLock(token);
             try
             {
-                lock (this)
+                if (IsOpen)
                 {
-                    TimeSpan timeSinceLastReopen = DateTime.Now.Subtract(_lastReopenTime);
-                    if (timeSinceLastReopen.TotalSeconds < ConfigSettings.SecondsBetweenReopens)
-                    {
-                        CALog.LogData(LogID.B, $"(Reopen) skipped {PortName} {productType} {serialNumber} - time since last reopen {timeSinceLastReopen}");
-                        return true;
-                    }
-
-                    if (_reconnectLimit-- < 0)
-                        return false;
-
-                    if (IsOpen)
-                    {
-                        CALog.LogData(LogID.B, $"(Reopen) Closing port {PortName} {productType} {serialNumber}");
-                        Close();
-                        Thread.Sleep(500);
-                    }
-                    
-                    CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {productType} {serialNumber}");
-                    Open();
-                    Thread.Sleep(500);
-
-                    bytesToRead500ms = BytesToRead;
-                    CALog.LogData(LogID.B, $"(Reopen) skipping {ConfigSettings.ExpectedHeaderLines} header lines for port {PortName} {productType} {serialNumber} ");
-                    lines = SkipExtraHeaders(ConfigSettings.ExpectedHeaderLines);
-                    _lastReopenTime = DateTime.Now;
+                    CALog.LogData(LogID.B, $"(Reopen) Closing port {PortName} {productType} {serialNumber}");
+                    Close();
+                    await Task.Delay(500, token);
                 }
+                
+                CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {productType} {serialNumber}");
+                Open();
+                Thread.Sleep(500);
+
+                bytesToRead500ms = BytesToRead;
+                CALog.LogData(LogID.B, $"(Reopen) skipping {ConfigSettings.ExpectedHeaderLines} header lines for port {PortName} {productType} {serialNumber} ");
+                lines = SkipExtraHeaders(ConfigSettings.ExpectedHeaderLines);
             }
             catch (Exception ex)
             {
-                _lastReopenTime = DateTime.Now;
                 CALog.LogErrorAndConsoleLn(
                     LogID.B, 
                     $"Failure reopening port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
                     ex);
-                return true;
+                return false;
+            }
+            finally
+            {
+                _reconnectionLock.ReleaseWriterLock();
             }
 
             CALog.LogData(LogID.B, $"Reopened port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§", lines)}'");
@@ -337,34 +333,20 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private TResult RunEnsuringConnectionIsOpen<TResult>(string actionName, Func<TResult> action) 
+        private async Task<TResult> RunEnsuringConnectionIsOpen<TResult>(string actionName, Func<TResult> action, CancellationToken token)
         {
+            await _reconnectionLock.AcquireReaderLock(token);
             try
             {
-                lock (this)
-                {
-                    if (IsOpen)
-                        return action();
-
-                    // Thread.Sleep(100);
-                    // Open();
-
-                    // if (IsOpen)
-                    //     return action();
-                }
-
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to {actionName}() - port closed: {PortName} {productType} {serialNumber}{Environment.NewLine}");
+                return action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.                
             }
-            catch (Exception ex)
+            finally
             {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to {actionName}() from serial port: {PortName} {productType} {serialNumber}{Environment.NewLine}", ex);
-                if (_safeLimit-- <= 0) throw;
+                _reconnectionLock.ReleaseReaderLock();
             }
-
-            return default;
         }
 
-        private void RunEnsuringConnectionIsOpen(string actionName, Action action) => 
-            RunEnsuringConnectionIsOpen(actionName, () => { action(); return true; });
+        private Task RunEnsuringConnectionIsOpen(string actionName, Action action, CancellationToken token) => 
+            RunEnsuringConnectionIsOpen(actionName, () => { action(); return true; }, token);
     }
 }

@@ -32,12 +32,14 @@ namespace CA_DataUploaderLib.IOconf
                 if (TypeKs.Count == 0)
                     throw new Exception($"Failed to find temperature sensor {TemperatureSensorName} for oven");
             }
+            BoardStateSensorNames = TypeKs.Select(k => k.BoardStateSensorName).ToList().AsReadOnly();
         }
 
         public int OvenArea;
         public IOconfHeater HeatingElement;
         public bool IsTemperatureSensorInitialized => TypeKs.All(k => k.IsInitialized());
         public string TemperatureSensorName { get; }
+        public IReadOnlyCollection<string> BoardStateSensorNames {get;}
         private readonly List<IOconfTypeK> TypeKs;
     }
 }

@@ -14,7 +14,7 @@ namespace CA_DataUploaderLib.IOconf
         public int ExpectedHeaderLines { get; set; } = 8;
         public int MaxMillisecondsWithoutNewValues { get; set; } = 2000;
         public int SecondsBetweenReopens { get; set; } = 3;
-        public bool StopWhenLosingSensor { get; set; } = true;
+        public bool StopWhenLosingSensor { get; set; } = false;
         public bool SkipBoardAutoDetection { get; set; } = false;
         public LineParser Parser { get; set; } = LineParser.Default;
         public string ValuesEndOfLineChar { get; set; } = "\n";

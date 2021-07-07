@@ -25,6 +25,7 @@ namespace CA_DataUploaderLib
         private Lazy<VectorFilterAndMath> _fullsystemFilterAndMath;
 
         public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
+        public event EventHandler<AlertFiredArgs> AlertFired;
         public bool IsRunning { get { return _running; } }
 
         public CommandHandler(SerialNumberMapper mapper = null)
@@ -99,6 +100,10 @@ namespace CA_DataUploaderLib
         public void OnNewVectorReceived(IEnumerable<SensorSample> vector) =>
             NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector.ToDictionary(v => v.Name, v => v.Value)));
         
+        public void FireAlert(string msg)
+        {
+            AlertFired?.Invoke(this, new AlertFiredArgs(msg));
+        }
         private bool Stop(List<string> args)
         {
             _running = false;
