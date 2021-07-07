@@ -25,7 +25,7 @@ namespace CA_DataUploaderLib
         protected readonly AllBoardsState _allBoardsState;
         private readonly string commandHelp;
         private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
-        private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamples;
+        private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamplesLookup = new Dictionary<MCUBoard, SensorSample[]>();
 
         public BaseSensorBox(
             CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values)
@@ -268,9 +268,9 @@ namespace CA_DataUploaderLib
         public void ProcessLine(IEnumerable<double> numbers, MCUBoard board) => ProcessLine(numbers, board, GetSamples(board));
         private SensorSample[] GetSamples(MCUBoard board)
         {
-            if (_boardSamples.TryGetValue(board, out var samples))
+            if (_boardSamplesLookup.TryGetValue(board, out var samples))
                 return samples;
-            _boardSamples[board] = samples = _values.Where(s => s.Input.BoxName == board.BoxName).ToArray();
+            _boardSamplesLookup[board] = samples = _values.Where(s => s.Input.BoxName == board.BoxName).ToArray();
             return samples;
         }
 
