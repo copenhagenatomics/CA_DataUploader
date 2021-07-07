@@ -1,5 +1,6 @@
 ﻿using CA_DataUploaderLib.Extensions;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
@@ -13,6 +14,7 @@ namespace CA_DataUploaderLib.IOconf
         public string SensorName { get; }
         /// <summary>max sensor value. Above this value the safe valve triggers, setting the valve to the default/safe position</summary>
         public double Max { get; }
+        public IReadOnlyCollection<string> BoardStateNames { get; }
 
         public IOconfSafeValve(string row, int lineNum) : base(row, lineNum, "SafeValve")
         {
@@ -30,12 +32,32 @@ namespace CA_DataUploaderLib.IOconf
 
             if  (!IOconfFile.GetValve().Any(v => v.Name == ValveName))
                 throw new Exception($"Failed to find valve: {ValveName} for safevalve: {row}");
+            var pressures = IOconfFile.GetPressure().Where(p => p.Name == SensorName).ToList();
+            var maths = IOconfFile.GetMath().Where(m => m.Name == SensorName).ToList();
+            var filters = IOconfFile.GetFilters().Where(f => f.NameInVector == SensorName).ToList();
             var foundSensor = 
-                IOconfFile.GetPressure().Any(p => p.Name == SensorName) ||
-                IOconfFile.GetMath().Any(m => m.Name == SensorName) ||
-                IOconfFile.GetFilters().Any(m => m.NameInVector == SensorName);
+                pressures.Count > 0 ||
+                maths.Count > 0 ||
+                filters.Count > 0;
             if (!foundSensor)
                 throw new Exception($"Failed to find sensor: {SensorName} for safevalve: {row}");
+            // note this does not currently include math sources. It is technically possible but we need to get the sources referenced in the math expression.
+            BoardStateNames =
+                pressures.Select(p => p.BoardStateSensorName)
+                .Concat(GetBoardStateNamesForSensors(maths.SelectMany(p => p.GetSources())))
+                .Concat(GetBoardStateNamesForSensors(filters.SelectMany(f => f.SourceNames)))
+                .ToList()
+                .AsReadOnly();
+        }
+
+        private IEnumerable<string> GetBoardStateNamesForSensors(IEnumerable<string> sensors)
+        {
+            var targetSources = sensors.ToHashSet();
+            foreach (var input in IOconfFile.GetInputs()) // since we call it in the ctor, it includes only inputs before the safe valve
+            {
+                if (targetSources.Contains(input.Name))
+                    yield return input.BoardStateSensorName;
+            }
         }
     }
 }
