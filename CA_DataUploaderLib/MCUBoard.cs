@@ -188,7 +188,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                CALog.LogErrorAndConsoleLn(
+                CALog.LogError(
                     LogID.B, 
                     $"Failure reopening port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
                     ex);
