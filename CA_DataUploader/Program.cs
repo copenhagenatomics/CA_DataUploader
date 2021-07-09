@@ -30,12 +30,13 @@ namespace CA_DataUploader
                     CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
 
                     int i = 0;
+                    var uploadThrottle = new TimeThrottle(100);
                     while (cmd.IsRunning)
                     {
                         var (sensorsSamples, vectorTime) = cmd.GetFullSystemVectorValues();
                         cloud.SendVector(sensorsSamples.Select(v => v.Value).ToList(), vectorTime);
                         Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
-                        cloud.Wait(100);
+                        uploadThrottle.Wait();
                         if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
                     }
                 }

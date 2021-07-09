@@ -115,12 +115,13 @@ namespace CA_DataUploaderLib
         private async Task BoardLoop(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
         {
             var msBetweenReads = board.ConfigSettings.MillisecondsBetweenReads;
+            var readThrottle = new TimeThrottle(msBetweenReads);
             while (!token.IsCancellationRequested)
             {
                 try
                 {
-                    await Task.Delay(msBetweenReads, token);
-                    await SafeReadSensors(board, targetSamples, token); 
+                    await readThrottle.WaitAsync();
+                    await SafeReadSensors(board, targetSamples, msBetweenReads, token); 
                     if (CheckFails(board, targetSamples))
                         await ReconnectBoard(board, targetSamples, token);
                 }
@@ -138,30 +139,31 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private async Task SafeReadSensors(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
+        private async Task SafeReadSensors(MCUBoard board, SensorSample[] targetSamples, int msBetweenReads, CancellationToken token)
         {
             try
             {
-                await ReadSensors(board, targetSamples, token);
+                await ReadSensors(board, targetSamples, msBetweenReads, token);
             }
             catch (Exception ex)
             { // seeing this is the log is not unexpected in cases where we have trouble communicating to a board.
                 _allBoardsState.SetReadSensorsExceptionState(board);
-                CALog.LogErrorAndConsoleLn(LogID.A, "error reading data from {Title}-{board}", ex);
+                CALog.LogErrorAndConsoleLn(LogID.A, $"error reading data from {Title}-{board}", ex);
             }
         }
 
-        private async Task ReadSensors(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
+        private async Task ReadSensors(MCUBoard board, SensorSample[] targetSamples, int msBetweenReads, CancellationToken token)
         {
-            bool hadDataAvailable = false, receivedValues = false;
+            bool receivedValues = false;
             var timeInLoop = Stopwatch.StartNew();
-            // We read all lines available, but only those we can start within 100ms to avoid being stuck when data with errors is continuously returned by the board.
-            // We use time instead of attempts as SafeHasDataInReadBuffer can continuously report there is data when a partial line is returned by a board that stalls,
-            // which then consistently times out in SafeReadLine, making each loop iteration 2 seconds (the regular read timeout).
-            while (await board.SafeHasDataInReadBuffer(token) && timeInLoop.ElapsedMilliseconds < 100)
+            //We read all lines available, but only those we can start within msBetweenReads to avoid being stuck when data with errors is continuously returned by the board.
+            //We set the state early if we detect no data is being returned or if we received values,
+            //but we only set ReturningNonValues until we have confirmed there is no valid data in the rest of available data read within msBetweenReads.
+            do
             {
-                hadDataAvailable = true;
-                var line = await board.SafeReadLine(token); // tries to read a full line for up to MCUBoard.ReadTimeout
+                string line = await TryReadLineWithStallDetection(board, msBetweenReads, token);
+                if (line == default) 
+                    return; //timed out reading from the board, TryReadLineWithStallDetection already updated the state after the first msBetweenReads  
                 try
                 {
                     var numbers = TryParseAsDoubleList(board, line);
@@ -169,20 +171,48 @@ namespace CA_DataUploaderLib
                     {
                         ProcessLine(numbers, board, targetSamples);
                         receivedValues = true;
+                        _allBoardsState.SetState(board, ConnectionState.ReceivingValues);
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                         CALog.LogInfoAndConsoleLn(LogID.B, $"Unexpected board response {board}: {line}");
                 }
                 catch (Exception ex)
-                {
+                { //usually a parsing errors on non value data, we log it and consider it as such i.e. we finish reading available data and set ReturningNonValues if we did not get valid values
                     CALog.LogErrorAndConsoleLn(LogID.B, $"Failed handling board response {board}: " + line, ex);
                 }
             }
+            while (await board.SafeHasDataInReadBuffer(token) && timeInLoop.ElapsedMilliseconds < msBetweenReads);
 
-            _allBoardsState.SetReadSensorsState(board, hadDataAvailable, receivedValues);
-            if (!hadDataAvailable) 
-                // we expect data on every cycle (each 100 ms), as the boards normally write a line every 100 ms.
-                CALog.LogData(LogID.B, "No data available for " + board.ToString());
+            if (!receivedValues)
+                _allBoardsState.SetState(board, ConnectionState.ReturningNonValues);
+        }
+
+        ///<returns>the line, or null/default string if it exceeded the MCUBoard.ReadTimeout.</returns>
+        ///<remarks>
+        ///Notifies in _allBoardsState (which is reported to the next vector) if there is no data available within <param cref="msBetweenReads" /> 
+        ///and when that happens it waits up to MCUBoard.ReadTimeout for the board to return data.
+        ///Both in the above case and when the MCUBoard.ReadTimeout is exceeded a message is written to the log (but not the console to reduce operational noise),
+        ///specially as it can now be observed on the graphs if board these events are happening + CheckFailure & reconnects will display relevant messages if appropiate.
+        ///</remarks>
+        private async Task<string> TryReadLineWithStallDetection(MCUBoard board, int msBetweenReads, CancellationToken token)
+        {
+            var readLineTask = board.SafeReadLine(token);
+            var noDataAvailableTask = Task.Delay(msBetweenReads, token); 
+            if (await Task.WhenAny(readLineTask, noDataAvailableTask) == noDataAvailableTask)
+            {
+                CALog.LogData(LogID.B, $"{Title} no data available for {board}");
+                _allBoardsState.SetState(board, ConnectionState.NoDataAvailable); //report the state early before waiting up to 2 seconds for the data (readLineTask)
+            }
+
+            try
+            {
+                return await readLineTask; // waits up to 2 seconds for the read to complete, while we are here the state keeps being no data.
+            }
+            catch (TimeoutException)
+            {
+                CALog.LogData(LogID.B, $"{Title} timed out reading data from {board}");
+                return default;
+            }
         }
 
         /// <returns>the list of doubles, otherwise <c>null</c></returns>
@@ -340,17 +370,14 @@ namespace CA_DataUploaderLib
             public void SetConnectedState(MCUBoard board) => SetState(board, ConnectionState.Connected);
             public void SetReadSensorsState(MCUBoard board, bool hadDataAvailable, bool receivedValues)
             {
-                var lastState = GetLastState(board);
                 var newState = 
                     receivedValues ? ConnectionState.ReceivingValues :
-                    hadDataAvailable && lastState == ConnectionState.Connecting ? ConnectionState.Connecting :
                     hadDataAvailable ? ConnectionState.ReturningNonValues : 
                     ConnectionState.NoDataAvailable;
-                if (lastState == newState) return;
                 SetState(board, newState);
             }
 
-            private void SetState(MCUBoard board, ConnectionState state) => _states[_boardsIndexes[board]] = state;
+            public void SetState(MCUBoard board, ConnectionState state) => _states[_boardsIndexes[board]] = state;
             private ConnectionState GetLastState(MCUBoard board) => _states[_boardsIndexes[board]];
 
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
