@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Text;
 using CA_DataUploaderLib.IOconf;
-using System.Text.RegularExpressions;
 using Humanizer;
 using System.Diagnostics;
 using CA_DataUploaderLib.Extensions;
@@ -100,7 +99,7 @@ namespace CA_DataUploaderLib
                 }
                 catch(Exception ex)
                 {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"error closing the connection to board {board}", ex);
+                    LogError(board.board, "error closing the connection to the board", ex);
                 }
             }
         }
@@ -121,38 +120,44 @@ namespace CA_DataUploaderLib
                 try
                 {
                     await readThrottle.WaitAsync();
-                    await SafeReadSensors(board, targetSamples, msBetweenReads, token); 
-                    if (CheckFails(board, targetSamples))
+                    var disconnectDetected = await SafeReadSensors(board, targetSamples, msBetweenReads, token);
+                    if (disconnectDetected || CheckFails(board, targetSamples))
                         await ReconnectBoard(board, targetSamples, token);
                 }
                 catch (TaskCanceledException ex)
-                {
+                { //if the token is canceled we are about to exit the loop so we do nothing. Otherwise we consider it like any other exception and log it.
                     if (!token.IsCancellationRequested)
-                        CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
+                    {
+                        _allBoardsState.SetReadSensorsExceptionState(board);
+                        LogError(board, "unexpected error on board read loop", ex);
+                    }
                 }
                 catch (Exception ex)
                 { // we expect most errors to be handled within SafeReadSensors and in the SafeReopen of the ReconnectBoard,
                   // so seeing this in the log is most likely a bug handling some error case.
                     _allBoardsState.SetReadSensorsExceptionState(board);
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"unhandled error for {Title}-{board}", ex);
+                    LogError(board, "unexpected error on board read loop", ex);
                 }
             }
         }
 
-        private async Task SafeReadSensors(MCUBoard board, SensorSample[] targetSamples, int msBetweenReads, CancellationToken token)
+        ///<returns><c>false</c> if a board disconnect was detected</returns>
+        private async Task<bool> SafeReadSensors(MCUBoard board, SensorSample[] targetSamples, int msBetweenReads, CancellationToken token)
         {
             try
             {
-                await ReadSensors(board, targetSamples, msBetweenReads, token);
+                return await ReadSensors(board, targetSamples, msBetweenReads, token);
             }
             catch (Exception ex)
             { // seeing this is the log is not unexpected in cases where we have trouble communicating to a board.
                 _allBoardsState.SetReadSensorsExceptionState(board);
-                CALog.LogErrorAndConsoleLn(LogID.A, $"error reading data from {Title}-{board}", ex);
+                LogError(board, "error reading sensor data", ex);
+                return true; //ReadSensor normally should return false if the board is detected as disconnected, so we say the board is still connected here since the caller will still do stale values detection
             }
         }
 
-        private async Task ReadSensors(MCUBoard board, SensorSample[] targetSamples, int msBetweenReads, CancellationToken token)
+        ///<returns><c>false</c> if a board disconnect was detected</returns>
+        private async Task<bool> ReadSensors(MCUBoard board, SensorSample[] targetSamples, int msBetweenReads, CancellationToken token)
         {
             bool receivedValues = false;
             var timeInLoop = Stopwatch.StartNew();
@@ -161,9 +166,11 @@ namespace CA_DataUploaderLib
             //but we only set ReturningNonValues until we have confirmed there is no valid data in the rest of available data read within msBetweenReads.
             do
             {
-                string line = await TryReadLineWithStallDetection(board, msBetweenReads, token);
+                var (stillConnected, line) = await TryReadLineWithStallDetection(board, msBetweenReads, token);
+                if (!stillConnected)
+                    return false;  //board disconnect detected, let caller know 
                 if (line == default) 
-                    return; //timed out reading from the board, TryReadLineWithStallDetection already updated the state after the first msBetweenReads  
+                    return true; //timed out reading from the board, TryReadLineWithStallDetection already updated the state after the first msBetweenReads / still considered connected
                 try
                 {
                     var numbers = TryParseAsDoubleList(board, line);
@@ -174,44 +181,58 @@ namespace CA_DataUploaderLib
                         _allBoardsState.SetState(board, ConnectionState.ReceivingValues);
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
-                        CALog.LogInfoAndConsoleLn(LogID.B, $"Unexpected board response {board}: {line}");
+                        LogInfo(board, $"unexpected board response {line}");
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we finish reading available data and set ReturningNonValues if we did not get valid values
-                    CALog.LogErrorAndConsoleLn(LogID.B, $"Failed handling board response {board}: " + line, ex);
+                    LogError(board, $"failed handling board response {line}", ex);
                 }
             }
             while (await board.SafeHasDataInReadBuffer(token) && timeInLoop.ElapsedMilliseconds < msBetweenReads);
 
             if (!receivedValues)
                 _allBoardsState.SetState(board, ConnectionState.ReturningNonValues);
+            return true; //still connected
         }
 
-        ///<returns>the line, or null/default string if it exceeded the MCUBoard.ReadTimeout.</returns>
+        ///<returns>(<c>false</c> if the board was explicitely detected as disconnected, the line, or null/default string if it exceeded the MCUBoard.ReadTimeout).</returns>
         ///<remarks>
         ///Notifies in _allBoardsState (which is reported to the next vector) if there is no data available within <param cref="msBetweenReads" /> 
         ///and when that happens it waits up to MCUBoard.ReadTimeout for the board to return data.
         ///Both in the above case and when the MCUBoard.ReadTimeout is exceeded a message is written to the log (but not the console to reduce operational noise),
         ///specially as it can now be observed on the graphs if board these events are happening + CheckFailure & reconnects will display relevant messages if appropiate.
         ///</remarks>
-        private async Task<string> TryReadLineWithStallDetection(MCUBoard board, int msBetweenReads, CancellationToken token)
+        private async Task<(bool, string)> TryReadLineWithStallDetection(MCUBoard board, int msBetweenReads, CancellationToken token)
         {
             var readLineTask = board.SafeReadLine(token);
             var noDataAvailableTask = Task.Delay(msBetweenReads, token); 
             if (await Task.WhenAny(readLineTask, noDataAvailableTask) == noDataAvailableTask)
             {
-                CALog.LogData(LogID.B, $"{Title} no data available for {board}");
+                LogData(board, "no data available");
                 _allBoardsState.SetState(board, ConnectionState.NoDataAvailable); //report the state early before waiting up to 2 seconds for the data (readLineTask)
             }
 
             try
             {
-                return await readLineTask; // waits up to 2 seconds for the read to complete, while we are here the state keeps being no data.
+                return (true, await readLineTask); // waits up to 2 seconds for the read to complete, while we are here the state keeps being no data.
+            }
+            catch (ObjectDisposedException)
+            {
+                LogData(board, "detected closed connection");
+                return (false, default);
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                //typically readline reports ObjectDisposedException once when disconnecting a temp hub and later calls fail with "ArgumentOutOfRangeException: Non-negative number required."
+                //calling code is expected to handle the disconnected board returned by ObjectDisposedException so this is logged and displayed as an error.
+                //more testing is needed with switchboards, as potentially a write could get the ObjectDisposeException which might end up hitting this catch statement.
+                LogError(board, "detected closed connection", ex);
+                return (false, default);
             }
             catch (TimeoutException)
             {
-                CALog.LogData(LogID.B, $"{Title} timed out reading data from {board}");
-                return default;
+                LogData(board, "timed out reading data");
+                return (true, default);
             }
         }
 
@@ -228,7 +249,7 @@ namespace CA_DataUploaderLib
                 if (msSinceLastRead <= item.Input.Map.Board.ConfigSettings.MaxMillisecondsWithoutNewValues)
                     continue;
                 hasStaleValues = true; 
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Stale sensor detected: {Title} - {item.Input.Name}. {msSinceLastRead} milliseconds since last read");
+                LogInfo(board, $"stale sensor detected: {item.Input.Name}. {msSinceLastRead} milliseconds since last read");
             }
 
             return hasStaleValues;
@@ -237,7 +258,7 @@ namespace CA_DataUploaderLib
         private async Task ReconnectBoard(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
         {
             _allBoardsState.SetAttemptingReconnectState(board);
-            CALog.LogInfoAndConsoleLn(LogID.A, $"Attempting to reconnect to {Title} - {board}");
+            LogInfo(board, "attempting to reconnect");
             var lostSensorAttempts = 100;
             var delayBetweenAttempts = TimeSpan.FromSeconds(board.ConfigSettings.SecondsBetweenReopens);
             while (!(await board.SafeReopen(token)))
@@ -245,13 +266,13 @@ namespace CA_DataUploaderLib
                 _allBoardsState.SetDisconnectedState(board);
                 if (ExactSensorAttemptsCheck(ref lostSensorAttempts)) 
                 { // we run this once when there has been 100 attempts
-                    var reconnecMsg = $"{Title} - {board}: reconnect limit exceeded, reducing reconnect frequency to 15 minutes";
-                    CALog.LogErrorAndConsoleLn(LogID.A, reconnecMsg);
-                    _cmd.FireAlert(reconnecMsg);
+                    var reconnecMsg = $"reconnect limit exceeded, reducing reconnect frequency to 15 minutes";
+                    LogError(board, reconnecMsg);
+                    _cmd.FireAlert(reconnecMsg + " - title - " + board.ToShortDescription());
                     delayBetweenAttempts = TimeSpan.FromMinutes(15); // 4 times x hour = 96 times x day
                     if (board.ConfigSettings.StopWhenLosingSensor)
                     {
-                        CALog.LogErrorAndConsoleLn(LogID.A, $"Emergency shutdown: {Title}-{board} reconnect limit exceeded");
+                        LogError(board, "emergency shutdown: reconnect limit exceeded");
                         _cmd.Execute("emergencyshutdown");
                     }
                 }
@@ -260,7 +281,7 @@ namespace CA_DataUploaderLib
             }
 
             _allBoardsState.SetConnectedState(board);
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{Title} - {board}: board reconnection succeeded.");
+            LogInfo(board, "board reconnection succeeded");
         }
 
         private bool ExactSensorAttemptsCheck(ref int lostSensorAttempts)
@@ -268,7 +289,10 @@ namespace CA_DataUploaderLib
              if (lostSensorAttempts > 0)
                 lostSensorAttempts--;
             else if (lostSensorAttempts == 0) 
+            {
+                lostSensorAttempts--;
                 return true;
+            }
             return false;
         }
 
@@ -289,7 +313,7 @@ namespace CA_DataUploaderLib
                 {
                     sensor.Value = value;
 
-                    HandleSaltLeakage(sensor);
+                    HandleSaltLeakage(board, sensor);
                 }
 
                 i++;
@@ -304,16 +328,19 @@ namespace CA_DataUploaderLib
             return samples;
         }
 
-        private void HandleSaltLeakage(SensorSample sensor)
+        private void HandleSaltLeakage(MCUBoard board, SensorSample sensor)
         {
             if (sensor.GetType() == typeof(IOconfSaltLeakage))
             {
                 if (sensor.Value < 3000 && sensor.Value > 0)  // Salt leakage algorithm. 
                 {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Salt leak detected from {sensor.Input.Name}={sensor.Value} {DateTime.Now:dd-MMM-yyyy HH:mm}");
+                    LogError(board, $"salt leak detected from {sensor.Input.Name}={sensor.Value} {DateTime.Now:dd-MMM-yyyy HH:mm}");
                     sensor.Value = 1d;
                     if (_cmd != null)
+                    {
+                        LogError(board, "emergency shutdown: salt leakage detected");
                         _cmd.Execute("emergencyshutdown"); // make the whole system shut down. 
+                    }
                 }
                 else
                 {
@@ -327,7 +354,11 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, commandHelp);
             return true;
         }
-
+                
+        private void LogError(MCUBoard board, string message, Exception ex) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}", ex);
+        private void LogError(MCUBoard board, string message) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}");
+        private void LogData(MCUBoard board, string message) => CALog.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
+        private void LogInfo(MCUBoard board, string message) => CALog.LogInfoAndConsoleLn(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
         protected virtual void Dispose(bool disposing) => _boardLoopsStopTokenSource.Cancel();
         public void Dispose()
         {

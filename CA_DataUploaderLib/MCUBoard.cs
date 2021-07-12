@@ -142,15 +142,10 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public string ToDebugString(string seperator)
-        {
-            return $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
-        }
-
-        public override string ToString()
-        {
-            return $"{productTypeHeader}{productType,-20} {serialNumberHeader}{serialNumber,-12} Port name: {PortName}";
-        }
+        public string ToDebugString(string seperator) => 
+            $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
+        public override string ToString() => $"{productTypeHeader}{productType,-20} {serialNumberHeader}{serialNumber,-12} Port name: {PortName}";
+        public string ToShortDescription() => $"{BoxName} {productType} {serialNumber} {PortName}";
 
         /// <summary>
         /// Reopens the connection skipping the header.
