@@ -66,9 +66,9 @@ namespace CA_DataUploaderLib
         public void Dispose()
         { // class is sealed without unmanaged resources, no need for the full disposable pattern.
             if (_disposed) return;
-            _switchboardController.Dispose();
-            _ovenCmd.Dispose();
-            _heaterCmd.Dispose();
+            _switchboardController?.Dispose();
+            _ovenCmd?.Dispose();
+            _heaterCmd?.Dispose();
             _disposed = true;
         }
  
