@@ -120,8 +120,8 @@ namespace CA_DataUploaderLib
                 try
                 {
                     await readThrottle.WaitAsync();
-                    var disconnectDetected = await SafeReadSensors(board, targetSamples, msBetweenReads, token);
-                    if (disconnectDetected || CheckFails(board, targetSamples))
+                    var stillConnected = await SafeReadSensors(board, targetSamples, msBetweenReads, token);
+                    if (!stillConnected || CheckFails(board, targetSamples))
                         await ReconnectBoard(board, targetSamples, token);
                 }
                 catch (TaskCanceledException ex)
