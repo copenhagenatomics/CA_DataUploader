@@ -22,7 +22,7 @@ namespace CA_DataUploaderLib.IOconf
         public class LineParser
         {
             public static LineParser Default { get; } = new LineParser();
-            private static readonly Regex _hasCommaSeparatedNumbers = new Regex(@"^\s*-?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*(?:[0-9]*[.])?[0-9]+\s*)*,?\s*$");
+            private static readonly Regex _hasCommaSeparatedNumbers = new Regex(@"^\s*-?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*-?(?:[0-9]*[.])?[0-9]+\s*)*,?\s*$");
 
             /// <returns>the list of doubles, or null when the line did not match the expected format</returns>
             public virtual List<double> TryParseAsDoubleList(string line)
