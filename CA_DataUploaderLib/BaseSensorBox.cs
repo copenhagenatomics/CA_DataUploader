@@ -407,15 +407,6 @@ namespace CA_DataUploaderLib
             public void SetAttemptingReconnectState(MCUBoard board) => SetState(board, ConnectionState.Connecting);
             public void SetDisconnectedState(MCUBoard board) => SetState(board, ConnectionState.Disconnected);
             public void SetConnectedState(MCUBoard board) => SetState(board, ConnectionState.Connected);
-            public void SetReadSensorsState(MCUBoard board, bool hadDataAvailable, bool receivedValues)
-            {
-                var newState = 
-                    receivedValues ? ConnectionState.ReceivingValues :
-                    hadDataAvailable ? ConnectionState.ReturningNonValues : 
-                    ConnectionState.NoDataAvailable;
-                SetState(board, newState);
-            }
-
             public void SetState(MCUBoard board, ConnectionState state) => _states[_boardsIndexes[board]] = state;
             private ConnectionState GetLastState(MCUBoard board) => _states[_boardsIndexes[board]];
 
