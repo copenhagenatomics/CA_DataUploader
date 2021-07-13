@@ -143,10 +143,18 @@ namespace CA_DataUploaderLib
 
         ///<returns><c>false</c> if a board disconnect was detected</returns>
         private async Task<bool> SafeReadSensors(MCUBoard board, SensorSample[] targetSamples, int msBetweenReads, CancellationToken token)
-        {
+        { //we use this to prevent read exceptions from interfering with failure checks and reconnects
             try
             {
                 return await ReadSensors(board, targetSamples, msBetweenReads, token);
+            }
+            catch (TaskCanceledException ex)
+            { 
+                if (token.IsCancellationRequested)
+                    throw; // if the token is cancelled we bubble up the cancel so the caller can abort.
+                _allBoardsState.SetReadSensorsExceptionState(board);
+                LogError(board, "error reading sensor data", ex);
+                return true; //ReadSensor normally should return false if the board is detected as disconnected, so we say the board is still connected here since the caller will still do stale values detection
             }
             catch (Exception ex)
             { // seeing this is the log is not unexpected in cases where we have trouble communicating to a board.
