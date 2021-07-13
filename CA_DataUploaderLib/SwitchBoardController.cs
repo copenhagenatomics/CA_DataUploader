@@ -66,7 +66,7 @@ namespace CA_DataUploaderLib
                 try
                 {
                     var vector = await _cmd.When(_ => true, token);
-                    if (!CheckConnectedStateInVector(board, boardStateName, waitingBoardReconnect, vector)) 
+                    if (!CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector)) 
                         continue; // no point trying to send commands while there is no connection to the board.
 
                     foreach (var port in ports)
@@ -86,13 +86,16 @@ namespace CA_DataUploaderLib
             AllOff(board, ports);
         }
 
-        private static bool CheckConnectedStateInVector(MCUBoard board, string boardStateName, bool waitingBoardReconnect, NewVectorReceivedArgs vector)
+        private static bool CheckConnectedStateInVector(MCUBoard board, string boardStateName, ref bool waitingBoardReconnect, NewVectorReceivedArgs vector)
         {
             var connected = (BaseSensorBox.ConnectionState)(int)vector[boardStateName] >= BaseSensorBox.ConnectionState.Connected;
             if (waitingBoardReconnect && connected)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"resuming switchboard actions after reconnect on {board}");
+                CALog.LogInfoAndConsoleLn(LogID.A, $"resuming switchboard actions after reconnect on {board}");
             else if (!waitingBoardReconnect && !connected)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"stopping switchboard actions while connection is reestablished on {board}");
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"stopping switchboard actions while connection is reestablished on {board}");
+                waitingBoardReconnect = true;
+            }
             return connected;
         }
 
