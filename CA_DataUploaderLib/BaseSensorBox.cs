@@ -181,11 +181,11 @@ namespace CA_DataUploaderLib
                         _allBoardsState.SetState(board, ConnectionState.ReceivingValues);
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
-                        LogInfo(board, $"unexpected board response {line}");
+                        LogInfo(board, $"unexpected board response {line.Replace("\r", "\\r")}"); // we avoid \r as it makes the output hard to read
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we finish reading available data and set ReturningNonValues if we did not get valid values
-                    LogError(board, $"failed handling board response {line}", ex);
+                    LogError(board, $"failed handling board response {line.Replace("\r", "\\r")}", ex); // we avoid \r as it makes the output hard to read
                 }
             }
             while (await board.SafeHasDataInReadBuffer(token) && timeInLoop.ElapsedMilliseconds < msBetweenReads);
