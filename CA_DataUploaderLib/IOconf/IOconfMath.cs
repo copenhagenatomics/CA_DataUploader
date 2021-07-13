@@ -37,5 +37,34 @@ namespace CA_DataUploaderLib.IOconf
             // note that some expression may even return different values depending on the branch hit i.e. when using if(...)
             return new SensorSample(this, Convert.ToDouble(expression.Evaluate())) { TimeStamp = DateTime.UtcNow };
         }
+
+        public List<string> GetSources() 
+        {
+            HashSet<string> parameters = new HashSet<string>();
+            expression.EvaluateFunction += EvalFunction; 
+            expression.EvaluateParameter += EvalParameter;
+            try
+            {
+                expression.Evaluate();              
+            }
+            finally
+            {
+                expression.EvaluateFunction -= EvalFunction; 
+                expression.EvaluateParameter -= EvalParameter;
+            }
+            return new List<string>(parameters);
+
+            void EvalFunction(string name, NCalc.FunctionArgs args) 
+            {
+                args.EvaluateParameters();
+                args.Result = 1;
+            };
+
+            void EvalParameter(string name, NCalc.ParameterArgs args) 
+            {
+                parameters.Add(name);
+                args.Result = 1;
+            };
+        }
     }
 }

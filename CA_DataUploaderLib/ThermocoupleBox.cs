@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using CA_DataUploaderLib.Helpers;
 using System;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace CA_DataUploaderLib
 {
@@ -17,14 +19,36 @@ namespace CA_DataUploaderLib
             _rpiCpuSample = _values.FirstOrDefault(x => x.Name.EndsWith("Cpu"));
         }
 
-        protected override void ReadSensors()
+        protected override List<Task> StartReadLoops((MCUBoard board, SensorSample[] values)[] boards, CancellationToken token)
         {
-            base.ReadSensors();
+            var loops = base.StartReadLoops(boards, token);
+            if (_rpiGpuSample != null || _rpiCpuSample != null) 
+                loops.Add(ReadRpiTemperaturesLoop(_rpiGpuSample, _rpiCpuSample, token));
+            return loops;
+        }
 
-            if (_rpiGpuSample != null)
-                _rpiGpuSample.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
-            if (_rpiCpuSample != null)
-                _rpiCpuSample.Value = DULutil.ExecuteShellCommand("cat /sys/class/thermal/thermal_zone0/temp").ToDouble() / 1000;
+        private async Task ReadRpiTemperaturesLoop(SensorSample gpuSample, SensorSample cpuSample, CancellationToken token)
+        {
+            var msBetweenReads = 1000; // waiting every second, for higher resolution.
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(msBetweenReads, token);
+                    gpuSample.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
+                    cpuSample.Value = DULutil.ExecuteShellCommand("cat /sys/class/thermal/thermal_zone0/temp").ToDouble() / 1000;
+                }
+                catch (TaskCanceledException ex)
+                {
+                    if (!token.IsCancellationRequested)
+                        CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
+                }
+                catch (Exception ex)
+                { 
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected error reading rpi temperatures", ex);
+                }
+            }
+            
         }
 
         private static IEnumerable<IOconfInput> GetSensors()

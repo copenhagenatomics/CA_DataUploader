@@ -28,6 +28,7 @@ namespace CA_DataUploaderLib.IOconf
             if (parseBoxName) 
             {
                 BoxName = list[2];
+                BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
                 SetMap(BoxName, boardSettings, Skip) ;
             }
         }
@@ -36,6 +37,7 @@ namespace CA_DataUploaderLib.IOconf
         public string Name { get; set; }
         public string BoxName { get; set; }
         /// <summary>the 1-based port number</summary>
+        public string BoardStateSensorName { get; } 
         public int PortNumber = 1;
         public bool Skip { get; set; }
         public IOconfMap Map { get; set; }

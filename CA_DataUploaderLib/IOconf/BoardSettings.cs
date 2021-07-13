@@ -14,7 +14,7 @@ namespace CA_DataUploaderLib.IOconf
         public int ExpectedHeaderLines { get; set; } = 8;
         public int MaxMillisecondsWithoutNewValues { get; set; } = 2000;
         public int SecondsBetweenReopens { get; set; } = 3;
-        public bool StopWhenLosingSensor { get; set; } = true;
+        public bool StopWhenLosingSensor { get; set; } = false;
         public bool SkipBoardAutoDetection { get; set; } = false;
         public LineParser Parser { get; set; } = LineParser.Default;
         public string ValuesEndOfLineChar { get; set; } = "\n";
@@ -22,12 +22,12 @@ namespace CA_DataUploaderLib.IOconf
         public class LineParser
         {
             public static LineParser Default { get; } = new LineParser();
-            private static readonly Regex _startsWithDigitRegex = new Regex(@"^\s*(-|\d+)\s*");
+            private static readonly Regex _hasCommaSeparatedNumbers = new Regex(@"^\s*-?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*-?(?:[0-9]*[.])?[0-9]+\s*)*,?\s*$");
 
             /// <returns>the list of doubles, or null when the line did not match the expected format</returns>
             public virtual List<double> TryParseAsDoubleList(string line)
             {
-                if (!_startsWithDigitRegex.IsMatch(line))
+                if (!_hasCommaSeparatedNumbers.IsMatch(line))
                     return null;
 
                 return line.Split(",".ToCharArray())
@@ -37,7 +37,7 @@ namespace CA_DataUploaderLib.IOconf
                     .ToList();
             }
 
-            public virtual bool MatchesValuesFormat(string line) => _startsWithDigitRegex.IsMatch(line);
+            public virtual bool MatchesValuesFormat(string line) => _hasCommaSeparatedNumbers.IsMatch(line);
 
             public virtual bool IsExpectedNonValuesLine(string line) => false;
         }

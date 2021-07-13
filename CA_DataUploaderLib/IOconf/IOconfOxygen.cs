@@ -16,7 +16,6 @@ namespace CA_DataUploaderLib.IOconf
                 MaxMillisecondsWithoutNewValues = 10000,
                 MillisecondsBetweenReads = 1200,
                 SecondsBetweenReopens = 10,
-                StopWhenLosingSensor = false,
                 Parser = LineParser.Default
             })
         {

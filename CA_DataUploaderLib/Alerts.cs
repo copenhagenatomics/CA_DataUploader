@@ -15,14 +15,14 @@ namespace CA_DataUploaderLib
         public override string Description => string.Empty;
         public override bool IsHiddenCommand => true;
         private readonly List<IOconfAlert> _alerts;
-        private readonly ServerUploader _uploader;
+        private readonly CommandHandler _cmd;
 
-        public Alerts(VectorDescription vectorDescription, CommandHandler cmd, ServerUploader uploader) : base()
+        public Alerts(VectorDescription vectorDescription, CommandHandler cmd) : base()
         {
+            _cmd = cmd;
             var cmdPlugins = new PluginsCommandHandler(cmd);
             Initialize(cmdPlugins, new PluginsLogger("Alerts"));
             cmdPlugins.AddCommand("removealert", RemoveAlert);
-            _uploader = uploader;
             _alerts = GetAlerts(vectorDescription, cmd);
         }
 
@@ -111,7 +111,7 @@ namespace CA_DataUploaderLib
             if (a.TriggersEmergencyShutdown)
                 ExecuteCommand("emergencyshutdown");
 
-            _uploader.SendAlert(message);
+            _cmd.FireAlert(message);            
         }
 
         private List<T> EnsureInitialized<T>(ref List<T> list) => list = list ?? new List<T>();

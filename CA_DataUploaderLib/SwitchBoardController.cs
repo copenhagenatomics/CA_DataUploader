@@ -59,13 +59,18 @@ namespace CA_DataUploaderLib
         private async Task BoardLoop(MCUBoard board, List<IOconfOut230Vac> ports, CancellationToken token)
         {
             var lastActions = new SwitchboardAction[ports.Count];
+            var boardStateName = board.BoxName + "_state";
+            var waitingBoardReconnect = false;
             while (!token.IsCancellationRequested)
             {
                 try
                 {
                     var vector = await _cmd.When(_ => true, token);
+                    if (!CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector)) 
+                        continue; // no point trying to send commands while there is no connection to the board.
+
                     foreach (var port in ports)
-                        DoPortActions(vector, board, port, lastActions, token);
+                        await DoPortActions(vector, board, port, lastActions, token);
                 }
                 catch (TaskCanceledException ex)
                 {
@@ -79,6 +84,22 @@ namespace CA_DataUploaderLib
             }
             
             AllOff(board, ports);
+        }
+
+        private static bool CheckConnectedStateInVector(MCUBoard board, string boardStateName, ref bool waitingBoardReconnect, NewVectorReceivedArgs vector)
+        {
+            var connected = (BaseSensorBox.ConnectionState)(int)vector[boardStateName] >= BaseSensorBox.ConnectionState.Connected;
+            if (waitingBoardReconnect && connected)
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"resuming switchboard actions after reconnect on {board}");
+                waitingBoardReconnect = false;
+            }
+            else if (!waitingBoardReconnect && !connected)
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"stopping switchboard actions while connection is reestablished on {board}");
+                waitingBoardReconnect = true;
+            }
+            return connected;
         }
 
         private async Task RunBoardControlLoops(List<IOconfOut230Vac> ports)
@@ -103,7 +124,7 @@ namespace CA_DataUploaderLib
             }
         }
         
-        private void DoPortActions(NewVectorReceivedArgs vector, MCUBoard board, IOconfOut230Vac port, SwitchboardAction[] lastActions, CancellationToken token)
+        private async Task DoPortActions(NewVectorReceivedArgs vector, MCUBoard board, IOconfOut230Vac port, SwitchboardAction[] lastActions, CancellationToken token)
         {
             if (token.IsCancellationRequested)
                 return;
@@ -115,11 +136,11 @@ namespace CA_DataUploaderLib
                 
                 var onSeconds = action.GetRemainingOnSeconds(vector.GetVectorTime());
                 if (onSeconds <= 0)
-                    board.SafeWriteLine($"p{port.PortNumber} off");
+                    await board.SafeWriteLine($"p{port.PortNumber} off", token);
                 else if (onSeconds == int.MaxValue)
-                    board.SafeWriteLine($"p{port.PortNumber} on");
+                    await board.SafeWriteLine($"p{port.PortNumber} on", token);
                 else
-                    board.SafeWriteLine($"p{port.PortNumber} on {onSeconds}");
+                    await board.SafeWriteLine($"p{port.PortNumber} on {onSeconds}", token);
                 lastActions[port.PortNumber - 1] = action;
             }
             catch (Exception)
@@ -133,10 +154,10 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                board.SafeWriteLine("off"); 
+                board.SafeWriteLine("off", CancellationToken.None); 
                 foreach (var port in ports)
                     if (port.HasOnSafeState)
-                        board.SafeWriteLine($"p{port.PortNumber} on");
+                        board.SafeWriteLine($"p{port.PortNumber} on", CancellationToken.None);
             }
             catch (Exception ex)
             {

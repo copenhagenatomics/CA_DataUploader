@@ -23,8 +23,6 @@ namespace CA_DataUploaderLib
         private readonly Queue<string> _alertQueue = new Queue<string>();
         private readonly List<DateTime> _badPackages = new List<DateTime>();
         private DateTime _lastTimestamp;
-        private DateTime _waitTimestamp = DateTime.Now;
-        private DateTime _waitLoopForeverTimestamp = DateTime.Now;
         private bool _running;
         private readonly VectorDescription _vectorDescription;
         private readonly CommandHandler _cmd;
@@ -48,6 +46,8 @@ namespace CA_DataUploaderLib
                 new Thread(() => this.LoopForever()).Start();
                 _cmd = cmd;
                 cmd?.AddCommand("escape", Stop);
+                if (cmd != null)
+                    cmd.AlertFired += SendAlert;
             }
             catch (Exception ex)
             {
@@ -56,6 +56,7 @@ namespace CA_DataUploaderLib
             }
         }
 
+        private void SendAlert(object sender, AlertFiredArgs e) => SendAlert(e.Message);
         internal void SendAlert(string message)
         {
             lock (_alertQueue)
@@ -86,27 +87,16 @@ namespace CA_DataUploaderLib
                 }
         }
 
-        // service method, that makes it easy to control the duration of each SendVector related loop in (milliseconds)
-        public int Wait(int milliseconds) => Wait(milliseconds, ref _waitTimestamp);
-
-        // service method, that makes it easy to control the duration of each loop in (milliseconds)
-        private static int Wait(int milliseconds, ref DateTime lastWaitDate)
-        {
-            int wait = milliseconds - (int)DateTime.Now.Subtract(lastWaitDate).TotalMilliseconds;
-            Thread.Sleep(Math.Max(0, wait));
-            lastWaitDate = DateTime.Now;
-            return wait;
-        }
-
         public string GetPlotUrl() => "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plot.PlotName;
 
         private void LoopForever()
         {
             _running = true;
             var vectorUploadDelay = IOconfFile.GetVectorUploadDelay();
+            var throttle = new TimeThrottle(vectorUploadDelay);
             while (_running)
             {
-                Wait(vectorUploadDelay, ref _waitLoopForeverTimestamp);
+                throttle.Wait();
                 try
                 {
                     var list = DequeueAllEntries(_queue);

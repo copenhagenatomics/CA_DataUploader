@@ -77,6 +77,12 @@ namespace CA_DataUploaderLib
             WriteToFile(logID, error + Environment.NewLine + ex.ToString() + Environment.NewLine);
         }
 
+        public static void LogError(LogID logID, string error, Exception ex)
+        {
+            error = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + error;
+            WriteToFile(logID, error + Environment.NewLine + ex.ToString() + Environment.NewLine);
+        }
+
         private static void WriteToFile(LogID logID, string msg)
         {
             try
