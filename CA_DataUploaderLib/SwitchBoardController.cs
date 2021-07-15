@@ -58,7 +58,7 @@ namespace CA_DataUploaderLib
 
         private async Task BoardLoop(MCUBoard board, List<IOconfOut230Vac> ports, CancellationToken token)
         {
-            var lastActions = new SwitchboardAction[ports.Count];
+            var lastActions = new SwitchboardAction[ports.Max(p => p.PortNumber)];
             var boardStateName = board.BoxName + "_state";
             var waitingBoardReconnect = false;
             while (!token.IsCancellationRequested)
