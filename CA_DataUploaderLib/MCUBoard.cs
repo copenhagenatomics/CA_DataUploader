@@ -56,7 +56,7 @@ namespace CA_DataUploaderLib
         private static int _detectedUnknownBoards;
         // the "writer" for this lock are operations that close/reopens the connection, while the readers are any other operation including SafeWriteLine.
         // This prevents operations being ran when the connections are being closed/reopened.
-        private static AsyncReaderWriterLock _reconnectionLock = new AsyncReaderWriterLock();
+        private AsyncReaderWriterLock _reconnectionLock = new AsyncReaderWriterLock();
 
         public BoardSettings ConfigSettings { get; set; } = BoardSettings.Default;
 
