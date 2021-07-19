@@ -208,6 +208,7 @@ namespace CA_DataUploaderLib
         { 
             if (IsOn || vectorTime < LastOff.AddSeconds(5) || !CurrentIsOn(current)) return false;
             LogRepeatCommand("off", temp, current, switchboardOnOffState);
+            LastOff = vectorTime;
             return true;
         }
         private bool CurrentIsOn(double current) => current > _config.CurrentSensingNoiseTreshold;
