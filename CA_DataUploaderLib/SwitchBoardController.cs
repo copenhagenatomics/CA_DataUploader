@@ -60,7 +60,10 @@ namespace CA_DataUploaderLib
         {
             var lastActions = new SwitchboardAction[ports.Max(p => p.PortNumber)];
             var boardStateName = board.BoxName + "_state";
+            // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operatio.
+            // we might still get lots of entries for problems that alternate between normal and failed states, but for now is a good data point to know if that case is happening.
             var waitingBoardReconnect = false;
+            var tryingToRecoverAfterTimeout = false;
             while (!token.IsCancellationRequested)
             {
                 try
@@ -71,6 +74,22 @@ namespace CA_DataUploaderLib
 
                     foreach (var port in ports)
                         await DoPortActions(vector, board, port, lastActions, token);
+
+                    if (tryingToRecoverAfterTimeout)
+                    {
+                        CALog.LogInfoAndConsoleLn(LogID.A, $"wrote to switch board without time outs, resuming normal action frequency - {board.ToShortDescription()}");
+                        tryingToRecoverAfterTimeout = false;
+                    }
+                }
+                catch (TimeoutException)
+                {
+                    if (!tryingToRecoverAfterTimeout) 
+                    {
+                        // we only notify of the situation once while this is a different way a disconnect might look like, we have
+                        CALog.LogInfoAndConsoleLn(LogID.A, $"timed out writing to switchboard, reducing action frequency until reconnect - {board.ToShortDescription()}");
+                        tryingToRecoverAfterTimeout = true;
+                    }
+                    await Task.Delay(500); // forcing reduced acting frequency
                 }
                 catch (TaskCanceledException ex)
                 {
@@ -91,12 +110,12 @@ namespace CA_DataUploaderLib
             var connected = (BaseSensorBox.ConnectionState)(int)vector[boardStateName] >= BaseSensorBox.ConnectionState.Connected;
             if (waitingBoardReconnect && connected)
             {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"resuming switchboard actions after reconnect on {board}");
+                CALog.LogInfoAndConsoleLn(LogID.A, $"resuming switchboard actions after reconnect on {board.ToShortDescription()}");
                 waitingBoardReconnect = false;
             }
             else if (!waitingBoardReconnect && !connected)
             {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"stopping switchboard actions while connection is reestablished on {board}");
+                CALog.LogInfoAndConsoleLn(LogID.A, $"stopping switchboard actions while connection is reestablished on {board.ToShortDescription()}");
                 waitingBoardReconnect = true;
             }
             return connected;
@@ -161,7 +180,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Error detected while attempting to set ports to default positions for board {board.BoxName}", ex);
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Error detected while attempting to set ports to default positions for board {board.ToShortDescription()}", ex);
             }
         }
 
