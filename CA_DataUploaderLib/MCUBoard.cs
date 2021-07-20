@@ -54,9 +54,7 @@ namespace CA_DataUploaderLib
         private static readonly Regex _scaleRegex = new Regex("[+-](([0-9]*[.])?[0-9]+) kg"); // "+0000.00 kg"
         private static int _detectedScaleBoards;
         private static int _detectedUnknownBoards;
-        // the "writer" for this lock are operations that close/reopens the connection, while the readers are any other operation including SafeWriteLine.
-        // This prevents operations being ran when the connections are being closed/reopened.
-        private AsyncReaderWriterLock _reconnectionLock = new AsyncReaderWriterLock();
+        private SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 
         public BoardSettings ConfigSettings { get; set; } = BoardSettings.Default;
 
@@ -130,7 +128,7 @@ namespace CA_DataUploaderLib
 
         public async Task SafeClose(CancellationToken token)
         {
-            await _reconnectionLock.AcquireWriterLock(token);
+            await _lock.WaitAsync(token);
             try
             {
                 if (IsOpen)
@@ -138,7 +136,7 @@ namespace CA_DataUploaderLib
             }
             finally
             {
-                _reconnectionLock.ReleaseWriterLock();
+                _lock.Release();
             }
         }
 
@@ -163,7 +161,7 @@ namespace CA_DataUploaderLib
         {
             var lines = new List<string>();
             var bytesToRead500ms = 0;
-            await _reconnectionLock.AcquireWriterLock(token);
+            await _lock.WaitAsync(token);
             try
             {
                 if (IsOpen)
@@ -191,7 +189,7 @@ namespace CA_DataUploaderLib
             }
             finally
             {
-                _reconnectionLock.ReleaseWriterLock();
+                _lock.Release();
             }
 
             CALog.LogData(LogID.B, $"Reopened port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§", lines)}'");
@@ -330,14 +328,14 @@ namespace CA_DataUploaderLib
 
         private async Task<TResult> RunEnsuringConnectionIsOpen<TResult>(string actionName, Func<TResult> action, CancellationToken token)
         {
-            await _reconnectionLock.AcquireReaderLock(token);
+            await _lock.WaitAsync(token);
             try
             {
                 return action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.                
             }
             finally
             {
-                _reconnectionLock.ReleaseReaderLock();
+                _lock.Release();
             }
         }
 
