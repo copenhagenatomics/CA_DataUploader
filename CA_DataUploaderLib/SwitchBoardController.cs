@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -63,7 +64,7 @@ namespace CA_DataUploaderLib
             // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operatio.
             // we might still get lots of entries for problems that alternate between normal and failed states, but for now is a good data point to know if that case is happening.
             var waitingBoardReconnect = false;
-            var tryingToRecoverAfterTimeout = false;
+            var tryingToRecoverAfterTimeoutWatch = new Stopwatch();
             while (!token.IsCancellationRequested)
             {
                 try
@@ -75,19 +76,19 @@ namespace CA_DataUploaderLib
                     foreach (var port in ports)
                         await DoPortActions(vector, board, port, lastActions, token);
 
-                    if (tryingToRecoverAfterTimeout)
+                    if (tryingToRecoverAfterTimeoutWatch.IsRunning)
                     {
-                        CALog.LogInfoAndConsoleLn(LogID.A, $"wrote to switch board without time outs, resuming normal action frequency - {board.ToShortDescription()}");
-                        tryingToRecoverAfterTimeout = false;
+                        tryingToRecoverAfterTimeoutWatch.Stop();
+                        CALog.LogInfoAndConsoleLn(LogID.A, $"wrote to switch board without time outs after {tryingToRecoverAfterTimeoutWatch.Elapsed}, resuming normal action frequency - {board.ToShortDescription()}");
                     }
                 }
                 catch (TimeoutException)
                 {
-                    if (!tryingToRecoverAfterTimeout) 
+                    if (!tryingToRecoverAfterTimeoutWatch.IsRunning) 
                     {
                         // we only notify of the situation once while this is a different way a disconnect might look like, we have
                         CALog.LogInfoAndConsoleLn(LogID.A, $"timed out writing to switchboard, reducing action frequency until reconnect - {board.ToShortDescription()}");
-                        tryingToRecoverAfterTimeout = true;
+                        tryingToRecoverAfterTimeoutWatch.Restart();
                     }
                     await Task.Delay(500); // forcing reduced acting frequency
                 }
@@ -161,6 +162,11 @@ namespace CA_DataUploaderLib
                 else
                     await board.SafeWriteLine($"p{port.PortNumber} on {onSeconds}", token);
                 lastActions[port.PortNumber - 1] = action;
+            }
+            catch (TimeoutException)
+            { 
+                // we don't want logging at this level as the caller handles this in a way that reduces the amount of noise for failures that last many vectors.
+                throw;
             }
             catch (Exception)
             {
