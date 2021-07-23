@@ -53,8 +53,31 @@ namespace CA_DataUploaderLib.IOconf
             {
                 var match = _switchBoxCurrentsRegex.Match(line);
                 if (!match.Success) 
-                    return null; 
+                    return TryParseOnlyNumbersAsDoubleList(line);
                 return GetValuesFromGroups(match.Groups);
+            }
+
+            // returns currents 0-3, states 0-3, board temperature
+            public List<double> TryParseOnlyNumbersAsDoubleList(string line)
+            {
+                var numbers = base.TryParseAsDoubleList(line); //the base implementation deals with any amount of simple numbers separated by commas.
+                var missingValues = 0;
+                if (numbers == null)
+                    return null;
+                if (numbers.Count == 4)
+                    missingValues = 5; // missing states and board temperature
+                else if (numbers.Count == 5)
+                    missingValues = 4; // missing states
+                else if (numbers.Count == 8)
+                    missingValues = 1; // missing board temperature
+                else if (numbers.Count == 9)
+                    return numbers;
+                else
+                    return null; // invalid line 
+                
+                for (int i = 0; i < missingValues; i++)
+                    numbers.Add(10000);
+                return numbers;
             }
 
             public override bool MatchesValuesFormat(string line) => _switchBoxCurrentsRegex.IsMatch(line);

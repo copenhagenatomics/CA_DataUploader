@@ -32,5 +32,65 @@ namespace UnitTests
             Assert.IsNotNull(values);
             CollectionAssert.AreEqual(new [] {0.06d, 0.05d, 0.05d, 0.06d, 0, 1, 0, 1, 25.87d}, values);
         }
+
+        [TestMethod]
+        public void OnlyNumbersWithoutStatesAndTemperaturesIsParsed()
+        {
+            string testString = "0.03,2.30,4.00,5.25";
+            var values = IOconfOut230Vac.SwitchBoardResponseParser.Default.TryParseAsDoubleList(testString);
+            Assert.IsNotNull(values);
+            CollectionAssert.AreEqual(new [] {0.03d,2.30,4.00,5.25,10000,10000,10000,10000,10000}, values);
+        }
+
+        [TestMethod]
+        public void OnlyNumbersWithoutStatesIsParsed()
+        {
+            string testString = "0.03,2.30,4.00,5.25,90";
+            var values = IOconfOut230Vac.SwitchBoardResponseParser.Default.TryParseAsDoubleList(testString);
+            Assert.IsNotNull(values);
+            CollectionAssert.AreEqual(new [] {0.03d,2.30,4.00,5.25,90,10000,10000,10000,10000}, values);
+        }
+
+        [TestMethod]
+        public void OnlyNumbersWithoutTemperatureIsParsed()
+        {
+            string testString = "0.03,2.30,4.00,5.25,1,0,1,1";
+            var values = IOconfOut230Vac.SwitchBoardResponseParser.Default.TryParseAsDoubleList(testString);
+            Assert.IsNotNull(values);
+            CollectionAssert.AreEqual(new [] {0.03d,2.30,4.00,5.25,1,0,1,1,10000}, values);
+        }
+
+        [TestMethod]
+        public void OnlyNumbersAllValuesIsParsed()
+        {
+            string testString = "0.03,2.30,4.00,5.25,1,0,1,1,40";
+            var values = IOconfOut230Vac.SwitchBoardResponseParser.Default.TryParseAsDoubleList(testString);
+            Assert.IsNotNull(values);
+            CollectionAssert.AreEqual(new [] {0.03d,2.30,4.00,5.25,1,0,1,1,40}, values);
+        }
+        
+        [TestMethod]
+        public void InvalidLineIsRejected()
+        {
+            string testString = "MISREAD: something went wrong";
+            var values = IOconfOut230Vac.SwitchBoardResponseParser.Default.TryParseAsDoubleList(testString);
+            Assert.IsNull(values);
+        }
+
+        [TestMethod]
+        public void LineConfirmationIsRejected()
+        {
+            string testString = "p1 on 60";
+            var values = IOconfOut230Vac.SwitchBoardResponseParser.Default.TryParseAsDoubleList(testString);
+            Assert.IsNull(values);
+        }
+
+        [TestMethod]
+        public void LineConfirmationIsRecognizedAsExpectedNonValuesLine()
+        {
+            string testString = "p1 on 60";
+            var value = IOconfOut230Vac.SwitchBoardResponseParser.Default.IsExpectedNonValuesLine(testString);
+            Assert.IsTrue(value);
+        }
     }
 }
