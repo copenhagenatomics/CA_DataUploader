@@ -67,7 +67,11 @@ namespace CA_DataUploaderLib.IOconf
                 if (numbers.Count == 4)
                     missingValues = 5; // missing states and board temperature
                 else if (numbers.Count == 5)
-                    missingValues = 4; // missing states
+                { // missing states, the temperature needs to go at the end
+                    for (int i = 0; i < 4; i++)
+                        numbers.Insert(4, 10000);// insert before the temp
+                    return numbers;
+                }
                 else if (numbers.Count == 8)
                     missingValues = 1; // missing board temperature
                 else if (numbers.Count == 9)
