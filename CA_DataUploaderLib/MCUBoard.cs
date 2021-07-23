@@ -175,7 +175,7 @@ namespace CA_DataUploaderLib
                 
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {productType} {serialNumber}");
                 Open();
-                Thread.Sleep(500);
+                await Task.Delay(500, token);
 
                 bytesToRead500ms = BytesToRead;
                 CALog.LogData(LogID.B, $"(Reopen) skipping {ConfigSettings.ExpectedHeaderLines} header lines for port {PortName} {productType} {serialNumber} ");
