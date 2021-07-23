@@ -48,7 +48,7 @@ namespace UnitTests
             string testString = "0.03,2.30,4.00,5.25,90";
             var values = IOconfOut230Vac.SwitchBoardResponseParser.Default.TryParseAsDoubleList(testString);
             Assert.IsNotNull(values);
-            CollectionAssert.AreEqual(new [] {0.03d,2.30,4.00,5.25,90,10000,10000,10000,10000}, values);
+            CollectionAssert.AreEqual(new [] {0.03d,2.30,4.00,5.25,10000,10000,10000,10000,90}, values);
         }
 
         [TestMethod]
