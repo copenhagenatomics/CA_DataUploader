@@ -324,11 +324,9 @@ namespace CA_DataUploaderLib
         private Task RunEnsuringConnectionIsOpen(string actionName, Action action, CancellationToken token) => 
             RunEnsuringConnectionIsOpen(actionName, () => { action(); return true; }, token);
 
-        public sealed class SingleThreadRunner : IDisposable
+        private sealed class SingleThreadRunner : IDisposable
         {
             private readonly BlockingCollection<Action> _queue = new BlockingCollection<Action>(new ConcurrentQueue<Action>());
-            // this event is just for testing purposes to check we can stop the loop
-            public event EventHandler finished; 
             private readonly Task _loop;
 
             public SingleThreadRunner()
@@ -338,13 +336,11 @@ namespace CA_DataUploaderLib
 
             private void Loop()
             {
-                foreach (var action in _queue.GetConsumingEnumerable())
-                    action();
-                finished?.Invoke(this, new EventArgs());
+                while(_queue.TryTake(out var action)) action();
             }
 
-            public Task Run(Action action, CancellationToken token) => Run(() => { action(); return false; }, token);
-            public Task<TResult> Run<TResult>(Func<TResult> action, CancellationToken token)
+            internal Task Run(Action action, CancellationToken token) => Run(() => { action(); return false; }, token);
+            internal Task<TResult> Run<TResult>(Func<TResult> action, CancellationToken token)
             {
                 var tsc = new TaskCompletionSource<TResult>();
                 token.Register(() => tsc.TrySetCanceled(token));
