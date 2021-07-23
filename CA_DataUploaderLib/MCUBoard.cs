@@ -9,7 +9,6 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
 
 namespace CA_DataUploaderLib
 {
@@ -55,7 +54,7 @@ namespace CA_DataUploaderLib
         private static readonly Regex _scaleRegex = new Regex("[+-](([0-9]*[.])?[0-9]+) kg"); // "+0000.00 kg"
         private static int _detectedScaleBoards;
         private static int _detectedUnknownBoards;
-        private SingleThreadRunner _singleThreadRunner = new SingleThreadRunner();
+        private SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 
         public BoardSettings ConfigSettings { get; set; } = BoardSettings.Default;
 
@@ -127,14 +126,18 @@ namespace CA_DataUploaderLib
         public Task SafeWriteLine(string msg, CancellationToken token) => RunEnsuringConnectionIsOpen("WriteLine", () => WriteLine(msg), token);
         public async Task<string> SafeReadExisting(CancellationToken token) => await RunEnsuringConnectionIsOpen("ReadExisting", ReadExisting, token) ?? string.Empty;
 
-        /// <remarks>this close is considered final so further use of this instance is not supported</remarks>
         public async Task SafeClose(CancellationToken token)
         {
-            await _singleThreadRunner.Run(() => {
+            await _lock.WaitAsync(token);
+            try
+            {
                 if (IsOpen)
                     Close();                
-            }, token);
-            _singleThreadRunner.Dispose();
+            }
+            finally
+            {
+                _lock.Release();
+            }
         }
 
         public string ToDebugString(string seperator) => 
@@ -154,18 +157,18 @@ namespace CA_DataUploaderLib
         /// A log entry to <see cref="LogID.B"/> is added with the skipped header 
         /// and the bytes in the receive buffer 500ms after the port was opened again.
         /// </remarks>
-        public async Task<bool> SafeReopen(CancellationToken token) => await _singleThreadRunner.Run(() => DoReopen(token), token);
-        private bool DoReopen(CancellationToken token)
+        public async Task<bool> SafeReopen(CancellationToken token)
         {
             var lines = new List<string>();
             var bytesToRead500ms = 0;
+            await _lock.WaitAsync(token);
             try
             {
                 if (IsOpen)
                 {
                     CALog.LogData(LogID.B, $"(Reopen) Closing port {PortName} {productType} {serialNumber}");
                     Close();
-                    Thread.Sleep(500);
+                    await Task.Delay(500, token);
                 }
                 
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {productType} {serialNumber}");
@@ -183,6 +186,10 @@ namespace CA_DataUploaderLib
                     $"Failure reopening port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
                     ex);
                 return false;
+            }
+            finally
+            {
+                _lock.Release();
             }
 
             CALog.LogData(LogID.B, $"Reopened port {PortName} {productType} {serialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§", lines)}'");
@@ -319,48 +326,20 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private Task<TResult> RunEnsuringConnectionIsOpen<TResult>(string actionName, Func<TResult> action, CancellationToken token) =>
-            _singleThreadRunner.Run(action, token);
+        private async Task<TResult> RunEnsuringConnectionIsOpen<TResult>(string actionName, Func<TResult> action, CancellationToken token)
+        {
+            await _lock.WaitAsync(token);
+            try
+            {
+                return action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.                
+            }
+            finally
+            {
+                _lock.Release();
+            }
+        }
+
         private Task RunEnsuringConnectionIsOpen(string actionName, Action action, CancellationToken token) => 
             RunEnsuringConnectionIsOpen(actionName, () => { action(); return true; }, token);
-
-        private sealed class SingleThreadRunner : IDisposable
-        {
-            private readonly BlockingCollection<Action> _queue = new BlockingCollection<Action>(new ConcurrentQueue<Action>());
-            private readonly Task _loop;
-
-            public SingleThreadRunner()
-            {
-                _loop = Task.Factory.StartNew(Loop, CancellationToken.None, TaskCreationOptions.LongRunning,TaskScheduler.Default);
-            }
-
-            private void Loop()
-            {
-                while(_queue.TryTake(out var action)) action();
-            }
-
-            internal Task Run(Action action, CancellationToken token) => Run(() => { action(); return false; }, token);
-            internal Task<TResult> Run<TResult>(Func<TResult> action, CancellationToken token)
-            {
-                var tsc = new TaskCompletionSource<TResult>();
-                token.Register(() => tsc.TrySetCanceled(token));
-                _queue.Add(ActionInThread);
-                return tsc.Task;
-
-                void ActionInThread()
-                {
-                    try
-                    {
-                        tsc.TrySetResult(action());
-                    }
-                    catch (Exception ex)
-                    {
-                        tsc.TrySetException(ex);
-                    }
-                }
-            }
-
-            public void Dispose() => _queue.CompleteAdding();
-        }
     }
 }
