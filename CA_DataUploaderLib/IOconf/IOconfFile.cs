@@ -19,54 +19,12 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public static void Reload()
-        {
+        { // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization / static ctor rejects the custom entries.
             Table.Clear();
-            if (!File.Exists("IO.conf"))
-                throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
-
-            var lines = File.ReadAllLines("IO.conf").ToList();
-            RawFile = string.Join(Environment.NewLine, lines);
-            // remove empty lines and commented out lines
-            var lines2 = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
-            lines2.ForEach(x => Table.Add(CreateType(x, lines.IndexOf(x))));
+            var (rawFile, entries) = IOconfFileLoader.Load(Table);
+            Table.AddRange(entries);
+            RawFile = rawFile;
             CheckRules();
-        }
-
-        private static IOconfRow CreateType(string row, int lineNum)
-        {
-            try
-            {
-                if (row.StartsWith("LoopName")) return new IOconfLoopName(row, lineNum);
-                if (row.StartsWith("Account")) return new IOconfAccount(row, lineNum);
-                if (row.StartsWith("SampleRates")) return new IOconfSamplingRates(row, lineNum);
-                if (row.StartsWith("Map"))    return new IOconfMap(row, lineNum);
-                if (row.StartsWith("Math")) return new IOconfMath(row, lineNum);
-                if (row.StartsWith("Alert")) return new IOconfAlert(row, lineNum);
-                if (row.StartsWith("TypeK"))  return new IOconfTypeK(row, lineNum);
-                if (row.StartsWith("SaltLeakage")) return new IOconfSaltLeakage(row, lineNum);
-                if (row.StartsWith("AirFlow")) return new IOconfAirFlow(row, lineNum);
-                if (row.StartsWith("Heater")) return new IOconfHeater(row, lineNum);
-                if (row.StartsWith("Light")) return new IOconfLight(row, lineNum);
-                if (row.StartsWith("Motor")) return new IOconfMotor(row, lineNum);
-                if (row.StartsWith("Oven")) return new IOconfOven(row, lineNum);
-                if (row.StartsWith("Pressure")) return new IOconfPressure(row, lineNum);
-                if (row.StartsWith("Geiger")) return new IOconfGeiger(row, lineNum);
-                if (row.StartsWith("Scale")) return new IOconfScale(row, lineNum);
-                if (row.StartsWith("Valve")) return new IOconfValve(row, lineNum);
-                if (row.StartsWith("SafeValve")) return new IOconfSafeValve(row, lineNum);
-                if (row.StartsWith("Filter")) return new IOconfFilter(row, lineNum);
-                if (row.StartsWith("RPiTemp")) return new IOconfRPiTemp(row, lineNum);
-                if (row.StartsWith("VacuumPump")) return new IOconfVacuumPump(row, lineNum);
-                if (row.StartsWith("Oxygen")) return new IOconfOxygen(row, lineNum);
-                if (row.StartsWith("GenericSensor")) return new IOconfGeneric(row, lineNum);
-
-                return new IOconfRow(row, lineNum, "Unknown");
-            }
-            catch (Exception ex)
-            {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in line {lineNum} of {Directory.GetCurrentDirectory()}\\IO.conf {Environment.NewLine}{row}{Environment.NewLine}" + ex.ToString());
-                throw;
-            }
         }
 
         private static void CheckRules()
