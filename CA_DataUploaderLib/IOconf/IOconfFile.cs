@@ -90,6 +90,6 @@ namespace CA_DataUploaderLib.IOconf
         public static IEnumerable<IOconfMath> GetMath() => GetEntries<IOconfMath>();
         public static IEnumerable<IOconfFilter> GetFilters() => GetEntries<IOconfFilter>();
         public static IEnumerable<IOconfInput> GetInputs() => GetEntries<IOconfInput>();
-        private static IEnumerable<T> GetEntries<T>() => Table.OfType<T>();
+        public static IEnumerable<T> GetEntries<T>() => Table.OfType<T>();
     }
 }
