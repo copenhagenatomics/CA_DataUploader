@@ -25,7 +25,6 @@ namespace CA_DataUploaderLib.IOconf
             ("Pressure", (r, l) => new IOconfPressure(r, l)),
             ("Geiger", (r, l) => new IOconfGeiger(r, l)),
             ("Scale", (r, l) => new IOconfScale(r, l)),
-            ("Valve", (r, l) => new IOconfValve(r, l)),
             ("SafeValve", (r, l) => new IOconfSafeValve(r, l)),
             ("Filter", (r, l) => new IOconfFilter(r, l)),
             ("RPiTemp", (r, l) => new IOconfRPiTemp(r, l)),
