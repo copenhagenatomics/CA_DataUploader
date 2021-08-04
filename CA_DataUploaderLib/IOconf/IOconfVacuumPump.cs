@@ -2,6 +2,6 @@
 {
     public class IOconfVacuumPump : IOconfOut230Vac
     {
-        public IOconfVacuumPump(string row, int lineNum) : base(row, lineNum, "VacuumPump") {}
+        public IOconfVacuumPump(string row, int lineNum) : base(row, lineNum, "VacuumPump", false) {}
     }
 }

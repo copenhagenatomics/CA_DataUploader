@@ -6,18 +6,20 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfOut230Vac : IOconfOutput
     {
-        public IOconfOut230Vac(string row, int lineNum, string type) : base(row, lineNum, type, true, 
+        public IOconfOut230Vac(string row, int lineNum, string type, bool isSwitchboardControllerOutput = true) : base(row, lineNum, type, true, 
             new BoardSettings() { Parser = new SwitchBoardResponseParser(!row.Contains("showConfirmations")), ValuesEndOfLineChar = "\r" }) 
         {
             CurrentSensorName = Name + "_current";
             SwitchboardOnOffSensorName = Name + "_SwitchboardOn/Off";
             BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
+            IsSwitchboardControllerOutput = isSwitchboardControllerOutput;
         }
 
         public string CurrentSensorName { get; }
         public string SwitchboardOnOffSensorName { get; }
         public string BoardStateSensorName { get; } 
         public bool HasOnSafeState { get; protected set; } = false;
+        public bool IsSwitchboardControllerOutput { get; }
         public IEnumerable<IOconfInput> GetExpandedInputConf()
         { // note "_On/Off" is not included as its not an input but the current expected on/off state as seen by the control loop.
             yield return NewPortInput(CurrentSensorName, 0 + PortNumber);

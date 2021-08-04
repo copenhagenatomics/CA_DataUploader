@@ -80,7 +80,6 @@ namespace CA_DataUploaderLib.IOconf
         public static IEnumerable<IOconfInput> GetAirFlow()=> GetEntries<IOconfAirFlow>();
         public static IEnumerable<IOconfMotor> GetMotor()=> GetEntries<IOconfMotor>();
         public static IEnumerable<IOconfScale> GetScale() => GetEntries<IOconfScale>();
-        public static IEnumerable<IOconfSafeValve> GetSafeValves()=> GetEntries<IOconfSafeValve>();
         public static IEnumerable<IOconfHeater> GetHeater() => GetEntries<IOconfHeater>();
         public static IEnumerable<IOconfLight> GetLight() => GetEntries<IOconfLight>();
         public static IEnumerable<IOconfOxygen> GetOxygen() => GetEntries<IOconfOxygen>();
