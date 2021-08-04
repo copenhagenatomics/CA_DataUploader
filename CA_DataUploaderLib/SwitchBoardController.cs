@@ -25,8 +25,7 @@ namespace CA_DataUploaderLib
         private SwitchBoardController(CommandHandler cmd) 
         {
             _cmd = new PluginsCommandHandler(cmd);
-            var heaters = IOconfFile.GetHeater().Cast<IOconfOut230Vac>();
-            var ports = heaters.Concat(IOconfFile.GetValve()).Where(p => p.Map.Board != null).ToList();
+            var ports = IOconfFile.GetEntries<IOconfOut230Vac>().Where(p => p.IsSwitchboardControllerOutput && p.Map.Board != null).ToList();
             var boardsTemperatures = ports.GroupBy(p => p.BoxName).Select(b => b.Select(p => p.GetBoardTemperatureInputConf()).FirstOrDefault());
             var inputs = ports.SelectMany(p => p.GetExpandedInputConf()).Concat(boardsTemperatures);
             _reader = new BaseSensorBox(cmd, "switchboards", string.Empty, "show switchboards inputs", inputs);
