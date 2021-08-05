@@ -78,6 +78,30 @@ namespace UnitTests
         }
 
         [TestMethod]
+        public void InvalidLineWithOnlyProperCommandIsRejected()
+        {
+            string testString = "MISREAD: p1 on 60";
+            var values = IOconfOut230Vac.SwitchBoardResponseParser.Default.TryParseAsDoubleList(testString);
+            Assert.IsNull(values);
+        }
+
+        [TestMethod]
+        public void InvalidLineIncludingProperCommandIsRejected()
+        {
+            string testString = "MISREAD: something p1 on 60";
+            var values = IOconfOut230Vac.SwitchBoardResponseParser.Default.TryParseAsDoubleList(testString);
+            Assert.IsNull(values);
+        }
+
+        [TestMethod]
+        public void InvalidLineIncludingProperCommandAndBoardValuesLineIsRejected()
+        {
+            string testString = "MISREAD: 0.03,2.30,4.00,5.25,1,0,1,1,40p1 on 60";
+            var values = IOconfOut230Vac.SwitchBoardResponseParser.Default.TryParseAsDoubleList(testString);
+            Assert.IsNull(values);
+        }
+
+        [TestMethod]
         public void LineConfirmationIsRejected()
         {
             string testString = "p1 on 60";
@@ -91,6 +115,38 @@ namespace UnitTests
             string testString = "p1 on 60";
             var value = IOconfOut230Vac.SwitchBoardResponseParser.Default.IsExpectedNonValuesLine(testString);
             Assert.IsTrue(value);
+        }
+        
+        [TestMethod]
+        public void MisreadIsNotRecognizedAsExpectedNonValuesLine()
+        {
+            string testString = "MISREAD: random data";
+            var value = IOconfOut230Vac.SwitchBoardResponseParser.Default.IsExpectedNonValuesLine(testString);
+            Assert.IsFalse(value);
+        }
+
+        [TestMethod]
+        public void MisreadWithOnlyProperCommandIsNotRecognizedAsExpectedNonValuesLine()
+        {
+            string testString = "MISREAD: psssss1 on 60";
+            var value = IOconfOut230Vac.SwitchBoardResponseParser.Default.IsExpectedNonValuesLine(testString);
+            Assert.IsFalse(value);
+        }
+
+        [TestMethod]
+        public void MisreadIncludingProperCommandIsNotRecognizedAsExpectedNonValuesLine()
+        {
+            string testString = "MISREAD: something p1 on 60";
+            var value = IOconfOut230Vac.SwitchBoardResponseParser.Default.IsExpectedNonValuesLine(testString);
+            Assert.IsFalse(value);
+        }
+
+        [TestMethod]
+        public void MisreadIncludingProperCommandAndValuesLineIsNotRecognizedAsExpectedNonValuesLine()
+        {
+            string testString = "MISREAD: 0.03,2.30,4.00,5.25,1,0,1,1,40p1 on 60";
+            var value = IOconfOut230Vac.SwitchBoardResponseParser.Default.IsExpectedNonValuesLine(testString);
+            Assert.IsFalse(value);
         }
     }
 }
