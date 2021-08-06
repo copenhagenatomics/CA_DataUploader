@@ -109,7 +109,10 @@ namespace CA_DataUploaderLib
             message = timestamp + message;
             logger.LogError(message);
             if (a.Command != default)
-                ExecuteCommand(a.Command);
+            {
+                foreach (var commands in a.Command.Split('|'))
+                    ExecuteCommand(a.Command);
+            }
 
             _cmd.FireAlert(message);            
         }
