@@ -22,6 +22,7 @@ namespace CA_DataUploaderLib
             set { ReadSensor_LoopTime = value.Subtract(_timeStamp).TotalMilliseconds; _timeStamp = value; }
         } 
         public double ReadSensor_LoopTime { get; private set; }  // in miliseconds. 
+        internal int InvalidReadsRemainingAttempts { get; set; } = 3000; //3k attempts = 5 (mins) x 60 (seconds) x 10 (cycles x second). The attempts are reset whenever we get valid values
 
         public SensorSample(IOconfInput input, double value = 0)
         {
