@@ -64,7 +64,7 @@ namespace CA_DataUploaderLib.IOconf
         public bool CheckValue(double newValue, DateTime vectorTime)
         {
             //don't alert for invalid values.
-            //Sensor readers are responsible from reporting fully lost sensors, while actuating logic is responsible for only doing targetted reactions.
+            //Sensor readers are responsible for reporting fully lost sensors, while actuating logic is responsible for only doing targetted reactions.
             //Limitation: emergency shutdown alerts ignore board disconnects or lost sensors (10k+ thermocouple errors),
             //            for the earlier separate alerts can be set on the disconnects, for the later use alert + Math like this (filter length controls how long before the alert sees the 10k and triggers): Math;MyFilterDisconnected;MyFilter >= 10000
             //            Also note that some redundant alerts can be added so that if one sensor fails the problem can still be detected by other sensors/boards.
