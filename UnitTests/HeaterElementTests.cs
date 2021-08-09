@@ -96,8 +96,31 @@ namespace UnitTests
             var newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(1).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
+            element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(2).ToVectorDouble();// only 1 second after detecting the disconnect for the first time
+            newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
             var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
             Assert.AreEqual(firstAction, newAction);
+        }
+
+        [TestMethod]
+        public void DisconnectedTemperatureOven2SecondsTurnsOff()
+        { 
+            var element = new HeaterElement(NewConfig.Build());
+            element.SetTargetTemperature(45);
+            NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
+            var firstAction = element.MakeNextActionDecision(vector);
+            var newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(1).ToVectorDouble();
+            newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
+            element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(4).ToVectorDouble();// 3 seconds after detecting the disconnect for the first time
+            newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
+            var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
+            Assert.IsFalse(newAction.IsOn);
+            Assert.AreNotEqual(firstAction, newAction);
         }
 
         [TestMethod]
