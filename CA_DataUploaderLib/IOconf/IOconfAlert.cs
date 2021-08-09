@@ -24,15 +24,14 @@ namespace CA_DataUploaderLib.IOconf
             if (list[0] != "Alert" || list.Count < 3) throw new Exception("IOconfAlert: wrong format: " + row);
             Name = list[1];
             (Sensor, Value, MessageTemplate, type) = ParseExpression(
-                Name, list[2], "IOconfAlert: wrong format: " + row + ". Format: Alert;Name;SensorName comparison value;[rateMinutes];[emergencyshutdown].");
+                Name, list[2], "IOconfAlert: wrong format: " + row + ". Format: Alert;Name;SensorName comparison value;[rateMinutes];[command].");
             Message = MessageTemplate;
             if (list.Count <= 3)
-                (RateLimitMinutes, TriggersEmergencyShutdown) = (DefaultRateLimitMinutes, false);
-            else 
-            {
-                TriggersEmergencyShutdown = list[3] == "emergencyshutdown" || list.Count > 4 && list[4] == "emergencyshutdown";
-                RateLimitMinutes = !TriggersEmergencyShutdown || list.Count > 4 ? list[3].ToInt() : DefaultRateLimitMinutes;
-            }
+                (RateLimitMinutes, Command) = (DefaultRateLimitMinutes, default);
+            else if (int.TryParse(list[3], out var rateLimitMins))
+                (RateLimitMinutes, Command) = (rateLimitMins, list.Count > 4 ? list[4] : default);
+            else
+                (RateLimitMinutes, Command) = (DefaultRateLimitMinutes, list[3]);
         }
 
         public IOconfAlert(string name, string expression, int? rateLimit = DefaultRateLimitMinutes, bool triggersEmergencyShutdown = true) : base("DynamicAlert", 0, "DynamicAlert")
@@ -42,13 +41,13 @@ namespace CA_DataUploaderLib.IOconf
                 name, expression, "alert expression - wrong format: " + expression + ". Expression format: SensorName comparison value.");
             Message = MessageTemplate;
             RateLimitMinutes = rateLimit ?? DefaultRateLimitMinutes;
-            TriggersEmergencyShutdown = triggersEmergencyShutdown;
+            Command = "emergencyshutdown";
         }
 
         public string Name { get; set; }
         public string Sensor { get; set; }
         public string Message { get; private set; }
-        public bool TriggersEmergencyShutdown { get; private set; }
+        public string Command { get; private set; }
         private readonly AlertCompare type;
         private readonly double Value;
         private double LastValue;
@@ -63,6 +62,12 @@ namespace CA_DataUploaderLib.IOconf
 
         public bool CheckValue(double newValue, DateTime vectorTime)
         {
+            //don't alert for invalid values.
+            //Sensor readers are responsible for reporting fully lost sensors, while actuating logic is responsible for only doing targetted reactions.
+            //Limitation: emergency shutdown alerts ignore board disconnects or lost sensors (10k+ thermocouple errors),
+            //            for the earlier separate alerts can be set on the disconnects, for the later use alert + Math like this (filter length controls how long before the alert sees the 10k and triggers): Math;MyFilterDisconnected;MyFilter >= 10000
+            //            Also note that some redundant alerts can be added so that if one sensor fails the problem can still be detected by other sensors/boards.
+            if (newValue >= 10000) return false;
             Message = MessageTemplate + newValue.ToString(CultureInfo.InvariantCulture) + ")";
             bool newMatches = RawCheckValue(newValue);
             bool lastMatches = !_isFirstCheck && RawCheckValue(LastValue); // there is no lastValue to check on the first call

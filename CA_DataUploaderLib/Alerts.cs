@@ -34,8 +34,8 @@ namespace CA_DataUploaderLib
                 logger.LogError($"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Alert: {alert.Name} points to missing sensor: {alert.Sensor}");
             if (alertsWithoutItem.Count > 0)
                 throw new InvalidOperationException("Misconfigured alerts detected");
-            if (alerts.Any(a => a.TriggersEmergencyShutdown) && cmd == null)
-                throw new InvalidOperationException("Alert with emergency shutdown is configured, but command handler is not available to trigger it");
+            if (alerts.Any(a => a.Command != default) && cmd == null)
+                throw new InvalidOperationException("Alert with command is configured, but command handler is not available to trigger it");
             return alerts;
         }
 
@@ -108,8 +108,11 @@ namespace CA_DataUploaderLib
         {
             message = timestamp + message;
             logger.LogError(message);
-            if (a.TriggersEmergencyShutdown)
-                ExecuteCommand("emergencyshutdown");
+            if (a.Command != default)
+            {
+                foreach (var commands in a.Command.Split('|'))
+                    ExecuteCommand(a.Command);
+            }
 
             _cmd.FireAlert(message);            
         }

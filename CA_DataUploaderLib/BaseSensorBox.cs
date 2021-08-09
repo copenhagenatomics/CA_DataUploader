@@ -320,13 +320,33 @@ namespace CA_DataUploaderLib
                 if (sensor != null)
                 {
                     sensor.Value = value;
-
+                    DetectAndWarnSensorDisconnects(board, sensor);
                     HandleSaltLeakage(board, sensor);
                 }
 
                 i++;
             }
         }
+
+        private void DetectAndWarnSensorDisconnects(MCUBoard board, SensorSample sensor)
+        {
+            if (sensor.Value < 10000)
+            {//we reset the attempts when we get valid values, both to avoid recurring but temporary errors firing the warning + to re-enable the warning when the issue is fixed.
+                sensor.InvalidReadsRemainingAttempts = 3000;
+                return;
+            }
+
+            var remainingAttempts = sensor.InvalidReadsRemainingAttempts;
+            if (ExactSensorAttemptsCheck(ref remainingAttempts))
+            {
+                var lostSensorMsg = $"sensor {sensor.Name} has been unreachable for at least 5 minutes (returning 10k+ values)";
+                LogError(board, lostSensorMsg);
+                _cmd.FireAlert(lostSensorMsg + " - title - " + board.ToShortDescription());
+            }
+
+            sensor.InvalidReadsRemainingAttempts = remainingAttempts;
+        }
+
         public void ProcessLine(IEnumerable<double> numbers, MCUBoard board) => ProcessLine(numbers, board, GetSamples(board));
         private SensorSample[] GetSamples(MCUBoard board)
         {

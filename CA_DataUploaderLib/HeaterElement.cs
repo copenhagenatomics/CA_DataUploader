@@ -160,12 +160,12 @@ namespace CA_DataUploaderLib
             return (false, double.MaxValue);
         }
 
-        private bool TemperatureBoardsAreConnected(NewVectorReceivedArgs vector, IReadOnlyCollection<string> boardStateSensorNames)
+        private static bool TemperatureBoardsAreConnected(NewVectorReceivedArgs vector, IReadOnlyCollection<string> boardStateSensorNames)
         {
             foreach (var board in boardStateSensorNames)
             {
-                if (!vector.TryGetValue(_config.SwitchBoardStateSensorName, out var state))
-                    throw new InvalidOperationException($"missing temperature board's connection state: {_config.SwitchBoardStateSensorName}");
+                if (!vector.TryGetValue(board, out var state))
+                    throw new InvalidOperationException($"missing temperature board's connection state: {board}");
                 if (state != (int)BaseSensorBox.ConnectionState.ReceivingValues)
                     return false;
             }
