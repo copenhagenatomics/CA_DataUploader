@@ -44,5 +44,7 @@ namespace CA_DataUploaderLib
                 ReadSensor_LoopTime = ReadSensor_LoopTime
             };
         }
+
+        public bool HasSpecialDisconnectValue() => Input != null ? Input.IsSpecialDisconnectValue(Value) : false;
     }
 }
