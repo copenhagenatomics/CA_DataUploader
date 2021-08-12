@@ -33,6 +33,7 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
+        public virtual bool IsSpecialDisconnectValue(double value) => false;
 
         public string Name { get; set; }
         public string BoxName { get; set; }

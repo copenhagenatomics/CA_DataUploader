@@ -330,7 +330,7 @@ namespace CA_DataUploaderLib
 
         private void DetectAndWarnSensorDisconnects(MCUBoard board, SensorSample sensor)
         {
-            if (sensor.Value < 10000)
+            if (!sensor.HasSpecialDisconnectValue())
             {//we reset the attempts when we get valid values, both to avoid recurring but temporary errors firing the warning + to re-enable the warning when the issue is fixed.
                 sensor.InvalidReadsRemainingAttempts = 3000;
                 return;

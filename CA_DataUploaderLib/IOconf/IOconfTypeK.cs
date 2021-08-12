@@ -21,5 +21,7 @@ namespace CA_DataUploaderLib.IOconf
             else if (!Skip && (PortNumber < 1 || PortNumber > 34)) 
                 throw new Exception("IOconfTypeK: invalid port number: " + row);
         }
+
+        public override bool IsSpecialDisconnectValue(double value) => value >= 10000;
     }
 }
