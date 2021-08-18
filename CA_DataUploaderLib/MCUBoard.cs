@@ -81,6 +81,7 @@ namespace CA_DataUploaderLib
                 // DataReceived += new SerialDataReceivedEventHandler(port_DataReceived);
 
                 Open();
+                Thread.Sleep(30); // it needs to await that the board registers that the COM port has been opened before sending commands (work arounds issue when first opening the connection and sending serial).
 
                 if (skipBoardAutoDetection)
                     InitialConnectionSucceeded = true;
