@@ -22,11 +22,8 @@ namespace CA_DataUploaderLib
 
         public static void LogException(LogID logID, Exception ex)
         {
-            var temp = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Red;
             var msg = $"{DateTime.Now:MM.dd HH:mm:ss} - {ex}{Environment.NewLine}";
-            Console.WriteLine(msg);
-            Console.ForegroundColor = temp;
+            WriteLineToConsole(msg, ConsoleColor.Red);
             WriteToFile(logID, msg);
         }
 
@@ -50,30 +47,21 @@ namespace CA_DataUploaderLib
 
         public static void LogColor(LogID logID, ConsoleColor color, string msg)
         {
-            var temp = Console.ForegroundColor;
-            Console.ForegroundColor = color;
-            Console.WriteLine(msg);
-            Console.ForegroundColor = temp;
+            WriteLineToConsole(msg, color);
             WriteToFile(logID, msg);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error)
         {
-            var temp = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Red;
             error = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + error;
-            Console.WriteLine(error);
-            Console.ForegroundColor = temp;
+            WriteLineToConsole(error, ConsoleColor.Red);
             WriteToFile(logID, error + Environment.NewLine);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error, Exception ex)
         {
-            var temp = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Red;
             error = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + error;
-            Console.WriteLine(error);
-            Console.ForegroundColor = temp;
+            WriteLineToConsole(error, ConsoleColor.Red);
             WriteToFile(logID, error + Environment.NewLine + ex.ToString() + Environment.NewLine);
         }
 
@@ -137,6 +125,17 @@ namespace CA_DataUploaderLib
             _nextSizeCheck.Add(LogID.F, DateTime.Now);
             _nextSizeCheck.Add(LogID.G, DateTime.Now);
             _nextSizeCheck.Add(LogID.H, DateTime.Now);
+        }
+
+        private static void WriteLineToConsole(string line, ConsoleColor color)
+        {
+            lock (Console.Out)
+            {
+                var temp = Console.ForegroundColor;
+                Console.ForegroundColor = color;
+                Console.WriteLine(line);
+                Console.ForegroundColor = temp;
+            }
         }
     }
 }
