@@ -202,10 +202,11 @@ namespace CA_DataUploaderLib
 
         private void OnCommandAccepted(string cmdString, bool addToCommandHistory)
         {
-            if (!addToCommandHistory || AcceptedCommands.LastOrDefault() == cmdString)
+            if (!addToCommandHistory)
                 return;
 
-            AcceptedCommands.Add(cmdString);
+            if (AcceptedCommands.LastOrDefault() != cmdString)
+                AcceptedCommands.Add(cmdString);
             AcceptedCommandsIndex = AcceptedCommands.Count;
         }
 
