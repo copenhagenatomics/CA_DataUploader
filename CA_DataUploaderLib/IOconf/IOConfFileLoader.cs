@@ -20,7 +20,6 @@ namespace CA_DataUploaderLib.IOconf
             ("AirFlow", (r, l) => new IOconfAirFlow(r, l)),
             ("Heater", (r, l) => new IOconfHeater(r, l)),
             ("Light", (r, l) => new IOconfLight(r, l)),
-            ("Motor", (r, l) => new IOconfMotor(r, l)),
             ("Oven", (r, l) => new IOconfOven(r, l)),
             ("Pressure", (r, l) => new IOconfPressure(r, l)),
             ("Geiger", (r, l) => new IOconfGeiger(r, l)),
