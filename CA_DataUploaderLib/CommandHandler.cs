@@ -295,10 +295,12 @@ namespace CA_DataUploaderLib
 
         private bool GetVersion(List<string> args)
         {
-            CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetSoftware() 
-                                            + Environment.NewLine 
-                                            + RpiVersion.GetHardware()
-                                            + string.Join(Environment.NewLine, _mapper.McuBoards.Select(x => x.ToString())));
+            var connInfo = IOconfFile.GetConnectionInfo();
+            CALog.LogInfoAndConsoleLn(LogID.A, 
+$@"{RpiVersion.GetSoftware()}
+{RpiVersion.GetHardware()}
+{connInfo.LoopName} - {connInfo.email}
+{string.Join(Environment.NewLine, _mapper.McuBoards.Select(x => x.ToString()))}");
             return true;
         }
 
