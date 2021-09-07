@@ -9,13 +9,11 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfOut230Vac(string row, int lineNum, string type, bool isSwitchboardControllerOutput = true) : base(row, lineNum, type, true, GetNewSwitchboardBoardSettings(row)) 
         {
             CurrentSensorName = Name + "_current";
-            SwitchboardOnOffSensorName = Name + "_SwitchboardOn/Off";
             BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
             IsSwitchboardControllerOutput = isSwitchboardControllerOutput;
         }
 
         public string CurrentSensorName { get; }
-        public string SwitchboardOnOffSensorName { get; }
         public string BoardStateSensorName { get; } 
         public bool HasOnSafeState { get; protected set; } = false;
         public bool IsSwitchboardControllerOutput { get; }
