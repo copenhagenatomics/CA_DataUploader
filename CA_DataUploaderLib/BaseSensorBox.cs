@@ -25,6 +25,7 @@ namespace CA_DataUploaderLib
         private readonly string commandHelp;
         private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
         private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamplesLookup = new Dictionary<MCUBoard, SensorSample[]>();
+        private string mainSubsystem;
 
         public BaseSensorBox(
             CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values)
@@ -37,8 +38,9 @@ namespace CA_DataUploaderLib
 
             if (cmd != null)
             {
-                commandHelp = $"{commandName.ToLower() + " " + commandArgsHelp,-26}- {commandDescription}";
-                cmd.AddCommand(commandName.ToLower(), ShowQueue);
+                mainSubsystem = commandName.ToLower();
+                commandHelp = $"{mainSubsystem + " " + commandArgsHelp,-26}- {commandDescription}";
+                SubscribeCommandsToSubsystems(cmd, mainSubsystem, _values);
                 cmd.AddCommand("help", HelpMenu);
                 cmd.AddCommand("escape", Stop);
                 cmd.AddSubsystem(this);
@@ -47,6 +49,17 @@ namespace CA_DataUploaderLib
             var boards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map.Board).Select(g => (board: g.Key, values: g.ToArray())).ToArray();
             _allBoardsState = new AllBoardsState(boards.Select(b => b.board));
             Task.Run(() => RunBoardReadLoops(boards));
+        }
+
+        private void SubscribeCommandsToSubsystems(CommandHandler cmd, string mainSubsystem, List<SensorSample> values)
+        {
+            cmd.AddCommand(mainSubsystem, ShowQueue);
+            var subsystemOverrides = values.Select(v => v.Input.SubsystemOverride).Where(v => v != default).Distinct();
+            foreach (var subsystem in subsystemOverrides)
+            {
+                if (subsystem == mainSubsystem) continue;
+                cmd.AddCommand(subsystem, ShowQueue);
+            }
         }
 
         public IEnumerable<SensorSample> GetInputValues() => _values
@@ -62,11 +75,22 @@ namespace CA_DataUploaderLib
 
         protected bool ShowQueue(List<string> args)
         {
-            var sb = new StringBuilder($"NAME      {GetAvgLoopTime(),4:N0}           ");
-            sb.AppendLine();
+            var subsystem = args[0].ToLower();
+            var isMainCommand = subsystem == mainSubsystem;
+            StringBuilder sb;
+            if (isMainCommand)
+            {
+                sb = new StringBuilder($"NAME      {GetAvgLoopTime(),4:N0}           ");
+                sb.AppendLine();
+            }
+            else
+                sb = new StringBuilder();
             foreach (var t in _values)
             {
-                sb.AppendLine($"{t.Input.Name,-22}={t.Value,9:N2}");
+                string subsystemOverride = t.Input.SubsystemOverride;
+                var matchesSubsystem = (isMainCommand && subsystemOverride == default) || subsystemOverride == subsystem;
+                if (matchesSubsystem)
+                    sb.AppendLine($"{t.Input.Name,-22}={t.Value,9:N2}");
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, sb.ToString());

@@ -43,6 +43,7 @@ namespace CA_DataUploaderLib.IOconf
         public bool Skip { get; set; }
         public IOconfMap Map { get; set; }
         protected bool HasPort { get; }
+        public string SubsystemOverride { get; set; }
 
         private void SetMap(string boxName, BoardSettings settings, bool skipBoardSettings)
         {
