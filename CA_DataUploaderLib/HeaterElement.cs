@@ -34,7 +34,7 @@ namespace CA_DataUploaderLib
 
         public SwitchboardAction MakeNextActionDecision(NewVectorReceivedArgs vector)
         {
-            if (!TryGetSwitchboardInputsFromVector(vector, out var current, out var switchboardOnOffState)) 
+            if (!TryGetSwitchboardInputsFromVector(vector, out var current)) 
                 return _lastAction; // not connected, we skip this heater and act again when the connection is re-established
             var (hasValidTemperature, temp) = GetOvenTemperatureFromVector(vector);
             // Careful consideration must be taken if changing the order of the below statements.
@@ -50,7 +50,7 @@ namespace CA_DataUploaderLib
                 // manual off re-enables temp control, so we only turn off if CanTurnOn above didn't decide to turn on
                 executeManualOff ? new SwitchboardAction(false, vectorTime) :
                 // keep off: retrigger if current is detected
-                MustResendOffCommand(temp, current, switchboardOnOffState, vectorTime) ? new SwitchboardAction(false, vectorTime) :
+                MustResendOffCommand(temp, current, vectorTime) ? new SwitchboardAction(false, vectorTime) :
                 // keep on: re-trigger early to avoid switching
                 _lastAction.IsOn && _lastAction.GetRemainingOnSeconds(vectorTime) < 2 ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) : 
                 _lastAction;
@@ -204,33 +204,31 @@ namespace CA_DataUploaderLib
         }
 
         // resends the off command every 5 seconds as long as there is current.
-        private bool MustResendOffCommand(double temp, double current, double switchboardOnOffState, DateTime vectorTime) 
+        private bool MustResendOffCommand(double temp, double current, DateTime vectorTime) 
         { 
             if (IsOn || vectorTime < LastOff.AddSeconds(5) || !CurrentIsOn(current)) return false;
-            LogRepeatCommand("off", temp, current, switchboardOnOffState);
+            LogRepeatCommand("off", temp, current);
             LastOff = vectorTime;
             return true;
         }
         private bool CurrentIsOn(double current) => current > _config.CurrentSensingNoiseTreshold;
         public string Name() => _config.Name;
-        private void LogRepeatCommand(string command, double  temp, double current, double switchboardOnOffState) => 
-            CALog.LogData(LogID.A, $"{command}.={Name()}-{temp:N0}, v#={current}, switch-on/off={switchboardOnOffState}{Environment.NewLine}");
+        private void LogRepeatCommand(string command, double  temp, double current) => 
+            CALog.LogData(LogID.A, $"{command}.={Name()}-{temp:N0}, v#={current}{Environment.NewLine}");
 
         private bool TryGetSwitchboardInputsFromVector(
-            NewVectorReceivedArgs vector, out double current, out double switchboardOnOffState)
+            NewVectorReceivedArgs vector, out double current)
         {
             if (!vector.TryGetValue(_config.SwitchBoardStateSensorName, out var state))
                 throw new InvalidOperationException($"missing heater's board connection state: {_config.SwitchBoardStateSensorName}");
             if (state != (int)BaseSensorBox.ConnectionState.ReceivingValues)
             {
-                current = switchboardOnOffState = 0;
+                current = 0;
                 return false;
             }
 
             if (!vector.TryGetValue(_config.CurrentSensorName, out current))
                 throw new InvalidOperationException($"missing heater current: {_config.CurrentSensorName}");
-            if (!vector.TryGetValue(_config.SwitchboardOnOffSensorName, out switchboardOnOffState))
-                throw new InvalidOperationException($"missing switchboard on/off state: {_config.SwitchboardOnOffSensorName}");
             return true;
         }
 
@@ -246,8 +244,7 @@ namespace CA_DataUploaderLib
                 CurrentSensingNoiseTreshold = heater.CurrentSensingNoiseTreshold,
                 Name = heater.Name,
                 SwitchBoardStateSensorName = heater.BoardStateSensorName,
-                CurrentSensorName = heater.CurrentSensorName,
-                SwitchboardOnOffSensorName = heater.SwitchboardOnOffSensorName
+                CurrentSensorName = heater.CurrentSensorName
             };
         }
 
@@ -272,7 +269,6 @@ namespace CA_DataUploaderLib
             public string Name { get; set; }
             public string SwitchBoardStateSensorName { get; set; }
             public string CurrentSensorName { get; set; }
-            public string SwitchboardOnOffSensorName { get; set; }
             public IReadOnlyCollection<string> TemperatureBoardStateSensorNames { get; set; }
         }
     }

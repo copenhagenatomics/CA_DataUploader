@@ -175,8 +175,7 @@ namespace UnitTests
                     CurrentSensorName = "heater_current",
                     MaxTemperature = 800,
                     Name = "heater",
-                    OvenSensor = "temp",
-                    SwitchboardOnOffSensorName = "heater_switchon"
+                    OvenSensor = "temp"
                 };
         }
     }
