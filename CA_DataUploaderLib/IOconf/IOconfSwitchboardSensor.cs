@@ -4,8 +4,6 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfSwitchboardSensor : IOconfInput
     {
-        private readonly string RmsName;
-        private readonly string MaxName;
         private readonly string Subsystem;
 
         public IOconfSwitchboardSensor(string row, int lineNum) : base(row, lineNum, "SwitchboardSensor", false, true, IOconfOut230Vac.GetNewSwitchboardBoardSettings(row))
