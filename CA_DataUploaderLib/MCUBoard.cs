@@ -16,7 +16,7 @@ namespace CA_DataUploaderLib
     /// Thread safety: reading and writing from 2 different threads is supported as long as only one thread reads and the other one writes.
     /// In addition to that, the Safe* methods must be used so that no operations run in parallel while trying to close/open the connection. 
     /// </remarks>
-    public class MCUBoard : SerialPort
+    public class MCUBoard
     {
         public string BoxName = null;
         public const string BoxNameHeader = "IOconf.Map BoxName: ";
@@ -59,28 +59,26 @@ namespace CA_DataUploaderLib
         private AsyncReaderWriterLock _reconnectionLock = new AsyncReaderWriterLock();
 
         public BoardSettings ConfigSettings { get; set; } = BoardSettings.Default;
+        public string PortName => port.PortName;
+        private SerialPort port;
 
         private MCUBoard(string name, int baudrate, bool skipBoardAutoDetection) 
         {
             try
             {
-                if(IsOpen)
-                {
-                    throw new Exception($"Something is wrong, port {name} is already open. You may need to reboot!");
-                }
-
-                BaudRate = 1;
-                DtrEnable = true;
-                RtsEnable = true;
-                BaudRate = baudrate;
-                PortName = name;
+                port = new SerialPort(name);
+                port.BaudRate = 1;
+                port.DtrEnable = true;
+                port.RtsEnable = true;
+                port.BaudRate = baudrate;
+                port.PortName = name;
                 productType = "NA";
                 PortOpenTimeStamp = DateTime.UtcNow;
-                ReadTimeout = 2000;
-                WriteTimeout = 2000;
+                port.ReadTimeout = 2000;
+                port.WriteTimeout = 2000;
                 // DataReceived += new SerialDataReceivedEventHandler(port_DataReceived);
 
-                Open();
+                port.Open();
                 Thread.Sleep(30); // it needs to await that the board registers that the COM port has been opened before sending commands (work arounds issue when first opening the connection and sending serial).
 
                 if (skipBoardAutoDetection)
@@ -96,7 +94,7 @@ namespace CA_DataUploaderLib
                         {
                             BoxName = ioconfMap.BoxName;
                             ConfigSettings = ioconfMap.BoardSettings;
-                            NewLine = ioconfMap.BoardSettings.ValuesEndOfLineChar;
+                            port.NewLine = ioconfMap.BoardSettings.ValuesEndOfLineChar;
                         }
                     }
                 }
@@ -108,7 +106,7 @@ namespace CA_DataUploaderLib
 
             if (!InitialConnectionSucceeded)
             {
-                Close();
+                port.Close();
                 Thread.Sleep(100);
             }
 
@@ -124,18 +122,17 @@ namespace CA_DataUploaderLib
                     pcbVersion.IsNullOrEmpty();  
         }
         
-        public async Task<string> SafeReadLine(CancellationToken token) => await RunEnsuringConnectionIsOpen("ReadLine", ReadLine, token) ?? string.Empty;
-        public Task<bool> SafeHasDataInReadBuffer(CancellationToken token) => RunEnsuringConnectionIsOpen("HasDataInReadBuffer", () => BytesToRead > 0, token);
-        public Task SafeWriteLine(string msg, CancellationToken token) => RunEnsuringConnectionIsOpen("WriteLine", () => WriteLine(msg), token);
-        public async Task<string> SafeReadExisting(CancellationToken token) => await RunEnsuringConnectionIsOpen("ReadExisting", ReadExisting, token) ?? string.Empty;
+        public async Task<string> SafeReadLine(CancellationToken token) => await RunEnsuringConnectionIsOpen("ReadLine", port.ReadLine, token) ?? string.Empty;
+        public Task<bool> SafeHasDataInReadBuffer(CancellationToken token) => RunEnsuringConnectionIsOpen("HasDataInReadBuffer", () => port.BytesToRead > 0, token);
+        public Task SafeWriteLine(string msg, CancellationToken token) => RunEnsuringConnectionIsOpen("WriteLine", () => port.WriteLine(msg), token);
 
         public async Task SafeClose(CancellationToken token)
         {
             await _reconnectionLock.AcquireWriterLock(token);
             try
             {
-                if (IsOpen)
-                    Close();                
+                if (port.IsOpen)
+                    port.Close();                
             }
             finally
             {
@@ -144,7 +141,7 @@ namespace CA_DataUploaderLib
         }
 
         public string ToDebugString(string seperator) => 
-            $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {BaudRate}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
+            $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {port.BaudRate}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
         public override string ToString() => $"{productTypeHeader}{productType,-20} {serialNumberHeader}{serialNumber,-12} Port name: {PortName}";
         public string ToShortDescription() => $"{BoxName} {productType} {serialNumber} {PortName}";
 
@@ -167,18 +164,18 @@ namespace CA_DataUploaderLib
             await _reconnectionLock.AcquireWriterLock(token);
             try
             {
-                if (IsOpen)
+                if (port.IsOpen)
                 {
                     CALog.LogData(LogID.B, $"(Reopen) Closing port {PortName} {productType} {serialNumber}");
-                    Close();
+                    port.Close();
                     await Task.Delay(500, token);
                 }
                 
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {productType} {serialNumber}");
-                Open();
+                port.Open();
                 await Task.Delay(500, token);
 
-                bytesToRead500ms = BytesToRead;
+                bytesToRead500ms = port.BytesToRead;
                 CALog.LogData(LogID.B, $"(Reopen) skipping {ConfigSettings.ExpectedHeaderLines} header lines for port {PortName} {productType} {serialNumber} ");
                 lines = SkipExtraHeaders(ConfigSettings.ExpectedHeaderLines);
             }
@@ -210,7 +207,7 @@ namespace CA_DataUploaderLib
                 mcu = OpenWithAutoDetection(name, initialBaudrate);
             if (mcu.serialNumber.IsNullOrEmpty())
                 mcu.serialNumber = "unknown" + Interlocked.Increment(ref _detectedUnknownBoards);
-            if (mcu.InitialConnectionSucceeded && map != null && map.BaudRate != 0 && mcu.BaudRate != map.BaudRate)
+            if (mcu.InitialConnectionSucceeded && map != null && map.BaudRate != 0 && mcu.port.BaudRate != map.BaudRate)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected baud rate for {map}. Board info {mcu}");
             if (mcu.ConfigSettings.ExpectedHeaderLines > 8)
                 mcu.SkipExtraHeaders(mcu.ConfigSettings.ExpectedHeaderLines - 8);
@@ -222,7 +219,7 @@ namespace CA_DataUploaderLib
             var lines = new List<string>(extraHeaderLinesToSkip);
             for (int i = 0; i < ConfigSettings.ExpectedHeaderLines; i++)
             {
-                var line = ReadLine().Trim();
+                var line = port.ReadLine().Trim();
                 lines.Add(line);
                 if (ConfigSettings.Parser.MatchesValuesFormat(line))
                     break; // we are past the header.
@@ -245,20 +242,20 @@ namespace CA_DataUploaderLib
         /// <returns><c>true</c> if we were able to read</returns>
         private bool ReadSerialNumber()
         {
-            WriteLine("Serial");
+            port.WriteLine("Serial");
             var stop = DateTime.Now.AddSeconds(5);
             bool sentSerialCommandTwice = false;
             bool ableToRead = false;
             while (IsEmpty() && DateTime.Now < stop)
             {
 
-                if (BytesToRead > 0)
+                if (port.BytesToRead > 0)
                 {
                     try
                     {
                         // we use the regular ReadLine to capture timeouts early 
                         // (also only 1 thread uses the board during instance initialization)
-                        var input = ReadLine();
+                        var input = port.ReadLine();
                         if (Debugger.IsAttached && input.Length > 0)
                         {
                             CALog.LogColor(LogID.A, ConsoleColor.Green, input);
@@ -291,19 +288,19 @@ namespace CA_DataUploaderLib
                             return true;
                         else if (input.Contains("MISREAD") && !sentSerialCommandTwice && serialNumber == null)
                         {
-                            WriteLine("Serial");
+                            port.WriteLine("Serial");
                             CALog.LogInfoAndConsoleLn(LogID.A, $"Received misread without any serial on port {PortName} - re-sending serial command");
                             sentSerialCommandTwice = true;
                         }
                     }
                     catch (TimeoutException ex)
                     {
-                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({BaudRate}): " + ex.Message);
+                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
                         break;
                     }
                     catch (Exception ex)
                     {
-                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({BaudRate}): " + ex.Message);
+                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
                     }
                 }
             }
