@@ -236,8 +236,8 @@ namespace CA_DataUploaderLib
         ///</remarks>
         private async Task<(bool, string)> TryReadLineWithStallDetection(MCUBoard board, int msBetweenReads, CancellationToken token)
         {
-            var readLineTask = board.SafeReadLine(token);
-            var noDataAvailableTask = Task.Delay(msBetweenReads, token); 
+            var readLineTask = ReadBoardLine(board, token);
+            var noDataAvailableTask = Task.Delay(msBetweenReads, token);
             if (await Task.WhenAny(readLineTask, noDataAvailableTask) == noDataAvailableTask)
             {
                 LogData(board, "no data available");
@@ -267,6 +267,8 @@ namespace CA_DataUploaderLib
                 return (true, default);
             }
         }
+
+        protected virtual Task<string> ReadBoardLine(MCUBoard board, CancellationToken token) => board.SafeReadLine(token);
 
         /// <returns>the list of doubles, otherwise <c>null</c></returns>
         protected virtual List<double> TryParseAsDoubleList(MCUBoard board, string line) => 
