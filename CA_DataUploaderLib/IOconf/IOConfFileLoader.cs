@@ -27,7 +27,6 @@ namespace CA_DataUploaderLib.IOconf
             ("Filter", (r, l) => new IOconfFilter(r, l)),
             ("RPiTemp", (r, l) => new IOconfRPiTemp(r, l)),
             ("VacuumPump", (r, l) => new IOconfVacuumPump(r, l)),
-            ("Oxygen", (r, l) => new IOconfOxygen(r, l)),
             ("GenericSensor", (r, l) => new IOconfGeneric(r, l))
         };
 
