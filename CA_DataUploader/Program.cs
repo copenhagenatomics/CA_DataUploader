@@ -3,6 +3,7 @@ using CA_DataUploaderLib.Helpers;
 using System;
 using System.Data;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace CA_DataUploader
 {
@@ -10,17 +11,22 @@ namespace CA_DataUploader
     {
         static void Main(string[] args)
         {
+            MainAsync(args).GetAwaiter().GetResult();
+        }
+
+        static async Task MainAsync(string[] args)
+        {
             try
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
                 Console.WriteLine("Initializing...");
-                using (var serial = new SerialNumberMapper())
+                using (var serial = await SerialNumberMapper.DetectDevices())
                 {
                     if (args.Length > 0 && args[0] == "-listdevices")
                         return; // SerialNumberMapper already lists devices, no need for further output.
 
                     // close all ports which are not Hub10
-                    serial.McuBoards.Where(x => !x.productType.Contains("Temperature")).ToList().ForEach(x => x.Close());
+                    serial.McuBoards.Where(x => !x.productType.Contains("Temperature")).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
 
                     var email = IOconfSetup.UpdateIOconf(serial);
 

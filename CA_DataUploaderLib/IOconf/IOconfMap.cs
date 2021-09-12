@@ -27,11 +27,13 @@ namespace CA_DataUploaderLib.IOconf
                 BaudRate = baudrate;
         }
 
+        public event EventHandler<EventArgs> OnBoardDetected;
         public bool SetMCUboard(MCUBoard board)
         {
             if ((board.serialNumber == SerialNumber && SerialNumber != null) || board.PortName == USBPort)
             {
                 Board = board;
+                OnBoardDetected?.Invoke(this, EventArgs.Empty);
                 return true;
             }
 
