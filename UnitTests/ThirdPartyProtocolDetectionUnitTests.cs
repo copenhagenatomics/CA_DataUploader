@@ -45,5 +45,27 @@ namespace UnitTests
             Assert.IsNotNull(detectedInfo);
             Assert.AreEqual("ze03", detectedInfo.ProductType);
         }
+        
+
+        [TestMethod]
+        public async Task CanReadLinedForDetectedZE03Sensor()
+        {
+            var dataBytes = Convert.FromHexString("FF8600D105010000A3FF8600D105010000A3FF8600D105010000A3");
+            using var ms = new MemoryStream(dataBytes);
+            var reader = PipeReader.Create(ms);
+            var detectedInfo = await MCUBoard.DetectThirdPartyProtocol(9600, "USB1-1.1", reader);
+            Assert.IsNotNull(detectedInfo);
+
+            var res = await reader.ReadAsync();
+            var buffer = res.Buffer;
+
+            for (int i = 0; i < 3; i++)
+            {
+                Assert.IsTrue(detectedInfo.LineParser(ref buffer, out var input));
+                Assert.AreEqual("20.9", input);
+            }
+
+            Assert.IsFalse(detectedInfo.LineParser(ref buffer, out var _));
+        }
     }
 }

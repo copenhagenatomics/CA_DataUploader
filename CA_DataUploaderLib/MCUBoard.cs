@@ -12,6 +12,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Buffers;
 using System.Text;
+using System.Globalization;
 
 namespace CA_DataUploaderLib
 {
@@ -567,8 +568,8 @@ namespace CA_DataUploaderLib
                 return false;
             if (checksum == receivedChecksum)
             {
-                var concentration = ((concentrationHighByte * 256) + concentrationLowByte) * 0.1;
-                line = concentration.ToString(); 
+                var concentration = Math.Round(((concentrationHighByte * 256) + concentrationLowByte) * 0.1, 2);
+                line = concentration.ToString(CultureInfo.InvariantCulture); 
                 return true;
             }
             
