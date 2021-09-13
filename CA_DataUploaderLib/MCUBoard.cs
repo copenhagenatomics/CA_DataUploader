@@ -7,12 +7,10 @@ using CA_DataUploaderLib.IOconf;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipelines;
-using System.Text.RegularExpressions;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Buffers;
 using System.Text;
-using System.Globalization;
 
 namespace CA_DataUploaderLib
 {
@@ -45,15 +43,8 @@ namespace CA_DataUploaderLib
 
         public string mcuFamily = null;
         public const string mcuFamilyHeader = "MCU Family: ";
-        private readonly Regex _startsWithNumberRegex = new Regex(@"^(-|\d+)");
         public bool InitialConnectionSucceeded {get; private set;} = false;
 
-        // "O 0213.1 T +21.0 P 1019 % 020.92 e 0000"
-        private static readonly Regex _luminoxRegex = new Regex(
-            "O (([0-9]*[.])?[0-9]+) T ([+-]?([0-9]*[.])?[0-9]+) P (([0-9]*[.])?[0-9]+) % (([0-9]*[.])?[0-9]+) e ([0-9]*)");
-        private static int _oxygenSensorsDetected;
-        private static readonly Regex _scaleRegex = new Regex("[+-](([0-9]*[.])?[0-9]+) kg"); // "+0000.00 kg"
-        private static int _detectedScaleBoards;
         private static int _detectedUnknownBoards;
         // the "writer" for this lock are operations that close/reopens the connection, while the readers are any other operation including SafeWriteLine.
         // This prevents operations being ran when the connections are being closed/reopened.
@@ -66,13 +57,7 @@ namespace CA_DataUploaderLib
         public delegate bool TryReadLineDelegate(ref ReadOnlySequence<byte> buffer, out string line);
         private TryReadLineDelegate TryReadLine;
         public delegate (bool finishedDetection, BoardInfo info) CustomProtocolDetectionDelegate(ReadOnlySequence<byte> buffer, string portName);
-        private static List<CustomProtocolDetectionDelegate> customProtocolDetectors = 
-            new List<CustomProtocolDetectionDelegate>()
-            {
-                TryDetectZE03Protocol,
-                TryDetectLuminoxProtocol,
-                TryDetectAscaleProtocol
-            };
+        private static List<CustomProtocolDetectionDelegate> customProtocolDetectors = new List<CustomProtocolDetectionDelegate>();
 
         private MCUBoard(SerialPort port) 
         {
@@ -347,10 +332,8 @@ namespace CA_DataUploaderLib
         private Task<BoardInfo> DetectThirdPartyProtocol() => 
             DetectThirdPartyProtocol(port.BaudRate, PortName, pipeReader);
 
-        public static void AddCustomProtocol(CustomProtocolDetectionDelegate detector)
-        {
-            customProtocolDetectors.Add(detector);
-        }
+        public static void AddCustomProtocol(CustomProtocolDetectionDelegate detector) => customProtocolDetectors.Add(detector ?? throw new ArgumentNullException(nameof(detector)));
+
         /// <summary>detects if we are talking with a supported third party device</summary>
         public static async Task<BoardInfo> DetectThirdPartyProtocol(
             int baudRate, string portName, PipeReader pipeReader)
@@ -381,47 +364,6 @@ namespace CA_DataUploaderLib
             }
 
             return default;
-        }
-
-        private static (bool finishedDetection, BoardInfo detectedInfo) TryDetectLuminoxProtocol(ReadOnlySequence<byte> buffer, string _)
-        {
-            var pos = buffer.PositionOf((byte)'\n');
-            if (pos == null) return (false, default);
-            if (buffer.FirstSpan[0] != (byte)'O')
-                return (true, default); //just a quick check to abort the string conversion if the first character does not match.
-            buffer = buffer.Slice(0, pos.Value);
-            return (true, DetectLuminoxSensor(EncodingExtensions.GetString(Encoding.ASCII, buffer)));
-        }
-
-        private static (bool finishedDetection, BoardInfo detectedInfo) TryDetectAscaleProtocol(ReadOnlySequence<byte> buffer, string _)
-        {
-            var pos = buffer.PositionOf((byte)'\n');
-            if (pos == null) return (false, default);
-            buffer = buffer.Slice(0, pos.Value);
-            if (buffer.PositionOf((byte)'k') == null)
-                return (true, default); //just a quick check to abort the string conversion if the k from kg is not present.
-            return (true, DetectAscale(EncodingExtensions.GetString(Encoding.ASCII, buffer)));
-        }
-
-        /// <summary>detects the ze03 by checking the first 2 bytes are 0xFF 0x86 and verifying the checksum matches</summary>
-        /// <returns>true if detection is finished, otherwise it means we need to receive more data to complete detection</returns>
-        private static (bool finishedDetection, BoardInfo detectedInfo) TryDetectZE03Protocol(ReadOnlySequence<byte> buffer, string portName)
-        {
-            if (buffer.Length < 9)
-                return (false, default); // waiting for enough data to detect a full valid frame.
-            if (TryReadZE03FrameAtCurrentPosition(buffer, out _, out var checksumFailure))
-            {
-                var info =  new BoardInfo("Oxygen" + Interlocked.Increment(ref _oxygenSensorsDetected), "ze03", TryReadLineZE03);
-                return (true, info);
-            }
-
-            if (checksumFailure)
-            {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Data received in port {portName} seems o2 (ze03) sensor but checksum did not match");
-                LogSkippedZE03Data(buffer);
-            }
-
-            return (true, default);
         }
 
         private async Task<string> ReadLine()
@@ -455,26 +397,8 @@ namespace CA_DataUploaderLib
             throw new TimeoutException("timed out (idle)");
         }
 
-        private static BoardInfo DetectLuminoxSensor(string line)
-        {
-            if (!_luminoxRegex.IsMatch(line)) return default;
-            return new BoardInfo(
-                "Oxygen" + Interlocked.Increment(ref _oxygenSensorsDetected),
-                "Luminox O2",
-                TryReadLineLuminox);
-        }
-
-        private static BoardInfo DetectAscale(string line)
-        {
-            if (!_scaleRegex.IsMatch(line)) return default;
-            return new BoardInfo(
-                "Scale" + Interlocked.Increment(ref _detectedScaleBoards),
-                "Scale",
-                TryReadLineScale);
-        }
-
         private bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, out string line) => TryReadAsciiLine(ref buffer, out line, ConfigSettings.ValuesEndOfLineChar);
-        private static bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, out string line, char endOfLineChar) 
+        public static bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, out string line, char endOfLineChar) 
         {
             // Look for a EOL in the buffer.
             SequencePosition? position = buffer.PositionOf((byte)endOfLineChar);
@@ -488,100 +412,6 @@ namespace CA_DataUploaderLib
             line = EncodingExtensions.GetString(Encoding.ASCII, buffer.Slice(0, position.Value));
             buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
             return true;
-        }
-
-        private static bool TryReadLineLuminox(ref ReadOnlySequence<byte> buffer, out string line) => TryReadAsciiLine(ref buffer, out line, '\n'); //just return the raw lines to keep current config based implementation for now
-        private static bool TryReadLineScale(ref ReadOnlySequence<byte> buffer, out string line) => TryReadAsciiLine(ref buffer, out line, '\n'); //just return the raw lines to keep current config based implementation for now
-        private static bool TryReadLineZE03(ref ReadOnlySequence<byte> buffer, out string line)
-        {
-            var origBuffer = buffer;
-            var isValid = TryReadNextValidZE03Frame(ref buffer, out line);
-            var skippedData = origBuffer.Slice(0, buffer.Start);
-            if (isValid)
-                skippedData = skippedData.Slice(0, skippedData.Length - 9);
-            if (skippedData.Length > 0)
-                LogSkippedZE03Data(skippedData);
-            return isValid;
-        }
-
-        private static void LogSkippedZE03Data(ReadOnlySequence<byte> skippedData)
-        {//could make sense to improve the performance of this in the future, like the byte[] allocation.
-            var sequence = new SequenceReader<byte>(skippedData);
-            var bytesReceived = new byte[skippedData.Length]; 
-            var bytesCopied = sequence.TryCopyTo(bytesReceived);
-            var bytesStr = bytesCopied ? Convert.ToHexString(bytesReceived) : "";
-            CALog.LogData(LogID.B, $"invalid data detected for o2 (ze03) sensor: {bytesStr}");
-        }
-
-        private static bool TryReadNextValidZE03Frame(ref ReadOnlySequence<byte> buffer, out string line)
-        {
-            line = default;
-            while (true)
-            {
-                var pos = buffer.PositionOf((byte)0xFF); //start of frame
-                if (pos == null)
-                {//no start frame found
-                    buffer = buffer.Length > 50 
-                        ? buffer.Slice(buffer.End) //skip to the end to avoid accumulating unprocessed data
-                        : buffer; //lets wait to have a bit more data before reporting the invalid data (so we get better log info about it)
-                    return false;
-                }
-
-                buffer = buffer.Slice(pos.Value); //skip to the detected start of frame
-                if (buffer.Length < 9)
-                    return false; //waiting for more data to complete a full frame
-
-                if (TryReadZE03FrameAtCurrentPosition(buffer, out line, out _))
-                {
-                    buffer = buffer.Slice(9); //skip the processed frame
-                    return true;
-                }
-                
-                pos = buffer.PositionOf((byte)0xFF) ?? buffer.End; //we skip to the end if we don't find a new start of frame
-            }
-        }
-
-        /// <returns>true if the frame was valid, otherwise false</returns>
-        /// <remarks>caller should validate there are at least 9 bytes, as this method also returns false if there are less than 9 bytes</remarks>
-        private static bool TryReadZE03FrameAtCurrentPosition(ReadOnlySequence<byte> buffer, out string line, out bool checksumFailure)
-        {
-            line = default;
-            checksumFailure = false;
-            var sequence = new SequenceReader<byte>(buffer);
-            if (!sequence.TryRead(out byte first))
-                return false;
-            if (first != 0xFF)
-                return false;
-            if (!sequence.TryPeek(out var second))
-                return false;
-            if (second != 0x86)
-                return false;
-            byte checksum = 0;
-            byte concentrationHighByte = 0, concentrationLowByte = 0;
-            for (int i = 0; i < 7; i++)
-            {
-                if (!sequence.TryRead(out var val))
-                    return false;
-                if (i == 1) //this is the third byte in the frame
-                    concentrationHighByte = val;
-                if (i == 2) //this is the fourth byte in the frame
-                    concentrationLowByte = val;
-                checksum += val;
-            }
-
-            checksum ^= 0xff; //uses xor to negate all bits
-            checksum += 1;
-            if (!sequence.TryRead(out var receivedChecksum))
-                return false;
-            if (checksum == receivedChecksum)
-            {
-                var concentration = Math.Round(((concentrationHighByte * 256) + concentrationLowByte) * 0.1, 2);
-                line = concentration.ToString(CultureInfo.InvariantCulture); 
-                return true;
-            }
-            
-            checksumFailure = true;
-            return false;
         }
 
         private async Task<TResult> RunEnsuringConnectionIsOpen<TResult>(string actionName, Func<TResult> action, CancellationToken token)
