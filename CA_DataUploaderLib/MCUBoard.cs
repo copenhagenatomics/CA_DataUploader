@@ -353,24 +353,25 @@ namespace CA_DataUploaderLib
                 TryDetectLuminoxProtocol,
                 TryDetectAscaleProtocol
             };
-            while (watch.ElapsedMilliseconds < 3000) //only allow up to 3 seconds to detect a third party device
+            foreach (var detector in thirdPartyDetectors)
             {
-                var result = await pipeReader.ReadAsync();
-                var buffer = result.Buffer;
-
-                foreach (var detector in thirdPartyDetectors.ToList())
+                while (watch.ElapsedMilliseconds < 3000) //only allow up to 3 seconds to detect a third party device
                 {
-                    var (finishedDetection, detectedInfo) = thirdPartyDetectors[0](buffer, portName);
-                    if (!finishedDetection)
-                        break; // waiting for more data to be able to do the detection
-                    if (detectedInfo != null)
-                        return detectedInfo; //confirmed it is a third party, leave pipeReader data not examined so next read processes data available right away
-                    thirdPartyDetectors.Remove(detector); //confirmed it is not this third party, avoid re-detecting this third party
-                }
+                    var result = await pipeReader.ReadAsync();
+                    var buffer = result.Buffer;
 
-                pipeReader.AdvanceTo(buffer.Start, buffer.End); // whole buffer was examined but not consumed = we don't throw any info + wait for more data to finish detection
-                if (result.IsCompleted)
-                    return default; //should only happen if the connection was closed
+                    var (finishedDetection, detectedInfo) = detector(buffer, portName);
+                    if (finishedDetection && detectedInfo != default)
+                        return detectedInfo; //confirmed it is a third party, leave pipeReader data not examined so next read processes data available right away
+                    if (finishedDetection && detectedInfo == default)
+                        break; //move to next third party. Note data is not set as examined in the pipeReader so ReadAsync returns inmediately with already read data.
+
+                    // set all data as examined as we need more data to finish detection
+                    pipeReader.AdvanceTo(buffer.Start, buffer.End);
+
+                    if (result.IsCompleted)
+                        return default; //should only happen if the connection was closed
+                }
             }
 
             return default;
