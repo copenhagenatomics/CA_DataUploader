@@ -23,7 +23,6 @@ namespace CA_DataUploaderLib.IOconf
             ("Oven", (r, l) => new IOconfOven(r, l)),
             ("Pressure", (r, l) => new IOconfPressure(r, l)),
             ("Geiger", (r, l) => new IOconfGeiger(r, l)),
-            ("Scale", (r, l) => new IOconfScale(r, l)),
             ("Filter", (r, l) => new IOconfFilter(r, l)),
             ("RPiTemp", (r, l) => new IOconfRPiTemp(r, l)),
             ("VacuumPump", (r, l) => new IOconfVacuumPump(r, l)),
