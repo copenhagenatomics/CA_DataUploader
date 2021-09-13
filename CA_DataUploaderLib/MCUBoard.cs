@@ -65,6 +65,14 @@ namespace CA_DataUploaderLib
         private PipeReader pipeReader;
         public delegate bool TryReadLineDelegate(ref ReadOnlySequence<byte> buffer, out string line);
         private TryReadLineDelegate TryReadLine;
+        public delegate (bool finishedDetection, BoardInfo info) CustomProtocolDetectionDelegate(ReadOnlySequence<byte> buffer, string portName);
+        private static List<CustomProtocolDetectionDelegate> customProtocolDetectors = 
+            new List<CustomProtocolDetectionDelegate>()
+            {
+                TryDetectZE03Protocol,
+                TryDetectLuminoxProtocol,
+                TryDetectAscaleProtocol
+            };
 
         private MCUBoard(SerialPort port) 
         {
@@ -339,6 +347,10 @@ namespace CA_DataUploaderLib
         private Task<BoardInfo> DetectThirdPartyProtocol() => 
             DetectThirdPartyProtocol(port.BaudRate, PortName, pipeReader);
 
+        public static void AddCustomProtocol(CustomProtocolDetectionDelegate detector)
+        {
+            customProtocolDetectors.Add(detector);
+        }
         /// <summary>detects if we are talking with a supported third party device</summary>
         public static async Task<BoardInfo> DetectThirdPartyProtocol(
             int baudRate, string portName, PipeReader pipeReader)
@@ -347,13 +359,7 @@ namespace CA_DataUploaderLib
                 return default; //all the third party devices currently supported are running at 9600<
 
             var watch = Stopwatch.StartNew();
-            var thirdPartyDetectors = new List<Func<ReadOnlySequence<byte>, string, (bool finishedDetection, BoardInfo)>>()
-            {
-                TryDetectZE03Protocol,
-                TryDetectLuminoxProtocol,
-                TryDetectAscaleProtocol
-            };
-            foreach (var detector in thirdPartyDetectors)
+            foreach (var detector in customProtocolDetectors)
             {
                 while (watch.ElapsedMilliseconds < 3000) //only allow up to 3 seconds to detect a third party device
                 {
