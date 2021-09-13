@@ -45,6 +45,7 @@
     </PackageReference>
     <PackageReference Include="System.IO.Ports" Version="5.0.0" />
     <PackageReference Include="CA.LoopControlPluginBase" Version="0.0.2" />
+    <PackageReference Include="System.IO.Pipelines" Version="5.0.1" />
   </ItemGroup>
 
   <ItemGroup>

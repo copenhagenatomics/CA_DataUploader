@@ -25,7 +25,7 @@ namespace CA_DataUploaderLib.IOconf
         /// <remarks>This config is general for the board, so caller must make sure to use a single instance x board</remarks>
         public IOconfInput GetBoardTemperatureInputConf() => NewPortInput(Map.BoxName + "_temperature", 5);
         public static BoardSettings GetNewSwitchboardBoardSettings(string row) => 
-            new BoardSettings() { Parser = new SwitchBoardResponseParser(!row.Contains("showConfirmations")), ValuesEndOfLineChar = "\r" };
+            new BoardSettings() { Parser = new SwitchBoardResponseParser(!row.Contains("showConfirmations")), ValuesEndOfLineChar = '\r' };
         private IOconfInput NewPortInput(string name, int portNumber) => new IOconfInput(Row, LineNumber, Type, false, false, null) 
             { Name = name, BoxName = BoxName, Map = Map, PortNumber = portNumber };
 

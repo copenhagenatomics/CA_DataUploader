@@ -11,36 +11,43 @@ namespace CA_DataUploaderLib
 {
     public sealed class SerialNumberMapper : IDisposable
     {
-        public readonly List<MCUBoard> McuBoards = new List<MCUBoard>();
-        private readonly CALogLevel _logLevel = CALogLevel.Normal;
+        public readonly List<MCUBoard> McuBoards;
 
-        public SerialNumberMapper()
+        private SerialNumberMapper(IEnumerable<MCUBoard> boards)
         {
-            if(File.Exists("IO.conf"))
-                _logLevel = IOconfFile.GetOutputLevel();
-
-            Parallel.ForEach(RpiVersion.GetUSBports(), name =>
-            {
-                try
-                {
-                    var mcu = MCUBoard.OpenDeviceConnection(name);
-                    McuBoards.Add(mcu);
-                    mcu.productType = mcu.productType ?? GetStringFromDmesg(mcu.PortName);
-                    string logline = _logLevel == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
-                    CALog.LogInfoAndConsoleLn(LogID.A, logline);
-                }
-                catch (UnauthorizedAccessException ex)
-                {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex.Message}" + Environment.NewLine);
-                }
-                catch (Exception ex)
-                {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex.ToString()}" + Environment.NewLine);
-                }
-            });
+            McuBoards = new List<MCUBoard>(boards);
         }
 
-        private string GetStringFromDmesg(string portName)
+        public async static Task<SerialNumberMapper> DetectDevices()
+        {
+            var logLevel = File.Exists("IO.conf") ? IOconfFile.GetOutputLevel() : CALogLevel.Normal;
+            var boards = await Task.WhenAll(RpiVersion.GetUSBports().Select(name => AttemptToOpenDeviceConnection(name, logLevel)));
+            return new SerialNumberMapper(boards);
+        }
+
+        private static async Task<MCUBoard> AttemptToOpenDeviceConnection(string name, CALogLevel logLevel)
+        {
+            try
+            {
+                var mcu = await MCUBoard.OpenDeviceConnection(name);
+                mcu.productType = mcu.productType ?? GetStringFromDmesg(mcu.PortName);
+                string logline = logLevel == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
+                CALog.LogInfoAndConsoleLn(LogID.A, logline);
+                return mcu;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex.Message}" + Environment.NewLine);
+            }
+            catch (Exception ex)
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex.ToString()}" + Environment.NewLine);
+            }
+
+            return default;
+        }
+
+        private static string GetStringFromDmesg(string portName)
         {
             if (portName.StartsWith("COM"))
                 return null;

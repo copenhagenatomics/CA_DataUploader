@@ -137,14 +137,11 @@ namespace CA_DataUploaderLib
 
         private async Task BoardLoop(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
         {
-            var msBetweenReads = board.ConfigSettings.MillisecondsBetweenReads;
-            var readThrottle = new TimeThrottle(msBetweenReads);
             while (!token.IsCancellationRequested)
             {
                 try
                 {
-                    await readThrottle.WaitAsync();
-                    var stillConnected = await SafeReadSensors(board, targetSamples, msBetweenReads, token);
+                    var stillConnected = await SafeReadSensors(board, targetSamples, token);
                     if (!stillConnected || CheckFails(board, targetSamples))
                         await ReconnectBoard(board, targetSamples, token);
                 }
@@ -166,11 +163,11 @@ namespace CA_DataUploaderLib
         }
 
         ///<returns><c>false</c> if a board disconnect was detected</returns>
-        private async Task<bool> SafeReadSensors(MCUBoard board, SensorSample[] targetSamples, int msBetweenReads, CancellationToken token)
+        private async Task<bool> SafeReadSensors(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
         { //we use this to prevent read exceptions from interfering with failure checks and reconnects
             try
             {
-                return await ReadSensors(board, targetSamples, msBetweenReads, token);
+                return await ReadSensors(board, targetSamples, token);
             }
             catch (TaskCanceledException ex)
             { 
@@ -189,14 +186,15 @@ namespace CA_DataUploaderLib
         }
 
         ///<returns><c>false</c> if a board disconnect was detected</returns>
-        private async Task<bool> ReadSensors(MCUBoard board, SensorSample[] targetSamples, int msBetweenReads, CancellationToken token)
+        private async Task<bool> ReadSensors(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
         {
-            bool receivedValues = false;
             var timeInLoop = Stopwatch.StartNew();
-            //We read all lines available, but only those we can start within msBetweenReads to avoid being stuck when data with errors is continuously returned by the board.
+            var timeSinceLastValidRead = Stopwatch.StartNew();
+            // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
+            var msBetweenReads = (int)Math.Ceiling(board.ConfigSettings.MillisecondsBetweenReads * 1.5); 
             //We set the state early if we detect no data is being returned or if we received values,
-            //but we only set ReturningNonValues until we have confirmed there is no valid data in the rest of available data read within msBetweenReads.
-            do
+            //but we only set ReturningNonValues if it has passed msBetweenReads since the last valid read
+            while (true) // we only stop reading if a disconnect or timeout is detected
             {
                 var (stillConnected, line) = await TryReadLineWithStallDetection(board, msBetweenReads, token);
                 if (!stillConnected)
@@ -209,22 +207,23 @@ namespace CA_DataUploaderLib
                     if (numbers != null)
                     {
                         ProcessLine(numbers, board, targetSamples);
-                        receivedValues = true;
+                        timeSinceLastValidRead.Restart();
                         _allBoardsState.SetState(board, ConnectionState.ReceivingValues);
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
+                    {
                         LogInfo(board, $"unexpected board response {line.Replace("\r", "\\r")}"); // we avoid \r as it makes the output hard to read
+                        if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
+                            _allBoardsState.SetState(board, ConnectionState.ReturningNonValues);
+                    }
                 }
                 catch (Exception ex)
-                { //usually a parsing errors on non value data, we log it and consider it as such i.e. we finish reading available data and set ReturningNonValues if we did not get valid values
+                { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in msBetweenReads
                     LogError(board, $"failed handling board response {line.Replace("\r", "\\r")}", ex); // we avoid \r as it makes the output hard to read
+                    if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
+                        _allBoardsState.SetState(board, ConnectionState.ReturningNonValues);
                 }
             }
-            while (await board.SafeHasDataInReadBuffer(token) && timeInLoop.ElapsedMilliseconds < msBetweenReads);
-
-            if (!receivedValues)
-                _allBoardsState.SetState(board, ConnectionState.ReturningNonValues);
-            return true; //still connected
         }
 
         ///<returns>(<c>false</c> if the board was explicitely detected as disconnected, the line, or null/default string if it exceeded the MCUBoard.ReadTimeout).</returns>

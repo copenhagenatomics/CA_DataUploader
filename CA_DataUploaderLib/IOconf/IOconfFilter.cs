@@ -35,7 +35,7 @@ namespace CA_DataUploaderLib.IOconf
                 sources.Remove("hidesource");
             }
 
-            // source validation happens later, as there is not a 1-1 relation of IOConfFile entries and values getting into the Vector i.e. oxygen has 3 values, heaters have current and state. 
+            // source validation happens later, as there is not a 1-1 relation of IOConfFile entries and values getting into the Vector i.e. some oxygen sensors have 3 values. 
             SourceNames = sources;
         }
     }
