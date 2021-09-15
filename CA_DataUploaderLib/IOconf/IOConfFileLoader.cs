@@ -21,7 +21,6 @@ namespace CA_DataUploaderLib.IOconf
             ("Heater", (r, l) => new IOconfHeater(r, l)),
             ("Light", (r, l) => new IOconfLight(r, l)),
             ("Oven", (r, l) => new IOconfOven(r, l)),
-            ("Pressure", (r, l) => new IOconfPressure(r, l)),
             ("Geiger", (r, l) => new IOconfGeiger(r, l)),
             ("Filter", (r, l) => new IOconfFilter(r, l)),
             ("RPiTemp", (r, l) => new IOconfRPiTemp(r, l)),
