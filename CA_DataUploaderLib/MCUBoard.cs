@@ -276,7 +276,7 @@ namespace CA_DataUploaderLib
                         if (Debugger.IsAttached && input.Length > 0)
                             CALog.LogColor(LogID.A, ConsoleColor.Green, input);
 
-                        ableToRead = input.Length >= 2;
+                        ableToRead |= input.Length >= 2;
                         if (input.Contains(MCUBoard.serialNumberHeader))
                             serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
                         else if (input.Contains(MCUBoard.boardFamilyHeader))
