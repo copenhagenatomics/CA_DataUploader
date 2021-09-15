@@ -271,7 +271,7 @@ namespace CA_DataUploaderLib
                     var res = await pipeReader.ReadAsync();
                     var buffer = res.Buffer;
 
-                    while (TryReadLine(ref buffer, out var input))
+                    while (IsEmpty() && TryReadLine(ref buffer, out var input))
                     {
                         if (Debugger.IsAttached && input.Length > 0)
                             CALog.LogColor(LogID.A, ConsoleColor.Green, input);
