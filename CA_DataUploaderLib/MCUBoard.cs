@@ -102,6 +102,7 @@ namespace CA_DataUploaderLib
                             board.BoxName = ioconfMap.BoxName;
                             board.ConfigSettings = ioconfMap.BoardSettings;
                             port.ReadTimeout = ioconfMap.BoardSettings.MaxMillisecondsWithoutNewValues;
+                            await board.UpdateCalibration(board.ConfigSettings);
                         }
                     }
                 }
@@ -119,6 +120,15 @@ namespace CA_DataUploaderLib
             }
 
             return board;
+        }
+
+        private Task UpdateCalibration(BoardSettings configSettings)
+        {
+            if (configSettings.Calibration == default || calibration == configSettings.Calibration)
+                return Task.CompletedTask; // ignore if there is no calibration in configuration or if the board already had the expected configuration
+
+            CALog.LogInfoAndConsoleLn(LogID.A, $"replacing old board calibration '{calibration}' with '{configSettings.Calibration}' - {ToShortDescription()}");
+            return SafeWriteLine(configSettings.Calibration, CancellationToken.None);
         }
 
         private bool IsEmpty()
@@ -343,7 +353,10 @@ namespace CA_DataUploaderLib
             if (!TryReadLine(ref localBuffer, out var input))
                 return false; //we did not get a line, more data is needed
             if (input.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase))
+            {
                 calibration = input.Substring(input.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length).Trim();
+                buffer = localBuffer; //avoids the calibration line being treated as data
+            }
             return true;
         }
 
