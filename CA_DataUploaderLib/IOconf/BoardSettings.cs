@@ -18,6 +18,18 @@ namespace CA_DataUploaderLib.IOconf
         public bool SkipBoardAutoDetection { get; set; } = false;
         public LineParser Parser { get; set; } = LineParser.Default;
         public char ValuesEndOfLineChar { get; set; } = '\n';
+        public string Calibration { get; set; }
+
+        ///<remarks>index is 0 based</remarks>
+        public void SetCalibrationAtIndex(string defaultCalibration, char value, int index)
+        {
+            var currCalibration = Calibration ?? defaultCalibration;
+            Calibration = string.Create(currCalibration.Length, currCalibration, (chars, currCalibration) => 
+            {
+                for (int i = 0; i < chars.Length; i++)
+                    chars[i] = (i == index) ? value : currCalibration[i];
+            });
+        }
 
         public class LineParser
         {

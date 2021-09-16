@@ -75,7 +75,6 @@ namespace CA_DataUploaderLib.IOconf
             Table.Where(x => x.GetType() == typeof(IOconfTypeK) || x.GetType() == typeof(IOconfSaltLeakage)).Cast<IOconfInput>();
 
         public static IOconfRPiTemp GetRPiTemp() => GetEntries<IOconfRPiTemp>().SingleOrDefault() ?? IOconfRPiTemp.Default;
-        public static IEnumerable<IOconfInput> GetPressure()=> GetEntries<IOconfPressure>();
         public static IEnumerable<IOconfInput> GetGeiger()=> GetEntries<IOconfGeiger>();
         public static IEnumerable<IOconfInput> GetAirFlow()=> GetEntries<IOconfAirFlow>();
         public static IEnumerable<IOconfHeater> GetHeater() => GetEntries<IOconfHeater>();

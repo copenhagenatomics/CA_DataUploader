@@ -45,6 +45,9 @@ namespace CA_DataUploaderLib
         public const string mcuFamilyHeader = "MCU Family: ";
         public bool InitialConnectionSucceeded {get; private set;} = false;
 
+        public const string CalibrationHeader = "Calibration: ";
+        private string calibration;
+
         private static int _detectedUnknownBoards;
         // the "writer" for this lock are operations that close/reopens the connection, while the readers are any other operation including SafeWriteLine.
         // This prevents operations being ran when the connections are being closed/reopened.
@@ -99,6 +102,7 @@ namespace CA_DataUploaderLib
                             board.BoxName = ioconfMap.BoxName;
                             board.ConfigSettings = ioconfMap.BoardSettings;
                             port.ReadTimeout = ioconfMap.BoardSettings.MaxMillisecondsWithoutNewValues;
+                            await board.UpdateCalibration(board.ConfigSettings);
                         }
                     }
                 }
@@ -116,6 +120,15 @@ namespace CA_DataUploaderLib
             }
 
             return board;
+        }
+
+        private Task UpdateCalibration(BoardSettings configSettings)
+        {
+            if (configSettings.Calibration == default || calibration == configSettings.Calibration)
+                return Task.CompletedTask; // ignore if there is no calibration in configuration or if the board already had the expected configuration
+
+            CALog.LogInfoAndConsoleLn(LogID.A, $"replacing old board calibration '{calibration}' with '{configSettings.Calibration}' - {ToShortDescription()}");
+            return SafeWriteLine(configSettings.Calibration, CancellationToken.None);
         }
 
         private bool IsEmpty()
@@ -147,7 +160,7 @@ namespace CA_DataUploaderLib
         }
 
         public string ToDebugString(string seperator) => 
-            $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {port.BaudRate}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}";
+            $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {port.BaudRate}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}{CalibrationHeader}{calibration}{seperator}";
         public override string ToString() => $"{productTypeHeader}{productType,-20} {serialNumberHeader}{serialNumber,-12} Port name: {PortName}";
         public string ToShortDescription() => $"{BoxName} {productType} {serialNumber} {PortName}";
 
@@ -263,7 +276,8 @@ namespace CA_DataUploaderLib
             var stop = DateTime.Now.AddSeconds(5);
             bool sentSerialCommandTwice = false;
             bool ableToRead = false;
-            while (IsEmpty() && DateTime.Now < stop)
+            var finishedReadingHeader = false;
+            while (!finishedReadingHeader && DateTime.Now < stop)
             {
                 try
                 {
@@ -271,12 +285,12 @@ namespace CA_DataUploaderLib
                     var res = await pipeReader.ReadAsync();
                     var buffer = res.Buffer;
 
-                    while (TryReadLine(ref buffer, out var input))
+                    while (IsEmpty() && TryReadLine(ref buffer, out var input))
                     {
                         if (Debugger.IsAttached && input.Length > 0)
                             CALog.LogColor(LogID.A, ConsoleColor.Green, input);
 
-                        ableToRead = input.Length >= 2;
+                        ableToRead |= input.Length >= 2;
                         if (input.Contains(MCUBoard.serialNumberHeader))
                             serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
                         else if (input.Contains(MCUBoard.boardFamilyHeader))
@@ -285,8 +299,8 @@ namespace CA_DataUploaderLib
                             productType = input.Substring(input.IndexOf(MCUBoard.productTypeHeader) + MCUBoard.productTypeHeader.Length).Trim();
                         else if (input.Contains(MCUBoard.boardVersionHeader))
                             pcbVersion = input.Substring(input.IndexOf(MCUBoard.boardVersionHeader) + MCUBoard.boardVersionHeader.Length).Trim();
-                        else if (input.Contains(MCUBoard.pcbVersionHeader))
-                            pcbVersion = input.Substring(input.IndexOf(MCUBoard.pcbVersionHeader) + MCUBoard.pcbVersionHeader.Length).Trim();
+                        else if (input.Contains(MCUBoard.pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase))
+                            pcbVersion = input.Substring(input.IndexOf(MCUBoard.pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase) + MCUBoard.pcbVersionHeader.Length).Trim();
                         else if (input.Contains(MCUBoard.boardSoftwareHeader))
                             softwareCompileDate = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
                         else if (input.Contains(MCUBoard.softwareCompileDateHeader))
@@ -304,6 +318,9 @@ namespace CA_DataUploaderLib
                             sentSerialCommandTwice = true;
                         }
                     }
+
+                    if (!IsEmpty() && TryReadOptionalCalibration(ref buffer, out calibration))
+                        finishedReadingHeader = true;
 
                     // Tell the PipeReader how much of the buffer has been consumed.
                     pipeReader.AdvanceTo(buffer.Start, buffer.End);
@@ -326,6 +343,21 @@ namespace CA_DataUploaderLib
             }
 
             return ableToRead;
+        }
+
+        ///<returns>true if it finished attempting to read the optional calibration, or false if more data is needed</returns>
+        private bool TryReadOptionalCalibration(ref ReadOnlySequence<byte> buffer, out string calibration)
+        {
+            calibration = default;
+            var localBuffer = buffer; // take a copy to avoid unnecesarily throwing away data coming after the header
+            if (!TryReadLine(ref localBuffer, out var input))
+                return false; //we did not get a line, more data is needed
+            if (input.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase))
+            {
+                calibration = input.Substring(input.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length).Trim();
+                buffer = localBuffer; //avoids the calibration line being treated as data
+            }
+            return true;
         }
 
         /// <summary>detects if we are talking with a supported third party device</summary>
