@@ -51,7 +51,10 @@ namespace CA_DataUploaderLib.IOconf
             Map = maps.SingleOrDefault(x => x.BoxName == boxName);
             if (Map == null) 
                 throw new Exception($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
-            if (!skipBoardSettings)
+
+            // Map.BoardSettings == BoardSettings.Default is there since some boards need separate board settings, but have multiple sensor entries. 
+            // This check means a new BoardSettings instance will be created with first entry of board, but not updated (i.e. shared) among the rest of the board entries.    
+            if (!skipBoardSettings && Map.BoardSettings == BoardSettings.Default)
                 Map.BoardSettings = settings;
         }
     }
