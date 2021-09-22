@@ -398,9 +398,13 @@ namespace CA_DataUploaderLib
             return default;
         }
 
-        private async Task<string> ReadLine()
+        private Task<string> ReadLine() => 
+            ReadLine(pipeReader, PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine);
+        //exposing this one for testing purposes
+        public static async Task<string> ReadLine(
+            PipeReader pipeReader, string portName, int millisecondsTimeout, TryReadLineDelegate tryReadLine)
         {
-            using var cts = new CancellationTokenSource(ConfigSettings.MaxMillisecondsWithoutNewValues);
+            using var cts = new CancellationTokenSource(millisecondsTimeout);
             var token = cts.Token;
             try
             {
@@ -410,13 +414,17 @@ namespace CA_DataUploaderLib
                     if (res.IsCanceled)
                         throw new TimeoutException("timed out (soft)");
                     var buffer = res.Buffer;
-                    var readLine = TryReadLine(ref buffer, out var line);
-                    pipeReader.AdvanceTo(buffer.Start, buffer.End); // Tell the PipeReader how much of the buffer has been consumed.
+                    var readLine = tryReadLine(ref buffer, out var line);
+                    //if we don't have a full line we set the whole buffer  as examined so the next ReadAsync call waits for more data.
+                    //if we instead got a full line we avoid setting any data of the next line as examined,
+                    //as otherwise the next call to ReadLine will wait for yet more data to arrive causing a memory leak (buffer keeps growing) 
+                    var examinedPos = readLine ? buffer.Start : buffer.End;
+                    pipeReader.AdvanceTo(buffer.Start, examinedPos);  
                     if (readLine)
                         return line; //we return a single line for now to keep a similar API before introducing the pipe reader, but would be fine to explore changing the API shape in the future
 
                     if (res.IsCompleted)
-                        throw new ObjectDisposedException(PortName, "closed connection detected");
+                        throw new ObjectDisposedException(portName, "closed connection detected");
                 }
             }
             catch (OperationCanceledException ex)
