@@ -414,17 +414,35 @@ namespace CA_DataUploaderLib
                     if (res.IsCanceled)
                         throw new TimeoutException("timed out (soft)");
                     var buffer = res.Buffer;
-                    var readLine = tryReadLine(ref buffer, out var line);
-                    //if we don't have a full line we set the whole buffer  as examined so the next ReadAsync call waits for more data.
-                    //if we instead got a full line we avoid setting any data of the next line as examined,
-                    //as otherwise the next call to ReadLine will wait for yet more data to arrive causing a memory leak (buffer keeps growing) 
-                    var examinedPos = readLine ? buffer.Start : buffer.End;
-                    pipeReader.AdvanceTo(buffer.Start, examinedPos);  
-                    if (readLine)
-                        return line; //we return a single line for now to keep a similar API before introducing the pipe reader, but would be fine to explore changing the API shape in the future
 
-                    if (res.IsCompleted)
-                        throw new ObjectDisposedException(portName, "closed connection detected");
+                    //In the event that no message is parsed successfully, mark consumed as nothing and examined as the entire buffer. 
+                    //This means the next call to ReadAsync will wait for more data to arrive.
+                    //Note this still means the buffer keeps growing as we get more data until we get a message we can process,
+                    //but normally a timeout would be hit and board reconnection would be initiated by the caller.
+                    var consumed = buffer.Start;
+                    var examined = buffer.End;
+
+                    try
+                    {
+                        var readLine = tryReadLine(ref buffer, out var line);
+                        consumed = buffer.Start; //we update consumed regardless of reading a line, as TryReadLineDelegate can decide to skip broken data / frames.
+                        if (readLine)
+                        {
+                            //after reading a line, the call to tryReadLine above updates the buffer reference to start at the next line
+                            //by pointing examined to it, we are signaling we can inmediately use the data in the buffer 
+                            //so the first ReadAsync in the next ReadLine call does not wait for more data but returns inmediately.
+                            //not doing this would be a memory leak if we already had a full line in the buffer (as we keep waiting for an extra line and over time the buffer keeps accumulating extra lines).
+                            examined = buffer.Start;
+                            return line; //we return a single line for now to keep a similar API before introducing the pipe reader, but would be fine to explore changing the API shape in the future
+                        }
+
+                        if (res.IsCompleted)
+                            throw new ObjectDisposedException(portName, "closed connection detected");
+                    }
+                    finally
+                    {
+                        pipeReader.AdvanceTo(consumed, examined);  
+                    }
                 }
             }
             catch (OperationCanceledException ex)
