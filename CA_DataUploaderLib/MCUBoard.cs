@@ -391,7 +391,7 @@ namespace CA_DataUploaderLib
 
             // A cancellation token is made here rather than a simple timer since the ReadAsync function can hang
             // if a device never sends a line for it to read.
-            int millisecondsTimeout = 5000;
+            int millisecondsTimeout = 3000;
             using var cts = new CancellationTokenSource(millisecondsTimeout);
             var token = cts.Token;
             foreach (var detector in customProtocolDetectors)
@@ -418,7 +418,10 @@ namespace CA_DataUploaderLib
                     } 
                     catch (OperationCanceledException ex)
                     {
-                        break;
+                        if (ex.CancellationToken == token)
+                            break;
+                        else
+                            throw;
                     }
                 }
             }
