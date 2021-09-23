@@ -65,6 +65,19 @@ namespace UnitTests
             Assert.AreEqual("4", await ReadLine(reader));
         }
 
+        [TestMethod]
+        public async Task ProcessingEmptyLineDoesNotStallInitialization()
+        {//this test reproduces a similar situation as Processes2AvailableLinesWithoutWaitingForMoreData,
+         //but confirms the buffer permanently needs to get the extra line to do a read
+         //which means we are getting stale data + have leaked memory for 1 line
+            var pipe = new Pipe();
+            var (reader, writer) = (pipe.Reader, pipe.Writer);
+            MCUBoard.AddCustomProtocol((buffer, portName) => default);
+            var detectTask = MCUBoard.DetectThirdPartyProtocol(9600, "abc", reader);
+            Assert.AreEqual(detectTask, await Task.WhenAny(detectTask, Task.Delay(4000)));
+            await detectTask;
+        }
+
         private static Task<string> ReadLine(PipeReader reader) => MCUBoard.ReadLine(reader, "abc", 5, TryReadLine);
         private static ValueTask<FlushResult> Write(PipeWriter writer, string data) => Write(writer, Encoding.ASCII.GetBytes(data));
         private static ValueTask<FlushResult> Write(PipeWriter writer, byte[] bytes)

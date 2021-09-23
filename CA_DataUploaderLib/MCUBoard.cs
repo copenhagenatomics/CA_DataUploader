@@ -273,16 +273,27 @@ namespace CA_DataUploaderLib
             }
 
             port.WriteLine("Serial");
-            var stop = DateTime.Now.AddSeconds(5);
             bool sentSerialCommandTwice = false;
             bool ableToRead = false;
             var finishedReadingHeader = false;
-            while (!finishedReadingHeader && DateTime.Now < stop)
+
+            // A cancellation token is made here rather than a simple timer since the ReadAsync function can hang
+            // if a device never sends a line for it to read.
+            int millisecondsTimeout = 3000;
+            using var cts = new CancellationTokenSource(millisecondsTimeout);
+            var token = cts.Token;
+
+            while (!finishedReadingHeader && !token.IsCancellationRequested)
             {
                 try
                 {
                     // we use the regular reads as only 1 thread uses the board during instance initialization
-                    var res = await pipeReader.ReadAsync();
+                    var res = await pipeReader.ReadAsync(token);
+
+                    if (res.IsCanceled){
+                        return ableToRead;
+                    }
+
                     var buffer = res.Buffer;
 
                     while (IsEmpty() && TryReadLine(ref buffer, out var input))
@@ -336,6 +347,11 @@ namespace CA_DataUploaderLib
                     CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
                     break;
                 }
+                catch (OperationCanceledException ex)
+                {
+                    CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
+                    break;
+                }
                 catch (Exception ex)
                 {
                     CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
@@ -373,28 +389,43 @@ namespace CA_DataUploaderLib
             if (baudRate != 9600) 
                 return default; //all the third party devices currently supported are running at 9600<
 
-            var watch = Stopwatch.StartNew();
+            // A cancellation token is made here rather than a simple timer since the ReadAsync function can hang
+            // if a device never sends a line for it to read.
+            int millisecondsTimeout = 3000;
+            using var cts = new CancellationTokenSource(millisecondsTimeout);
+            var token = cts.Token;
             foreach (var detector in customProtocolDetectors)
             {
-                while (watch.ElapsedMilliseconds < 3000) //only allow up to 3 seconds to detect a third party device
+                while (!token.IsCancellationRequested) //only allow up to 3 seconds to detect a third party device
                 {
-                    var result = await pipeReader.ReadAsync();
-                    var buffer = result.Buffer;
+                    try 
+                    { 
+                        var result = await pipeReader.ReadAsync(token); 
+                    
+                        var buffer = result.Buffer;
 
-                    var (finishedDetection, detectedInfo) = detector(buffer, portName);
-                    if (finishedDetection && detectedInfo != default)
-                        return detectedInfo; //confirmed it is a third party, leave pipeReader data not examined so next read processes data available right away
-                    if (finishedDetection && detectedInfo == default)
-                        break; //move to next third party. Note data is not set as examined in the pipeReader so ReadAsync returns inmediately with already read data.
+                        var (finishedDetection, detectedInfo) = detector(buffer, portName);
+                        if (finishedDetection && detectedInfo != default)
+                            return detectedInfo; //confirmed it is a third party, leave pipeReader data not examined so next read processes data available right away
+                        if (finishedDetection && detectedInfo == default)
+                            break; //move to next third party. Note data is not set as examined in the pipeReader so ReadAsync returns inmediately with already read data.
 
-                    // set all data as examined as we need more data to finish detection
-                    pipeReader.AdvanceTo(buffer.Start, buffer.End);
+                        // set all data as examined as we need more data to finish detection
+                        pipeReader.AdvanceTo(buffer.Start, buffer.End);
 
-                    if (result.IsCompleted)
-                        return default; //should only happen if the connection was closed
+                        if (result.IsCompleted)
+                            return default; //should only happen if the connection was closed
+                    } 
+                    catch (OperationCanceledException ex)
+                    {
+                        if (ex.CancellationToken == token)
+                        {
+                            CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {portName} ({baudRate}): " + ex.Message);
+                            break;
+                        }
+                    }
                 }
             }
-
             return default;
         }
 
