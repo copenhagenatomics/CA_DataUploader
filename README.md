@@ -15,11 +15,11 @@ ____
 
 ## How to run this datalogger from RaspberryPi (Linux):
 
-This software runs on .Net 5 and you do not need Mono any more. 
+This software runs on .Net 6 and you do not need Mono any more. 
 
 You can download the latest release files here.
 
-Or build the source code with the .net 5 sdk installed:
+Or build the source code with the .net 6 sdk installed (note to build from VS you need to upgrade to 2022):
 * on a command line in the repository folder, run (replacing linux-arm with your target platform): 
   * dotnet publish CA_DataUploader -c Release -p:PublishSingleFile=true --runtime linux-arm --self-contained
   * other options for target are: linux-x64, osx-x64, win-arm, win-x64, win-x86
