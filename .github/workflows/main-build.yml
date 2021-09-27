@@ -17,7 +17,7 @@ jobs:
       with:
         fetch-depth: 0
     - name: Setup .NET
-      uses: actions/setup-dotnet@v1
+      uses: actions/setup-dotnet@v1.8.2
       with:
         dotnet-version: 6.0.x
     - name: Restore dependencies
@@ -44,7 +44,7 @@ jobs:
       with:
         fetch-depth: 0
     - name: Setup .NET
-      uses: actions/setup-dotnet@v1
+      uses: actions/setup-dotnet@v1.8.2
       with:
         dotnet-version: 6.0.x
     - name: Generate DataUploader - linux-x64
