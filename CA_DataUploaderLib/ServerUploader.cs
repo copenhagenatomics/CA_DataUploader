@@ -368,7 +368,7 @@ namespace CA_DataUploaderLib
 
             public byte[] GetPublicKey() => _rsaWriter.ExportCspBlob(false);
 
-            public byte[] GetSignature(byte[] data) => _rsaWriter.SignData(data, new SHA1CryptoServiceProvider());
+            public byte[] GetSignature(byte[] data) => _rsaWriter.SignData(data, SHA1.Create());
         }
     }
 }
