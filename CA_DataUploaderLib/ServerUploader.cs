@@ -8,7 +8,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
@@ -20,7 +19,7 @@ namespace CA_DataUploaderLib
         private readonly PlotConnection _plot;
         private readonly Signing _signing;
         private readonly Queue<DataVector> _queue = new Queue<DataVector>();
-        private readonly Queue<string> _alertQueue = new Queue<string>();
+        private readonly Queue<EventFiredArgs> _eventsQueue = new Queue<EventFiredArgs>();
         private readonly List<DateTime> _badPackages = new List<DateTime>();
         private DateTime _lastTimestamp;
         private bool _running;
@@ -47,7 +46,7 @@ namespace CA_DataUploaderLib
                 _cmd = cmd;
                 cmd?.AddCommand("escape", Stop);
                 if (cmd != null)
-                    cmd.AlertFired += SendAlert;
+                    cmd.EventFired += SendEvent;
             }
             catch (Exception ex)
             {
@@ -56,12 +55,11 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private void SendAlert(object sender, AlertFiredArgs e) => SendAlert(e.Message);
-        internal void SendAlert(string message)
+        private void SendEvent(object sender, EventFiredArgs e)
         {
-            lock (_alertQueue)
-                if (_alertQueue.Count < 10000)  // if sending thread can't catch up, then drop packages.
-                    _alertQueue.Enqueue(message);
+            lock (_eventsQueue)
+                if (_eventsQueue.Count < 10000)  // if sending thread can't catch up, then drop packages.
+                    _eventsQueue.Enqueue(e);
         }
 
         public void SendVector(List<double> vector, DateTime timestamp)
@@ -103,11 +101,11 @@ namespace CA_DataUploaderLib
                     if (list != null)
                         PostVectorAsync(GetSignedVectors(list), list.First().timestamp);
 
-                    var alerts = DequeueAllEntries(_alertQueue);
-                    if (alerts != null)
+                    var events = DequeueAllEntries(_eventsQueue);
+                    if (events != null)
                     {
-                        foreach (var alert in alerts)
-                            PostAlertAsync(alert);
+                        foreach (var @event in events)
+                            PostEventAsync(@event);
                     }
 
                     PrintBadPackagesMessage(false);
@@ -164,10 +162,10 @@ namespace CA_DataUploaderLib
             return SignAndCompress(listLen.Concat(theData).ToArray());
         }
 
-        private byte[] SignedMessage(string message)
-        {
-            var buffer = Encoding.UTF8.GetBytes(message);
-            return _signing.GetSignature(buffer).Concat(buffer).ToArray();
+        private byte[] GetSignedEvent(EventFiredArgs @event)
+        { //this can be made more efficient to avoid extra allocations and/or use a memory pool, but these are for low frequency events so postponing looking at that.
+            var bytes = @event.ToByteArray();
+            return _signing.GetSignature(bytes).Concat(bytes).ToArray(); 
         }
 
         private static void OnError(string message, Exception ex) => CALog.LogErrorAndConsoleLn(LogID.A, message, ex);
@@ -188,11 +186,11 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private async void PostAlertAsync(string message)
+        private async void PostEventAsync(EventFiredArgs args)
         {
             try
             {
-                await _plot.PostAlertAsync(SignedMessage(message));
+                await _plot.PostEventAsync(GetSignedEvent(args));
             }
             catch (Exception ex)
             {
@@ -200,7 +198,8 @@ namespace CA_DataUploaderLib
                 {
                     _badPackages.Add(DateTime.UtcNow);
                 }
-                OnError("failed posting alert: " + message, ex);
+
+                OnError($"failed posting event: {args.EventType} - {args.Data} - {args.TimeSpan}", ex);
             }
         }
 
@@ -252,9 +251,9 @@ namespace CA_DataUploaderLib
                 response.EnsureSuccessStatusCode();
             }
 
-            public async Task PostAlertAsync(byte[] signedMessage)
+            public async Task PostEventAsync(byte[] signedMessage)
             {
-                string query = $"api/LoopApi/AlertMessage?plotnameID={_plotID}";
+                string query = $"api/LoopApi/LogEvent?plotnameID={_plotID}";
                 var response = await _client.PutAsJsonAsync(query, signedMessage);
                 response.EnsureSuccessStatusCode();
             }

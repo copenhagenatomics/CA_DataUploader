@@ -25,7 +25,7 @@ namespace CA_DataUploaderLib
         private Lazy<VectorFilterAndMath> _fullsystemFilterAndMath;
 
         public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
-        public event EventHandler<AlertFiredArgs> AlertFired;
+        public event EventHandler<EventFiredArgs> EventFired;
         public bool IsRunning { get { return _running; } }
 
         public CommandHandler(SerialNumberMapper mapper = null)
@@ -99,11 +99,12 @@ namespace CA_DataUploaderLib
 
         public void OnNewVectorReceived(IEnumerable<SensorSample> vector) =>
             NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector.ToDictionary(v => v.Name, v => v.Value)));
-        
-        public void FireAlert(string msg)
-        {
-            AlertFired?.Invoke(this, new AlertFiredArgs(msg));
-        }
+
+        public void FireAlert(string msg) => FireAlert(msg, DateTime.UtcNow);
+        public void FireAlert(string msg, DateTime timespan) => FireCustomEvent(msg, timespan, (byte)EventType.Alert);
+        /// <summary>registers a custom event (low frequency, such like user commands and alerts that have a max firing rate)</summary>
+        /// <remarks>preferably use values above 100 for eventType to avoid future collisions with built in event types</remarks>
+        public void FireCustomEvent(string msg, DateTime timespan, byte eventType) => EventFired?.Invoke(this, new EventFiredArgs(msg, eventType, timespan));
         private bool Stop(List<string> args)
         {
             _running = false;
@@ -208,6 +209,7 @@ namespace CA_DataUploaderLib
             if (AcceptedCommands.LastOrDefault() != cmdString)
                 AcceptedCommands.Add(cmdString);
             AcceptedCommandsIndex = AcceptedCommands.Count;
+            EventFired?.Invoke(this, new EventFiredArgs(cmdString, EventType.Command, DateTime.UtcNow));
         }
 
         private string GetCommand()

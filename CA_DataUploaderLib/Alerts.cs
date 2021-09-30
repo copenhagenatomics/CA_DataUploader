@@ -72,7 +72,7 @@ namespace CA_DataUploaderLib
 
         public override void OnNewVectorReceived(object sender, NewVectorReceivedArgs e)
         {
-            var timestamp = e.GetVectorTime().ToString("yyyy.MM.dd HH:mm:ss");
+            var timestamp = e.GetVectorTime();
             var (alertsToTrigger, noSensorAlerts) = GetAlertsToTrigger(e); // we gather alerts separately from triggering, to reduce time locking the _alerts list
             
             foreach (var a in alertsToTrigger ?? Enumerable.Empty<IOconfAlert>())
@@ -104,17 +104,16 @@ namespace CA_DataUploaderLib
                 noSensorAlerts ?? Enumerable.Empty<IOconfAlert>());
         }
 
-        private void TriggerAlert(IOconfAlert a, string timestamp, string message)
+        private void TriggerAlert(IOconfAlert a, DateTime timestamp, string message)
         {
-            message = timestamp + message;
-            logger.LogError(message);
+            logger.LogError(timestamp.ToString("yyyy.MM.dd HH:mm:ss") + message);
             if (a.Command != default)
             {
                 foreach (var commands in a.Command.Split('|'))
-                    ExecuteCommand(a.Command);
+                    ExecuteCommand(commands);
             }
 
-            _cmd.FireAlert(message);            
+            _cmd.FireAlert(message, timestamp);            
         }
 
         private List<T> EnsureInitialized<T>(ref List<T> list) => list = list ?? new List<T>();
