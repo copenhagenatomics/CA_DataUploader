@@ -169,14 +169,18 @@ namespace CA_DataUploaderLib
         private List<bool> RunCommandFunctions(string cmdString, bool addToCommandHistory, List<string> cmd, List<Func<List<string>, bool>> commandFunctions)
         {
             List<bool> executionResults = new List<bool>(commandFunctions.Count);
+            var isFirstAccepted = true;
             foreach (var func in commandFunctions)
             {
                 try
                 {
                     bool accepted;
                     executionResults.Add(accepted = func.Invoke(cmd));
-                    if (accepted)
+                    if (accepted && isFirstAccepted)
+                    {//avoid unnecesarily trying to add the command multiple times + triggering the command's EventFired
+                        isFirstAccepted = false;
                         OnCommandAccepted(cmdString, addToCommandHistory); // track it in the history if at least one execution accepted the command
+                    }
                     else
                         break; // avoid running the command on another subsystem when it was already rejected
                 }
@@ -209,7 +213,7 @@ namespace CA_DataUploaderLib
             if (AcceptedCommands.LastOrDefault() != cmdString)
                 AcceptedCommands.Add(cmdString);
             AcceptedCommandsIndex = AcceptedCommands.Count;
-            EventFired?.Invoke(this, new EventFiredArgs(cmdString, EventType.Command, DateTime.UtcNow));
+            FireCustomEvent(cmdString, DateTime.UtcNow, (byte)EventType.Command);
         }
 
         private string GetCommand()
