@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib
         public PluginsLoader(CommandHandler handler, Func<(string pluginName, string targetFolder), Task> pluginDownloader = null, string targetFolder = "plugins")
         {
             this.handler = handler;
-            this.targetFolder = targetFolder;
+            this.targetFolder = targetFolder; 
             if (pluginDownloader != null)
                 this.updatePluginsCommand = new UpdatePluginsCommand(handler, pluginDownloader, this, targetFolder);
         }
