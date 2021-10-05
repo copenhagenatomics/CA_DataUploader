@@ -30,13 +30,14 @@ namespace CA_DataUploaderLib
 
         public void LoadPlugins(bool automaticallyLoadPluginChanges = true)
         {
+            Directory.CreateDirectory("plugins");
             // load all
-            foreach (var assembly in Directory.GetFiles(".", "*.dll"))
-                LoadPlugin(assembly);
+            foreach (var assemblyFullPath in Directory.GetFiles("plugins", "*.dll"))
+                LoadPlugin(assemblyFullPath);
 
             if (automaticallyLoadPluginChanges)
             {
-                _pluginChangesWatcher = new SingleFireFileWatcher(".", "*.dll");
+                _pluginChangesWatcher = new SingleFireFileWatcher("plugins", "*.dll");
                 _pluginChangesWatcher.Deleted += UnloadPlugin;
                 _pluginChangesWatcher.Changed += ReloadPlugin;
             }
@@ -49,10 +50,9 @@ namespace CA_DataUploaderLib
             GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
         }
 
-        void LoadPlugin(string assemblyPath)
+        void LoadPlugin(string assemblyFullPath)
         {
-            assemblyPath = Path.GetFullPath(assemblyPath);
-            var (context, plugins) = Load(assemblyPath, plugingArgs);
+            var (context, plugins) = Load(assemblyFullPath, plugingArgs);
             var initializedPlugins = plugins.ToList();
             if (initializedPlugins.Count == 0)
             {
@@ -63,26 +63,25 @@ namespace CA_DataUploaderLib
             foreach (var plugin in initializedPlugins)
                 plugin.Initialize(new PluginsCommandHandler(handler), new PluginsLogger(plugin.Name)); 
 
-            _runningPlugins[assemblyPath] = (context, initializedPlugins);
-            CALog.LogData(LogID.A, $"loaded plugins from {assemblyPath} - {string.Join(",", initializedPlugins.Select(e => e.GetType().Name))}");
+            _runningPlugins[assemblyFullPath] = (context, initializedPlugins);
+            CALog.LogData(LogID.A, $"loaded plugins from {assemblyFullPath} - {string.Join(",", initializedPlugins.Select(e => e.GetType().Name))}");
         }
 
-        void UnloadPlugin(string assemblyPath)
+        void UnloadPlugin(string assemblyFullPath)
         {
-            assemblyPath = Path.GetFullPath(assemblyPath);
-            if (!_runningPlugins.TryGetValue(assemblyPath, out var runningPluginEntry))
-                CALog.LogData(LogID.A, $"running plugin not found: {Path.GetFileNameWithoutExtension(assemblyPath)}");
+            if (!_runningPlugins.TryGetValue(assemblyFullPath, out var runningPluginEntry))
+                CALog.LogData(LogID.A, $"running plugin not found: {Path.GetFileNameWithoutExtension(assemblyFullPath)}");
             else
-                UnloadPlugin(assemblyPath, runningPluginEntry);
+                UnloadPlugin(assemblyFullPath, runningPluginEntry);
         }
 
-        void UnloadPlugin(string assemblyPath, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances) entry)
+        void UnloadPlugin(string assemblyFullPath, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances) entry)
         {
             foreach (var instance in entry.instances)
                 instance.Dispose();
-            _runningPlugins.Remove(assemblyPath);
+            _runningPlugins.Remove(assemblyFullPath);
             entry.ctx.Unload();
-            CALog.LogData(LogID.A, $"unloaded plugins from {assemblyPath}");
+            CALog.LogData(LogID.A, $"unloaded plugins from {assemblyFullPath}");
         }
 
         /// <remarks>
@@ -94,16 +93,16 @@ namespace CA_DataUploaderLib
             LoadPlugin(fullpath);
         }
 
-        static (AssemblyLoadContext context, IEnumerable<LoopControlCommand> plugins) Load(string assemblyPath, params object[] args)
+        static (AssemblyLoadContext context, IEnumerable<LoopControlCommand> plugins) Load(string assemblyFullPath, params object[] args)
         {
-            var (context, assembly) = LoadAssembly(assemblyPath);
+            var (context, assembly) = LoadAssembly(assemblyFullPath);
             return (context, CreateInstances<LoopControlCommand>(assembly, args));
         }
 
-        static (AssemblyLoadContext context, Assembly assembly) LoadAssembly(string assemblyPath)
+        static (AssemblyLoadContext context, Assembly assembly) LoadAssembly(string assemblyFullPath)
         {
-            PluginLoadContext context = new PluginLoadContext(assemblyPath);
-            using var fs = new FileStream(assemblyPath, FileMode.Open, FileAccess.Read); // force no file lock
+            PluginLoadContext context = new PluginLoadContext(assemblyFullPath);
+            using var fs = new FileStream(assemblyFullPath, FileMode.Open, FileAccess.Read); // force no file lock
             return (context, context.LoadFromStream(fs));
         }
 
@@ -121,8 +120,8 @@ namespace CA_DataUploaderLib
         {
             private readonly AssemblyDependencyResolver _resolver;
 
-            public PluginLoadContext(string pluginPath) : base (true) => 
-                _resolver = new AssemblyDependencyResolver(pluginPath);
+            public PluginLoadContext(string pluginFullPath) : base (true) => 
+                _resolver = new AssemblyDependencyResolver(pluginFullPath);
 
             protected override Assembly Load(AssemblyName assemblyName)
             {
@@ -201,7 +200,7 @@ namespace CA_DataUploaderLib
                 foreach (var pluginName in loader.GetRunningPluginsNames())
                 {
                     CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
-                    await pluginDownloader((pluginName, "."));
+                    await pluginDownloader((pluginName, "plugins"));
                 }
 
                 CALog.LogInfoAndConsoleLn(LogID.A, $"unloading running plugins");
@@ -214,12 +213,12 @@ namespace CA_DataUploaderLib
             private async Task UpdatePlugin(string pluginName)
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
-                await pluginDownloader((pluginName, "."));
-                var assemblyPath = Path.GetFullPath(pluginName + ".dll");
+                await pluginDownloader((pluginName, "plugins"));
+                var assemblyFullPath = Path.Combine("plugins", Path.GetFullPath(pluginName + ".dll"));
                 CALog.LogInfoAndConsoleLn(LogID.A, $"unloading plugin: {pluginName}");
-                loader.UnloadPlugin(assemblyPath);
+                loader.UnloadPlugin(assemblyFullPath);
                 CALog.LogInfoAndConsoleLn(LogID.A, $"loading plugin: {pluginName}");
-                loader.LoadPlugin(assemblyPath);
+                loader.LoadPlugin(assemblyFullPath);
                 CALog.LogInfoAndConsoleLn(LogID.A, $"plugins updated");
             }
         }
