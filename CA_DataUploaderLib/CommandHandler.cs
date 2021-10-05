@@ -181,7 +181,7 @@ namespace CA_DataUploaderLib
                         isFirstAccepted = false;
                         OnCommandAccepted(cmdString, addToCommandHistory); // track it in the history if at least one execution accepted the command
                     }
-                    else
+                    else if (!accepted)
                         break; // avoid running the command on another subsystem when it was already rejected
                 }
                 catch (ArgumentException ex)
