@@ -78,7 +78,7 @@ namespace UnitTests
             await detectTask;
         }
 
-        private static Task<string> ReadLine(PipeReader reader) => MCUBoard.ReadLine(reader, "abc", 5, TryReadLine);
+        private static Task<string> ReadLine(PipeReader reader) => MCUBoard.ReadLine(reader, "abc", 16, TryReadLine);
         private static ValueTask<FlushResult> Write(PipeWriter writer, string data) => Write(writer, Encoding.ASCII.GetBytes(data));
         private static ValueTask<FlushResult> Write(PipeWriter writer, byte[] bytes)
         {
