@@ -12,7 +12,7 @@ namespace CA_DataUploaderLib
 {
     public class PluginsLoader
     { // see https://docs.microsoft.com/en-us/dotnet/core/tutorials/creating-app-with-plugin-support
-        private readonly string targetFolder = "plugins";
+        private readonly string targetFolder;
         readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances)> _runningPlugins =
             new Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances)>();
         SingleFireFileWatcher _pluginChangesWatcher;
@@ -218,7 +218,7 @@ namespace CA_DataUploaderLib
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
                 await pluginDownloader((pluginName, targetFolder));
-                var assemblyFullPath = Path.Combine(targetFolder, Path.GetFullPath(pluginName + ".dll"));
+                var assemblyFullPath = Path.GetFullPath(Path.Combine(targetFolder, pluginName + ".dll"));
                 CALog.LogInfoAndConsoleLn(LogID.A, $"unloading plugin: {pluginName}");
                 loader.UnloadPlugin(assemblyFullPath);
                 CALog.LogInfoAndConsoleLn(LogID.A, $"loading plugin: {pluginName}");
