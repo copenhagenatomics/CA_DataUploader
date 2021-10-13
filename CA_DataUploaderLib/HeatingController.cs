@@ -13,8 +13,8 @@ namespace CA_DataUploaderLib
         public string Title => "Heaters";
         private bool _disposed = false;
         private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
-        private PluginsCommandHandler _cmd;
-        private SwitchBoardController _switchboardController;
+        private readonly PluginsCommandHandler _cmd;
+        private readonly SwitchBoardController _switchboardController;
         private readonly OvenCommand _ovenCmd;
         private readonly HeaterCommand _heaterCmd;
 
@@ -30,13 +30,8 @@ namespace CA_DataUploaderLib
             foreach (var heater in heatersConfigs)
                 _heaters.Add(new HeaterElement(
                     heater, 
-                    ovens.SingleOrDefault(x => x.HeatingElement.Name == heater.Name)));
-
-            var unreachableBoards = heatersConfigs.Where(h => h.Map.Board == null).GroupBy(h => h.Map).ToList();
-            foreach (var board in unreachableBoards)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Missing board {board.Key} for heaters {string.Join(",", board.Select(h => h.Name))}");
-            if (unreachableBoards.Count > 0)
-                throw new NotSupportedException("Running with missing heaters is not currently supported");
+                    ovens.SingleOrDefault(x => x.HeatingElement.Name == heater.Name),
+                    cmd.FireAlert));
 
             cmd.AddCommand("emergencyshutdown", EmergencyShutdown);    
             cmd.AddSubsystem(this);

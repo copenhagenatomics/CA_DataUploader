@@ -17,7 +17,7 @@ namespace CA_DataUploaderLib
         /// <remarks>some boards might be closed, specially if the system is stopping due to losing connection to one of the boards</remarks>
         private readonly BaseSensorBox _reader;
         private static readonly object ControllerInitializationLock = new object();
-        private PluginsCommandHandler _cmd;
+        private readonly PluginsCommandHandler _cmd;
         private static SwitchBoardController _instance;
         private readonly TaskCompletionSource _boardControlLoopsStopped = new TaskCompletionSource();
         private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
@@ -25,7 +25,7 @@ namespace CA_DataUploaderLib
         private SwitchBoardController(CommandHandler cmd) 
         {
             _cmd = new PluginsCommandHandler(cmd);
-            var ports = IOconfFile.GetEntries<IOconfOut230Vac>().Where(p => p.IsSwitchboardControllerOutput && p.Map.Board != null).ToList();
+            var ports = IOconfFile.GetEntries<IOconfOut230Vac>().Where(p => p.IsSwitchboardControllerOutput).ToList();
             var boardsTemperatures = ports.GroupBy(p => p.BoxName).Select(b => b.Select(p => p.GetBoardTemperatureInputConf()).FirstOrDefault());
             var sensorPortsInputs = IOconfFile.GetEntries<IOconfSwitchboardSensor>().SelectMany(i => i.GetExpandedConf());
             var inputs = ports.SelectMany(p => p.GetExpandedInputConf()).Concat(boardsTemperatures).Concat(sensorPortsInputs);
@@ -61,7 +61,7 @@ namespace CA_DataUploaderLib
         {
             var lastActions = new SwitchboardAction[ports.Max(p => p.PortNumber)];
             var boardStateName = board.BoxName + "_state";
-            // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operatio.
+            // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operation.
             // we might still get lots of entries for problems that alternate between normal and failed states, but for now is a good data point to know if that case is happening.
             var waitingBoardReconnect = false;
             var tryingToRecoverAfterTimeoutWatch = new Stopwatch();
@@ -90,7 +90,7 @@ namespace CA_DataUploaderLib
                         CALog.LogInfoAndConsoleLn(LogID.A, $"timed out writing to switchboard, reducing action frequency until reconnect - {board.ToShortDescription()}");
                         tryingToRecoverAfterTimeoutWatch.Restart();
                     }
-                    await Task.Delay(500); // forcing reduced acting frequency
+                    await Task.Delay(500, token); // forcing reduced acting frequency
                 }
                 catch (TaskCanceledException ex)
                 {
@@ -102,7 +102,7 @@ namespace CA_DataUploaderLib
                     CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
                 }
             }
-            
+
             AllOff(board, ports);
         }
 
@@ -128,6 +128,7 @@ namespace CA_DataUploaderLib
             try
             {
                 var boardLoops = ports
+                    .Where(p => p.Map.Board != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start. Note the reader in the ctor already reports the missing board.
                     .GroupBy(v => v.Map.Board)
                     .Select(g => BoardLoop(g.Key, g.ToList(), _boardLoopsStopTokenSource.Token))
                     .ToList();
@@ -144,7 +145,7 @@ namespace CA_DataUploaderLib
             }
         }
         
-        private async Task DoPortActions(NewVectorReceivedArgs vector, MCUBoard board, IOconfOut230Vac port, SwitchboardAction[] lastActions, CancellationToken token)
+        private static async Task DoPortActions(NewVectorReceivedArgs vector, MCUBoard board, IOconfOut230Vac port, SwitchboardAction[] lastActions, CancellationToken token)
         {
             if (token.IsCancellationRequested)
                 return;
@@ -175,7 +176,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private void AllOff(MCUBoard board, List<IOconfOut230Vac> ports)
+        private static void AllOff(MCUBoard board, List<IOconfOut230Vac> ports)
         {
             try
             {

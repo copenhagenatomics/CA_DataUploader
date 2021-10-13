@@ -106,16 +106,14 @@ namespace CA_DataUploaderLib
 
         private void TriggerAlert(IOconfAlert a, DateTime timestamp, string message)
         {
-            logger.LogError(timestamp.ToString("yyyy.MM.dd HH:mm:ss") + message);
+            _cmd.FireAlert(message, timestamp);
             if (a.Command != default)
             {
                 foreach (var commands in a.Command.Split('|'))
                     ExecuteCommand(commands);
             }
-
-            _cmd.FireAlert(message, timestamp);            
         }
 
-        private List<T> EnsureInitialized<T>(ref List<T> list) => list = list ?? new List<T>();
+        private static List<T> EnsureInitialized<T>(ref List<T> list) => list = list ?? new List<T>();
     }
 }

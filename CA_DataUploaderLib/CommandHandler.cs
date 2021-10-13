@@ -22,7 +22,7 @@ namespace CA_DataUploaderLib
         private readonly List<string> AcceptedCommands = new List<string>();
         private readonly List<ISubsystemWithVectorData> _subsystems = new List<ISubsystemWithVectorData>();
         private int AcceptedCommandsIndex = -1;
-        private Lazy<VectorFilterAndMath> _fullsystemFilterAndMath;
+        private readonly Lazy<VectorFilterAndMath> _fullsystemFilterAndMath;
 
         public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
         public event EventHandler<EventFiredArgs> EventFired;
@@ -87,7 +87,7 @@ namespace CA_DataUploaderLib
      
         public bool AssertArgs(List<string> args, int minimumLen)
         {
-            if (args.Count() < minimumLen)
+            if (args.Count < minimumLen)
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, "Too few arguments for this command");
                 Execute("help", false);
@@ -101,7 +101,12 @@ namespace CA_DataUploaderLib
             NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector.ToDictionary(v => v.Name, v => v.Value)));
 
         public void FireAlert(string msg) => FireAlert(msg, DateTime.UtcNow);
-        public void FireAlert(string msg, DateTime timespan) => FireCustomEvent(msg, timespan, (byte)EventType.Alert);
+        public void FireAlert(string msg, DateTime timespan)
+        {
+            CALog.LogErrorAndConsoleLn(LogID.A, msg);
+            FireCustomEvent(msg, timespan, (byte)EventType.Alert);
+        }
+
         /// <summary>registers a custom event (low frequency, such like user commands and alerts that have a max firing rate)</summary>
         /// <remarks>preferably use values above 100 for eventType to avoid future collisions with built in event types</remarks>
         public void FireCustomEvent(string msg, DateTime timespan, byte eventType) => EventFired?.Invoke(this, new EventFiredArgs(msg, eventType, timespan));
@@ -253,8 +258,8 @@ namespace CA_DataUploaderLib
             return inputCommand.ToString();
         }
 
-        public static int GetCmdParam(List<string> cmd, int index, int defaultValue) => 
-            cmd.Count() > index && int.TryParse(cmd[index], out int value) ? value : defaultValue;
+        public static int GetCmdParam(List<string> cmd, int index, int defaultValue) =>
+            cmd.Count > index && int.TryParse(cmd[index], out int value) ? value : defaultValue;
 
         private void RestoreNextAcceptedCommand()
         {

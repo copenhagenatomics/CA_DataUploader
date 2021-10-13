@@ -14,12 +14,12 @@ namespace CA_DataUploaderLib
         private readonly SensorSample _rpiGpuSample;
         private readonly SensorSample _rpiCpuSample;
         public ThermocoupleBox(CommandHandler cmd) : base(cmd, "Temperatures", string.Empty, "show all temperatures in input queue", GetSensors()) 
-        { // these are disabled / null when we are not running on windows, see GetSensors
+        { // these are disabled / null when we are running on windows, see GetSensors
             _rpiGpuSample = _values.FirstOrDefault(x => x.Name.EndsWith("Gpu"));
             _rpiCpuSample = _values.FirstOrDefault(x => x.Name.EndsWith("Cpu"));
         }
 
-        protected override List<Task> StartReadLoops((MCUBoard board, SensorSample[] values)[] boards, CancellationToken token)
+        protected override List<Task> StartReadLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
         {
             var loops = base.StartReadLoops(boards, token);
             if (_rpiGpuSample != null || _rpiCpuSample != null) 
@@ -27,7 +27,7 @@ namespace CA_DataUploaderLib
             return loops;
         }
 
-        private async Task ReadRpiTemperaturesLoop(SensorSample gpuSample, SensorSample cpuSample, CancellationToken token)
+        private static async Task ReadRpiTemperaturesLoop(SensorSample gpuSample, SensorSample cpuSample, CancellationToken token)
         {
             var msBetweenReads = 1000; // waiting every second, for higher resolution.
             while (!token.IsCancellationRequested)
