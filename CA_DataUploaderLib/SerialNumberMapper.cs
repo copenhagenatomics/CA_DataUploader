@@ -5,35 +5,38 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
     public sealed class SerialNumberMapper : IDisposable
     {
-        public readonly List<MCUBoard> McuBoards;
+        public List<MCUBoard> McuBoards { get; }
+        public List<string> CalibrationUpdateMessages { get; }
 
-        private SerialNumberMapper(IEnumerable<MCUBoard> boards)
+        private SerialNumberMapper(IEnumerable<MCUBoard> boards, IEnumerable<string> calibrationUpdateMessages)
         {
             McuBoards = new List<MCUBoard>(boards);
+            CalibrationUpdateMessages = new List<string>(calibrationUpdateMessages);
         }
 
         public async static Task<SerialNumberMapper> DetectDevices()
         {
             var logLevel = File.Exists("IO.conf") ? IOconfFile.GetOutputLevel() : CALogLevel.Normal;
             var boards = await Task.WhenAll(RpiVersion.GetUSBports().Select(name => AttemptToOpenDeviceConnection(name, logLevel)));
-            return new SerialNumberMapper(boards);
+            return new SerialNumberMapper(boards.Select(b => b.board), boards.Where(b => b.calibrationUpdateMsg != default).Select(b => b.calibrationUpdateMsg));
         }
 
-        private static async Task<MCUBoard> AttemptToOpenDeviceConnection(string name, CALogLevel logLevel)
+        private static async Task<(MCUBoard board, string calibrationUpdateMsg)> AttemptToOpenDeviceConnection(string name, CALogLevel logLevel)
         {
             try
             {
-                var mcu = await MCUBoard.OpenDeviceConnection(name);
+                var (mcu, calibrationUpdateMsg) = await MCUBoard.OpenDeviceConnection(name);
                 mcu.productType = mcu.productType ?? GetStringFromDmesg(mcu.PortName);
                 string logline = logLevel == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
                 CALog.LogInfoAndConsoleLn(LogID.A, logline);
-                return mcu;
+                return (mcu, calibrationUpdateMsg);
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -41,10 +44,20 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex.ToString()}" + Environment.NewLine);
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex}" + Environment.NewLine);
             }
 
             return default;
+        }
+
+        public void SendDeviceDetectionEvent(CommandHandler cmd)
+        {
+            var sb = new StringBuilder();
+            foreach (var msg in CalibrationUpdateMessages)
+                sb.AppendLine(msg);
+            foreach (var board in McuBoards)
+                sb.Append(board.ToShortDescription());
+            cmd.FireCustomEvent(sb.ToString(), DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
         }
 
         private static string GetStringFromDmesg(string portName)
@@ -52,7 +65,7 @@ namespace CA_DataUploaderLib
             if (portName.StartsWith("COM"))
                 return null;
 
-            portName = portName.Substring(portName.LastIndexOf('/') + 1);
+            portName = portName[(portName.LastIndexOf('/') + 1)..];
             var result = DULutil.ExecuteShellCommand($"dmesg | grep {portName}").Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
             return result.FirstOrDefault(x => x.EndsWith(portName))?.StringBetween(": ", " to ttyUSB");
         }
