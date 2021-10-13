@@ -25,7 +25,8 @@ namespace CA_DataUploaderLib.IOconf
             ("Filter", (r, l) => new IOconfFilter(r, l)),
             ("RPiTemp", (r, l) => new IOconfRPiTemp(r, l)),
             ("VacuumPump", (r, l) => new IOconfVacuumPump(r, l)),
-            ("GenericSensor", (r, l) => new IOconfGeneric(r, l))
+            ("GenericSensor", (r, l) => new IOconfGeneric(r, l)),
+            ("SwitchboardSensor", (r, l) => new IOconfSwitchboardSensor(r, l)),
         };
 
         public static (string, IEnumerable<IOconfRow>) Load(List<IOconfRow> target)
