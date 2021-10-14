@@ -4,6 +4,7 @@ using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
@@ -17,10 +18,12 @@ namespace CA_DataUploaderLib
         private readonly SwitchBoardController _switchboardController;
         private readonly OvenCommand _ovenCmd;
         private readonly HeaterCommand _heaterCmd;
+        private readonly CommandHandler _cmdUnwrapped;
 
         public HeatingController(CommandHandler cmd)
         {
             _cmd = new PluginsCommandHandler(cmd);
+            _cmdUnwrapped = cmd;
 
             var heatersConfigs = IOconfFile.GetHeater().ToList();
             if (!heatersConfigs.Any())
@@ -30,8 +33,7 @@ namespace CA_DataUploaderLib
             foreach (var heater in heatersConfigs)
                 _heaters.Add(new HeaterElement(
                     heater, 
-                    ovens.SingleOrDefault(x => x.HeatingElement.Name == heater.Name),
-                    cmd.FireAlert));
+                    ovens.SingleOrDefault(x => x.HeatingElement.Name == heater.Name)));
 
             cmd.AddCommand("emergencyshutdown", EmergencyShutdown);    
             cmd.AddSubsystem(this);
@@ -46,6 +48,14 @@ namespace CA_DataUploaderLib
         {
             _cmd.Execute("oven off", false);
             return true;
+        }
+
+        public Task Run(CancellationToken token)
+        {
+            foreach (var heater in _heaters)
+                heater.ReportDetectedConfigAlerts(_cmdUnwrapped);
+
+            return _switchboardController.Run(token);
         }
 
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();

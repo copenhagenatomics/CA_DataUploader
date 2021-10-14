@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
@@ -71,6 +72,25 @@ namespace CA_DataUploaderLib
             OnNewVectorReceived(samples.WithVectorTime(vectorTime));
             return (samples, vectorTime);
         }
+
+        public Task RunSubsystems()
+        {
+            Execute("help");
+            SendDeviceDetectionEvent();
+            return Task.WhenAll(_subsystems.Select(s => s.Run(CancellationToken.None)));
+        }
+
+        private void SendDeviceDetectionEvent()
+        {
+            var sb = new StringBuilder();
+            foreach (var msg in _mapper.CalibrationUpdateMessages)
+                sb.AppendLine(msg);
+            sb.AppendLine("Detected devices:");
+            foreach (var board in _mapper.McuBoards)
+                sb.AppendLine(board.ToShortDescription());
+            FireCustomEvent(sb.ToString(), DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
+        }
+
         private VectorFilterAndMath GetFullSystemFilterAndMath()
         { 
             var items = new List<VectorDescriptionItem>(_subsystems.Count * 10);

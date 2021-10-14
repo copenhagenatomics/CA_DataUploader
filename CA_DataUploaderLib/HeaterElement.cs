@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib
         private readonly Stopwatch timeSinceLastMissingTemperatureWarning = new Stopwatch();
         private SwitchboardAction _lastAction = new SwitchboardAction(false, DateTime.UtcNow);
 
-        public HeaterElement(IOconfHeater heater, IOconfOven oven, Action<string> fireAlert) : this(ToConfig(heater, oven, fireAlert))
+        public HeaterElement(IOconfHeater heater, IOconfOven oven) : this(ToConfig(heater, oven))
         {
         }
 
@@ -55,6 +55,12 @@ namespace CA_DataUploaderLib
                 _lastAction.IsOn && _lastAction.GetRemainingOnSeconds(vectorTime) < 2 ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) : 
                 _lastAction;
             return _lastAction = action;
+        }
+
+        internal void ReportDetectedConfigAlerts(CommandHandler cmd)
+        {
+            if (_config.AlertMessage != default)
+                cmd.FireAlert(_config.AlertMessage);
         }
 
         public (bool manualOff, bool manualOn) MustExecuteManualMode(DateTime vectorTime)
@@ -230,9 +236,9 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private static Config ToConfig(IOconfHeater heater, IOconfOven oven, Action<string> fireAlert)
+        private static Config ToConfig(IOconfHeater heater, IOconfOven oven)
         {
-            var (area, ovenSensor, boardStateSensorNames) = GetOvenInfo(heater.Name, oven, fireAlert);
+            var (area, ovenSensor, boardStateSensorNames, alertMessage) = GetOvenInfo(heater.Name, oven);
             return new Config
             {
                 Area = area,
@@ -242,20 +248,21 @@ namespace CA_DataUploaderLib
                 CurrentSensingNoiseTreshold = heater.CurrentSensingNoiseTreshold,
                 Name = heater.Name,
                 SwitchBoardStateSensorName = heater.BoardStateSensorName,
-                CurrentSensorName = heater.CurrentSensorName
+                CurrentSensorName = heater.CurrentSensorName,
+                AlertMessage = alertMessage
             };
         }
 
-        private static (int area, string ovenSensor, IReadOnlyCollection<string> boardStateSensorNames) GetOvenInfo(string heaterName, IOconfOven oven, Action<string> fireAlert)
+        private static (int area, string ovenSensor, IReadOnlyCollection<string> boardStateSensorNames, string alertMessage) GetOvenInfo(string heaterName, IOconfOven oven)
         {
             if (oven != null && oven.IsTemperatureSensorInitialized)
-                return (oven.OvenArea, oven.TemperatureSensorName, oven.BoardStateSensorNames);
+                return (oven.OvenArea, oven.TemperatureSensorName, oven.BoardStateSensorNames, default);
             if (oven == null)
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heaterName}");
             else if (!oven.IsTemperatureSensorInitialized)
-                fireAlert($"Warn: disabled oven for heater {heaterName} - missing temperature board");
+                return (-1, default, default, $"Warn: disabled oven for heater {heaterName} - missing temperature board");
 
-            return (-1, default, default);
+            return (-1, default, default, default);
         }
 
         public class Config
@@ -268,6 +275,7 @@ namespace CA_DataUploaderLib
             public string SwitchBoardStateSensorName { get; set; }
             public string CurrentSensorName { get; set; }
             public IReadOnlyCollection<string> TemperatureBoardStateSensorNames { get; set; }
+            public string AlertMessage { get; internal set; }
         }
     }
 }

@@ -34,7 +34,7 @@ namespace CA_DataUploader
                     using var usb = new ThermocoupleBox(cmd);
                     using var cloud = new ServerUploader(cmd.GetFullSystemVectorDescription(), cmd);
                     CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
-                    serial.SendDeviceDetectionEvent(cmd);
+                    _ = Task.Run(() => cmd.RunSubsystems());
 
                     int i = 0;
                     var uploadThrottle = new TimeThrottle(100);

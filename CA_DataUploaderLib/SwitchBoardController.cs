@@ -18,21 +18,31 @@ namespace CA_DataUploaderLib
         private readonly BaseSensorBox _reader;
         private static readonly object ControllerInitializationLock = new object();
         private readonly PluginsCommandHandler _cmd;
+        private readonly List<IOconfOut230Vac> _ports;
         private static SwitchBoardController _instance;
         private readonly TaskCompletionSource _boardControlLoopsStopped = new TaskCompletionSource();
         private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
+        private Task _runningTask;
 
         private SwitchBoardController(CommandHandler cmd) 
         {
             _cmd = new PluginsCommandHandler(cmd);
-            var ports = IOconfFile.GetEntries<IOconfOut230Vac>().Where(p => p.IsSwitchboardControllerOutput).ToList();
-            var boardsTemperatures = ports.GroupBy(p => p.BoxName).Select(b => b.Select(p => p.GetBoardTemperatureInputConf()).FirstOrDefault());
+            _ports = IOconfFile.GetEntries<IOconfOut230Vac>().Where(p => p.IsSwitchboardControllerOutput).ToList();
+            var boardsTemperatures = _ports.GroupBy(p => p.BoxName).Select(b => b.Select(p => p.GetBoardTemperatureInputConf()).FirstOrDefault());
             var sensorPortsInputs = IOconfFile.GetEntries<IOconfSwitchboardSensor>().SelectMany(i => i.GetExpandedConf());
-            var inputs = ports.SelectMany(p => p.GetExpandedInputConf()).Concat(boardsTemperatures).Concat(sensorPortsInputs);
+            var inputs = _ports.SelectMany(p => p.GetExpandedInputConf()).Concat(boardsTemperatures).Concat(sensorPortsInputs);
             _reader = new BaseSensorBox(cmd, "switchboards", string.Empty, "show switchboards inputs", inputs);
             _reader.Stopping += WaitForLoopStopped;
             cmd.AddCommand("escape", Stop);
-            Task.Run(() => RunBoardControlLoops(ports));
+        }
+
+        public Task Run(CancellationToken token)
+        {
+            lock (this)
+            { //important: the lock is only to start the task i.e. it is intended that there are no awaits while in the lock section.
+                if (_runningTask != null) return _runningTask;
+                return _runningTask = Task.WhenAll(_reader.Run(token), RunBoardControlLoops(_ports, token));
+            }
         }
 
         public void Dispose() 
@@ -90,7 +100,9 @@ namespace CA_DataUploaderLib
                         CALog.LogInfoAndConsoleLn(LogID.A, $"timed out writing to switchboard, reducing action frequency until reconnect - {board.ToShortDescription()}");
                         tryingToRecoverAfterTimeoutWatch.Restart();
                     }
-                    await Task.Delay(500, token); // forcing reduced acting frequency
+                    // forcing reduced acting frequency )
+                    try { await Task.Delay(500, token); } 
+                    catch (TaskCanceledException) { }
                 }
                 catch (TaskCanceledException ex)
                 {
@@ -122,15 +134,16 @@ namespace CA_DataUploaderLib
             return connected;
         }
 
-        private async Task RunBoardControlLoops(List<IOconfOut230Vac> ports)
+        private async Task RunBoardControlLoops(List<IOconfOut230Vac> ports, CancellationToken token)
         {
             DateTime start = DateTime.Now;
             try
             {
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, _boardLoopsStopTokenSource.Token);
                 var boardLoops = ports
                     .Where(p => p.Map.Board != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start. Note the reader in the ctor already reports the missing board.
                     .GroupBy(v => v.Map.Board)
-                    .Select(g => BoardLoop(g.Key, g.ToList(), _boardLoopsStopTokenSource.Token))
+                    .Select(g => BoardLoop(g.Key, g.ToList(), linkedCts.Token))
                     .ToList();
                 await Task.WhenAll(boardLoops);                
                 CALog.LogInfoAndConsoleLn(LogID.A, "Exiting SwitchBoardController.RunBoardControlLoops() " + DateTime.Now.Subtract(start).Humanize(5));

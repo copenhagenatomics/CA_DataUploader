@@ -6,7 +6,6 @@ using System.Text;
 using CA_DataUploaderLib.IOconf;
 using Humanizer;
 using System.Diagnostics;
-using CA_DataUploaderLib.Extensions;
 using System.Collections;
 using CA.LoopControlPluginBase;
 using System.Threading.Tasks;
@@ -21,6 +20,7 @@ namespace CA_DataUploaderLib
         public event EventHandler Stopping;
         private readonly CommandHandler _cmd;
         protected readonly List<SensorSample> _values = new List<SensorSample>();
+        private readonly (IOconfMap map, SensorSample[] values)[] _boards;
         protected readonly AllBoardsState _allBoardsState;
         private readonly string commandHelp;
         private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
@@ -46,11 +46,11 @@ namespace CA_DataUploaderLib
                 cmd.AddSubsystem(this);
             }
 
-            var boards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray())).ToArray();
-            _allBoardsState = new AllBoardsState(boards.Select(b => b.map));
-            Task.Run(() => RunBoardReadLoops(boards));
+            _boards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray())).ToArray();
+            _allBoardsState = new AllBoardsState(_boards.Select(b => b.map));
         }
 
+        public Task Run(CancellationToken token) => RunBoardReadLoops(_boards, token);
         private void SubscribeCommandsToSubsystems(CommandHandler cmd, string mainSubsystem, List<SensorSample> values)
         {
             cmd.AddCommand(mainSubsystem, ShowQueue);
@@ -99,12 +99,13 @@ namespace CA_DataUploaderLib
 
         private double GetAvgLoopTime() => _values.Average(x => x.ReadSensor_LoopTime);
 
-        private async Task RunBoardReadLoops((IOconfMap map, SensorSample[] values)[] boards)
+        private async Task RunBoardReadLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
         {
             DateTime start = DateTime.Now;
             try
             {
-                var readLoops = StartReadLoops(boards, _boardLoopsStopTokenSource.Token);
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, _boardLoopsStopTokenSource.Token);
+                var readLoops = StartReadLoops(boards, linkedCts.Token);
                 await Task.WhenAll(readLoops);
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardReadLoops() " + DateTime.Now.Subtract(start).Humanize(5));
             }
@@ -118,7 +119,8 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    map.Board?.SafeClose(CancellationToken.None);
+                    using var closeTimeoutToken = new CancellationTokenSource(5000);
+                    map.Board?.SafeClose(closeTimeoutToken.Token);
                     _allBoardsState.SetDisconnectedState(map);
                 }
                 catch(Exception ex)

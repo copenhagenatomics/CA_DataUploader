@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
@@ -48,16 +47,6 @@ namespace CA_DataUploaderLib
             }
 
             return default;
-        }
-
-        public void SendDeviceDetectionEvent(CommandHandler cmd)
-        {
-            var sb = new StringBuilder();
-            foreach (var msg in CalibrationUpdateMessages)
-                sb.AppendLine(msg);
-            foreach (var board in McuBoards)
-                sb.Append(board.ToShortDescription());
-            cmd.FireCustomEvent(sb.ToString(), DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
         }
 
         private static string GetStringFromDmesg(string portName)
