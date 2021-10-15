@@ -26,7 +26,7 @@ namespace CA_DataUploader
                         return; // SerialNumberMapper already lists devices, no need for further output.
 
                     // close all ports which are not Hub10
-                    serial.McuBoards.Where(x => !x.productType.Contains("Temperature")).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
+                    serial.McuBoards.Where(x => !x.productType.Contains("Temperature") &&!x.productType.Contains("Hub10STM")).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
 
                     var email = IOconfSetup.UpdateIOconf(serial);
 
@@ -34,6 +34,7 @@ namespace CA_DataUploader
                     using var usb = new ThermocoupleBox(cmd);
                     using var cloud = new ServerUploader(cmd.GetFullSystemVectorDescription(), cmd);
                     CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
+                    _ = Task.Run(() => cmd.RunSubsystems());
 
                     int i = 0;
                     var uploadThrottle = new TimeThrottle(100);

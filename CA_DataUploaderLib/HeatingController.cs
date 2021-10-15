@@ -4,6 +4,7 @@ using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
@@ -13,14 +14,16 @@ namespace CA_DataUploaderLib
         public string Title => "Heaters";
         private bool _disposed = false;
         private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
-        private PluginsCommandHandler _cmd;
-        private SwitchBoardController _switchboardController;
+        private readonly PluginsCommandHandler _cmd;
+        private readonly SwitchBoardController _switchboardController;
         private readonly OvenCommand _ovenCmd;
         private readonly HeaterCommand _heaterCmd;
+        private readonly CommandHandler _cmdUnwrapped;
 
         public HeatingController(CommandHandler cmd)
         {
             _cmd = new PluginsCommandHandler(cmd);
+            _cmdUnwrapped = cmd;
 
             var heatersConfigs = IOconfFile.GetHeater().ToList();
             if (!heatersConfigs.Any())
@@ -31,12 +34,6 @@ namespace CA_DataUploaderLib
                 _heaters.Add(new HeaterElement(
                     heater, 
                     ovens.SingleOrDefault(x => x.HeatingElement.Name == heater.Name)));
-
-            var unreachableBoards = heatersConfigs.Where(h => h.Map.Board == null).GroupBy(h => h.Map).ToList();
-            foreach (var board in unreachableBoards)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Missing board {board.Key} for heaters {string.Join(",", board.Select(h => h.Name))}");
-            if (unreachableBoards.Count > 0)
-                throw new NotSupportedException("Running with missing heaters is not currently supported");
 
             cmd.AddCommand("emergencyshutdown", EmergencyShutdown);    
             cmd.AddSubsystem(this);
@@ -51,6 +48,14 @@ namespace CA_DataUploaderLib
         {
             _cmd.Execute("oven off", false);
             return true;
+        }
+
+        public Task Run(CancellationToken token)
+        {
+            foreach (var heater in _heaters)
+                heater.ReportDetectedConfigAlerts(_cmdUnwrapped);
+
+            return _switchboardController.Run(token);
         }
 
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();

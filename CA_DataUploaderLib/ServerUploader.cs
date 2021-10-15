@@ -34,6 +34,8 @@ namespace CA_DataUploaderLib
         {
             try
             {
+                if (cmd != null)
+                    cmd.EventFired += SendEvent;
                 var duplicates = vectorDescription._items.GroupBy(x => x.Descriptor).Where(x => x.Count() > 1).Select(x => x.Key);
                 if (duplicates.Any())
                     throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", duplicates));
@@ -45,8 +47,7 @@ namespace CA_DataUploaderLib
                 new Thread(() => this.LoopForever()).Start();
                 _cmd = cmd;
                 cmd?.AddCommand("escape", Stop);
-                if (cmd != null)
-                    cmd.EventFired += SendEvent;
+
             }
             catch (Exception ex)
             {

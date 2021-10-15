@@ -10,7 +10,7 @@ namespace CA_DataUploaderLib
     public class HeaterElement
     {
         private int OvenTargetTemperature;
-        private Config _config;
+        private readonly Config _config;
         private DateTime LastOff = DateTime.MinValue; // assume there is no previous off
         private DateTime LastAutoOff = DateTime.MinValue; // assume there is no previous off
         private DateTime invalidValuesStartedVectorTime = default;
@@ -19,8 +19,8 @@ namespace CA_DataUploaderLib
         private bool ManualTurnOn;
         private bool PendingManualModeExecution;
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
-        private Stopwatch timeSinceLastNegativeValuesWarning = new Stopwatch();
-        private Stopwatch timeSinceLastMissingTemperatureWarning = new Stopwatch();
+        private readonly Stopwatch timeSinceLastNegativeValuesWarning = new Stopwatch();
+        private readonly Stopwatch timeSinceLastMissingTemperatureWarning = new Stopwatch();
         private SwitchboardAction _lastAction = new SwitchboardAction(false, DateTime.UtcNow);
 
         public HeaterElement(IOconfHeater heater, IOconfOven oven) : this(ToConfig(heater, oven))
@@ -57,6 +57,12 @@ namespace CA_DataUploaderLib
             return _lastAction = action;
         }
 
+        internal void ReportDetectedConfigAlerts(CommandHandler cmd)
+        {
+            if (_config.AlertMessage != default)
+                cmd.FireAlert(_config.AlertMessage);
+        }
+
         public (bool manualOff, bool manualOn) MustExecuteManualMode(DateTime vectorTime)
         {
             if (!PendingManualModeExecution) return (false, false);
@@ -64,7 +70,7 @@ namespace CA_DataUploaderLib
             if (!ManualTurnOn)
                 SetOffProperties(vectorTime);
             else
-                SetOnProperties(vectorTime);
+                SetOnProperties();
             return (!ManualTurnOn, ManualTurnOn);
         }
 
@@ -96,7 +102,7 @@ namespace CA_DataUploaderLib
                 return false; // already at target temperature. 
 
             onTemperature = temperature;
-            return SetOnProperties(vectorTime);
+            return SetOnProperties();
         }
 
         private bool MustTurnOff(bool hasValidTemperature, double temperature, DateTime vectorTime)
@@ -134,7 +140,7 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private bool SetOnProperties(DateTime vectorTime)
+        private bool SetOnProperties()
         {
             IsOn = true;
             return true;
@@ -156,7 +162,7 @@ namespace CA_DataUploaderLib
             else if (val <= 10000 && val > 0) // we only use valid positive values. Note some temperature hubs alternate between 10k+ and 0 for errors.
                 return (true, val);
             else if (val < 0)
-                WarnNegativeTemperatures(sensor);
+                WarnNegativeTemperatures();
             return (false, double.MaxValue);
         }
 
@@ -173,19 +179,17 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private void WarnNegativeTemperatures(string sensorName) =>
+        private void WarnNegativeTemperatures() =>
             LowFrequencyWarning(
-                timeSinceLastNegativeValuesWarning, 
-                sensorName, 
+                timeSinceLastNegativeValuesWarning,
                 $"detected negative values in sensors for heater {this.Name()}. Confirm thermocouples cables are not inverted");
  
         private void WarnMissingSensor(string sensorName) =>
             LowFrequencyWarning(
-                timeSinceLastMissingTemperatureWarning, 
-                sensorName, 
+                timeSinceLastMissingTemperatureWarning,
                 $"detected missing temperature sensor {sensorName} for heater {Name()}. Confirm the name is listed exactly as is in the plot.");
         
-        private void LowFrequencyWarning(Stopwatch watch, string sensorName, string message)
+        private static void LowFrequencyWarning(Stopwatch watch, string message)
         {
             if (watch.IsRunning && watch.Elapsed.Hours < 1) return;
             CALog.LogErrorAndConsoleLn(LogID.A,message);
@@ -234,7 +238,7 @@ namespace CA_DataUploaderLib
 
         private static Config ToConfig(IOconfHeater heater, IOconfOven oven)
         {
-            var (area, ovenSensor, boardStateSensorNames) = GetOvenInfo(heater.Name, oven);
+            var (area, ovenSensor, boardStateSensorNames, alertMessage) = GetOvenInfo(heater.Name, oven);
             return new Config
             {
                 Area = area,
@@ -244,20 +248,21 @@ namespace CA_DataUploaderLib
                 CurrentSensingNoiseTreshold = heater.CurrentSensingNoiseTreshold,
                 Name = heater.Name,
                 SwitchBoardStateSensorName = heater.BoardStateSensorName,
-                CurrentSensorName = heater.CurrentSensorName
+                CurrentSensorName = heater.CurrentSensorName,
+                AlertMessage = alertMessage
             };
         }
 
-        private static (int area, string ovenSensor, IReadOnlyCollection<string> boardStateSensorNames) GetOvenInfo(string heaterName, IOconfOven oven)
+        private static (int area, string ovenSensor, IReadOnlyCollection<string> boardStateSensorNames, string alertMessage) GetOvenInfo(string heaterName, IOconfOven oven)
         {
             if (oven != null && oven.IsTemperatureSensorInitialized)
-                return (oven.OvenArea, oven.TemperatureSensorName, oven.BoardStateSensorNames);
+                return (oven.OvenArea, oven.TemperatureSensorName, oven.BoardStateSensorNames, default);
             if (oven == null)
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heaterName}");
             else if (!oven.IsTemperatureSensorInitialized)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Warn: disabled oven for heater {heaterName} - missing temperature board");
+                return (-1, default, default, $"Warn: disabled oven for heater {heaterName} - missing temperature board");
 
-            return (-1, default, default);
+            return (-1, default, default, default);
         }
 
         public class Config
@@ -270,6 +275,7 @@ namespace CA_DataUploaderLib
             public string SwitchBoardStateSensorName { get; set; }
             public string CurrentSensorName { get; set; }
             public IReadOnlyCollection<string> TemperatureBoardStateSensorNames { get; set; }
+            public string AlertMessage { get; internal set; }
         }
     }
 }

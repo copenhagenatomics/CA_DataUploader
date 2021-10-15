@@ -51,25 +51,26 @@ namespace CA_DataUploaderLib
         private static int _detectedUnknownBoards;
         // the "writer" for this lock are operations that close/reopens the connection, while the readers are any other operation including SafeWriteLine.
         // This prevents operations being ran when the connections are being closed/reopened.
-        private AsyncReaderWriterLock _reconnectionLock = new AsyncReaderWriterLock();
+        private readonly AsyncReaderWriterLock _reconnectionLock = new AsyncReaderWriterLock();
 
         public BoardSettings ConfigSettings { get; set; } = BoardSettings.Default;
         public string PortName => port.PortName;
-        private SerialPort port;
+        private readonly SerialPort port;
         private PipeReader pipeReader;
         public delegate bool TryReadLineDelegate(ref ReadOnlySequence<byte> buffer, out string line);
         private TryReadLineDelegate TryReadLine;
         public delegate (bool finishedDetection, BoardInfo info) CustomProtocolDetectionDelegate(ReadOnlySequence<byte> buffer, string portName);
-        private static List<CustomProtocolDetectionDelegate> customProtocolDetectors = new List<CustomProtocolDetectionDelegate>();
+        private static readonly List<CustomProtocolDetectionDelegate> customProtocolDetectors = new List<CustomProtocolDetectionDelegate>();
 
         private MCUBoard(SerialPort port) 
         {
             this.port = port;
         }
 
-        private async static Task<MCUBoard> Create(string name, int baudrate, bool skipBoardAutoDetection)
+        private async static Task<(MCUBoard board, string calibrationUpdateMsg)> Create(string name, int baudrate, bool skipBoardAutoDetection)
         {
             MCUBoard board = null;
+            string calibrationUpdateMsg = default;
             try
             {
                 var port = new SerialPort(name);
@@ -102,7 +103,7 @@ namespace CA_DataUploaderLib
                             board.BoxName = ioconfMap.BoxName;
                             board.ConfigSettings = ioconfMap.BoardSettings;
                             port.ReadTimeout = ioconfMap.BoardSettings.MaxMillisecondsWithoutNewValues;
-                            await board.UpdateCalibration(board.ConfigSettings);
+                            calibrationUpdateMsg = await board.UpdateCalibration(board.ConfigSettings);
                         }
                     }
                 }
@@ -119,16 +120,18 @@ namespace CA_DataUploaderLib
                 Thread.Sleep(100);
             }
 
-            return board;
+            return (board, calibrationUpdateMsg);
         }
 
-        private Task UpdateCalibration(BoardSettings configSettings)
+        private async Task<string> UpdateCalibration(BoardSettings configSettings)
         {
             if (configSettings.Calibration == default || calibration == configSettings.Calibration)
-                return Task.CompletedTask; // ignore if there is no calibration in configuration or if the board already had the expected configuration
+                return default; // ignore if there is no calibration in configuration or if the board already had the expected configuration
 
-            CALog.LogInfoAndConsoleLn(LogID.A, $"replacing old board calibration '{calibration}' with '{configSettings.Calibration}' - {ToShortDescription()}");
-            return SafeWriteLine(configSettings.Calibration, CancellationToken.None);
+            var calibrationMessage = $"replaced board calibration '{calibration}' with '{configSettings.Calibration}";
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{calibrationMessage}' - {ToShortDescription()}");
+            await SafeWriteLine(configSettings.Calibration, CancellationToken.None);
+            return calibrationMessage;
         }
 
         private bool IsEmpty()
@@ -217,22 +220,22 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public async static Task<MCUBoard> OpenDeviceConnection(string name)
+        public async static Task<(MCUBoard board, string calibrationUpdateMsg)> OpenDeviceConnection(string name)
         {
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
             var map = File.Exists("IO.conf") ? IOconfFile.GetMap().SingleOrDefault(m => m.USBPort == name) : null;
             var initialBaudrate = map != null && map.BaudRate != 0 ? map.BaudRate : 115200;
             bool skipAutoDetection = (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;
-            var mcu = await Create(name, initialBaudrate, skipAutoDetection);
+            var (mcu, calibrationUpdateMsg) = await Create(name, initialBaudrate, skipAutoDetection);
             if (!mcu.InitialConnectionSucceeded)
-                mcu = await OpenWithAutoDetection(name, initialBaudrate);
+                (mcu, calibrationUpdateMsg) = await OpenWithAutoDetection(name, initialBaudrate);
             if (mcu.serialNumber.IsNullOrEmpty())
                 mcu.serialNumber = "unknown" + Interlocked.Increment(ref _detectedUnknownBoards);
             if (mcu.InitialConnectionSucceeded && map != null && map.BaudRate != 0 && mcu.port.BaudRate != map.BaudRate)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected baud rate for {map}. Board info {mcu}");
             if (mcu.ConfigSettings.ExpectedHeaderLines > 8)
                 await mcu.SkipExtraHeaders(mcu.ConfigSettings.ExpectedHeaderLines - 8);
-            return mcu;
+            return (mcu, calibrationUpdateMsg);
         }
 
         private async Task<List<string>> SkipExtraHeaders(int extraHeaderLinesToSkip)
@@ -249,15 +252,15 @@ namespace CA_DataUploaderLib
             return lines;
         }
 
-        private async static Task<MCUBoard> OpenWithAutoDetection(string name, int previouslyAttemptedBaudRate)
+        private async static Task<(MCUBoard board, string calibrationUpdateMsg)> OpenWithAutoDetection(string name, int previouslyAttemptedBaudRate)
         { 
             var skipAutoDetection = false;
             if (previouslyAttemptedBaudRate == 115200)
                 return await Create(name, 9600, skipAutoDetection);
             if (previouslyAttemptedBaudRate == 9600)
                 return await Create(name, 115200, skipAutoDetection);
-            var mcu = await Create(name, 115200, skipAutoDetection);
-            return mcu.InitialConnectionSucceeded ? mcu : await Create(name, 9600, skipAutoDetection);
+            var res = await Create(name, 115200, skipAutoDetection);
+            return res.board.InitialConnectionSucceeded ? res : await Create(name, 9600, skipAutoDetection);
         }
 
         /// <returns><c>true</c> if we were able to read</returns>
@@ -302,26 +305,26 @@ namespace CA_DataUploaderLib
                             CALog.LogColor(LogID.A, ConsoleColor.Green, input);
 
                         ableToRead |= input.Length >= 2;
-                        if (input.Contains(MCUBoard.serialNumberHeader))
-                            serialNumber = input.Substring(input.IndexOf(MCUBoard.serialNumberHeader) + MCUBoard.serialNumberHeader.Length).Trim();
-                        else if (input.Contains(MCUBoard.boardFamilyHeader))
-                            productType = input.Substring(input.IndexOf(MCUBoard.boardFamilyHeader) + MCUBoard.boardFamilyHeader.Length).Trim();
-                        else if (input.Contains(MCUBoard.productTypeHeader))
-                            productType = input.Substring(input.IndexOf(MCUBoard.productTypeHeader) + MCUBoard.productTypeHeader.Length).Trim();
-                        else if (input.Contains(MCUBoard.boardVersionHeader))
-                            pcbVersion = input.Substring(input.IndexOf(MCUBoard.boardVersionHeader) + MCUBoard.boardVersionHeader.Length).Trim();
-                        else if (input.Contains(MCUBoard.pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase))
-                            pcbVersion = input.Substring(input.IndexOf(MCUBoard.pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase) + MCUBoard.pcbVersionHeader.Length).Trim();
-                        else if (input.Contains(MCUBoard.boardSoftwareHeader))
-                            softwareCompileDate = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
-                        else if (input.Contains(MCUBoard.softwareCompileDateHeader))
-                            softwareCompileDate = input.Substring(input.IndexOf(MCUBoard.softwareCompileDateHeader) + MCUBoard.softwareCompileDateHeader.Length).Trim();
-                        else if (input.Contains(MCUBoard.boardSoftwareHeader))
-                            softwareVersion = input.Substring(input.IndexOf(MCUBoard.boardSoftwareHeader) + MCUBoard.boardSoftwareHeader.Length).Trim();
-                        else if (input.Contains(MCUBoard.softwareVersionHeader))
-                            softwareVersion = input.Substring(input.IndexOf(MCUBoard.softwareVersionHeader) + MCUBoard.softwareVersionHeader.Length).Trim();
-                        else if (input.Contains(MCUBoard.mcuFamilyHeader))
-                            mcuFamily = input.Substring(input.IndexOf(MCUBoard.mcuFamilyHeader) + MCUBoard.mcuFamilyHeader.Length).Trim();
+                        if (input.Contains(serialNumberHeader))
+                            serialNumber = input[(input.IndexOf(serialNumberHeader) + serialNumberHeader.Length)..].Trim();
+                        else if (input.Contains(boardFamilyHeader))
+                            productType = input[(input.IndexOf(boardFamilyHeader) + boardFamilyHeader.Length)..].Trim();
+                        else if (input.Contains(productTypeHeader))
+                            productType = input[(input.IndexOf(productTypeHeader) + productTypeHeader.Length)..].Trim();
+                        else if (input.Contains(boardVersionHeader))
+                            pcbVersion = input[(input.IndexOf(boardVersionHeader) + boardVersionHeader.Length)..].Trim();
+                        else if (input.Contains(pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase))
+                            pcbVersion = input[(input.IndexOf(pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase) + pcbVersionHeader.Length)..].Trim();
+                        else if (input.Contains(boardSoftwareHeader))
+                            softwareCompileDate = input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim();
+                        else if (input.Contains(softwareCompileDateHeader))
+                            softwareCompileDate = input[(input.IndexOf(softwareCompileDateHeader) + softwareCompileDateHeader.Length)..].Trim();
+                        else if (input.Contains(boardSoftwareHeader))
+                            softwareVersion = input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim();
+                        else if (input.Contains(softwareVersionHeader))
+                            softwareVersion = input[(input.IndexOf(softwareVersionHeader) + softwareVersionHeader.Length)..].Trim();
+                        else if (input.Contains(mcuFamilyHeader))
+                            mcuFamily = input[(input.IndexOf(mcuFamilyHeader) + mcuFamilyHeader.Length)..].Trim();
                         else if (input.Contains("MISREAD") && !sentSerialCommandTwice && serialNumber == null)
                         {
                             port.WriteLine("Serial");
@@ -370,7 +373,7 @@ namespace CA_DataUploaderLib
                 return false; //we did not get a line, more data is needed
             if (input.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase))
             {
-                calibration = input.Substring(input.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length).Trim();
+                calibration = input[(input.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
                 buffer = localBuffer; //avoids the calibration line being treated as data
             }
             return true;

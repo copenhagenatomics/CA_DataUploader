@@ -14,12 +14,12 @@ namespace CA_DataUploaderLib
         private readonly SensorSample _rpiGpuSample;
         private readonly SensorSample _rpiCpuSample;
         public ThermocoupleBox(CommandHandler cmd) : base(cmd, "Temperatures", string.Empty, "show all temperatures in input queue", GetSensors()) 
-        { // these are disabled / null when we are not running on windows, see GetSensors
-            _rpiGpuSample = _values.FirstOrDefault(x => x.Name.EndsWith("Gpu"));
-            _rpiCpuSample = _values.FirstOrDefault(x => x.Name.EndsWith("Cpu"));
+        { // these are disabled / null when we are running on windows, see GetSensors
+            _rpiGpuSample = _values.FirstOrDefault(x => GetSensorName("Gpu").Equals(x.Name));
+            _rpiCpuSample = _values.FirstOrDefault(x => GetSensorName("Cpu").Equals(x.Name));
         }
 
-        protected override List<Task> StartReadLoops((MCUBoard board, SensorSample[] values)[] boards, CancellationToken token)
+        protected override List<Task> StartReadLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
         {
             var loops = base.StartReadLoops(boards, token);
             if (_rpiGpuSample != null || _rpiCpuSample != null) 
@@ -27,7 +27,7 @@ namespace CA_DataUploaderLib
             return loops;
         }
 
-        private async Task ReadRpiTemperaturesLoop(SensorSample gpuSample, SensorSample cpuSample, CancellationToken token)
+        private static async Task ReadRpiTemperaturesLoop(SensorSample gpuSample, SensorSample cpuSample, CancellationToken token)
         {
             var msBetweenReads = 1000; // waiting every second, for higher resolution.
             while (!token.IsCancellationRequested)
@@ -56,7 +56,11 @@ namespace CA_DataUploaderLib
             var values = IOconfFile.GetTypeKAndLeakage();
             var rpiTemp = IOconfFile.GetRPiTemp();
             var addRpiTemp = !rpiTemp.Disabled && !OperatingSystem.IsWindows();
-            return addRpiTemp ? values.Concat(new []{ rpiTemp.WithName(rpiTemp.Name + "Gpu"), rpiTemp.WithName(rpiTemp.Name + "Cpu")}) : values;
+            return addRpiTemp
+                ? values.Concat(new[] { rpiTemp.WithName(GetSensorName("Gpu")), rpiTemp.WithName(GetSensorName("Cpu")) })
+                : values;
         }
+
+        private static string GetSensorName(string suffix) => IOconfFile.GetLoopName() + "-" + IOconfFile.GetRPiTemp().Name + suffix;
     }
 }
