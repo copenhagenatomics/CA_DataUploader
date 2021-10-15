@@ -442,7 +442,7 @@ namespace CA_DataUploaderLib
                 {
                     _sensorNames[i] = _boardList[i].BoxName + "_state";
                     _boardsIndexes[_boardList[i].BoxName] = i;
-                    _states[i] = ConnectionState.Connected;
+                    _states[i] = _boardList[i].Board?.InitialConnectionSucceeded == true ? ConnectionState.Connected : ConnectionState.Disconnected;
                 }
             }
 
