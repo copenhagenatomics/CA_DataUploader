@@ -41,7 +41,9 @@ namespace CA_DataUploaderLib
             lock (this)
             { //important: the lock is only to start the task i.e. it is intended that there are no awaits while in the lock section.
                 if (_runningTask != null) return _runningTask;
-                return _runningTask = Task.WhenAll(_reader.Run(token), RunBoardControlLoops(_ports, token));
+                //the Task.Run around the _reader.Run is because _reader.Run can raise the _reader.Stopping event in its sync code path.
+                //this prevents continuing the sync code path of this method (and the caller) while Stopping finishes being raised, which in turn would deadlock as it waits on RunBoardControlLoops to finish running.
+                return _runningTask = Task.WhenAll(Task.Run(() => _reader.Run(token)), RunBoardControlLoops(_ports, token));
             }
         }
 
