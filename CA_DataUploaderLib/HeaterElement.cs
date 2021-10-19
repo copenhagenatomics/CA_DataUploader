@@ -21,6 +21,7 @@ namespace CA_DataUploaderLib
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
         private readonly Stopwatch timeSinceLastNegativeValuesWarning = new Stopwatch();
         private readonly Stopwatch timeSinceLastMissingTemperatureWarning = new Stopwatch();
+        private readonly Stopwatch timeSinceLastMissingTemperatureBoardWarning = new Stopwatch();
         private SwitchboardAction _lastAction = new SwitchboardAction(false, DateTime.UtcNow);
 
         public HeaterElement(IOconfHeater heater, IOconfOven oven) : this(ToConfig(heater, oven))
@@ -156,7 +157,8 @@ namespace CA_DataUploaderLib
         {
             var sensor = _config.OvenSensor;
             if (sensor == null) return (false, double.MaxValue);
-            if (!TemperatureBoardsAreConnected(vector, _config.TemperatureBoardStateSensorNames)) return (false, double.MaxValue);
+            if (!TemperatureBoardsAreConnected(vector, _config.TemperatureBoardStateSensorNames))
+                return (false, double.MaxValue); 
             if (!vector.TryGetValue(sensor, out var val))
                 WarnMissingSensor(sensor);
             else if (val <= 10000 && val > 0) // we only use valid positive values. Note some temperature hubs alternate between 10k+ and 0 for errors.
@@ -166,12 +168,16 @@ namespace CA_DataUploaderLib
             return (false, double.MaxValue);
         }
 
-        private static bool TemperatureBoardsAreConnected(NewVectorReceivedArgs vector, IReadOnlyCollection<string> boardStateSensorNames)
+        private bool TemperatureBoardsAreConnected(NewVectorReceivedArgs vector, IReadOnlyCollection<string> boardStateSensorNames)
         {
             foreach (var board in boardStateSensorNames)
             {
                 if (!vector.TryGetValue(board, out var state))
-                    throw new InvalidOperationException($"missing temperature board's connection state: {board}");
+                {//seeing this warning must likely would mean there is a bug, as config validations and overall design is supposed to ensure we always have the board state in the vector.
+                    LowFrequencyWarning(timeSinceLastMissingTemperatureBoardWarning, $"detected missing temperature board {board} in vector for heater {Name()}.");
+                    return false;
+                }
+
                 if (state != (int)BaseSensorBox.ConnectionState.ReceivingValues)
                     return false;
             }
@@ -188,7 +194,7 @@ namespace CA_DataUploaderLib
             LowFrequencyWarning(
                 timeSinceLastMissingTemperatureWarning,
                 $"detected missing temperature sensor {sensorName} for heater {Name()}. Confirm the name is listed exactly as is in the plot.");
-        
+
         private static void LowFrequencyWarning(Stopwatch watch, string message)
         {
             if (watch.IsRunning && watch.Elapsed.Hours < 1) return;
@@ -255,13 +261,10 @@ namespace CA_DataUploaderLib
 
         private static (int area, string ovenSensor, IReadOnlyCollection<string> boardStateSensorNames, string alertMessage) GetOvenInfo(string heaterName, IOconfOven oven)
         {
-            if (oven != null && oven.IsTemperatureSensorInitialized)
+            if (oven != null)
                 return (oven.OvenArea, oven.TemperatureSensorName, oven.BoardStateSensorNames, default);
-            if (oven == null)
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heaterName}");
-            else if (!oven.IsTemperatureSensorInitialized)
-                return (-1, default, default, $"Warn: disabled oven for heater {heaterName} - missing temperature board");
 
+            CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heaterName}");
             return (-1, default, default, default);
         }
 

@@ -142,8 +142,9 @@ namespace CA_DataUploaderLib
             try
             {
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, _boardLoopsStopTokenSource.Token);
-                var boardLoops = ports
-                    .Where(p => p.Map.Board != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start. Note the reader in the ctor already reports the missing board.
+                //we ignore remote boards and boards missing during the start sequence (as we don't have auto reconnect logic yet for those). Note the reader in the ctor already reports the missing local boards.
+                var connectedBoards = ports.Where(p => p.Map.IsLocalBoard && p.Map.Board != null);
+                var boardLoops = connectedBoards
                     .GroupBy(v => v.Map.Board)
                     .Select(g => BoardLoop(g.Key, g.ToList(), linkedCts.Token))
                     .ToList();
