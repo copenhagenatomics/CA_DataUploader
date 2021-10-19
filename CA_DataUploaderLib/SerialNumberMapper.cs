@@ -27,6 +27,9 @@ namespace CA_DataUploaderLib
             return new SerialNumberMapper(boards.Select(b => b.board), boards.Where(b => b.calibrationUpdateMsg != default).Select(b => b.calibrationUpdateMsg));
         }
 
+        public static Task<SerialNumberMapper> SkipDetection() 
+            => Task.FromResult(new SerialNumberMapper(Enumerable.Empty<MCUBoard>(), Enumerable.Empty<string>()));
+
         private static async Task<(MCUBoard board, string calibrationUpdateMsg)> AttemptToOpenDeviceConnection(string name, CALogLevel logLevel)
         {
             try

@@ -13,10 +13,10 @@ namespace CA_DataUploaderLib.IOconf
         {
             format = "Node;Name;ipaddress:port";
             var list = ToList();
-            if (list.Count < 4)
+            if (list.Count < 3)
                 throw new Exception($"IOconfNode: wrong format: {row} {format}");
             Name = list[1];
-            if (IPEndPoint.TryParse(list[2], out var endPoint))
+            if (!IPEndPoint.TryParse(list[2], out var endPoint))
                 throw new Exception($"IOconfNode: failed to parse the passed ip address. format: {row} {format}");
             EndPoint = endPoint;
         }
