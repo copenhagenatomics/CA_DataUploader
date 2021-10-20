@@ -97,7 +97,8 @@ namespace CA_DataUploaderLib
             foreach (var subsystem in _subsystems)
             {
                 var subsystemItems = subsystem.GetVectorDescriptionItems();
-                CALog.LogInfoAndConsoleLn(LogID.A, $"{subsystemItems.Count,2} datapoints from {subsystem.Title}");
+                if (subsystemItems.Count > 0)
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"{subsystemItems.Count,2} datapoints from {subsystem.Title}");
                 items.AddRange(subsystemItems);
             }
 

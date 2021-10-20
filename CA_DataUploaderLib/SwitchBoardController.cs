@@ -11,10 +11,8 @@ using Humanizer;
 
 namespace CA_DataUploaderLib
 {
-    public sealed class SwitchBoardController : IDisposable
+    public sealed class SwitchBoardController : IDisposable, ISubsystemWithVectorData
     {
-        /// <summary>runs when the subsystem is about to stop running, but before all boards are closed</summary>
-        /// <remarks>some boards might be closed, specially if the system is stopping due to losing connection to one of the boards</remarks>
         private readonly BaseSensorBox _reader;
         private static readonly object ControllerInitializationLock = new object();
         private readonly PluginsCommandHandler _cmd;
@@ -22,7 +20,8 @@ namespace CA_DataUploaderLib
         private static SwitchBoardController _instance;
         private readonly TaskCompletionSource _boardControlLoopsStopped = new TaskCompletionSource();
         private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
-        private Task _runningTask;
+
+        public string Title => "SwitchboardActuation"; //not really displayed as this subsystem does not have data points
 
         private SwitchBoardController(CommandHandler cmd) 
         {
@@ -31,22 +30,16 @@ namespace CA_DataUploaderLib
             var boardsTemperatures = _ports.GroupBy(p => p.BoxName).Select(b => b.Select(p => p.GetBoardTemperatureInputConf()).FirstOrDefault());
             var sensorPortsInputs = IOconfFile.GetEntries<IOconfSwitchboardSensor>().SelectMany(i => i.GetExpandedConf());
             var inputs = _ports.SelectMany(p => p.GetExpandedInputConf()).Concat(boardsTemperatures).Concat(sensorPortsInputs);
+            //we register the subsystem before the reader auto registers, ensuring our Run is called first.
+            //reason: if there are no boards connected, _reader.Stopping can be raised synchronously
+            //        preventing our sub system from running and causing a deadlock as it WaitForLoopStopped.
+            cmd.AddSubsystem(this); 
             _reader = new BaseSensorBox(cmd, "switchboards", string.Empty, "show switchboards inputs", inputs);
             _reader.Stopping += WaitForLoopStopped;
             cmd.AddCommand("escape", Stop);
         }
 
-        public Task Run(CancellationToken token)
-        {
-            lock (this)
-            { //important: the lock is only to start the task i.e. it is intended that there are no awaits while in the lock section.
-                if (_runningTask != null) return _runningTask;
-                //the Task.Run around the _reader.Run is because _reader.Run can raise the _reader.Stopping event in its sync code path.
-                //this prevents continuing the sync code path of this method (and the caller) while Stopping finishes being raised, which in turn would deadlock as it waits on RunBoardControlLoops to finish running.
-                return _runningTask = Task.WhenAll(Task.Run(() => _reader.Run(token)), RunBoardControlLoops(_ports, token));
-            }
-        }
-
+        public Task Run(CancellationToken token) => RunBoardControlLoops(_ports, token);
         public void Dispose() 
         { 
             _boardLoopsStopTokenSource.Cancel();
@@ -212,5 +205,9 @@ namespace CA_DataUploaderLib
             _boardControlLoopsStopped.Task.Wait();
             CALog.LogData(LogID.A, "finished waiting for switchboards loops");
         }
+
+        public List<VectorDescriptionItem> GetVectorDescriptionItems() => new List<VectorDescriptionItem>();
+        public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
+        public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs) => Enumerable.Empty<SensorSample>();
     }
 }
