@@ -9,7 +9,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfOven(string row, int lineNum) : base(row, lineNum, "Oven")
         {
-            format = "Oven;Area;HeatingElement;TypeK";
+            format = "Oven;Area;HeatingElement;TypeK;[ProportionalGain]";
 
             var list = ToList();
             if (!int.TryParse(list[1], out OvenArea)) 
@@ -33,6 +33,11 @@ namespace CA_DataUploaderLib.IOconf
                     throw new Exception($"Failed to find temperature sensor {TemperatureSensorName} for oven");
             }
             BoardStateSensorNames = TypeKs.Select(k => k.BoardStateSensorName).ToList().AsReadOnly();
+
+            if (list.Count < 5) return;
+            if (!list[4].TryToDouble(out var proportionalGain))
+                throw new Exception($"Failed to parse the specified proportional gain: {row}");
+            ProportionalGain = proportionalGain;
         }
 
         public int OvenArea;
@@ -40,6 +45,7 @@ namespace CA_DataUploaderLib.IOconf
         public bool IsTemperatureSensorInitialized => TypeKs.All(k => k.IsInitialized());
         public string TemperatureSensorName { get; }
         public IReadOnlyCollection<string> BoardStateSensorNames {get;}
+        public double ProportionalGain { get; }
         private readonly List<IOconfTypeK> TypeKs;
     }
 }

@@ -15,6 +15,7 @@ namespace CA_DataUploaderLib
         private DateTime LastAutoOff = DateTime.MinValue; // assume there is no previous off
         private DateTime invalidValuesStartedVectorTime = default;
         private double onTemperature = 10000;
+        private DateTime globalTimeOff;
         public bool IsOn;
         private bool ManualTurnOn;
         private bool PendingManualModeExecution;
@@ -101,8 +102,26 @@ namespace CA_DataUploaderLib
             if (temperature >= OvenTargetTemperature)
                 return false; // already at target temperature. 
 
+            globalTimeOff = GetProportionalControlTimeOff(temperature, vectorTime);
+            if (globalTimeOff == vectorTime)
+                return false;
+
             onTemperature = temperature;
             return SetOnProperties();
+        }
+
+        private DateTime GetProportionalControlTimeOff(double currentTemperature, DateTime vectorTime)
+        {
+            var gain = _config.ProportionalGain;
+            if (gain == default)
+                return DateTime.MaxValue; //if we are not using proportional gain there is no max duration, so the heater will turn off the moment the temperature sensor reaches the target temperature (or temp increased 20C, see MustTurnOff)
+
+            var tempDifference = OvenTargetTemperature - currentTemperature;
+            var secondsOn = tempDifference * gain;
+            if (secondsOn < 1d) //randomly chosen limit to avoid too frequent actuations.
+                return vectorTime;
+
+            return vectorTime.AddSeconds(secondsOn);
         }
 
         private bool MustTurnOff(bool hasValidTemperature, double temperature, DateTime vectorTime)
@@ -122,6 +141,9 @@ namespace CA_DataUploaderLib
 
             if (temperature > OvenTargetTemperature)
                 return SetAutoOffProperties(vectorTime); //turn off: already at target temperature
+
+            if (vectorTime >= globalTimeOff)
+                return SetAutoOffProperties(vectorTime);
 
             return false;
         }
@@ -238,11 +260,12 @@ namespace CA_DataUploaderLib
 
         private static Config ToConfig(IOconfHeater heater, IOconfOven oven)
         {
-            var (area, ovenSensor, boardStateSensorNames, alertMessage) = GetOvenInfo(heater.Name, oven);
+            var (area, ovenSensor, proportionalGain, boardStateSensorNames, alertMessage) = GetOvenInfo(heater.Name, oven);
             return new Config
             {
                 Area = area,
                 OvenSensor = ovenSensor,
+                ProportionalGain = proportionalGain,
                 TemperatureBoardStateSensorNames = boardStateSensorNames,
                 MaxTemperature = heater.MaxTemperature,
                 CurrentSensingNoiseTreshold = heater.CurrentSensingNoiseTreshold,
@@ -253,16 +276,16 @@ namespace CA_DataUploaderLib
             };
         }
 
-        private static (int area, string ovenSensor, IReadOnlyCollection<string> boardStateSensorNames, string alertMessage) GetOvenInfo(string heaterName, IOconfOven oven)
+        private static (int area, string ovenSensor, double proportionalGain, IReadOnlyCollection<string> boardStateSensorNames, string alertMessage) GetOvenInfo(string heaterName, IOconfOven oven)
         {
             if (oven != null && oven.IsTemperatureSensorInitialized)
-                return (oven.OvenArea, oven.TemperatureSensorName, oven.BoardStateSensorNames, default);
+                return (oven.OvenArea, oven.TemperatureSensorName, oven.ProportionalGain, oven.BoardStateSensorNames, default);
             if (oven == null)
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heaterName}");
             else if (!oven.IsTemperatureSensorInitialized)
-                return (-1, default, default, $"Warn: disabled oven for heater {heaterName} - missing temperature board");
+                return (-1, default, default, default, $"Warn: disabled oven for heater {heaterName} - missing temperature board");
 
-            return (-1, default, default, default);
+            return (-1, default, default, default, default);
         }
 
         public class Config
@@ -276,6 +299,7 @@ namespace CA_DataUploaderLib
             public string CurrentSensorName { get; set; }
             public IReadOnlyCollection<string> TemperatureBoardStateSensorNames { get; set; }
             public string AlertMessage { get; internal set; }
+            public double ProportionalGain { get; set; }
         }
     }
 }
