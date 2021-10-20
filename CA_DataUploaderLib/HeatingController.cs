@@ -52,10 +52,12 @@ namespace CA_DataUploaderLib
 
         public Task Run(CancellationToken token)
         {
+            //we only report detected config alerts after all subsystems are initialized (and alerts can be delivered).
+            //the actual read and actuation is done by the SwitchBoardController subsystem.
             foreach (var heater in _heaters)
                 heater.ReportDetectedConfigAlerts(_cmdUnwrapped);
 
-            return _switchboardController.Run(token);
+            return Task.CompletedTask; 
         }
 
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
