@@ -73,7 +73,7 @@ namespace UnitTests
         [TestMethod]
         public void WhenHeaterIsOnCanTurnOffBeforeReachingTargetTemperatureBasedOnProportionalGain()
         {
-            //in this test we are 6 degrees below the target temperature when first actuating (so when it turns on)
+            //in this test we are 6 degrees below the target temperature when first actuating (so it turns on)
             //and even though the temperature did not change the proportional gain must turn the heater off after the expected amount of time.
             //the gain of 2 means there should pass 2 seconds for every 1C to gain, so we expect it to take 12 seconds before it decides to turn off.
             var element = new HeaterElement(NewConfig.WithProportionalGain(2).Build());
@@ -94,11 +94,11 @@ namespace UnitTests
             newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(17).ToVectorDouble();
             action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
-            Assert.AreEqual(false, action.IsOn, "should remain off within 10 seconds after turning off / 10 seconds off rule in MustTurnOff");
+            Assert.AreEqual(false, action.IsOn, "should remain off within 30 seconds after turning on");
             newSamples = NewVectorSamples;
-            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(22).ToVectorDouble();
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(30).ToVectorDouble();
             action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
-            Assert.AreEqual(true, action.IsOn, "should try heating again 10 seconds after it turned off");
+            Assert.AreEqual(true, action.IsOn, "should try heating again 30 seconds after it turned off");
         }
 
         [TestMethod, Description("avoiding making action changes when we don't have connection to the switchboard anyway")]
@@ -155,12 +155,12 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void ReconnectedUnderTargetTemperatureKeepsOnAction()
+        public void ReconnectedUnderTargetTemperatureWaitsForNextControlPeriod()
         { 
             var element = new HeaterElement(NewConfig.Build());
             element.SetTargetTemperature(45);
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
-            var firstAction = element.MakeNextActionDecision(vector);
+            element.MakeNextActionDecision(vector);
             var newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(1).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
@@ -169,8 +169,11 @@ namespace UnitTests
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(3).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.ReceivingValues;
             var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
-            Assert.IsTrue(newAction.IsOn); 
-            Assert.AreEqual(firstAction, newAction);
+            Assert.IsFalse(newAction.IsOn); 
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(30).ToVectorDouble();
+            newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.IsTrue(newAction.IsOn);
         }
 
         [TestMethod]
@@ -196,7 +199,7 @@ namespace UnitTests
 
         private class HeaterElementConfigBuilder
         {
-            private double _proportionalGain;
+            private double _proportionalGain = 0.2d;
 
             public HeaterElementConfigBuilder WithProportionalGain(double value)
             { 
@@ -208,6 +211,7 @@ namespace UnitTests
                 new HeaterElement.Config
                 {
                     ProportionalGain = _proportionalGain,
+                    ControlPeriod = TimeSpan.FromSeconds(30),
                     Area = 0,
                     SwitchBoardStateSensorName = "box_state",
                     TemperatureBoardStateSensorNames = new List<string>{ "temperature_state" },
