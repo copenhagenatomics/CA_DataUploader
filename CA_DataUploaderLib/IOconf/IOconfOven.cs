@@ -9,7 +9,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfOven(string row, int lineNum) : base(row, lineNum, "Oven")
         {
-            format = "Oven;Area;HeatingElement;TypeK";
+            format = "Oven;Area;HeatingElement;TypeK;[ProportionalGain];[ControlPeriod]";
 
             var list = ToList();
             if (!int.TryParse(list[1], out OvenArea)) 
@@ -33,6 +33,16 @@ namespace CA_DataUploaderLib.IOconf
                     throw new Exception($"Failed to find temperature sensor {TemperatureSensorName} for oven");
             }
             BoardStateSensorNames = TypeKs.Select(k => k.BoardStateSensorName).ToList().AsReadOnly();
+
+            if (list.Count < 5) return;
+            if (!list[4].TryToDouble(out var proportionalGain))
+                throw new Exception($"Failed to parse the specified proportional gain: {row}");
+            ProportionalGain = proportionalGain;
+
+            if (list.Count < 6) return;
+            if (!TimeSpan.TryParse(list[5], out var controlPeriod))
+                throw new Exception($"Failed to parse the specified control period: {row}");
+            ControlPeriod = controlPeriod;
         }
 
         public int OvenArea;
@@ -40,6 +50,10 @@ namespace CA_DataUploaderLib.IOconf
         public bool IsTemperatureSensorInitialized => TypeKs.All(k => k.IsInitialized());
         public string TemperatureSensorName { get; }
         public IReadOnlyCollection<string> BoardStateSensorNames {get;}
+        //with the current formula the gain pretty much means seconds to gain 1C
+        //by default we assume the HeatingElement can heat TypeK 5 degrees x second on. 
+        public double ProportionalGain { get; } = 0.2d; 
+        public TimeSpan ControlPeriod { get; } = TimeSpan.FromSeconds(30);
         private readonly List<IOconfTypeK> TypeKs;
     }
 }
