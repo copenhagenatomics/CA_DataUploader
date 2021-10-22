@@ -132,11 +132,12 @@ namespace CA_DataUploaderLib
 
         protected virtual List<Task> StartReadLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
         {
-            var missingBoards = boards.Where(h => h.map.Board == null).Select(b => b.map.BoxName).Distinct().ToList();
+            var localBoards = boards.Where(b => b.map.IsLocalBoard);
+            var missingBoards = localBoards.Where(h => h.map.Board == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
                 _cmd.FireAlert($"{Title} - missing boards detected {string.Join(",", missingBoards)}. Related sensors/actuators are disabled.");
 
-            return boards
+            return localBoards
                 .Where(b => b.map.Board != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
                 .Select(b => BoardLoop(b.map.Board, b.values, token))
                 .ToList();
