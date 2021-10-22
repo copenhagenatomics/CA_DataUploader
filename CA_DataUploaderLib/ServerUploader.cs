@@ -113,7 +113,8 @@ namespace CA_DataUploaderLib
                 }
                 catch (Exception ex)
                 {
-                    CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message, ex);
+                    if(!Environment.MachineName.StartsWith("DESKTOP"))
+                        CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message, ex);
                 }
             }
 
