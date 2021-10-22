@@ -12,9 +12,8 @@ namespace CA_DataUploaderLib
         private int OvenTargetTemperature;
         private readonly Config _config;
         private DateTime LastOff = DateTime.MinValue; // assume there is no previous off
-        private DateTime LastAutoOff = DateTime.MinValue; // assume there is no previous off
         private DateTime invalidValuesStartedVectorTime = default;
-        private double onTemperature = 10000;
+        private DateTime globalTimeOff;
         public bool IsOn;
         private bool ManualTurnOn;
         private bool PendingManualModeExecution;
@@ -23,6 +22,7 @@ namespace CA_DataUploaderLib
         private readonly Stopwatch timeSinceLastMissingTemperatureWarning = new Stopwatch();
         private readonly Stopwatch timeSinceLastMissingTemperatureBoardWarning = new Stopwatch();
         private SwitchboardAction _lastAction = new SwitchboardAction(false, DateTime.UtcNow);
+        private DateTime LastAutoOn;
 
         public HeaterElement(IOconfHeater heater, IOconfOven oven) : this(ToConfig(heater, oven))
         {
@@ -96,14 +96,30 @@ namespace CA_DataUploaderLib
             if (OvenTargetTemperature <= 0) return false; // oven's command is off, skip any extra checks
             if (!hasValidTemperature) return false; // no valid oven sensors
 
-            if (LastAutoOff > vectorTime.AddSeconds(-10))
-                return false;  // less than 10 seconds since we last turned it off
-
             if (temperature >= OvenTargetTemperature)
                 return false; // already at target temperature. 
 
-            onTemperature = temperature;
+            globalTimeOff = GetProportionalControlTimeOff(temperature, vectorTime);
+            if (globalTimeOff == vectorTime)
+                return false;
+
             return SetOnProperties();
+        }
+
+        private DateTime GetProportionalControlTimeOff(double currentTemperature, DateTime vectorTime)
+        {
+            var gain = _config.ProportionalGain;
+            var tempDifference = OvenTargetTemperature - currentTemperature;
+            var secondsOn = tempDifference * gain;
+            if (secondsOn < 0.1d) //we can't turn off less than the decision cycle duration (switchboards take at least 1 second so we explicitely shut off on the next cycle).
+                return vectorTime;
+
+            if ((vectorTime - LastAutoOn) < _config.ControlPeriod)
+                return vectorTime; //less than the control period since we last turned it on
+
+            secondsOn = Math.Min(secondsOn, _config.ControlPeriod.TotalSeconds); //we act max for this control period so we can re-evaluate where we are for next actuation
+            LastAutoOn = vectorTime;
+            return vectorTime.AddSeconds(secondsOn);
         }
 
         private bool MustTurnOff(bool hasValidTemperature, double temperature, DateTime vectorTime)
@@ -118,22 +134,17 @@ namespace CA_DataUploaderLib
             else if (timeoutResult.HasValue)
                 return false; // no valid temperatures, waiting up to 2 seconds before turn off
 
-            if (onTemperature < 10000 && temperature > onTemperature + 20)
-                return SetAutoOffProperties(vectorTime); // turn off: already 20C higher than the last time we turned on
-
             if (temperature > OvenTargetTemperature)
                 return SetAutoOffProperties(vectorTime); //turn off: already at target temperature
+
+            if (vectorTime >= globalTimeOff)
+                return SetAutoOffProperties(vectorTime);
 
             return false;
         }
 
         // returns true to simplify MustTurnOff
-        private bool SetAutoOffProperties(DateTime vectorTime)
-        {
-            LastAutoOff = vectorTime;
-            return SetOffProperties(vectorTime);
-        }
-
+        private bool SetAutoOffProperties(DateTime vectorTime) => SetOffProperties(vectorTime);
         private bool SetOffProperties(DateTime vectorTime)
         {
             IsOn = false;
@@ -244,11 +255,13 @@ namespace CA_DataUploaderLib
 
         private static Config ToConfig(IOconfHeater heater, IOconfOven oven)
         {
-            var (area, ovenSensor, boardStateSensorNames, alertMessage) = GetOvenInfo(heater.Name, oven);
+            var (area, ovenSensor, proportionalGain, controlPeriod, boardStateSensorNames, alertMessage) = GetOvenInfo(heater.Name, oven);
             return new Config
             {
                 Area = area,
                 OvenSensor = ovenSensor,
+                ProportionalGain = proportionalGain,
+                ControlPeriod = controlPeriod,
                 TemperatureBoardStateSensorNames = boardStateSensorNames,
                 MaxTemperature = heater.MaxTemperature,
                 CurrentSensingNoiseTreshold = heater.CurrentSensingNoiseTreshold,
@@ -259,13 +272,13 @@ namespace CA_DataUploaderLib
             };
         }
 
-        private static (int area, string ovenSensor, IReadOnlyCollection<string> boardStateSensorNames, string alertMessage) GetOvenInfo(string heaterName, IOconfOven oven)
+        private static (int area, string ovenSensor, double proportionalGain, TimeSpan controlPeriod, IReadOnlyCollection<string> boardStateSensorNames, string alertMessage) GetOvenInfo(string heaterName, IOconfOven oven)
         {
             if (oven != null)
-                return (oven.OvenArea, oven.TemperatureSensorName, oven.BoardStateSensorNames, default);
+                return (oven.OvenArea, oven.TemperatureSensorName, oven.ProportionalGain, oven.ControlPeriod, oven.BoardStateSensorNames, default);
 
             CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heaterName}");
-            return (-1, default, default, default);
+            return (-1, default, default, TimeSpan.FromSeconds(30), default, default);
         }
 
         public class Config
@@ -279,6 +292,8 @@ namespace CA_DataUploaderLib
             public string CurrentSensorName { get; set; }
             public IReadOnlyCollection<string> TemperatureBoardStateSensorNames { get; set; }
             public string AlertMessage { get; internal set; }
+            public double ProportionalGain { get; set; }
+            public TimeSpan ControlPeriod { get; set; }
         }
     }
 }

@@ -70,6 +70,37 @@ namespace UnitTests
             Assert.AreEqual(true, action.IsOn);
         }
 
+        [TestMethod]
+        public void WhenHeaterIsOnCanTurnOffBeforeReachingTargetTemperatureBasedOnProportionalGain()
+        {
+            //in this test we are 6 degrees below the target temperature when first actuating (so it turns on)
+            //and even though the temperature did not change the proportional gain must turn the heater off after the expected amount of time.
+            //the gain of 2 means there should pass 2 seconds for every 1C to gain, so we expect it to take 12 seconds before it decides to turn off.
+            var element = new HeaterElement(NewConfig.WithProportionalGain(2).Build());
+            element.SetTargetTemperature(50);
+            NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
+            element.MakeNextActionDecision(vector);
+            var newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(5).ToVectorDouble();
+            var action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.AreEqual(true, action.IsOn, "should still be on after 5 seconds");
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(11).ToVectorDouble();
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.AreEqual(true, action.IsOn, "should still be on after 11 seconds");
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(12).ToVectorDouble();
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.AreEqual(false, action.IsOn, "should be off after 12 seconds");
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(17).ToVectorDouble();
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.AreEqual(false, action.IsOn, "should remain off within 30 seconds after turning on");
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(30).ToVectorDouble();
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.AreEqual(true, action.IsOn, "should try heating again 30 seconds after it turned off");
+        }
+
         [TestMethod, Description("avoiding making action changes when we don't have connection to the switchboard anyway")]
         //Note that the switchboard controller would ignore the action regardless of what we send due to the disconnect.
         //However, having the decision logic explicitely indicate there is no action change better reflects the situation.
@@ -124,12 +155,12 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void ReconnectedUnderTargetTemperatureKeepsOnAction()
+        public void ReconnectedUnderTargetTemperatureWaitsForNextControlPeriod()
         { 
             var element = new HeaterElement(NewConfig.Build());
             element.SetTargetTemperature(45);
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
-            var firstAction = element.MakeNextActionDecision(vector);
+            element.MakeNextActionDecision(vector);
             var newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(1).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
@@ -138,8 +169,11 @@ namespace UnitTests
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(3).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.ReceivingValues;
             var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
-            Assert.IsTrue(newAction.IsOn); 
-            Assert.AreEqual(firstAction, newAction);
+            Assert.IsFalse(newAction.IsOn); 
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(30).ToVectorDouble();
+            newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.IsTrue(newAction.IsOn);
         }
 
         [TestMethod]
@@ -165,9 +199,19 @@ namespace UnitTests
 
         private class HeaterElementConfigBuilder
         {
+            private double _proportionalGain = 0.2d;
+
+            public HeaterElementConfigBuilder WithProportionalGain(double value)
+            { 
+                _proportionalGain = value;
+                return this;
+            }
+
             public HeaterElement.Config Build() =>
                 new HeaterElement.Config
                 {
+                    ProportionalGain = _proportionalGain,
+                    ControlPeriod = TimeSpan.FromSeconds(30),
                     Area = 0,
                     SwitchBoardStateSensorName = "box_state",
                     TemperatureBoardStateSensorNames = new List<string>{ "temperature_state" },
