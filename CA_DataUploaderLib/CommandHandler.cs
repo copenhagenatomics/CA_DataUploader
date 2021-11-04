@@ -63,7 +63,7 @@ namespace CA_DataUploaderLib
         public VectorDescription GetFullSystemVectorDescription() => _fullsystemFilterAndMath.Value.VectorDescription;
         /// <remarks>This method is experimental and is likely to change in the future</remarks>
         public VectorDescription GetInputsOnlyVectorDescription() => _fullsystemFilterAndMath.Value.InputsDescription;
-        /// <remarks>This method is only aimed at single host scenarios where a single system has all the the system that hashas all the inputs </remarks>
+        /// <remarks>This method is only aimed at single host scenarios where a single system has all the inputs</remarks>
         public (List<SensorSample> samples, DateTime vectorTime) GetFullSystemVectorValues() => MakeDecision(GetNodeInputs().ToList(), DateTime.UtcNow);
         /// <remarks>This method is experimental and is likely to change in the future</remarks>
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
