@@ -22,7 +22,7 @@ namespace CA_DataUploaderLib
         protected override List<Task> StartReadLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
         {
             var loops = base.StartReadLoops(boards, token);
-            if (_rpiGpuSample != null || _rpiCpuSample != null) 
+            if (_rpiGpuSample != null && _rpiCpuSample != null && !OperatingSystem.IsWindows()) 
                 loops.Add(ReadRpiTemperaturesLoop(_rpiGpuSample, _rpiCpuSample, token));
             return loops;
         }
@@ -55,7 +55,7 @@ namespace CA_DataUploaderLib
         {
             var values = IOconfFile.GetTypeKAndLeakage();
             var rpiTemp = IOconfFile.GetRPiTemp();
-            var addRpiTemp = !rpiTemp.Disabled && !OperatingSystem.IsWindows();
+            var addRpiTemp = !rpiTemp.Disabled;
             return addRpiTemp
                 ? values.Concat(new[] { rpiTemp.WithName(GetSensorName("Gpu")), rpiTemp.WithName(GetSensorName("Cpu")) })
                 : values;

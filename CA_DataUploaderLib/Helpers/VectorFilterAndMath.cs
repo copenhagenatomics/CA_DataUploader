@@ -10,14 +10,17 @@ namespace CA_DataUploaderLib.Helpers
     public class VectorFilterAndMath
     {
         private readonly CALogLevel _logLevel;
-        private List<FilterSample> _values;
-        private MathVectorExpansion _mathVectorExpansion;
-        private int _outputCount;
+        private readonly List<FilterSample> _values;
+        private readonly MathVectorExpansion _mathVectorExpansion;
+        private readonly int _outputCount;
         public VectorDescription VectorDescription { get; }
+        /// <remarks>This property is experimental and is likely to change/be remoevd in the future</remarks
+        public VectorDescription InputsDescription { get; }
 
         public VectorFilterAndMath(VectorDescription vectorDescription)
         {
             _logLevel = IOconfFile.GetOutputLevel();
+            InputsDescription = GetInputsOnlyVectorDescription(vectorDescription);
             VectorDescription = vectorDescription;
             _values = GetFilters(vectorDescription);
             vectorDescription._items.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Output.Name, DataTypeEnum.Input)));
@@ -27,7 +30,14 @@ namespace CA_DataUploaderLib.Helpers
             _outputCount = MoveOutputsToTheEnd(vectorDescription._items);
         }
 
-        private int MoveOutputsToTheEnd(List<VectorDescriptionItem> items)
+        private static VectorDescription GetInputsOnlyVectorDescription(VectorDescription vectorDescription)
+        {
+            List<VectorDescriptionItem> inputs = vectorDescription._items.ToList();
+            inputs.RemoveAll(i => i.DirectionType == DataTypeEnum.Output);
+            return new VectorDescription(inputs, vectorDescription.Hardware, vectorDescription.Software) { IOconf = vectorDescription.IOconf };
+        }
+
+        private static int MoveOutputsToTheEnd(List<VectorDescriptionItem> items)
         {
             var outputs = items.Where(i => i.DirectionType == DataTypeEnum.Output).ToList();
             items.RemoveAll(i => i.DirectionType == DataTypeEnum.Output);
