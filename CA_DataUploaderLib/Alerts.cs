@@ -56,7 +56,7 @@ namespace CA_DataUploaderLib
         {
             if (args.Count < 3)
             {
-                logger.LogError($"Unexpected format for Dynamic alert: {string.Join(',', args)}. Format: addalert AlertName SensorName comparison value");
+                logger.LogError($"Unexpected format for Dynamic alert: {string.Join(',', args)}. Format: addalert AlertName SensorName comparison value [rateMinutes] [command]");
                 return Task.CompletedTask;
             }
 
