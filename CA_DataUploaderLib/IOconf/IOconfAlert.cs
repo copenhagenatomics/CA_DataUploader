@@ -41,7 +41,15 @@ namespace CA_DataUploaderLib.IOconf
                 name, expression, "alert expression - wrong format: " + expression + ". Expression format: SensorName comparison value.");
             Message = MessageTemplate;
             RateLimitMinutes = rateLimit ?? DefaultRateLimitMinutes;
-            Command = "emergencyshutdown";
+            Command = triggersEmergencyShutdown ? "emergencyshutdown" : null;
+        }
+
+        public IOconfAlert(string name, string expressionWithOptions) : base("DynamicAlert", 0, "DynamicAlert")
+        {
+            Name = name;
+            (Sensor, Value, MessageTemplate, type, RateLimitMinutes, Command) = ParseExpressionWithOptions(
+                name, expressionWithOptions, "alert expression with options - wrong format: " + expressionWithOptions + ". Expression with options format: SensorName comparison value [rateMinutes] [command].");
+            Message = MessageTemplate;
         }
 
         public string Name { get; set; }
@@ -55,8 +63,9 @@ namespace CA_DataUploaderLib.IOconf
         private bool _isFirstCheck = true;
         //expression captures groups: 1-sensor, 2-comparison, 3-value
         //sample expression: SomeValue < 202
-        private static readonly Regex comparisonRegex = new Regex(@"^\s*([\w%]+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)\s*$");
-        private readonly int RateLimitMinutes;
+        private static readonly Regex comparisonRegex = new(@"^\s*([\w%]+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)\s*$");
+        private static readonly Regex expressionWithOptionsRegex = new(@"^\s*([\w%]+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)\s*(\d+\s*)?\s*(.+)?$");
+        public int RateLimitMinutes { get; }
         private const int DefaultRateLimitMinutes = 30; // by default fire the same alert max once every 30 mins.
         private DateTime LastTriggered;
 
@@ -100,6 +109,11 @@ namespace CA_DataUploaderLib.IOconf
             var match = comparisonRegex.Match(expression);
             if (!match.Success)
                 throw new Exception(formatErrorMessage + " Supported comparisons: =,!=, >, <, >=, <=");
+            return ParseExpression(name, expression, match);
+        }
+
+        private static (string sensor, double value, string messageTemplate, AlertCompare type) ParseExpression(string name, string expression, Match match)
+        {
             var sensor = match.Groups[1].Value;
             var comparison = match.Groups[2].Value.ToLower();
             var value = match.Groups[3].Value.ToDouble();
@@ -116,6 +130,18 @@ namespace CA_DataUploaderLib.IOconf
             };
 
             return (sensor, value, messageTemplate, type);
+        }
+
+        private static (string Sensor, double Value, string MessageTemplate, AlertCompare type, int RateLimitMinutes, string Command) ParseExpressionWithOptions(string name, string expression, string formatErrorMessage)
+        {
+            var match = expressionWithOptionsRegex.Match(expression);
+            if (!match.Success)
+                throw new Exception(formatErrorMessage + " Supported comparisons: =,!=, >, <, >=, <=");
+            var (sensor, value, messageTemplate, type) = ParseExpression(name, expression, match);
+            var rateLimit = match.Groups[4].Success ? match.Groups[4].Value.ToInt() : DefaultRateLimitMinutes;
+            var command = match.Groups[5].Value.Trim();
+            command = command == string.Empty ? null : command; //we explicitely use null if there is no command to properly signal the error
+            return (sensor, value, messageTemplate, type, rateLimit, command);
         }
     }
 }
