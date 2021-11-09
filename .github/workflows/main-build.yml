@@ -20,7 +20,6 @@ jobs:
       uses: actions/setup-dotnet@v1.8.2
       with:
         dotnet-version: '6.0'
-        include-prerelease: True
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
@@ -48,7 +47,6 @@ jobs:
       uses: actions/setup-dotnet@v1.8.2
       with:
         dotnet-version: '6.0'
-        include-prerelease: True
     - name: Generate DataUploader - linux-x64
       run: dotnet publish CA_DataUploader -c Release -o out/linux-x64/uploader -r linux-x64 -p:PublishSingleFile=true
     - name: Generate DataUploader - linux-arm
