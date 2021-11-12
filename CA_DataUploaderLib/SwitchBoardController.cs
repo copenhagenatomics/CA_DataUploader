@@ -207,7 +207,8 @@ namespace CA_DataUploaderLib
             CALog.LogData(LogID.A, "finished waiting for switchboards loops");
         }
 
-        public List<VectorDescriptionItem> GetVectorDescriptionItems() => new List<VectorDescriptionItem>();
+        public List<VectorDescriptionItem> GetLocalInputsDescriptionItems() => new();
+        public List<VectorDescriptionItem> GetVectorDescriptionItems() => new();
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
         public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs) => Enumerable.Empty<SensorSample>();
     }
