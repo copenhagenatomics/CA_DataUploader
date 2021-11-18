@@ -18,7 +18,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public IOconfNode(string row, int lineNum) : base(row, lineNum, "Node")
         {
-            format = "Node;Name;ipaddress:port";
+            format = "Node;Name;ipaddress:port;[role]";
             var list = ToList();
             if (list.Count < 3)
                 throw new Exception($"IOconfNode: wrong format: {row} {format}");
@@ -27,6 +27,8 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception($"IOconfNode: failed to parse the passed ip address. format: {row} {format}");
             _endPoint = endPoint;
             NodeIndex = _nodeInstances++;
+            if (list.Count > 3)
+                Role = list[3];
         }
 
         private IOconfNode(string name) : base($"Node;{name}", 0, "Node")
@@ -40,5 +42,6 @@ namespace CA_DataUploaderLib.IOconf
         public bool IsCurrentSystem { get; set; }
         /// <summary>position of the node in the config (starting at 0)</summary>
         public byte NodeIndex { get; }
+        public string Role { get; }
     }
 }
