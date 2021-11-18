@@ -35,13 +35,13 @@ namespace CA_DataUploaderLib.IOconf
             BaudRate = baudrate;
             DistributedNode = distributedNodeName != default 
                 ? IOconfFile.GetEntries<IOconfNode>().SingleOrDefault(n => n.Name == distributedNodeName) ?? throw new Exception($"Failed to find node in configuration for Map: {row}. Format: {format}")
-                : !IOconfFile.GetEntries<IOconfNode>().Any() ? default : throw new Exception($"The node name is not optional for distributed deployments: {row}. Format: {format}");
+                : !IOconfFile.GetEntries<IOconfNode>().Any() ? DistributedNode : throw new Exception($"The node name is not optional for distributed deployments: {row}. Format: {format}");
         }
 
         public event EventHandler<EventArgs> OnBoardDetected;
         public bool SetMCUboard(MCUBoard board)
         {
-            if (DistributedNode?.IsCurrentSystem == false)
+            if (DistributedNode.IsCurrentSystem == false)
                 return false; //when using a distributed deployment, the map entries are only valid in the specified node.
 
             if ((board.serialNumber == SerialNumber && SerialNumber != null) || board.PortName == USBPort)
@@ -70,8 +70,8 @@ namespace CA_DataUploaderLib.IOconf
         /// <remarks>check <see cref="BoardSettings" /> for additional baud rate set by configurations</remarks>
         public int BaudRate { get; private set; }
         /// <summary>the cluster node that is directly connected to the device or <c>default</c> when using </summary>
-        public IOconfNode DistributedNode { get; }
-        public bool IsLocalBoard => DistributedNode == null || DistributedNode.IsCurrentSystem;
+        public IOconfNode DistributedNode { get; } = IOconfNode.SingleNode;
+        public bool IsLocalBoard => DistributedNode.IsCurrentSystem;
 
         public MCUBoard Board;
         private BoardSettings _boardSettings = BoardSettings.Default;

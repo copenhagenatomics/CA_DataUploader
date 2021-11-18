@@ -6,49 +6,41 @@ using System.Linq;
 
 namespace CA_DataUploaderLib.Helpers
 {
-    /// <summary>adds filters and maths, while moving all outputs to the end of the vector</summary>
-    public class VectorFilterAndMath
+    /// <summary>adds filters and math, sets outputs at the end of the vector</summary>
+    public class ExtendedVectorDescription
     {
         private readonly CALogLevel _logLevel;
         private readonly List<FilterSample> _values;
         private readonly MathVectorExpansion _mathVectorExpansion;
         private readonly int _outputCount;
         public VectorDescription VectorDescription { get; }
-        /// <remarks>This property is experimental and is likely to change/be remoevd in the future</remarks
-        public VectorDescription InputsDescription { get; }
+        /// <summary>
+        /// list of inputs descriptions per node in the same order that <see cref="CommandHandler.GetNodeInputs"/> uses.
+        /// </summary>
+        public IReadOnlyList<(IOconfNode, IReadOnlyList<VectorDescriptionItem>)> InputsPerNode { get; set; }
 
-        public VectorFilterAndMath(VectorDescription vectorDescription)
+        public ExtendedVectorDescription(
+            List<(IOconfNode, IReadOnlyList<VectorDescriptionItem> values)> inputsPerNode,
+            List<VectorDescriptionItem> outputs,
+            string hardware, string software)
         {
             _logLevel = IOconfFile.GetOutputLevel();
-            InputsDescription = GetInputsOnlyVectorDescription(vectorDescription);
-            VectorDescription = vectorDescription;
-            _values = GetFilters(vectorDescription);
-            vectorDescription._items.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Output.Name, DataTypeEnum.Input)));
-            RemoveHiddenSources(vectorDescription._items, i => i.Descriptor);
+            InputsPerNode = inputsPerNode;
+            List<VectorDescriptionItem> allItems = inputsPerNode.SelectMany(n => n.values).ToList();
+            _values = GetFilters(allItems);
+            allItems.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Output.Name, DataTypeEnum.Input)));
+            RemoveHiddenSources(allItems, i => i.Descriptor);
             _mathVectorExpansion = new MathVectorExpansion();
-            VectorDescription._items.AddRange(_mathVectorExpansion.GetVectorDescriptionEntries());
-            _outputCount = MoveOutputsToTheEnd(vectorDescription._items);
+            allItems.AddRange(_mathVectorExpansion.GetVectorDescriptionEntries());
+            allItems.AddRange(outputs);
+            _outputCount = outputs.Count;
+            VectorDescription = new VectorDescription(allItems, hardware, software);
         }
 
-        private static VectorDescription GetInputsOnlyVectorDescription(VectorDescription vectorDescription)
-        {
-            List<VectorDescriptionItem> inputs = vectorDescription._items.ToList();
-            inputs.RemoveAll(i => i.DirectionType == DataTypeEnum.Output);
-            return new VectorDescription(inputs, vectorDescription.Hardware, vectorDescription.Software) { IOconf = vectorDescription.IOconf };
-        }
-
-        private static int MoveOutputsToTheEnd(List<VectorDescriptionItem> items)
-        {
-            var outputs = items.Where(i => i.DirectionType == DataTypeEnum.Output).ToList();
-            items.RemoveAll(i => i.DirectionType == DataTypeEnum.Output);
-            items.AddRange(outputs);
-            return outputs.Count;
-        }
-
-        private static List<FilterSample> GetFilters(VectorDescription vectorDesc)
+        private static List<FilterSample> GetFilters(List<VectorDescriptionItem> inputs)
         {
             var filters = IOconfFile.GetFilters().ToList();
-            var filtersWithoutItem = filters.SelectMany(f => f.SourceNames.Select(s => new { Filter = f, Source = s })).Where(f => !vectorDesc.HasItem(f.Source)).ToList();
+            var filtersWithoutItem = filters.SelectMany(f => f.SourceNames.Select(s => new { Filter = f, Source = s })).Where(f => !inputs.Any(i => i.Descriptor == f.Source)).ToList();
             foreach (var filter in filtersWithoutItem)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Filter: {filter.Filter.Name} points to missing sensor: {filter.Source}");
             if (filtersWithoutItem.Count > 0)

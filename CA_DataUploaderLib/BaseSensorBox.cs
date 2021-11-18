@@ -22,7 +22,6 @@ namespace CA_DataUploaderLib
         protected readonly List<SensorSample> _values;
         protected readonly List<SensorSample> _localValues;
         private readonly (IOconfMap map, SensorSample[] values)[] _boards;
-        protected readonly List<VectorDescriptionItem> _allBoardsDescriptionItems;
         protected readonly AllBoardsState _boardsState;
         private readonly string commandHelp;
         private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
@@ -50,9 +49,6 @@ namespace CA_DataUploaderLib
             }
 
             var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray())).ToArray();
-            _allBoardsDescriptionItems = new AllBoardsState(allBoards.Select(b => b.map))
-                .Select(b => new VectorDescriptionItem("double", b.sensorName, DataTypeEnum.State))
-                .ToList();
             _boards = allBoards.Where(b => b.map.IsLocalBoard).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
         }
@@ -74,16 +70,19 @@ namespace CA_DataUploaderLib
             .Concat(_boardsState.Select(b => new SensorSample(b.sensorName, (int)b.State)));
 
         public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs) => Enumerable.Empty<SensorSample>();
-        public virtual List<VectorDescriptionItem> GetVectorDescriptionItems() =>
-            _values
-                .Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input))
-                .Concat(_allBoardsDescriptionItems)
-                .ToList();
-        public virtual List<VectorDescriptionItem> GetLocalInputsDescriptionItems() =>
-            _localValues
-                .Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input))
-                .Concat(_boardsState.Select(b => new VectorDescriptionItem("double", b.sensorName, DataTypeEnum.State)))
-                .ToList();
+        public virtual SubsystemDescriptionItems GetVectorDescriptionItems()
+        {
+            var nodes = _values.GroupBy(v => v.Input.Map.DistributedNode);
+            var valuesByNode = nodes.Select(n => (n.Key, GetNodeDescItems(n))).ToList();
+            return new SubsystemDescriptionItems(valuesByNode, new());
+
+            static List<VectorDescriptionItem> GetNodeDescItems(IEnumerable<SensorSample> values) =>
+                values.Select(v => new VectorDescriptionItem("double", v.Input.Name, DataTypeEnum.Input))
+                 .Concat(GetBoards(values).Select(b => new VectorDescriptionItem("double", b.BoxName + "_state", DataTypeEnum.State)))
+                 .ToList();
+            static IEnumerable<IOconfMap> GetBoards(IEnumerable<SensorSample> n) =>
+                n.Where(v => !v.Input.Skip).GroupBy(v => v.Input.Map).Select(b => b.Key);
+        }
 
         protected bool ShowQueue(List<string> args)
         {
