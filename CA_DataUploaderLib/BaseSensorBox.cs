@@ -476,13 +476,14 @@ namespace CA_DataUploaderLib
 
         public enum ConnectionState
         {
-            Disconnected = 0,
-            Connecting = 1,
-            Connected = 2,
-            ReadError = 3,
-            NoDataAvailable = 4,
+            NodeUnreachable = -1, // can be used by distributed deployments to indicate the node that has the board is unreachable
+            Disconnected = 0, // we are not currently connected to the board
+            Connecting = 1, // we are attempting to reconnect to the board
+            Connected = 2, // we have succesfully connected to the board and will soon be attempting to read from it
+            ReadError = 3, // there are unexpected exceptions communicating with the board
+            NoDataAvailable = 4, // we are connected to the box, but we have not received for 150ms+
             ReturningNonValues = 5, // we are getting data from the box, but these are not values lines
-            ReceivingValues = 6
+            ReceivingValues = 6 // we are connected & receiving values
         }
     }
 }
