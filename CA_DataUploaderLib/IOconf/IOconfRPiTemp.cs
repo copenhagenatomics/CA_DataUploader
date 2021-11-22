@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -17,7 +18,9 @@ namespace CA_DataUploaderLib.IOconf
         public IEnumerable<IOconfInput> GetDistributedExpandedInputConf()
         { 
             if (Disabled) yield break;
-            foreach (var node in IOconfFile.GetEntries<IOconfNode>())
+            var nodes = IOconfFile.GetEntries<IOconfNode>().ToList();
+            nodes = nodes.Count > 0 ? nodes : new() { IOconfNode.SingleNode };
+            foreach (var node in nodes)
             {
                 //note there is no map entry for the IOconfRpiTemp as it is grabbed it is not an external box, but at the moment we only expose the IOconfNode through it
                 var map = Map = new IOconfMap("Map;RpiFakeBox;{Name}_{node.Name}Box;", LineNumber);
