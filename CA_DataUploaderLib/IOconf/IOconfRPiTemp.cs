@@ -1,4 +1,6 @@
-﻿namespace CA_DataUploaderLib.IOconf
+﻿using System.Collections.Generic;
+
+namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfRPiTemp : IOconfInput
     {
@@ -12,6 +14,19 @@
             Skip = true;
         }
 
-        public IOconfRPiTemp WithName(string name) => new IOconfRPiTemp(Row, LineNumber) {Name = name };
+        public IEnumerable<IOconfInput> GetDistributedExpandedInputConf()
+        { 
+            if (Disabled) yield break;
+            foreach (var node in IOconfFile.GetEntries<IOconfNode>())
+            {
+                //note there is no map entry for the IOconfRpiTemp as it is grabbed it is not an external box, but at the moment we only expose the IOconfNode through it
+                var map = Map = new IOconfMap("Map;RpiFakeBox;{Name}_{node.Name}Box;", LineNumber);
+                yield return new IOconfInput($"RPiTemp;{Name}_{node.Name}Gpu", LineNumber, Type, false, false, BoardSettings.Default) { Map = map, Skip = true };
+                yield return new IOconfInput($"RPiTemp;{Name}_{node.Name}Cpu", LineNumber, Type, false, false, BoardSettings.Default) { Map = map, Skip = true };
+            }
+        }
+
+        public static bool IsLocalCpuSensor(IOconfInput input) => input.Map.DistributedNode.IsCurrentSystem && input.Name.EndsWith("Cpu");
+        public static bool IsLocalGpuSensor(IOconfInput input) => input.Map.DistributedNode.IsCurrentSystem && input.Name.EndsWith("Gpu");
     }
 }
