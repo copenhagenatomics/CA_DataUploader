@@ -36,6 +36,8 @@ namespace CA_DataUploaderLib.IOconf
             Name = name;
         }
 
+        /// <summary>resets the node instance count used to determine the node index, used for testing purposes</summary>
+        public static void ResetNodeIndexCount() => _nodeInstances = 0;
         public static IOconfNode SingleNode => _singleNode.Value;
         public string Name { get; }
         public IPEndPoint EndPoint => _endPoint ?? throw new InvalidOperationException($"Endpoint is only supported when running with distributed configuration");
