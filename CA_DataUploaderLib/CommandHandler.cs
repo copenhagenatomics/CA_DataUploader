@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib
         private readonly List<string> AcceptedCommands = new List<string>();
         private readonly List<ISubsystemWithVectorData> _subsystems = new List<ISubsystemWithVectorData>();
         private int AcceptedCommandsIndex = -1;
-        private readonly Lazy<VectorFilterAndMath> _fullsystemFilterAndMath;
+        private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
 
         public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
         public event EventHandler<EventFiredArgs> EventFired;
@@ -32,7 +32,7 @@ namespace CA_DataUploaderLib
         public CommandHandler(SerialNumberMapper mapper = null)
         {
             _mapper = mapper;
-            _fullsystemFilterAndMath = new Lazy<VectorFilterAndMath>(GetFullSystemFilterAndMath);
+            _fullsystemFilterAndMath = new Lazy<ExtendedVectorDescription>(GetFullSystemFilterAndMath);
             new Thread(() => this.LoopForever()).Start();
             AddCommand("escape", Stop);
             AddCommand("help", HelpMenu);
@@ -60,12 +60,10 @@ namespace CA_DataUploaderLib
         public void Execute(string command, bool addToCommandHistory = true) => HandleCommand(command, addToCommandHistory);
 
         public void AddSubsystem(ISubsystemWithVectorData subsystem) => _subsystems.Add(subsystem);
-        public VectorDescription GetFullSystemVectorDescription() => _fullsystemFilterAndMath.Value.VectorDescription;
-        /// <remarks>This method is experimental and is likely to change in the future</remarks>
-        public VectorDescription GetInputsOnlyVectorDescription() => _fullsystemFilterAndMath.Value.InputsDescription;
+        public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
+        public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
         /// <remarks>This method is only aimed at single host scenarios where a single system has all the inputs</remarks>
         public (List<SensorSample> samples, DateTime vectorTime) GetFullSystemVectorValues() => MakeDecision(GetNodeInputs().ToList(), DateTime.UtcNow);
-        /// <remarks>This method is experimental and is likely to change in the future</remarks>
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
         public (List<SensorSample> samples, DateTime vectorTime) MakeDecision(List<SensorSample> inputs, DateTime vectorTime)
         {
@@ -96,21 +94,21 @@ namespace CA_DataUploaderLib
             FireCustomEvent(sb.ToString(), DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
         }
 
-        private VectorFilterAndMath GetFullSystemFilterAndMath()
-        { 
-            var items = new List<VectorDescriptionItem>(_subsystems.Count * 10);
-            foreach (var subsystem in _subsystems)
-            {
-                var subsystemItems = subsystem.GetVectorDescriptionItems();
-                if (subsystemItems.Count > 0)
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"{subsystemItems.Count,2} datapoints from {subsystem.Title}");
-                items.AddRange(subsystemItems);
-            }
-
-            return new VectorFilterAndMath(
-                new VectorDescription(items, RpiVersion.GetHardware(), RpiVersion.GetSoftware()));
+        private ExtendedVectorDescription GetFullSystemFilterAndMath()
+        {
+            //note we regroup the inputs by node while keeping the node-subsystem order of inputs (returned by GetVectorDescriptionItems)
+            var descItemsPerSubsystem = _subsystems.Select(s => s.GetVectorDescriptionItems()).ToList();
+            var nodes = IOconfFile.GetEntries<IOconfNode>().ToList();
+            nodes = nodes.Count > 0 ? nodes : new() { IOconfNode.SingleNode };
+            var inputsPerNode = nodes
+                .Select(n => (node: n, inputs: descItemsPerSubsystem.SelectMany(s => s.GetNodeInputs(n)).ToList()))
+                .Where(n => n.inputs.Count > 0)
+                .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
+                .ToList();
+            var outputs = descItemsPerSubsystem.SelectMany(s => s.Outputs).ToList();
+            return new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
         }
-     
+
         public bool AssertArgs(List<string> args, int minimumLen)
         {
             if (args.Count < minimumLen)

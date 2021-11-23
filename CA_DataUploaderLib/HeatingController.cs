@@ -61,8 +61,8 @@ namespace CA_DataUploaderLib
         }
 
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
-        public List<VectorDescriptionItem> GetVectorDescriptionItems() => 
-            _heaters.SelectMany(x => SwitchboardAction.GetVectorDescriptionItems(x.Name())).ToList();
+        public SubsystemDescriptionItems GetVectorDescriptionItems() => 
+            new (new (), _heaters.SelectMany(x => SwitchboardAction.GetVectorDescriptionItems(x.Name())).ToList());
         public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs)
         { 
             foreach (var heater in _heaters)

@@ -19,9 +19,10 @@ namespace CA_DataUploaderLib
         /// <remarks>some boards might be closed, specially if the system is stopping due to losing connection to one of the boards</remarks>
         public event EventHandler Stopping;
         private readonly CommandHandler _cmd;
-        protected readonly List<SensorSample> _values = new List<SensorSample>();
+        protected readonly List<SensorSample> _values;
+        protected readonly List<SensorSample> _localValues;
         private readonly (IOconfMap map, SensorSample[] values)[] _boards;
-        protected readonly AllBoardsState _allBoardsState;
+        protected readonly AllBoardsState _boardsState;
         private readonly string commandHelp;
         private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
         private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamplesLookup = new Dictionary<MCUBoard, SensorSample[]>();
@@ -33,6 +34,7 @@ namespace CA_DataUploaderLib
             Title = commandName;
             _cmd = cmd;
             _values = values.Select(x => new SensorSample(x)).ToList();
+            _localValues = _values.Where(x => x.Input.Map.IsLocalBoard).ToList();
             if (!_values.Any())
                 return;  // no data
 
@@ -46,8 +48,9 @@ namespace CA_DataUploaderLib
                 cmd.AddSubsystem(this);
             }
 
-            _boards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray())).ToArray();
-            _allBoardsState = new AllBoardsState(_boards.Select(b => b.map));
+            var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray())).ToArray();
+            _boards = allBoards.Where(b => b.map.IsLocalBoard).ToArray();
+            _boardsState = new AllBoardsState(_boards.Select(b => b.map));
         }
 
         public Task Run(CancellationToken token) => RunBoardReadLoops(_boards, token);
@@ -62,16 +65,24 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public IEnumerable<SensorSample> GetInputValues() => _values
+        public IEnumerable<SensorSample> GetInputValues() => _localValues
             .Select(s => s.Clone())
-            .Concat(_allBoardsState.Select(b => new SensorSample(b.sensorName, (int)b.State)));
+            .Concat(_boardsState.Select(b => new SensorSample(b.sensorName, (int)b.State)));
 
         public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs) => Enumerable.Empty<SensorSample>();
-        public virtual List<VectorDescriptionItem> GetVectorDescriptionItems() =>
-            _values
-                .Select(x => new VectorDescriptionItem("double", x.Input.Name, DataTypeEnum.Input))
-                .Concat(_allBoardsState.Select(b => new VectorDescriptionItem("double", b.sensorName, DataTypeEnum.State)))
-                .ToList();
+        public virtual SubsystemDescriptionItems GetVectorDescriptionItems()
+        {
+            var nodes = _values.GroupBy(v => v.Input.Map.DistributedNode);
+            var valuesByNode = nodes.Select(n => (n.Key, GetNodeDescItems(n))).ToList();
+            return new SubsystemDescriptionItems(valuesByNode, new());
+
+            static List<VectorDescriptionItem> GetNodeDescItems(IEnumerable<SensorSample> values) =>
+                values.Select(v => new VectorDescriptionItem("double", v.Input.Name, DataTypeEnum.Input))
+                 .Concat(GetBoards(values).Select(b => new VectorDescriptionItem("double", b.BoxName + "_state", DataTypeEnum.State)))
+                 .ToList();
+            static IEnumerable<IOconfMap> GetBoards(IEnumerable<SensorSample> n) =>
+                n.Where(v => !v.Input.Skip).GroupBy(v => v.Input.Map).Select(b => b.Key);
+        }
 
         protected bool ShowQueue(List<string> args)
         {
@@ -121,7 +132,7 @@ namespace CA_DataUploaderLib
                 {
                     using var closeTimeoutToken = new CancellationTokenSource(5000);
                     map.Board?.SafeClose(closeTimeoutToken.Token);
-                    _allBoardsState.SetDisconnectedState(map);
+                    _boardsState.SetDisconnectedState(map);
                 }
                 catch(Exception ex)
                 {
@@ -132,12 +143,11 @@ namespace CA_DataUploaderLib
 
         protected virtual List<Task> StartReadLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
         {
-            var localBoards = boards.Where(b => b.map.IsLocalBoard);
-            var missingBoards = localBoards.Where(h => h.map.Board == null).Select(b => b.map.BoxName).Distinct().ToList();
+            var missingBoards = boards.Where(h => h.map.Board == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
                 _cmd.FireAlert($"{Title} - missing boards detected {string.Join(",", missingBoards)}. Related sensors/actuators are disabled.");
 
-            return localBoards
+            return boards
                 .Where(b => b.map.Board != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
                 .Select(b => BoardLoop(b.map.Board, b.values, token))
                 .ToList();
@@ -157,14 +167,14 @@ namespace CA_DataUploaderLib
                 { //if the token is canceled we are about to exit the loop so we do nothing. Otherwise we consider it like any other exception and log it.
                     if (!token.IsCancellationRequested)
                     {
-                        _allBoardsState.SetReadSensorsExceptionState(board);
+                        _boardsState.SetReadSensorsExceptionState(board);
                         LogError(board, "unexpected error on board read loop", ex);
                     }
                 }
                 catch (Exception ex)
                 { // we expect most errors to be handled within SafeReadSensors and in the SafeReopen of the ReconnectBoard,
                   // so seeing this in the log is most likely a bug handling some error case.
-                    _allBoardsState.SetReadSensorsExceptionState(board);
+                    _boardsState.SetReadSensorsExceptionState(board);
                     LogError(board, "unexpected error on board read loop", ex);
                 }
             }
@@ -181,13 +191,13 @@ namespace CA_DataUploaderLib
             { 
                 if (token.IsCancellationRequested)
                     throw; // if the token is cancelled we bubble up the cancel so the caller can abort.
-                _allBoardsState.SetReadSensorsExceptionState(board);
+                _boardsState.SetReadSensorsExceptionState(board);
                 LogError(board, "error reading sensor data", ex);
                 return true; //ReadSensor normally should return false if the board is detected as disconnected, so we say the board is still connected here since the caller will still do stale values detection
             }
             catch (Exception ex)
             { // seeing this is the log is not unexpected in cases where we have trouble communicating to a board.
-                _allBoardsState.SetReadSensorsExceptionState(board);
+                _boardsState.SetReadSensorsExceptionState(board);
                 LogError(board, "error reading sensor data", ex);
                 return true; //ReadSensor normally should return false if the board is detected as disconnected, so we say the board is still connected here since the caller will still do stale values detection
             }
@@ -215,27 +225,27 @@ namespace CA_DataUploaderLib
                     {
                         ProcessLine(numbers, board, targetSamples);
                         timeSinceLastValidRead.Restart();
-                        _allBoardsState.SetState(board, ConnectionState.ReceivingValues);
+                        _boardsState.SetState(board, ConnectionState.ReceivingValues);
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
                         LogInfo(board, $"unexpected board response {line.Replace("\r", "\\r")}"); // we avoid \r as it makes the output hard to read
                         if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
-                            _allBoardsState.SetState(board, ConnectionState.ReturningNonValues);
+                            _boardsState.SetState(board, ConnectionState.ReturningNonValues);
                     }
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in msBetweenReads
                     LogError(board, $"failed handling board response {line.Replace("\r", "\\r")}", ex); // we avoid \r as it makes the output hard to read
                     if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
-                        _allBoardsState.SetState(board, ConnectionState.ReturningNonValues);
+                        _boardsState.SetState(board, ConnectionState.ReturningNonValues);
                 }
             }
         }
 
         ///<returns>(<c>false</c> if the board was explicitely detected as disconnected, the line, or null/default string if it exceeded the MCUBoard.ReadTimeout).</returns>
         ///<remarks>
-        ///Notifies in _allBoardsState (which is reported to the next vector) if there is no data available within <param cref="msBetweenReads" /> 
+        ///Notifies in _localBoardsState (which is reported to the next vector) if there is no data available within <param cref="msBetweenReads" /> 
         ///and when that happens it waits up to MCUBoard.ReadTimeout for the board to return data.
         ///Both in the above case and when the MCUBoard.ReadTimeout is exceeded a message is written to the log (but not the console to reduce operational noise),
         ///specially as it can now be observed on the graphs if board these events are happening + CheckFailure & reconnects will display relevant messages if appropiate.
@@ -247,7 +257,7 @@ namespace CA_DataUploaderLib
             if (await Task.WhenAny(readLineTask, noDataAvailableTask) == noDataAvailableTask)
             {
                 LogData(board, "no data available");
-                _allBoardsState.SetState(board, ConnectionState.NoDataAvailable); //report the state early before waiting up to 2 seconds for the data (readLineTask)
+                _boardsState.SetState(board, ConnectionState.NoDataAvailable); //report the state early before waiting up to 2 seconds for the data (readLineTask)
             }
 
             try
@@ -295,13 +305,13 @@ namespace CA_DataUploaderLib
 
         private async Task ReconnectBoard(MCUBoard board, CancellationToken token)
         {
-            _allBoardsState.SetAttemptingReconnectState(board);
+            _boardsState.SetAttemptingReconnectState(board);
             LogInfo(board, "attempting to reconnect");
             var lostSensorAttempts = 100;
             var delayBetweenAttempts = TimeSpan.FromSeconds(board.ConfigSettings.SecondsBetweenReopens);
             while (!(await board.SafeReopen(token)))
             {
-                _allBoardsState.SetDisconnectedState(board);
+                _boardsState.SetDisconnectedState(board);
                 if (ExactSensorAttemptsCheck(ref lostSensorAttempts)) 
                 { // we run this once when there has been 100 attempts
                     _cmd.FireAlert($"reconnect limit exceeded, reducing reconnect frequency to 15 minutes - {Title} - {board.ToShortDescription()}");
@@ -316,7 +326,7 @@ namespace CA_DataUploaderLib
                 await Task.Delay(delayBetweenAttempts, token);
             }
 
-            _allBoardsState.SetConnectedState(board);
+            _boardsState.SetConnectedState(board);
             LogInfo(board, "board reconnection succeeded");
         }
 
@@ -466,13 +476,14 @@ namespace CA_DataUploaderLib
 
         public enum ConnectionState
         {
-            Disconnected = 0,
-            Connecting = 1,
-            Connected = 2,
-            ReadError = 3,
-            NoDataAvailable = 4,
+            NodeUnreachable = -1, // can be used by distributed deployments to indicate the node that has the board is unreachable
+            Disconnected = 0, // we are not currently connected to the board
+            Connecting = 1, // we are attempting to reconnect to the board
+            Connected = 2, // we have succesfully connected to the board and will soon be attempting to read from it
+            ReadError = 3, // there are unexpected exceptions communicating with the board
+            NoDataAvailable = 4, // we are connected to the box, but we have not received for 150ms+
             ReturningNonValues = 5, // we are getting data from the box, but these are not values lines
-            ReceivingValues = 6
+            ReceivingValues = 6 // we are connected & receiving values
         }
     }
 }
