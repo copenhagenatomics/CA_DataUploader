@@ -9,7 +9,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfOven(string row, int lineNum) : base(row, lineNum, "Oven")
         {
-            format = "Oven;Area;HeatingElement;TypeK;[ProportionalGain];[ControlPeriod]";
+            format = "Oven;Area;HeatingElement;TypeK;[ProportionalGain];[ControlPeriod];[MaxOutputPercentage]";
 
             var list = ToList();
             if (!int.TryParse(list[1], out OvenArea)) 
@@ -43,6 +43,13 @@ namespace CA_DataUploaderLib.IOconf
             if (!TimeSpan.TryParse(list[5], out var controlPeriod))
                 throw new Exception($"Failed to parse the specified control period: {row}");
             ControlPeriod = controlPeriod;
+
+            if (list.Count < 7) return;
+            if (!int.TryParse(list[6], out var maxOutputPercentage))
+                throw new Exception($"Failed to parse the specified proportional gain: {row}");
+            if (maxOutputPercentage < 0 || maxOutputPercentage > 100)
+                throw new Exception($"Max output percentage must be a whole number between 0 and 100: {row}");
+            MaxOutputPercentage = maxOutputPercentage / 100d;
         }
 
         public int OvenArea;
@@ -54,6 +61,7 @@ namespace CA_DataUploaderLib.IOconf
         //by default we assume the HeatingElement can heat TypeK 5 degrees x second on. 
         public double ProportionalGain { get; } = 0.2d; 
         public TimeSpan ControlPeriod { get; } = TimeSpan.FromSeconds(30);
+        public double MaxOutputPercentage { get; } = 1d;
         private readonly List<IOconfTypeK> TypeKs;
     }
 }

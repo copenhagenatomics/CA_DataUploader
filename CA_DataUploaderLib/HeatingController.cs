@@ -50,16 +50,8 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public Task Run(CancellationToken token)
-        {
-            //we only report detected config alerts after all subsystems are initialized (and alerts can be delivered).
-            //the actual read and actuation is done by the SwitchBoardController subsystem.
-            foreach (var heater in _heaters)
-                heater.ReportDetectedConfigAlerts(_cmdUnwrapped);
-
-            return Task.CompletedTask; 
-        }
-
+        //the read and actuation cycles are ran by the SwitchBoardController subsystem.
+        public Task Run(CancellationToken token) => Task.CompletedTask;
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
         public SubsystemDescriptionItems GetVectorDescriptionItems() => 
             new (new (), _heaters.SelectMany(x => SwitchboardAction.GetVectorDescriptionItems(x.Name())).ToList());

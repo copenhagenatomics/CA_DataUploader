@@ -58,12 +58,6 @@ namespace CA_DataUploaderLib
             return _lastAction = action;
         }
 
-        internal void ReportDetectedConfigAlerts(CommandHandler cmd)
-        {
-            if (_config.AlertMessage != default)
-                cmd.FireAlert(_config.AlertMessage);
-        }
-
         public (bool manualOff, bool manualOn) MustExecuteManualMode(DateTime vectorTime)
         {
             if (!PendingManualModeExecution) return (false, false);
@@ -117,7 +111,7 @@ namespace CA_DataUploaderLib
             if ((vectorTime - LastAutoOn) < _config.ControlPeriod)
                 return vectorTime; //less than the control period since we last turned it on
 
-            secondsOn = Math.Min(secondsOn, _config.ControlPeriod.TotalSeconds); //we act max for this control period so we can re-evaluate where we are for next actuation
+            secondsOn = Math.Min(secondsOn, _config.MaxOutputPercentage * _config.ControlPeriod.TotalSeconds); //we act max for this control period so we can re-evaluate where we are for next actuation
             LastAutoOn = vectorTime;
             return vectorTime.AddSeconds(secondsOn);
         }
@@ -255,30 +249,27 @@ namespace CA_DataUploaderLib
 
         private static Config ToConfig(IOconfHeater heater, IOconfOven oven)
         {
-            var (area, ovenSensor, proportionalGain, controlPeriod, boardStateSensorNames, alertMessage) = GetOvenInfo(heater.Name, oven);
-            return new Config
+            var config = new Config()
             {
-                Area = area,
-                OvenSensor = ovenSensor,
-                ProportionalGain = proportionalGain,
-                ControlPeriod = controlPeriod,
-                TemperatureBoardStateSensorNames = boardStateSensorNames,
                 MaxTemperature = heater.MaxTemperature,
                 CurrentSensingNoiseTreshold = heater.CurrentSensingNoiseTreshold,
                 Name = heater.Name,
                 SwitchBoardStateSensorName = heater.BoardStateSensorName,
                 CurrentSensorName = heater.CurrentSensorName,
-                AlertMessage = alertMessage
             };
-        }
+            if (oven == null)
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heater.Name}");
+                return config;// new Config { ControlPeriod = TimeSpan.FromSeconds(30) };
+            }
 
-        private static (int area, string ovenSensor, double proportionalGain, TimeSpan controlPeriod, IReadOnlyCollection<string> boardStateSensorNames, string alertMessage) GetOvenInfo(string heaterName, IOconfOven oven)
-        {
-            if (oven != null)
-                return (oven.OvenArea, oven.TemperatureSensorName, oven.ProportionalGain, oven.ControlPeriod, oven.BoardStateSensorNames, default);
-
-            CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heaterName}");
-            return (-1, default, default, TimeSpan.FromSeconds(30), default, default);
+            config.Area = oven.OvenArea;
+            config.OvenSensor = oven.TemperatureSensorName;
+            config.ProportionalGain = oven.ProportionalGain;
+            config.ControlPeriod = oven.ControlPeriod;
+            config.MaxOutputPercentage = oven.MaxOutputPercentage;
+            config.TemperatureBoardStateSensorNames = oven.BoardStateSensorNames;
+            return config;
         }
 
         public class Config
@@ -291,9 +282,9 @@ namespace CA_DataUploaderLib
             public string SwitchBoardStateSensorName { get; set; }
             public string CurrentSensorName { get; set; }
             public IReadOnlyCollection<string> TemperatureBoardStateSensorNames { get; set; }
-            public string AlertMessage { get; internal set; }
             public double ProportionalGain { get; set; }
             public TimeSpan ControlPeriod { get; set; }
+            public double MaxOutputPercentage { get; internal set; }
         }
     }
 }
