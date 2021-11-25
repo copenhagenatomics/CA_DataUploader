@@ -101,6 +101,38 @@ namespace UnitTests
             Assert.AreEqual(true, action.IsOn, "should try heating again 30 seconds after it turned off");
         }
 
+
+        [TestMethod]
+        public void ProportionalGainUsesMaxOutput()
+        {
+            //In this test we are 500 degrees below the target temperature so that it will actuate at max output for a long time.
+            //Because we are using time based power control, this means it should turn on for 80% of the control period
+            //the gain of 2 means there should pass 2 seconds for every 1C to gain, so the proportional control alone would normally turn it on for the whole control period.
+            var element = new HeaterElement(NewConfig.WithProportionalGain(2).WithMaxOutput(0.8d).Build());
+            element.SetTargetTemperature(544);
+            var vector = new NewVectorReceivedArgs(NewVectorSamples);
+            element.MakeNextActionDecision(vector);
+            var newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(5).ToVectorDouble();
+            var action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.AreEqual(true, action.IsOn, "should still be on after 5 seconds");
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(23).ToVectorDouble();
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.AreEqual(true, action.IsOn, "should still be on after 23 seconds");
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(24).ToVectorDouble();
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.AreEqual(false, action.IsOn, "should be off after 24 seconds");
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(29).ToVectorDouble();
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.AreEqual(false, action.IsOn, "should remain off just before next control period (29 seconds)");
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(30).ToVectorDouble();
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.AreEqual(true, action.IsOn, "should try heating again on the next control period");
+        }
+
         [TestMethod, Description("avoiding making action changes when we don't have connection to the switchboard anyway")]
         //Note that the switchboard controller would ignore the action regardless of what we send due to the disconnect.
         //However, having the decision logic explicitely indicate there is no action change better reflects the situation.
@@ -200,10 +232,17 @@ namespace UnitTests
         private class HeaterElementConfigBuilder
         {
             private double _proportionalGain = 0.2d;
+            private double _maxOutput = 1d;
 
             public HeaterElementConfigBuilder WithProportionalGain(double value)
             { 
                 _proportionalGain = value;
+                return this;
+            }
+
+            public HeaterElementConfigBuilder WithMaxOutput(double value)
+            {
+                _maxOutput = value;
                 return this;
             }
 
@@ -219,7 +258,8 @@ namespace UnitTests
                     CurrentSensorName = "heater_current",
                     MaxTemperature = 800,
                     Name = "heater",
-                    OvenSensor = "temp"
+                    OvenSensor = "temp",
+                    MaxOutputPercentage = _maxOutput,
                 };
         }
     }

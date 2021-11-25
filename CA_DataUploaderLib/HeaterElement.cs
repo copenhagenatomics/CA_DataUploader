@@ -284,7 +284,7 @@ namespace CA_DataUploaderLib
             public IReadOnlyCollection<string> TemperatureBoardStateSensorNames { get; set; }
             public double ProportionalGain { get; set; }
             public TimeSpan ControlPeriod { get; set; }
-            public double MaxOutputPercentage { get; internal set; }
+            public double MaxOutputPercentage { get; set; }
         }
     }
 }
