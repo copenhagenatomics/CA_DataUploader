@@ -30,6 +30,9 @@ namespace CA_DataUploaderLib
         public const string boardFamilyHeader = "Board Family: ";
         public const string productTypeHeader = "Product Type: ";
 
+        public string subProductType = null;
+        public const string subProductTypeHeader = "Sub Product Type: ";
+
         public string softwareVersion = null;
         public const string softwareVersionHeader = "Software Version: ";
         public const string boardSoftwareHeader = "Board Software: ";
@@ -305,26 +308,29 @@ namespace CA_DataUploaderLib
                             CALog.LogColor(LogID.A, ConsoleColor.Green, input);
 
                         ableToRead |= input.Length >= 2;
-                        if (input.Contains(serialNumberHeader))
+                        input = input.Trim();
+                        if (input.StartsWith(serialNumberHeader))
                             serialNumber = input[(input.IndexOf(serialNumberHeader) + serialNumberHeader.Length)..].Trim();
-                        else if (input.Contains(boardFamilyHeader))
+                        else if (input.StartsWith(boardFamilyHeader))
                             productType = input[(input.IndexOf(boardFamilyHeader) + boardFamilyHeader.Length)..].Trim();
-                        else if (input.Contains(productTypeHeader))
+                        else if (input.StartsWith(productTypeHeader))
                             productType = input[(input.IndexOf(productTypeHeader) + productTypeHeader.Length)..].Trim();
-                        else if (input.Contains(boardVersionHeader))
+                        else if (input.StartsWith(boardVersionHeader))
                             pcbVersion = input[(input.IndexOf(boardVersionHeader) + boardVersionHeader.Length)..].Trim();
-                        else if (input.Contains(pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase))
+                        else if (input.StartsWith(pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase))
                             pcbVersion = input[(input.IndexOf(pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase) + pcbVersionHeader.Length)..].Trim();
-                        else if (input.Contains(boardSoftwareHeader))
+                        else if (input.StartsWith(boardSoftwareHeader))
                             softwareCompileDate = input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim();
-                        else if (input.Contains(softwareCompileDateHeader))
+                        else if (input.StartsWith(softwareCompileDateHeader))
                             softwareCompileDate = input[(input.IndexOf(softwareCompileDateHeader) + softwareCompileDateHeader.Length)..].Trim();
-                        else if (input.Contains(boardSoftwareHeader))
+                        else if (input.StartsWith(boardSoftwareHeader))
                             softwareVersion = input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim();
-                        else if (input.Contains(softwareVersionHeader))
+                        else if (input.StartsWith(softwareVersionHeader))
                             softwareVersion = input[(input.IndexOf(softwareVersionHeader) + softwareVersionHeader.Length)..].Trim();
-                        else if (input.Contains(mcuFamilyHeader))
+                        else if (input.StartsWith(mcuFamilyHeader))
                             mcuFamily = input[(input.IndexOf(mcuFamilyHeader) + mcuFamilyHeader.Length)..].Trim();
+                        else if (input.StartsWith(subProductTypeHeader))
+                            subProductType = input[(input.IndexOf(subProductTypeHeader) + subProductTypeHeader.Length)..].Trim();
                         else if (input.Contains("MISREAD") && !sentSerialCommandTwice && serialNumber == null)
                         {
                             port.WriteLine("Serial");
