@@ -167,7 +167,7 @@ namespace CA_DataUploaderLib
                 return;
             }
 
-            var cmd = cmdString.Split(' ').Select(x => x.Trim()).ToList();
+            var cmd = cmdString.Trim().Split(' ').Select(x => x.Trim()).ToList();
 
             CALog.LogInfoAndConsoleLn(LogID.A, ""); // this ensures that next command start on a new line. 
             if (!cmd.Any())
