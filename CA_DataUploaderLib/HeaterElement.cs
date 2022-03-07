@@ -12,7 +12,6 @@ namespace CA_DataUploaderLib
         private int OvenTargetTemperature;
         private readonly Config _config;
         private DateTime LastOff = DateTime.MinValue; // assume there is no previous off
-        private DateTime invalidValuesStartedVectorTime = default;
         private DateTime globalTimeOff;
         public bool IsOn;
         private bool ManualTurnOn;
