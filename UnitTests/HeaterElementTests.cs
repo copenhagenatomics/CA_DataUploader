@@ -37,9 +37,9 @@ namespace UnitTests
         public void WhenHeaterIsOverHalfDegreeAboveTempKeepsOff()
         { 
             var element = new HeaterElement(NewConfig.Build());
-            element.SetTargetTemperature(45);
+            element.SetTargetTemperature(70);
             var samples = NewVectorSamples;
-            samples["temp"] = 45.5;
+            samples["temp"] = 70.5;
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(samples);
             var action = element.MakeNextActionDecision(vector);
             Assert.AreEqual(false, action.IsOn);
@@ -49,12 +49,12 @@ namespace UnitTests
         public void WhenHeaterIsOnCanTurnOff()
         { 
             var element = new HeaterElement(NewConfig.Build());
-            element.SetTargetTemperature(45);
+            element.SetTargetTemperature(100);
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
             element.MakeNextActionDecision(vector);
             var newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(10).ToVectorDouble();
-            newSamples["temp"] = 46;
+            newSamples["temp"] = 101;
             var action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
             Assert.AreEqual(false, action.IsOn);
         }
@@ -153,7 +153,7 @@ namespace UnitTests
         public void DisconnectedTemperatureLessThan2SecondsKeepsExistingAction()
         { 
             var element = new HeaterElement(NewConfig.Build());
-            element.SetTargetTemperature(45);
+            element.SetTargetTemperature(70);
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
             var firstAction = element.MakeNextActionDecision(vector);
             var newSamples = NewVectorSamples;
@@ -168,10 +168,10 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void DisconnectedTemperatureOven2SecondsTurnsOff()
+        public void DisconnectedTemperatureOver2SecondsKeepsExistingAction()
         { 
             var element = new HeaterElement(NewConfig.Build());
-            element.SetTargetTemperature(45);
+            element.SetTargetTemperature(70);
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
             var firstAction = element.MakeNextActionDecision(vector);
             var newSamples = NewVectorSamples;
@@ -182,37 +182,61 @@ namespace UnitTests
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(4).ToVectorDouble();// 3 seconds after detecting the disconnect for the first time
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
             var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
-            Assert.IsFalse(newAction.IsOn);
-            Assert.AreNotEqual(firstAction, newAction);
+            Assert.AreEqual(firstAction, newAction);
         }
 
         [TestMethod]
-        public void ReconnectedUnderTargetTemperatureWaitsForNextControlPeriod()
-        { 
+        public void DisconnectedTemperatureOverControlPeriodLengthTurnsOff()
+        {
             var element = new HeaterElement(NewConfig.Build());
-            element.SetTargetTemperature(45);
+            element.SetTargetTemperature(200);
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
             element.MakeNextActionDecision(vector);
             var newSamples = NewVectorSamples;
-            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(1).ToVectorDouble();
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(29).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
-            element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
+            var action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.IsTrue(action.IsOn);//still within the control period, should not turn off yet
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(30).ToVectorDouble();
+            newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.IsFalse(action.IsOn);//reached the end of the control period, so it should turn off
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(31).ToVectorDouble();
+            newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.IsFalse(action.IsOn);//must still be off as long as it keep being disconnected (its good to do the extra check, as the first actuation at the end of the control period tends to be off)
+        }
+
+        [TestMethod]
+        public void ReconnectedUnderTargetTemperatureStartsPostponedControlPeriodInmediately()
+        { 
+            var element = new HeaterElement(NewConfig.Build());
+            element.SetTargetTemperature(200);
+            NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
+            var newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().ToVectorDouble();
+            newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
+            var action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.IsFalse(action.IsOn); //no actuation yet, we are not connected
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(2).ToVectorDouble();
+            newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.IsFalse(action.IsOn); //still no actuation as we are not connected
             newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(3).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.ReceivingValues;
-            var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
-            Assert.IsFalse(newAction.IsOn); 
-            newSamples = NewVectorSamples;
-            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(30).ToVectorDouble();
-            newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
-            Assert.IsTrue(newAction.IsOn);
+            action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples));
+            Assert.IsTrue(action.IsOn); //we reconnected, so start the postponed control period right away
         }
 
         [TestMethod]
         public void ReconnectedOverTargetTemperatureTurnsOff()
         { 
             var element = new HeaterElement(NewConfig.Build());
-            element.SetTargetTemperature(45);
+            element.SetTargetTemperature(200);
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
             var firstAction = element.MakeNextActionDecision(vector);
             var newSamples = NewVectorSamples;
@@ -222,7 +246,7 @@ namespace UnitTests
             newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(3).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.ReceivingValues;
-            newSamples["temp"] = 46;
+            newSamples["temp"] = 201;
             var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
             Assert.IsFalse(newAction.IsOn);
             Assert.AreEqual(firstAction, disconnectedAction, "initial and disconnected action unexpectedly were different");

@@ -12,7 +12,6 @@ namespace CA_DataUploaderLib
         private int OvenTargetTemperature;
         private readonly Config _config;
         private DateTime LastOff = DateTime.MinValue; // assume there is no previous off
-        private DateTime invalidValuesStartedVectorTime = default;
         private DateTime globalTimeOff;
         public bool IsOn;
         private bool ManualTurnOn;
@@ -122,17 +121,14 @@ namespace CA_DataUploaderLib
             if (ManualTurnOn) return false; // heater is on in manual avoid, avoid turning off
             if (OvenTargetTemperature <= 0)
                 return SetOffProperties(vectorTime); // turn off: oven's command is off, skip any extra checks (note its not considered an auto off so new oven commands are not hit by the 10 seconds limit)
-            var timeoutResult = CheckInvalidValuesTimeout(hasValidTemperature, 2000, vectorTime);
-            if (timeoutResult.HasValue && timeoutResult.Value)
-                return SetAutoOffProperties(vectorTime); // turn off: 2 seconds without valid temperatures
-            else if (timeoutResult.HasValue)
-                return false; // no valid temperatures, waiting up to 2 seconds before turn off
-
-            if (temperature > OvenTargetTemperature)
-                return SetAutoOffProperties(vectorTime); //turn off: already at target temperature
 
             if (vectorTime >= globalTimeOff)
                 return SetAutoOffProperties(vectorTime);
+
+            if (!hasValidTemperature) return false; //do not turn off early due to invalid values during a control period. It will be handled on the next control period.
+
+            if (temperature > OvenTargetTemperature)
+                return SetAutoOffProperties(vectorTime); //turn off: already at target temperature
 
             return false;
         }
@@ -205,17 +201,6 @@ namespace CA_DataUploaderLib
             if (watch.IsRunning && watch.Elapsed.Hours < 1) return;
             CALog.LogErrorAndConsoleLn(LogID.A,message);
             watch.Restart();
-        }
-
-        /// <returns><c>true</c> if timed out with invalid values, <c>false</c> if we are waiting for the timeout and <c>null</c> if <paramref name="hasValidSensors"/> was <c>true</c></returns>
-        private bool? CheckInvalidValuesTimeout(bool hasValidSensors, int milliseconds, DateTime vectorTime)
-        {
-            if (hasValidSensors)
-                invalidValuesStartedVectorTime = default;
-            else if(invalidValuesStartedVectorTime == default)
-                invalidValuesStartedVectorTime = vectorTime;
-
-            return hasValidSensors ? default(bool?) : (vectorTime - invalidValuesStartedVectorTime).TotalMilliseconds >= milliseconds;
         }
 
         // resends the off command every 5 seconds as long as there is current.
