@@ -63,7 +63,12 @@ namespace CA_DataUploaderLib
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
         /// <remarks>This method is only aimed at single host scenarios where a single system has all the inputs</remarks>
-        public (List<SensorSample> samples, DateTime vectorTime) GetFullSystemVectorValues() => MakeDecision(GetNodeInputs().ToList(), DateTime.UtcNow);
+        public (List<SensorSample> samples, DateTime vectorTime) GetFullSystemVectorValues() 
+        {
+            var (samples, vectorTime) = MakeDecision(GetNodeInputs().ToList(), DateTime.UtcNow);
+            OnNewVectorReceived(samples.WithVectorTime(vectorTime));
+            return (samples, vectorTime);
+        }
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
         public (List<SensorSample> samples, DateTime vectorTime) MakeDecision(List<SensorSample> inputs, DateTime vectorTime)
         {
@@ -72,7 +77,6 @@ namespace CA_DataUploaderLib
             var inputVectorReceivedArgs = new NewVectorReceivedArgs(samples.WithVectorTime(vectorTime).ToDictionary(v => v.Name, v => v.Value));
             var outputs = _subsystems.SelectMany(s => s.GetDecisionOutputs(inputVectorReceivedArgs));
             filterAndMath.AddOutputsToInputVector(samples, outputs);
-            OnNewVectorReceived(samples.WithVectorTime(vectorTime));
             return (samples, vectorTime);
         }
 
