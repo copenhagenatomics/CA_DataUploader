@@ -122,6 +122,10 @@ namespace CA_DataUploaderLib
                 board.port.Close();
                 Thread.Sleep(100);
             }
+            else if (board != null && board.IsEmpty() && board.BoxName == null)
+            {//note we don't log this for devices without serial that were mapped by usb (last check above)
+                CALog.LogInfoAndConsoleLn(LogID.B, $"some data without serial detected for device at port {name} - {baudrate} / still connected");
+            }
 
             return (board, calibrationUpdateMsg);
         }
