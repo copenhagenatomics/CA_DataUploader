@@ -115,15 +115,16 @@ namespace CA_DataUploaderLib
 
         private static bool CheckConnectedStateInVector(MCUBoard board, string boardStateName, ref bool waitingBoardReconnect, NewVectorReceivedArgs vector)
         {
-            var connected = (BaseSensorBox.ConnectionState)(int)vector[boardStateName] >= BaseSensorBox.ConnectionState.Connected;
+            var vectorState = (BaseSensorBox.ConnectionState)(int)vector[boardStateName];
+            var connected = vectorState >= BaseSensorBox.ConnectionState.Connected;
             if (waitingBoardReconnect && connected)
             {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"resuming switchboard actions after reconnect on {board.ToShortDescription()}");
+                CALog.LogData(LogID.B, $"resuming switchboard actions after reconnect on {board.ToShortDescription()}");
                 waitingBoardReconnect = false;
             }
             else if (!waitingBoardReconnect && !connected)
             {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"stopping switchboard actions while connection is reestablished on {board.ToShortDescription()}");
+                CALog.LogData(LogID.B, $"stopping switchboard actions while connection is reestablished - state: {vectorState} - {board.ToShortDescription()}");
                 waitingBoardReconnect = true;
             }
             return connected;
