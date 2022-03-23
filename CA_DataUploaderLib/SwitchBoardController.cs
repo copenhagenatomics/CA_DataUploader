@@ -118,12 +118,12 @@ namespace CA_DataUploaderLib
             var connected = (BaseSensorBox.ConnectionState)(int)vector[boardStateName] >= BaseSensorBox.ConnectionState.Connected;
             if (waitingBoardReconnect && connected)
             {
-                CALog.LogInfo(LogID.B, $"resuming switchboard actions after reconnect on {board.ToShortDescription()}");
+                CALog.LogData(LogID.B, $"resuming switchboard actions after reconnect on {board.ToShortDescription()}");
                 waitingBoardReconnect = false;
             }
             else if (!waitingBoardReconnect && !connected)
             {
-                CALog.LogInfo(LogID.B, $"stopping switchboard actions while connection is reestablished on {board.ToShortDescription()}");
+                CALog.LogData(LogID.B, $"stopping switchboard actions while connection is reestablished on {board.ToShortDescription()}");
                 waitingBoardReconnect = true;
             }
             return connected;
