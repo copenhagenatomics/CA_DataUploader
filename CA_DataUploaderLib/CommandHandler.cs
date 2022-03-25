@@ -90,8 +90,9 @@ namespace CA_DataUploaderLib
         private void SendDeviceDetectionEvent()
         {
             var sb = new StringBuilder();
-            foreach (var msg in _mapper.CalibrationUpdateMessages)
-                sb.AppendLine(msg);
+            foreach (var board in _mapper.McuBoards)
+                if (board.Calibration != board.UpdatedCalibration)
+                    sb.AppendLine($"replaced board calibration '{board.Calibration}' with '{board.UpdatedCalibration}");
             sb.AppendLine("Detected devices:");
             foreach (var board in _mapper.McuBoards)
                 sb.AppendLine(board.ToShortDescription());
