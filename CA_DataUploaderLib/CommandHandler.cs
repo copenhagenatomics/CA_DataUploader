@@ -89,14 +89,24 @@ namespace CA_DataUploaderLib
 
         private void SendDeviceDetectionEvent()
         {
-            var sb = new StringBuilder();
-            foreach (var board in _mapper.McuBoards)
-                if (board.Calibration != board.UpdatedCalibration)
-                    sb.AppendLine($"replaced board calibration '{board.Calibration}' with '{board.UpdatedCalibration}");
-            sb.AppendLine("Detected devices:");
-            foreach (var board in _mapper.McuBoards)
-                sb.AppendLine(board.ToShortDescription());
-            FireCustomEvent(sb.ToString(), DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
+            var data = new SystemChangeNotificationData() { Boards = _mapper.McuBoards.Select(ToBoardInfo).ToList() }.ToJson();
+            FireCustomEvent(data, DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
+
+            static SystemChangeNotificationData.BoardInfo ToBoardInfo(MCUBoard board) => new()
+            {
+                SerialNumber = board.serialNumber,
+                ProductType = board.productType,
+                ProductSubType = board.subProductType,
+                McuFamily = board.mcuFamily,
+                SoftwareVersion = board.softwareVersion,
+                CompileDate = board.softwareCompileDate,
+                //TODO: GitSha = board.GitSha,
+                PcbVersion = board.pcbVersion,
+                Calibration = board.Calibration,
+                MappedBoardName = board.BoxName,
+                Port = board.PortName,
+                UpdatedCalibration = board.UpdatedCalibration
+            };
         }
 
         private ExtendedVectorDescription GetFullSystemFilterAndMath()
