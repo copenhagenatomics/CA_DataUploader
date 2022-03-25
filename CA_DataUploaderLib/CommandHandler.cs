@@ -100,7 +100,7 @@ namespace CA_DataUploaderLib
                 McuFamily = board.mcuFamily,
                 SoftwareVersion = board.softwareVersion,
                 CompileDate = board.softwareCompileDate,
-                //TODO: GitSha = board.GitSha,
+                GitSha = board.GitSha,
                 PcbVersion = board.pcbVersion,
                 Calibration = board.Calibration,
                 MappedBoardName = board.BoxName,

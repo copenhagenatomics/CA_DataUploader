@@ -52,6 +52,9 @@ namespace CA_DataUploaderLib
         public string Calibration { get; private set; }
         public string UpdatedCalibration { get; private set; }
 
+        public const string GitShaHeader = "Git SHA: ";
+        public string GitSha { get; private set; }
+
         private static int _detectedUnknownBoards;
         // the "writer" for this lock are operations that close/reopens the connection, while the readers are any other operation including SafeWriteLine.
         // This prevents operations being ran when the connections are being closed/reopened.
@@ -336,6 +339,9 @@ namespace CA_DataUploaderLib
                             mcuFamily = input[(input.IndexOf(mcuFamilyHeader) + mcuFamilyHeader.Length)..].Trim();
                         else if (input.StartsWith(subProductTypeHeader))
                             subProductType = input[(input.IndexOf(subProductTypeHeader) + subProductTypeHeader.Length)..].Trim();
+                        else if (input.StartsWith(GitShaHeader))
+                            GitSha = input[(input.IndexOf(GitShaHeader) + GitShaHeader.Length)..].Trim();
+
                         else if (input.Contains("MISREAD") && !sentSerialCommandTwice && serialNumber == null)
                         {
                             port.WriteLine("Serial");
