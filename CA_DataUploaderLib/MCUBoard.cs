@@ -39,6 +39,7 @@ namespace CA_DataUploaderLib
 
         public string softwareCompileDate = null;
         public const string softwareCompileDateHeader = "Software Compile Date: ";
+        public const string compileDateHeader = "Compile Date: ";
 
         public string pcbVersion = null;
         public const string pcbVersionHeader = "PCB version: ";
@@ -49,7 +50,12 @@ namespace CA_DataUploaderLib
         public bool InitialConnectionSucceeded {get; private set;} = false;
 
         public const string CalibrationHeader = "Calibration: ";
-        private string calibration;
+        public string Calibration { get; private set; }
+        public string UpdatedCalibration { get; private set; }
+
+        public const string GitShaHeader = "Git SHA: ";
+        public const string GitShaHeader2 = "Git SHA ";
+        public string GitSha { get; private set; }
 
         private static int _detectedUnknownBoards;
         // the "writer" for this lock are operations that close/reopens the connection, while the readers are any other operation including SafeWriteLine.
@@ -70,10 +76,9 @@ namespace CA_DataUploaderLib
             this.port = port;
         }
 
-        private async static Task<(MCUBoard board, string calibrationUpdateMsg)> Create(string name, int baudrate, bool skipBoardAutoDetection)
+        private async static Task<MCUBoard> Create(string name, int baudrate, bool skipBoardAutoDetection)
         {
             MCUBoard board = null;
-            string calibrationUpdateMsg = default;
             try
             {
                 var port = new SerialPort(name);
@@ -106,7 +111,7 @@ namespace CA_DataUploaderLib
                             board.BoxName = ioconfMap.BoxName;
                             board.ConfigSettings = ioconfMap.BoardSettings;
                             port.ReadTimeout = ioconfMap.BoardSettings.MaxMillisecondsWithoutNewValues;
-                            calibrationUpdateMsg = await board.UpdateCalibration(board.ConfigSettings);
+                            await board.UpdateCalibration(board.ConfigSettings);
                         }
                     }
                 }
@@ -127,17 +132,19 @@ namespace CA_DataUploaderLib
                 CALog.LogInfoAndConsoleLn(LogID.B, $"some data without serial detected for device at port {name} - {baudrate} / still connected");
             }
 
-            return (board, calibrationUpdateMsg);
+            return board;
         }
 
         private async Task<string> UpdateCalibration(BoardSettings configSettings)
         {
-            if (configSettings.Calibration == default || calibration == configSettings.Calibration)
+            string newCalibration = configSettings.Calibration;
+            if (newCalibration == default || Calibration == newCalibration)
                 return default; // ignore if there is no calibration in configuration or if the board already had the expected configuration
 
-            var calibrationMessage = $"replaced board calibration '{calibration}' with '{configSettings.Calibration}";
+            var calibrationMessage = $"replaced board calibration '{Calibration}' with '{newCalibration}";
             CALog.LogInfoAndConsoleLn(LogID.A, $"{calibrationMessage}' - {ToShortDescription()}");
-            await SafeWriteLine(configSettings.Calibration, CancellationToken.None);
+            await SafeWriteLine(newCalibration, CancellationToken.None);
+            UpdatedCalibration = newCalibration;
             return calibrationMessage;
         }
 
@@ -170,7 +177,7 @@ namespace CA_DataUploaderLib
         }
 
         public string ToDebugString(string seperator) => 
-            $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {port.BaudRate}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}{CalibrationHeader}{calibration}{seperator}";
+            $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {port.BaudRate}{seperator}{serialNumberHeader}{serialNumber}{seperator}{productTypeHeader}{productType}{seperator}{pcbVersionHeader}{pcbVersion}{seperator}{softwareVersionHeader}{softwareVersion}{seperator}{CalibrationHeader}{Calibration}{seperator}";
         public override string ToString() => $"{productTypeHeader}{productType,-20} {serialNumberHeader}{serialNumber,-12} Port name: {PortName}";
         public string ToShortDescription() => $"{BoxName} {productType} {serialNumber} {PortName}";
 
@@ -227,22 +234,22 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public async static Task<(MCUBoard board, string calibrationUpdateMsg)> OpenDeviceConnection(string name)
+        public async static Task<MCUBoard> OpenDeviceConnection(string name)
         {
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
             var map = File.Exists("IO.conf") ? IOconfFile.GetMap().SingleOrDefault(m => m.USBPort == name) : null;
             var initialBaudrate = map != null && map.BaudRate != 0 ? map.BaudRate : 115200;
             bool skipAutoDetection = (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;
-            var (mcu, calibrationUpdateMsg) = await Create(name, initialBaudrate, skipAutoDetection);
+            var mcu = await Create(name, initialBaudrate, skipAutoDetection);
             if (!mcu.InitialConnectionSucceeded)
-                (mcu, calibrationUpdateMsg) = await OpenWithAutoDetection(name, initialBaudrate);
+                mcu = await OpenWithAutoDetection(name, initialBaudrate);
             if (mcu.serialNumber.IsNullOrEmpty())
                 mcu.serialNumber = "unknown" + Interlocked.Increment(ref _detectedUnknownBoards);
             if (mcu.InitialConnectionSucceeded && map != null && map.BaudRate != 0 && mcu.port.BaudRate != map.BaudRate)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected baud rate for {map}. Board info {mcu}");
             if (mcu.ConfigSettings.ExpectedHeaderLines > 8)
                 await mcu.SkipExtraHeaders(mcu.ConfigSettings.ExpectedHeaderLines - 8);
-            return (mcu, calibrationUpdateMsg);
+            return mcu;
         }
 
         private async Task<List<string>> SkipExtraHeaders(int extraHeaderLinesToSkip)
@@ -259,15 +266,15 @@ namespace CA_DataUploaderLib
             return lines;
         }
 
-        private async static Task<(MCUBoard board, string calibrationUpdateMsg)> OpenWithAutoDetection(string name, int previouslyAttemptedBaudRate)
+        private async static Task<MCUBoard> OpenWithAutoDetection(string name, int previouslyAttemptedBaudRate)
         { 
             var skipAutoDetection = false;
             if (previouslyAttemptedBaudRate == 115200)
                 return await Create(name, 9600, skipAutoDetection);
             if (previouslyAttemptedBaudRate == 9600)
                 return await Create(name, 115200, skipAutoDetection);
-            var res = await Create(name, 115200, skipAutoDetection);
-            return res.board.InitialConnectionSucceeded ? res : await Create(name, 9600, skipAutoDetection);
+            var board = await Create(name, 115200, skipAutoDetection);
+            return board.InitialConnectionSucceeded ? board : await Create(name, 9600, skipAutoDetection);
         }
 
         /// <returns><c>true</c> if we were able to read</returns>
@@ -300,9 +307,8 @@ namespace CA_DataUploaderLib
                     // we use the regular reads as only 1 thread uses the board during instance initialization
                     var res = await pipeReader.ReadAsync(token);
 
-                    if (res.IsCanceled){
+                    if (res.IsCanceled)
                         return ableToRead;
-                    }
 
                     var buffer = res.Buffer;
 
@@ -327,6 +333,8 @@ namespace CA_DataUploaderLib
                             softwareCompileDate = input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim();
                         else if (input.StartsWith(softwareCompileDateHeader))
                             softwareCompileDate = input[(input.IndexOf(softwareCompileDateHeader) + softwareCompileDateHeader.Length)..].Trim();
+                        else if (input.StartsWith(compileDateHeader))
+                            softwareCompileDate = input[(input.IndexOf(compileDateHeader) + compileDateHeader.Length)..].Trim();
                         else if (input.StartsWith(boardSoftwareHeader))
                             softwareVersion = input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim();
                         else if (input.StartsWith(softwareVersionHeader))
@@ -335,6 +343,11 @@ namespace CA_DataUploaderLib
                             mcuFamily = input[(input.IndexOf(mcuFamilyHeader) + mcuFamilyHeader.Length)..].Trim();
                         else if (input.StartsWith(subProductTypeHeader))
                             subProductType = input[(input.IndexOf(subProductTypeHeader) + subProductTypeHeader.Length)..].Trim();
+                        else if (input.StartsWith(GitShaHeader))
+                            GitSha = input[(input.IndexOf(GitShaHeader) + GitShaHeader.Length)..].Trim();
+                        else if (input.StartsWith(GitShaHeader2))
+                            GitSha = input[(input.IndexOf(GitShaHeader2) + GitShaHeader2.Length)..].Trim();
+
                         else if (input.Contains("MISREAD") && !sentSerialCommandTwice && serialNumber == null)
                         {
                             port.WriteLine("Serial");
@@ -343,8 +356,11 @@ namespace CA_DataUploaderLib
                         }
                     }
 
-                    if (!IsEmpty() && TryReadOptionalCalibration(ref buffer, out calibration))
+                    if (!IsEmpty() && TryReadOptionalCalibration(ref buffer, out var calibration))
+                    {
                         finishedReadingHeader = true;
+                        Calibration = UpdatedCalibration = calibration;
+                    }
 
                     // Tell the PipeReader how much of the buffer has been consumed.
                     pipeReader.AdvanceTo(buffer.Start, buffer.End);

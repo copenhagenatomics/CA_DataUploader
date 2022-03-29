@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
@@ -192,7 +193,10 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                await _plot.PostEventAsync(GetSignedEvent(args));
+                if (args.EventType == (byte)EventType.SystemChangeNotification)
+                    await PostSystemChangeNotificationAsync(args);//this special event turns into reported boards serial info + still an event with a shorter description
+                else
+                    await Post(args);
             }
             catch (Exception ex)
             {
@@ -202,6 +206,32 @@ namespace CA_DataUploaderLib
                 }
 
                 OnError($"failed posting event: {args.EventType} - {args.Data} - {args.TimeSpan}", ex);
+            }
+
+            Task Post(EventFiredArgs args) => _plot.PostEventAsync(GetSignedEvent(args));
+            Task PostBoardsSerialInfo(SystemChangeNotificationData data, DateTime timeSpan) => 
+                _plot.PostBoardsSerialInfo(SignAndCompress(data.ToBoardsSerialInfoJsonUtf8Bytes(timeSpan)));
+            Task PostSystemChangeNotificationAsync(EventFiredArgs args)
+            {
+                var data = SystemChangeNotificationData.ParseJson(args.Data);
+                return Task.WhenAll(
+                    PostBoardsSerialInfo(data, args.TimeSpan), 
+                    Post(new EventFiredArgs(ToShortEventData(data), args.EventType, args.TimeSpan)));
+            }
+            static string ToShortEventData(SystemChangeNotificationData data)
+            {
+                var sb = new StringBuilder(data.Boards.Count * 100);//allocate more than enough space to avoid slow unnecesary resizes
+                sb.AppendLine("Detected devices:");
+                foreach (var board in data.Boards)
+                {
+                    sb.AppendFormat("{0} {1} {2} {3}", board.MappedBoardName, board.ProductType, board.SerialNumber, board.Port);
+                    if (board.Calibration != null && board.Calibration != board.UpdatedCalibration)
+                        sb.AppendFormat(" cal:{0}->{1}", board.Calibration, board.UpdatedCalibration);
+                    else if (board.Calibration != null)
+                        sb.AppendFormat(" cal:{0}", board.Calibration);
+                    sb.AppendLine();
+                }
+                return sb.ToString();
             }
         }
 
@@ -256,6 +286,13 @@ namespace CA_DataUploaderLib
             public async Task PostEventAsync(byte[] signedMessage)
             {
                 string query = $"api/LoopApi/LogEvent?plotnameID={_plotID}";
+                var response = await _client.PutAsJsonAsync(query, signedMessage);
+                response.EnsureSuccessStatusCode();
+            }
+
+            public async Task PostBoardsSerialInfo(byte[] signedMessage)
+            {
+                string query = $"api/MCUboard?plotnameID={_plotID}";
                 var response = await _client.PutAsJsonAsync(query, signedMessage);
                 response.EnsureSuccessStatusCode();
             }

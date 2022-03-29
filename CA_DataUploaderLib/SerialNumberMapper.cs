@@ -12,33 +12,29 @@ namespace CA_DataUploaderLib
     public sealed class SerialNumberMapper : IDisposable
     {
         public List<MCUBoard> McuBoards { get; }
-        public List<string> CalibrationUpdateMessages { get; }
 
-        private SerialNumberMapper(IEnumerable<MCUBoard> boards, IEnumerable<string> calibrationUpdateMessages)
+        private SerialNumberMapper(IEnumerable<MCUBoard> boards)
         {
             McuBoards = new List<MCUBoard>(boards);
-            CalibrationUpdateMessages = new List<string>(calibrationUpdateMessages);
         }
 
         public async static Task<SerialNumberMapper> DetectDevices()
         {
             var logLevel = File.Exists("IO.conf") ? IOconfFile.GetOutputLevel() : CALogLevel.Normal;
             var boards = await Task.WhenAll(RpiVersion.GetUSBports().Select(name => AttemptToOpenDeviceConnection(name, logLevel)));
-            return new SerialNumberMapper(boards.Select(b => b.board), boards.Where(b => b.calibrationUpdateMsg != default).Select(b => b.calibrationUpdateMsg));
+            return new SerialNumberMapper(boards);
         }
 
-        public static Task<SerialNumberMapper> SkipDetection() 
-            => Task.FromResult(new SerialNumberMapper(Enumerable.Empty<MCUBoard>(), Enumerable.Empty<string>()));
-
-        private static async Task<(MCUBoard board, string calibrationUpdateMsg)> AttemptToOpenDeviceConnection(string name, CALogLevel logLevel)
+        public static Task<SerialNumberMapper> SkipDetection() => Task.FromResult(new SerialNumberMapper(Enumerable.Empty<MCUBoard>()));
+        private static async Task<MCUBoard> AttemptToOpenDeviceConnection(string name, CALogLevel logLevel)
         {
             try
             {
-                var (mcu, calibrationUpdateMsg) = await MCUBoard.OpenDeviceConnection(name);
+                var mcu = await MCUBoard.OpenDeviceConnection(name);
                 mcu.productType = mcu.productType ?? GetStringFromDmesg(mcu.PortName);
                 string logline = logLevel == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
                 CALog.LogInfoAndConsoleLn(LogID.A, logline);
-                return (mcu, calibrationUpdateMsg);
+                return mcu;
             }
             catch (UnauthorizedAccessException ex)
             {
