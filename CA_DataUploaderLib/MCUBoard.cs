@@ -39,6 +39,7 @@ namespace CA_DataUploaderLib
 
         public string softwareCompileDate = null;
         public const string softwareCompileDateHeader = "Software Compile Date: ";
+        public const string compileDateHeader = "Compile Date: ";
 
         public string pcbVersion = null;
         public const string pcbVersionHeader = "PCB version: ";
@@ -53,6 +54,7 @@ namespace CA_DataUploaderLib
         public string UpdatedCalibration { get; private set; }
 
         public const string GitShaHeader = "Git SHA: ";
+        public const string GitShaHeader2 = "Git SHA ";
         public string GitSha { get; private set; }
 
         private static int _detectedUnknownBoards;
@@ -331,6 +333,8 @@ namespace CA_DataUploaderLib
                             softwareCompileDate = input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim();
                         else if (input.StartsWith(softwareCompileDateHeader))
                             softwareCompileDate = input[(input.IndexOf(softwareCompileDateHeader) + softwareCompileDateHeader.Length)..].Trim();
+                        else if (input.StartsWith(compileDateHeader))
+                            softwareCompileDate = input[(input.IndexOf(compileDateHeader) + compileDateHeader.Length)..].Trim();
                         else if (input.StartsWith(boardSoftwareHeader))
                             softwareVersion = input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim();
                         else if (input.StartsWith(softwareVersionHeader))
@@ -341,6 +345,8 @@ namespace CA_DataUploaderLib
                             subProductType = input[(input.IndexOf(subProductTypeHeader) + subProductTypeHeader.Length)..].Trim();
                         else if (input.StartsWith(GitShaHeader))
                             GitSha = input[(input.IndexOf(GitShaHeader) + GitShaHeader.Length)..].Trim();
+                        else if (input.StartsWith(GitShaHeader2))
+                            GitSha = input[(input.IndexOf(GitShaHeader2) + GitShaHeader2.Length)..].Trim();
 
                         else if (input.Contains("MISREAD") && !sentSerialCommandTwice && serialNumber == null)
                         {
