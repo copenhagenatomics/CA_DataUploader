@@ -7,7 +7,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public static class IOconfFileLoader
     {
-        private readonly static List<(string prefix, Func<string, int, IOconfRow> loader)> Loaders = new List<(string prefix, Func<string, int, IOconfRow> ctor)>
+        private readonly static List<(string rowType, Func<string, int, IOconfRow> loader)> Loaders = new List<(string rowType, Func<string, int, IOconfRow> ctor)>
         {
             ("LoopName", (r, l) => new IOconfLoopName(r, l)),
             ("Account", (r, l) => new IOconfAccount(r, l)),
@@ -35,26 +35,33 @@ namespace CA_DataUploaderLib.IOconf
             if (!File.Exists("IO.conf"))
                 throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
 
-            var lines = File.ReadAllLines("IO.conf").ToList();
-            var rawFile = string.Join(Environment.NewLine, lines);
-            // remove empty lines and commented out lines
-            var lines2 = lines.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
-            return (rawFile, lines2.Select(x => CreateType(x, lines.IndexOf(x))));
+            return ParseLines(File.ReadAllLines("IO.conf"));
         }
 
-        public static void AddLoader(string prefix, Func<string, int, IOconfRow> loader)
+        public static (string, IEnumerable<IOconfRow>) ParseLines(IEnumerable<string> lines)
         {
-            if (GetLoader(prefix) != null)
-                throw new ArgumentException($"the specified loader prefix is already in use: {prefix}", nameof(prefix));
+            var linesList = lines.ToList();
+            var rawFile = string.Join(Environment.NewLine, linesList);
+            // remove empty lines and commented out lines
+            var lines2 = linesList.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
+            return (rawFile, lines2.Select(x => CreateType(x, linesList.IndexOf(x))));
+        }
 
-            Loaders.Add((prefix, loader));
+        public static void AddLoader(string rowType, Func<string, int, IOconfRow> loader)
+        {
+            if (GetLoader(rowType) != null)
+                throw new ArgumentException($"the specified loader rowType is already in use: {rowType}", nameof(rowType));
+
+            Loaders.Add((rowType, loader));
         }
 
         private static IOconfRow CreateType(string row, int lineNum)
         {
             try
             {
-                var loader = GetLoader(row) ?? ((r, l) => new IOconfRow(r, l, "Unknown"));
+                var separatorIndex = row.IndexOf(';');
+                var rowType = separatorIndex > -1 ? row.AsSpan()[..separatorIndex].Trim() : row;
+                var loader = GetLoader(rowType) ?? ((r, l) => new IOconfRow(r, l, "Unknown"));
                 return loader(row, lineNum);
             }
             catch (Exception ex)
@@ -64,10 +71,10 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        private static Func<string, int, IOconfRow> GetLoader(string row)
+        private static Func<string, int, IOconfRow> GetLoader(ReadOnlySpan<char> rowType)
         {
             foreach (var loader in Loaders)
-                if (row.StartsWith(loader.prefix))
+                if (rowType.Equals(loader.rowType, StringComparison.InvariantCultureIgnoreCase))
                     return loader.loader;
 
             return null;
