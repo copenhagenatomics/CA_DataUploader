@@ -354,7 +354,6 @@ namespace CA_DataUploaderLib
                 {
                     sensor.Value = value;
                     DetectAndWarnSensorDisconnects(board, sensor);
-                    HandleSaltLeakage(sensor);
                 }
 
                 i++;
@@ -385,11 +384,6 @@ namespace CA_DataUploaderLib
             return samples;
         }
 
-        private static void HandleSaltLeakage(SensorSample sensor)
-        {
-            if (sensor.GetType() == typeof(IOconfSaltLeakage))
-                sensor.Value = sensor.Value > 0 && sensor.Value < 3000 ? 1d : 0d; // triggers on values between 0 and 3000 (excluding boundaries)
-        }
 
         private bool HelpMenu(List<string> args)
         {
