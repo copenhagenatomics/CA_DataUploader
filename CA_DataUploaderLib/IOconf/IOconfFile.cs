@@ -70,10 +70,6 @@ namespace CA_DataUploaderLib.IOconf
         public static IEnumerable<IOconfMap> GetMap() => GetEntries<IOconfMap>();
         public static IEnumerable<IOconfGeneric> GetGeneric()  => GetEntries<IOconfGeneric>();
         public static IEnumerable<IOconfTypeK> GetTypeK() => GetEntries<IOconfTypeK>();
-        public static IEnumerable<IOconfSaltLeakage> GetSaltLeakage() => GetEntries<IOconfSaltLeakage>();
-        public static IEnumerable<IOconfInput> GetTypeKAndLeakage() =>
-            Table.Where(x => x.GetType() == typeof(IOconfTypeK) || x.GetType() == typeof(IOconfSaltLeakage)).Cast<IOconfInput>();
-
         public static IOconfRPiTemp GetRPiTemp() => GetEntries<IOconfRPiTemp>().SingleOrDefault() ?? IOconfRPiTemp.Default;
         public static IEnumerable<IOconfInput> GetGeiger()=> GetEntries<IOconfGeiger>();
         public static IEnumerable<IOconfInput> GetAirFlow()=> GetEntries<IOconfAirFlow>();

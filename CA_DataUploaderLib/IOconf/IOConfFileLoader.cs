@@ -16,7 +16,6 @@ namespace CA_DataUploaderLib.IOconf
             ("Math", (r, l) => new IOconfMath(r, l)),
             ("Alert", (r, l) => new IOconfAlert(r, l)),
             ("TypeK", (r, l) => new IOconfTypeK(r, l)),
-            ("SaltLeakage", (r, l) => new IOconfSaltLeakage(r, l)),
             ("AirFlow", (r, l) => new IOconfAirFlow(r, l)),
             ("Heater", (r, l) => new IOconfHeater(r, l)),
             ("Light", (r, l) => new IOconfLight(r, l)),

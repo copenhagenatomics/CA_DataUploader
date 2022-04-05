@@ -316,11 +316,6 @@ namespace CA_DataUploaderLib
                 { // we run this once when there has been 100 attempts
                     _cmd.FireAlert($"reconnect limit exceeded, reducing reconnect frequency to 15 minutes - {Title} - {board.ToShortDescription()}");
                     delayBetweenAttempts = TimeSpan.FromMinutes(15); // 4 times x hour = 96 times x day
-                    if (board.ConfigSettings.StopWhenLosingSensor)
-                    {
-                        LogError(board, "emergency shutdown: reconnect limit exceeded");
-                        _cmd.Execute("emergencyshutdown");
-                    }
                 }
 
                 await Task.Delay(delayBetweenAttempts, token);
@@ -359,7 +354,6 @@ namespace CA_DataUploaderLib
                 {
                     sensor.Value = value;
                     DetectAndWarnSensorDisconnects(board, sensor);
-                    HandleSaltLeakage(board, sensor);
                 }
 
                 i++;
@@ -390,26 +384,6 @@ namespace CA_DataUploaderLib
             return samples;
         }
 
-        private void HandleSaltLeakage(MCUBoard board, SensorSample sensor)
-        {
-            if (sensor.GetType() == typeof(IOconfSaltLeakage))
-            {
-                if (sensor.Value < 3000 && sensor.Value > 0)  // Salt leakage algorithm. 
-                {
-                    LogError(board, $"salt leak detected from {sensor.Input.Name}={sensor.Value} {DateTime.Now:dd-MMM-yyyy HH:mm}");
-                    sensor.Value = 1d;
-                    if (_cmd != null)
-                    {
-                        LogError(board, "emergency shutdown: salt leakage detected");
-                        _cmd.Execute("emergencyshutdown"); // make the whole system shut down. 
-                    }
-                }
-                else
-                {
-                    sensor.Value = 0d; // no leakage
-                }
-            }
-        }
 
         private bool HelpMenu(List<string> args)
         {
