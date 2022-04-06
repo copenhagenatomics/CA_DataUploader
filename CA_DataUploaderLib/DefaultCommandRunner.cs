@@ -28,6 +28,8 @@ namespace CA_DataUploaderLib
 
         public bool Run(string cmdString, List<string> cmd)
         {
+            CALog.LogInfoAndConsoleLn(LogID.A, ""); // this ensures that next command start on a new line. 
+
             string commandName = cmd[0].ToLower();
             if (!_commands.TryGetValue(commandName, out var commandFunctions))
             {
