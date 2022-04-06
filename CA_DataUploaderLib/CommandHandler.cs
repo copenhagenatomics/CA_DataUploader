@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.ComponentModel;
 
 namespace CA_DataUploaderLib
 {
@@ -17,16 +18,17 @@ namespace CA_DataUploaderLib
         private bool _running = true;
         private readonly SerialNumberMapper _mapper;
         private DateTime _start = DateTime.Now;
-        private readonly StringBuilder inputCommand = new StringBuilder();
-        private readonly Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
+        private readonly StringBuilder inputCommand = new();
+        private readonly Dictionary<string, List<Func<List<string>, bool>>> _commands = new();
         private readonly CALogLevel _logLevel = IOconfFile.GetOutputLevel();
-        private readonly List<string> AcceptedCommands = new List<string>();
-        private readonly List<ISubsystemWithVectorData> _subsystems = new List<ISubsystemWithVectorData>();
+        private readonly List<string> AcceptedCommands = new();
+        private readonly List<ISubsystemWithVectorData> _subsystems = new();
         private int AcceptedCommandsIndex = -1;
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
 
         public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
         public event EventHandler<EventFiredArgs> EventFired;
+        public event EventHandler<RunningCommandEventArgs> RunningCommand;
         public bool IsRunning { get { return _running; } }
 
         public CommandHandler(SerialNumberMapper mapper = null)
@@ -58,7 +60,6 @@ namespace CA_DataUploaderLib
         }
 
         public void Execute(string command, bool addToCommandHistory = true) => HandleCommand(command, addToCommandHistory);
-
         public void AddSubsystem(ISubsystemWithVectorData subsystem) => _subsystems.Add(subsystem);
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
@@ -163,7 +164,8 @@ namespace CA_DataUploaderLib
                 try
                 {
                     var cmd = GetCommand();
-                    HandleCommand(cmd, true);
+                    if (cmd != null) //cmd is null when GetCommand abort due to _running being false
+                        HandleCommand(cmd, true);
                 }
                 catch (Exception ex)
                 {
@@ -176,12 +178,6 @@ namespace CA_DataUploaderLib
 
         private void HandleCommand(string cmdString, bool addToCommandHistory)
         {
-            if (cmdString == null)  // no NewLine
-            {
-                // echo to console here
-                return;
-            }
-
             var cmd = cmdString.Trim().Split(' ').Select(x => x.Trim()).ToList();
 
             CALog.LogInfoAndConsoleLn(LogID.A, ""); // this ensures that next command start on a new line. 
@@ -201,6 +197,11 @@ namespace CA_DataUploaderLib
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - unknown command");
                 return;
             }
+
+            var runningArgs = new RunningCommandEventArgs(cmdString, cmd);
+            RunningCommand?.Invoke(this, runningArgs);
+            if (runningArgs.Cancel)
+                return;
 
             List<bool> executionResults = RunCommandFunctions(cmdString, addToCommandHistory, cmd, commandFunctions);
 
@@ -260,12 +261,23 @@ namespace CA_DataUploaderLib
             FireCustomEvent(cmdString, DateTime.UtcNow, (byte)EventType.Command);
         }
 
+        /// <returns>the text line <c>null</c> if we are no longer running (_running is false)</returns>
         private string GetCommand()
         {
             var info = Console.ReadKey(true);
-            while (info.Key != ConsoleKey.Enter && info.Key != ConsoleKey.Escape && _running)
+            while (info.Key != ConsoleKey.Enter)
             {
-                if (info.Key == ConsoleKey.Backspace)
+                if (!_running)
+                    return null; //no longer running, abort
+                else if (info.Key == ConsoleKey.Escape)
+                {
+                    CALog.LogInfoAndConsoleLn(LogID.A, "You are about to stop the control program, type y if you want to continue");
+                    var confirmedStop = Console.ReadKey().KeyChar == 'y';
+                    CALog.LogInfoAndConsoleLn(LogID.A, confirmedStop ? "Stop sequence initiated" : "Stop sequence aborted");
+                    if (confirmedStop)
+                        return "escape";
+                }
+                else if (info.Key == ConsoleKey.Backspace)
                 {
                     Console.Write("\b \b"); // https://stackoverflow.com/a/53976873/66372
                     if (inputCommand.Length > 0)
@@ -282,17 +294,6 @@ namespace CA_DataUploaderLib
                 }
                 info = Console.ReadKey(true);
             }
-
-            if (info.Key == ConsoleKey.Escape)
-            {
-                CALog.LogInfoAndConsoleLn(LogID.A, "You are about to stop the control program, type y if you want to continue");
-                var confirmedStop = Console.ReadKey().KeyChar == 'y';
-                CALog.LogInfoAndConsoleLn(LogID.A, confirmedStop ? "Stop sequence initiated" : "Stop sequence aborted");
-                return confirmedStop ? "escape" : null;
-            }
-
-            if (info.Key != ConsoleKey.Enter)
-                return null;
 
             return inputCommand.ToString();
         }
