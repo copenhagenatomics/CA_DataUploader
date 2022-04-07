@@ -23,6 +23,8 @@ namespace CA_DataUploaderLib
             remove { cmd.NewVectorReceived -= value; lock(subscribedNewVectorReceivedEvents) subscribedNewVectorReceivedEvents.Remove(value); }
         }
         public void AddCommand(string name, Func<List<string>, bool> func) => removeCommandActions.Add(cmd.AddCommand(name, func));
+        //the addToCommandHistory should be renamed isUserCommand, but not changing now to avoid a new plugins base version just for an arg name change
+        //note addToCommandHistory is always false, as sent by: LoopControlCommand.ExecuteCommand
         public void Execute(string command, bool addToCommandHistory) => cmd.Execute(command, addToCommandHistory);
         public async Task<NewVectorReceivedArgs> When(Predicate<NewVectorReceivedArgs> condition, CancellationToken token)
         {

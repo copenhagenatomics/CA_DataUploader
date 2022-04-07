@@ -16,12 +16,12 @@ namespace CA_DataUploaderLib
     {
         private bool _running = true;
         private readonly SerialNumberMapper _mapper;
+        private readonly ICommandRunner _commandRunner;
         private DateTime _start = DateTime.Now;
-        private readonly StringBuilder inputCommand = new StringBuilder();
-        private readonly Dictionary<string, List<Func<List<string>, bool>>> _commands = new Dictionary<string, List<Func<List<string>, bool>>>();
+        private readonly StringBuilder inputCommand = new();
         private readonly CALogLevel _logLevel = IOconfFile.GetOutputLevel();
-        private readonly List<string> AcceptedCommands = new List<string>();
-        private readonly List<ISubsystemWithVectorData> _subsystems = new List<ISubsystemWithVectorData>();
+        private readonly List<string> AcceptedCommands = new();
+        private readonly List<ISubsystemWithVectorData> _subsystems = new();
         private int AcceptedCommandsIndex = -1;
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
 
@@ -29,8 +29,9 @@ namespace CA_DataUploaderLib
         public event EventHandler<EventFiredArgs> EventFired;
         public bool IsRunning { get { return _running; } }
 
-        public CommandHandler(SerialNumberMapper mapper = null)
+        public CommandHandler(SerialNumberMapper mapper = null, ICommandRunner runner = null)
         {
+            _commandRunner = runner ?? new DefaultCommandRunner();
             _mapper = mapper;
             _fullsystemFilterAndMath = new Lazy<ExtendedVectorDescription>(GetFullSystemFilterAndMath);
             new Thread(() => this.LoopForever()).Start();
@@ -41,24 +42,8 @@ namespace CA_DataUploaderLib
         }
 
         /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>
-        public Action AddCommand(string name, Func<List<string>, bool> func)
-        {
-            name = name.ToLower();
-            if (_commands.ContainsKey(name))
-                _commands[name].Add(func);
-            else
-                _commands.Add(name, new List<Func<List<string>, bool>>{func});
-
-            return () => 
-            {
-                _commands[name].Remove(func);
-                if (_commands[name].Count == 0) 
-                    _commands.Remove(name);
-            };
-        }
-
-        public void Execute(string command, bool addToCommandHistory = true) => HandleCommand(command, addToCommandHistory);
-
+        public Action AddCommand(string name, Func<List<string>, bool> func) => _commandRunner.AddCommand(name, func);
+        public void Execute(string command, bool isUserCommand = false) => HandleCommand(command, isUserCommand);
         public void AddSubsystem(ISubsystemWithVectorData subsystem) => _subsystems.Add(subsystem);
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
@@ -129,7 +114,7 @@ namespace CA_DataUploaderLib
             if (args.Count < minimumLen)
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, "Too few arguments for this command");
-                Execute("help", false);
+                Execute("help");
                 return false;
             }
 
@@ -163,7 +148,8 @@ namespace CA_DataUploaderLib
                 try
                 {
                     var cmd = GetCommand();
-                    HandleCommand(cmd, true);
+                    if (cmd != null) //cmd is null when GetCommand abort due to _running being false
+                        HandleCommand(cmd, true);
                 }
                 catch (Exception ex)
                 {
@@ -174,98 +160,44 @@ namespace CA_DataUploaderLib
             CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.Now.Subtract(_start).Humanize(5));
         }
 
-        private void HandleCommand(string cmdString, bool addToCommandHistory)
+        private void HandleCommand(string cmdString, bool isUserCommand)
         {
-            if (cmdString == null)  // no NewLine
-            {
-                // echo to console here
-                return;
-            }
-
-            var cmd = cmdString.Trim().Split(' ').Select(x => x.Trim()).ToList();
-
-            CALog.LogInfoAndConsoleLn(LogID.A, ""); // this ensures that next command start on a new line. 
-            if (!cmd.Any())
-            {
-                if(_logLevel == CALogLevel.Debug)
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {inputCommand.Replace(Environment.NewLine, "")} - bad command");
-
-                inputCommand.Clear();
-                return;
-            }
-
-            inputCommand.Clear();
-            string commandName = cmd.First().ToLower();
-            if (!_commands.TryGetValue(commandName, out var commandFunctions))
-            {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - unknown command");
-                return;
-            }
-
-            List<bool> executionResults = RunCommandFunctions(cmdString, addToCommandHistory, cmd, commandFunctions);
-
-            if (commandName == "help")
-                CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");  // end help menu divider
-            else
-                LogAndDisplayCommandResults(cmdString, executionResults);
+            //this ensures any command output, including a confirmation is shown in a separate line
+            //user commands: when the user presses enter the cursor does not go automatically to the next line, so the below ensures that even without output it shows correctly
+            //non user commands: this causes any text typed by the user before the non user command to show on a separate line
+            CALog.LogInfoAndConsoleLn(LogID.A, ""); 
+            cmdString = cmdString.Trim();
+            if (_commandRunner.Run(cmdString, isUserCommand) && isUserCommand)
+                OnUserCommandAccepted(cmdString);
         }
 
-        private List<bool> RunCommandFunctions(string cmdString, bool addToCommandHistory, List<string> cmd, List<Func<List<string>, bool>> commandFunctions)
+        private void OnUserCommandAccepted(string cmdString)
         {
-            List<bool> executionResults = new List<bool>(commandFunctions.Count);
-            var isFirstAccepted = true;
-            foreach (var func in commandFunctions)
-            {
-                try
-                {
-                    bool accepted;
-                    executionResults.Add(accepted = func.Invoke(cmd));
-                    if (accepted && isFirstAccepted)
-                    {//avoid unnecesarily trying to add the command multiple times + triggering the command's EventFired
-                        isFirstAccepted = false;
-                        OnCommandAccepted(cmdString, addToCommandHistory); // track it in the history if at least one execution accepted the command
-                    }
-                    else if (!accepted)
-                        break; // avoid running the command on another subsystem when it was already rejected
-                }
-                catch (ArgumentException ex)
-                {
-                    executionResults.Add(false);
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - invalid arguments", ex);
-                    break; // avoid running the command on another subsystem when it was already rejected
-                }
-            }
-
-            return executionResults;
-        }
-
-        private static void LogAndDisplayCommandResults(string cmdString, List<bool> executionResults)
-        {
-            if (executionResults.All(r => r))
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
-            else if (executionResults.All(r => !r))
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command");
-            else
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command / accepted by some subsystems");
-        }
-
-        private void OnCommandAccepted(string cmdString, bool addToCommandHistory)
-        {
-            if (!addToCommandHistory)
-                return;
-
             if (AcceptedCommands.LastOrDefault() != cmdString)
                 AcceptedCommands.Add(cmdString);
             AcceptedCommandsIndex = AcceptedCommands.Count;
             FireCustomEvent(cmdString, DateTime.UtcNow, (byte)EventType.Command);
         }
 
+        /// <returns>the text line <c>null</c> if we are no longer running (_running is false)</returns>
         private string GetCommand()
         {
+            inputCommand.Clear();
             var info = Console.ReadKey(true);
-            while (info.Key != ConsoleKey.Enter && info.Key != ConsoleKey.Escape && _running)
+            while (info.Key != ConsoleKey.Enter)
             {
-                if (info.Key == ConsoleKey.Backspace)
+                if (!_running)
+                    return null; //no longer running, abort
+                else if (info.Key == ConsoleKey.Escape)
+                {
+                    inputCommand.Clear();//clear input typed before the esc sequence
+                    CALog.LogInfoAndConsoleLn(LogID.A, "You are about to stop the control program, type y if you want to continue");
+                    var confirmedStop = Console.ReadKey().KeyChar == 'y';
+                    CALog.LogInfoAndConsoleLn(LogID.A, confirmedStop ? "Stop sequence initiated" : "Stop sequence aborted");
+                    if (confirmedStop)
+                        return "escape";
+                }
+                else if (info.Key == ConsoleKey.Backspace)
                 {
                     Console.Write("\b \b"); // https://stackoverflow.com/a/53976873/66372
                     if (inputCommand.Length > 0)
@@ -282,17 +214,6 @@ namespace CA_DataUploaderLib
                 }
                 info = Console.ReadKey(true);
             }
-
-            if (info.Key == ConsoleKey.Escape)
-            {
-                CALog.LogInfoAndConsoleLn(LogID.A, "You are about to stop the control program, type y if you want to continue");
-                var confirmedStop = Console.ReadKey().KeyChar == 'y';
-                CALog.LogInfoAndConsoleLn(LogID.A, confirmedStop ? "Stop sequence initiated" : "Stop sequence aborted");
-                return confirmedStop ? "escape" : null;
-            }
-
-            if (info.Key != ConsoleKey.Enter)
-                return null;
 
             return inputCommand.ToString();
         }
