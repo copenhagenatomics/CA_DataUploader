@@ -97,29 +97,43 @@ namespace CA_DataUploaderLib
             while (_running)
             {
                 throttle.Wait();
+                SendQueuedData(false);
+            }
+
+            CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued messages");
+            SendQueuedData(true);
+
+            async void SendQueuedData(bool stopping)
+            {
                 try
                 {
                     var list = DequeueAllEntries(_queue);
                     if (list != null)
-                        PostVectorAsync(GetSignedVectors(list), list.First().timestamp);
+                    {
+                        var task = PostVectorAsync(GetSignedVectors(list), list.First().timestamp);
+                        if (stopping) await task;
+                    }
 
                     var events = DequeueAllEntries(_eventsQueue);
                     if (events != null)
                     {
                         foreach (var @event in events)
-                            PostEventAsync(@event);
+                        {
+                            var task = PostEventAsync(@event);
+                            if (stopping) await task;
+                        }
                     }
 
-                    PrintBadPackagesMessage(false);
+                    if (stopping)
+                        await PostEventAsync(new EventFiredArgs("uploader has stopped", EventType.Log, DateTime.UtcNow));
+
+                    PrintBadPackagesMessage(stopping);
                 }
                 catch (Exception ex)
-                {
-                    if(!Environment.MachineName.StartsWith("DESKTOP"))
-                        CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message, ex);
+                {//we don't normally expect to reach here, as the post method above capture and log any exceptions
+                    CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message, ex);
                 }
             }
-
-            PrintBadPackagesMessage(true);
         }
 
         List<T> DequeueAllEntries<T>(Queue<T> queue)
@@ -171,9 +185,13 @@ namespace CA_DataUploaderLib
             return _signing.GetSignature(bytes).Concat(bytes).ToArray(); 
         }
 
-        private static void OnError(string message, Exception ex) => CALog.LogErrorAndConsoleLn(LogID.A, message, ex);
+        private static void OnError(string message, Exception ex)
+        {
+            CALog.LogError(LogID.A, message, ex); //note we don't use LogErrorAndConsoleLn variation, as CALog.LoggerForUserOutput may be set to generate events that are only visible on the event log.
+            Console.WriteLine(message);
+        }
 
-        private async void PostVectorAsync(byte[] buffer, DateTime timestamp)
+        private async Task PostVectorAsync(byte[] buffer, DateTime timestamp)
         {
             try
             {
@@ -189,7 +207,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private async void PostEventAsync(EventFiredArgs args)
+        private async Task PostEventAsync(EventFiredArgs args)
         {
             try
             {
