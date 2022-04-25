@@ -57,7 +57,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private void SendEvent(object sender, EventFiredArgs e)
+        public void SendEvent(object sender, EventFiredArgs e)
         {
             lock (_eventsQueue)
                 if (_eventsQueue.Count < 10000)  // if sending thread can't catch up, then drop packages.
