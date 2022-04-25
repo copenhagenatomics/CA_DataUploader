@@ -145,7 +145,7 @@ namespace CA_DataUploaderLib
         {
             var missingBoards = boards.Where(h => h.map.Board == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
-                _cmd.FireAlert($"{Title} - missing boards detected {string.Join(",", missingBoards)}. Related sensors/actuators are disabled.");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} - missing boards detected {string.Join(",", missingBoards)}. Related sensors/actuators are disabled.");
 
             return boards
                 .Where(b => b.map.Board != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
@@ -314,7 +314,7 @@ namespace CA_DataUploaderLib
                 _boardsState.SetDisconnectedState(board);
                 if (ExactSensorAttemptsCheck(ref lostSensorAttempts)) 
                 { // we run this once when there has been 100 attempts
-                    _cmd.FireAlert($"reconnect limit exceeded, reducing reconnect frequency to 15 minutes - {Title} - {board.ToShortDescription()}");
+                    LogError(board, "reconnect limit exceeded, reducing reconnect frequency to 15 minutes");
                     delayBetweenAttempts = TimeSpan.FromMinutes(15); // 4 times x hour = 96 times x day
                 }
 
@@ -370,7 +370,7 @@ namespace CA_DataUploaderLib
 
             var remainingAttempts = sensor.InvalidReadsRemainingAttempts;
             if (ExactSensorAttemptsCheck(ref remainingAttempts))
-                _cmd.FireAlert($"sensor {sensor.Name} has been unreachable for at least 5 minutes (returning 10k+ values) - {Title} - {board.ToShortDescription()}");
+                LogError(board, $"sensor {sensor.Name} has been unreachable for at least 5 minutes (returning 10k+ values)");
 
             sensor.InvalidReadsRemainingAttempts = remainingAttempts;
         }
