@@ -19,7 +19,6 @@ namespace CA_DataUploaderLib
         private readonly ICommandRunner _commandRunner;
         private DateTime _start = DateTime.Now;
         private readonly StringBuilder inputCommand = new();
-        private readonly CALogLevel _logLevel = IOconfFile.GetOutputLevel();
         private readonly List<string> AcceptedCommands = new();
         private readonly List<ISubsystemWithVectorData> _subsystems = new();
         private int AcceptedCommandsIndex = -1;
@@ -124,7 +123,6 @@ namespace CA_DataUploaderLib
         public void OnNewVectorReceived(IEnumerable<SensorSample> vector) =>
             NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector.ToDictionary(v => v.Name, v => v.Value)));
 
-        public void FireAlert(string msg) => FireAlert(msg, DateTime.UtcNow);
         public void FireAlert(string msg, DateTime timespan)
         {
             CALog.LogErrorAndConsoleLn(LogID.A, msg);
