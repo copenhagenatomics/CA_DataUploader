@@ -162,10 +162,6 @@ namespace CA_DataUploaderLib
 
         private void HandleCommand(string cmdString, bool isUserCommand)
         {
-            //this ensures any command output, including a confirmation is shown in a separate line
-            //user commands: when the user presses enter the cursor does not go automatically to the next line, so the below ensures that even without output it shows correctly
-            //non user commands: this causes any text typed by the user before the non user command to show on a separate line
-            CALog.LogInfoAndConsoleLn(LogID.A, ""); 
             cmdString = cmdString.Trim();
             if (_commandRunner.Run(cmdString, isUserCommand) && isUserCommand)
                 OnUserCommandAccepted(cmdString);
@@ -215,6 +211,7 @@ namespace CA_DataUploaderLib
                 info = Console.ReadKey(true);
             }
 
+            Console.WriteLine(string.Empty); //write the newline as the user pressed enter
             return inputCommand.ToString();
         }
 

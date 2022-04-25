@@ -314,9 +314,6 @@ namespace CA_DataUploaderLib
 
                     while (IsEmpty() && TryReadLine(ref buffer, out var input))
                     {
-                        if (Debugger.IsAttached && input.Length > 0)
-                            CALog.LogColor(LogID.A, ConsoleColor.Green, input);
-
                         ableToRead |= input.Length >= 2;
                         input = input.Trim();
                         if (input.StartsWith(serialNumberHeader))
@@ -367,23 +364,23 @@ namespace CA_DataUploaderLib
 
                     if (res.IsCompleted)
                     {
-                        CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({port.BaudRate}): pipe reader was closed");
+                        CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {PortName} ({port.BaudRate}): pipe reader was closed");
                         break; // typically means the connection was closed.
                     }
                 }
                 catch (TimeoutException ex)
                 {
-                    CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
                     break;
                 }
                 catch (OperationCanceledException ex)
                 {
-                    CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
                     break;
                 }
                 catch (Exception ex)
                 {
-                    CALog.LogColor(LogID.A, ConsoleColor.Red, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
                 }
             }
 

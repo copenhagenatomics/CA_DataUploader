@@ -69,7 +69,7 @@ namespace CA_DataUploaderLib
                 }
                 catch (ArgumentException ex)
                 {
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - invalid arguments", ex);
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Command: {cmdString} - invalid arguments", ex);
                     return i == 0 ? false : null;
                 }
             }
