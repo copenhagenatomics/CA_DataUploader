@@ -23,7 +23,6 @@ namespace CA_DataUploaderLib
         protected readonly List<SensorSample> _localValues;
         private readonly (IOconfMap map, SensorSample[] values)[] _boards;
         protected readonly AllBoardsState _boardsState;
-        private readonly string commandHelp;
         private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
         private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamplesLookup = new Dictionary<MCUBoard, SensorSample[]>();
         private readonly string mainSubsystem;
@@ -41,9 +40,7 @@ namespace CA_DataUploaderLib
             if (cmd != null)
             {
                 mainSubsystem = commandName.ToLower();
-                commandHelp = $"{mainSubsystem + " " + commandArgsHelp,-26}- {commandDescription}";
                 SubscribeCommandsToSubsystems(cmd, mainSubsystem, _values);
-                cmd.AddCommand("help", HelpMenu);
                 cmd.AddCommand("escape", Stop);
                 cmd.AddSubsystem(this);
             }
@@ -118,7 +115,8 @@ namespace CA_DataUploaderLib
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, _boardLoopsStopTokenSource.Token);
                 var readLoops = StartReadLoops(boards, linkedCts.Token);
                 await Task.WhenAll(readLoops);
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardReadLoops() " + DateTime.Now.Subtract(start).Humanize(5));
+                if (readLoops.Count > 0) //we only report the exit when we actually ran loops with detected boards. If a board was not detected StartReadLoops already reports the missing boards.
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardReadLoops() " + DateTime.Now.Subtract(start).Humanize(5));
             }
             catch (Exception ex)
             {
@@ -382,13 +380,6 @@ namespace CA_DataUploaderLib
                 return samples;
             _boardSamplesLookup[board] = samples = _values.Where(s => s.Input.BoxName == board.BoxName).ToArray();
             return samples;
-        }
-
-
-        private bool HelpMenu(List<string> args)
-        {
-            CALog.LogInfoAndConsoleLn(LogID.A, commandHelp);
-            return true;
         }
 
         private void LogError(IOconfMap board, string message, Exception ex) 
