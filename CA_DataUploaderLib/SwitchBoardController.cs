@@ -142,8 +142,9 @@ namespace CA_DataUploaderLib
                     .GroupBy(v => v.Map.Board)
                     .Select(g => BoardLoop(g.Key, g.ToList(), linkedCts.Token))
                     .ToList();
-                await Task.WhenAll(boardLoops);                
-                CALog.LogInfoAndConsoleLn(LogID.A, "Exiting SwitchBoardController.RunBoardControlLoops() " + DateTime.Now.Subtract(start).Humanize(5));
+                await Task.WhenAll(boardLoops);
+                if (boardLoops.Count > 0) //we only report the exit when we actually ran loops with detected boards. If a board was not detected BaseSensorBox already already reports the missing boards.
+                    CALog.LogInfoAndConsoleLn(LogID.A, "Exiting SwitchBoardController.RunBoardControlLoops() " + DateTime.Now.Subtract(start).Humanize(5));
             }
             catch (Exception ex)
             {
