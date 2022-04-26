@@ -7,6 +7,7 @@ namespace CA_DataUploaderLib
 {
     public class SystemChangeNotificationData
     {
+        public string NodeName { get; internal set; }
         public List<BoardInfo> Boards { get; init; }
         private static JsonSerializerOptions SerializerOptions { get; } = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         internal string ToJson() => JsonSerializer.Serialize(this, SerializerOptions);
@@ -34,6 +35,7 @@ namespace CA_DataUploaderLib
                     writer.WriteString("PcbVersion", board.PcbVersion);
                     writer.WriteString("Calibration", board.Calibration);
                     writer.WriteString("TimeStamp", timeSpan);
+                    writer.WriteString("NodeName", NodeName);
                     writer.WriteEndObject();
                 }
                 writer.WriteEndArray();

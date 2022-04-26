@@ -72,7 +72,7 @@ namespace CA_DataUploaderLib
 
         private void SendDeviceDetectionEvent()
         {
-            var data = new SystemChangeNotificationData() { Boards = _mapper.McuBoards.Select(ToBoardInfo).ToList() }.ToJson();
+            var data = new SystemChangeNotificationData() { NodeName = GetCurrentNode().Name, Boards = _mapper.McuBoards.Select(ToBoardInfo).ToList() }.ToJson();
             FireCustomEvent(data, DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
 
             static SystemChangeNotificationData.BoardInfo ToBoardInfo(MCUBoard board) => new()
@@ -96,15 +96,20 @@ namespace CA_DataUploaderLib
         {
             //note we regroup the inputs by node while keeping the node-subsystem order of inputs (returned by GetVectorDescriptionItems)
             var descItemsPerSubsystem = _subsystems.Select(s => s.GetVectorDescriptionItems()).ToList();
-            var nodes = IOconfFile.GetEntries<IOconfNode>().ToList();
-            nodes = nodes.Count > 0 ? nodes : new() { IOconfNode.SingleNode };
-            var inputsPerNode = nodes
+            var inputsPerNode = GetNodes()
                 .Select(n => (node: n, inputs: descItemsPerSubsystem.SelectMany(s => s.GetNodeInputs(n)).ToList()))
                 .Where(n => n.inputs.Count > 0)
                 .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
                 .ToList();
             var outputs = descItemsPerSubsystem.SelectMany(s => s.Outputs).ToList();
             return new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
+        }
+
+        private static IOconfNode GetCurrentNode() => GetNodes().Single(n => n.IsCurrentSystem);
+        private static List<IOconfNode> GetNodes()
+        {
+            var nodes = IOconfFile.GetEntries<IOconfNode>().ToList();
+            return nodes.Count > 0 ? nodes : new() { IOconfNode.SingleNode };
         }
 
         public bool AssertArgs(List<string> args, int minimumLen)
@@ -254,7 +259,7 @@ namespace CA_DataUploaderLib
 
         private bool Uptime(List<string> args)
         {
-            CALog.LogInfoAndConsoleLn(LogID.A, DateTime.Now.Subtract(_start).Humanize(5));
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{GetCurrentNode().Name} - {DateTime.Now.Subtract(_start).Humanize(5)}");
             return true;
         }
 
@@ -262,7 +267,8 @@ namespace CA_DataUploaderLib
         {
             var connInfo = IOconfFile.GetConnectionInfo();
             CALog.LogInfoAndConsoleLn(LogID.A, 
-$@"{RpiVersion.GetSoftware()}
+$@"{GetCurrentNode().Name}
+{RpiVersion.GetSoftware()}
 {RpiVersion.GetHardware()}
 {connInfo.LoopName} - {connInfo.email}
 {string.Join(Environment.NewLine, _mapper.McuBoards.Select(x => x.ToString()))}");

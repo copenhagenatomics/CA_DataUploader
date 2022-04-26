@@ -239,7 +239,8 @@ namespace CA_DataUploaderLib
             static string ToShortEventData(SystemChangeNotificationData data)
             {
                 var sb = new StringBuilder(data.Boards.Count * 100);//allocate more than enough space to avoid slow unnecesary resizes
-                sb.AppendLine("Detected devices:");
+                sb.Append("Detected devices for ");
+                sb.AppendLine(data.NodeName);
                 foreach (var board in data.Boards)
                 {
                     sb.AppendFormat("{0} {1} {2} {3}", board.MappedBoardName, board.ProductType, board.SerialNumber, board.Port);
