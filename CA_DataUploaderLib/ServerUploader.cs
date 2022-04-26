@@ -263,12 +263,19 @@ namespace CA_DataUploaderLib
             {
                 if (force || _badPackages.First().AddHours(1) < DateTime.UtcNow)
                 {
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Vector upload errors within the last hour:");
-                    foreach (var minutes in _badPackages.GroupBy(x => x.ToString("MMM dd HH:mm")))
-                        CALog.LogInfoAndConsoleLn(LogID.A, $"{minutes.Key} = {minutes.Count()}");
-
+                    var msg = GetBadPackagesErrorMessage(_badPackages);
+                    CALog.LogInfoAndConsoleLn(LogID.A, msg);
                     _badPackages.Clear();
                 }
+            }
+
+            static string GetBadPackagesErrorMessage(List<DateTime> times)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("Vector upload errors within the last hour:");
+                foreach (var minutes in times.GroupBy(x => x.ToString("MMM dd HH:mm")))
+                    sb.AppendLine($"{minutes.Key} = {minutes.Count()}");
+                return sb.ToString();
             }
         }
 
