@@ -34,6 +34,7 @@ namespace CA_DataUploader
                     using var usb = new ThermocoupleBox(cmd);
                     using var cloud = new ServerUploader(cmd.GetFullSystemVectorDescription(), cmd);
                     CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
+                    cmd.Execute("help");
                     _ = Task.Run(() => cmd.RunSubsystems());
 
                     int i = 0;

@@ -66,7 +66,6 @@ namespace CA_DataUploaderLib
 
         public Task RunSubsystems()
         {
-            Execute("help");
             SendDeviceDetectionEvent();
             return Task.WhenAll(_subsystems.Select(s => s.Run(CancellationToken.None)));
         }
