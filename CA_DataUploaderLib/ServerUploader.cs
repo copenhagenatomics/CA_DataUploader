@@ -414,8 +414,6 @@ namespace CA_DataUploaderLib
             public Signing(string loopName)
             {
                 var keyFilename = "Key" + loopName + ".bin";
-                CALog.LogInfoAndConsoleLn(LogID.A, loopName);
-
                 if (File.Exists(keyFilename))
                     _rsaWriter.ImportCspBlob(File.ReadAllBytes(keyFilename));
                 else
