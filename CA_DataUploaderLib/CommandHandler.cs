@@ -189,9 +189,11 @@ namespace CA_DataUploaderLib
                 else if (info.Key == ConsoleKey.Escape)
                 {
                     inputCommand.Clear();//clear input typed before the esc sequence
-                    CALog.LogInfoAndConsoleLn(LogID.A, "You are about to stop the control program, type y if you want to continue");
+                    Console.WriteLine("You are about to stop the control program, type y if you want to continue");
                     var confirmedStop = Console.ReadKey().KeyChar == 'y';
-                    CALog.LogInfoAndConsoleLn(LogID.A, confirmedStop ? "Stop sequence initiated" : "Stop sequence aborted");
+                    var msg = confirmedStop ? "Stop sequence initiated" : "Stop sequence aborted";
+                    Console.WriteLine(msg); //ensure there is console output for this interactive local action regardless of the logger
+                    CALog.LogData(LogID.A, msg); //no need to write the line to the screen again + no need to show it in remote logging, as confirmed stops show as the "escape" command.
                     if (confirmedStop)
                         return "escape";
                 }
