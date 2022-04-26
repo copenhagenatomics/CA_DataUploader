@@ -118,7 +118,8 @@ namespace CA_DataUploaderLib
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, _boardLoopsStopTokenSource.Token);
                 var readLoops = StartReadLoops(boards, linkedCts.Token);
                 await Task.WhenAll(readLoops);
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardReadLoops() " + DateTime.Now.Subtract(start).Humanize(5));
+                if (readLoops.Count > 0) //we only report the exit when we actually ran loops with detected boards. If a board was not detected StartReadLoops already reports the missing boards.
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardReadLoops() " + DateTime.Now.Subtract(start).Humanize(5));
             }
             catch (Exception ex)
             {
