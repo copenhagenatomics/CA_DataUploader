@@ -7,7 +7,7 @@ namespace CA_DataUploaderLib
 {
     public class SystemChangeNotificationData
     {
-        public string NodeName { get; internal set; }
+        public string NodeName { get; init; }
         public List<BoardInfo> Boards { get; init; }
         private static JsonSerializerOptions SerializerOptions { get; } = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         internal string ToJson() => JsonSerializer.Serialize(this, SerializerOptions);
