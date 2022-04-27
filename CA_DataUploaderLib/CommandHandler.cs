@@ -250,7 +250,6 @@ namespace CA_DataUploaderLib
         private bool HelpMenu(List<string> args)
         {
             CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");
-            CALog.LogInfoAndConsoleLn(LogID.A, "");
             CALog.LogInfoAndConsoleLn(LogID.A, "Commands: ");
             CALog.LogInfoAndConsoleLn(LogID.A, "Esc                       - press Esc key to shut down");
             CALog.LogInfoAndConsoleLn(LogID.A, "help                      - print the full list of available commands");
