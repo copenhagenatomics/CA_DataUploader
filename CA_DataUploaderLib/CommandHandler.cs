@@ -258,13 +258,13 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private bool Uptime(List<string> args)
+        public bool Uptime(List<string> args)
         {
             CALog.LogInfoAndConsoleLn(LogID.A, $"{GetCurrentNode().Name} - {DateTime.Now.Subtract(_start).Humanize(5)}");
             return true;
         }
 
-        private bool GetVersion(List<string> args)
+        public bool GetVersion(List<string> args)
         {
             var connInfo = IOconfFile.GetConnectionInfo();
             CALog.LogInfoAndConsoleLn(LogID.A, 
