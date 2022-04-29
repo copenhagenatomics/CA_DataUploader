@@ -368,7 +368,7 @@ namespace CA_DataUploaderLib
                     {
                         var token = await GetLoginToken(client, accountInfo);
                         if (failureCount > 0)
-                            CALog.LogInfoAndConsoleLn(LogID.A, "Reconnected.");
+                            CALog.LogInfoAndConsoleLn(LogID.A, $"Reconnected after {failureCount} failed attempts.");
                         return token;
                     }
                     catch (HttpRequestException ex)
@@ -376,7 +376,7 @@ namespace CA_DataUploaderLib
                         if (failureCount++ > 10)
                             throw;
 
-                        CALog.LogErrorAndConsoleLn(LogID.A, "Failed to connect while starting, attempting to reconnect in 5 seconds.", ex);
+                        OnError("Failed to connect while starting, attempting to reconnect in 5 seconds.", ex);
                         await Task.Delay(5000);
                     }
                 }
