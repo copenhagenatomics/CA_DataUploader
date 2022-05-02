@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -340,7 +341,7 @@ namespace CA_DataUploaderLib
                     string query = $"api/LoopApi?LoopName={loopName}&ticks={DateTime.UtcNow.Ticks}&loginToken={loginToken}";
                     response = await client.PutAsJsonAsync(query, publicKey.Concat(signedVectorDescription));
                     response.EnsureSuccessStatusCode();
-                    var result = await response.Content.ReadAsAsync<string>();
+                    var result = await response.Content.ReadAsStringAsync();
                     return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
                 }
                 catch (Exception ex)
@@ -398,7 +399,7 @@ namespace CA_DataUploaderLib
                 var response = await client.PostAsync(requestUri, new FormUrlEncodedContent(accountInfo));
                 if (response.StatusCode == System.Net.HttpStatusCode.OK && response.Content != null)
                 {
-                    var dic = await response.Content.ReadAsAsync<Dictionary<string, string>>();
+                    var dic = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
                     return (dic["status"], dic["message"]);
                 }
             
