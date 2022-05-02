@@ -36,16 +36,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CoreCLR-NCalc" Version="2.2.92" />
-    <PackageReference Include="Humanizer.Core" Version="2.8.26" />
-    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.7" />
-    <PackageReference Include="MinVer" Version="2.4.0">
+    <PackageReference Include="CoreCLR-NCalc" Version="2.2.101" />
+    <PackageReference Include="Humanizer.Core" Version="2.14.1" /> 
+    <PackageReference Include="MinVer" Version="3.1.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="System.IO.Ports" Version="6.0.0" />
     <PackageReference Include="CA.LoopControlPluginBase" Version="0.0.2" />
-    <PackageReference Include="System.IO.Pipelines" Version="6.0.0" />
+    <PackageReference Include="System.IO.Pipelines" Version="6.0.2" />
   </ItemGroup>
 
   <ItemGroup>
