@@ -341,7 +341,7 @@ namespace CA_DataUploaderLib
                     string query = $"api/LoopApi?LoopName={loopName}&ticks={DateTime.UtcNow.Ticks}&loginToken={loginToken}";
                     response = await client.PutAsJsonAsync(query, publicKey.Concat(signedVectorDescription));
                     response.EnsureSuccessStatusCode();
-                    var result = await response.Content.ReadAsStringAsync();
+                    var result = await response.Content.ReadFromJsonAsync<string>();
                     return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
                 }
                 catch (Exception ex)
