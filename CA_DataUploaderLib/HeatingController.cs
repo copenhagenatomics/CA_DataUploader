@@ -18,12 +18,10 @@ namespace CA_DataUploaderLib
         private readonly SwitchBoardController _switchboardController;
         private readonly OvenCommand _ovenCmd;
         private readonly HeaterCommand _heaterCmd;
-        private readonly CommandHandler _cmdUnwrapped;
 
         public HeatingController(CommandHandler cmd)
         {
             _cmd = new PluginsCommandHandler(cmd);
-            _cmdUnwrapped = cmd;
 
             var heatersConfigs = IOconfFile.GetHeater().ToList();
             if (!heatersConfigs.Any())
