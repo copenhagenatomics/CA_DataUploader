@@ -6,7 +6,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfLoopName(string row, int lineNum) : base(row, lineNum, "LoopName")
         {
-            format = "LoopName;Name;DebugLevel;[Server]";
+            Format = "LoopName;Name;DebugLevel;[Server]";
 
             var list = ToList();
             Name = list[1];
@@ -16,8 +16,8 @@ namespace CA_DataUploaderLib.IOconf
 
         public static IOconfLoopName Default { get; } = 
             new IOconfLoopName($"LoopName;{ Environment.MachineName };Normal;https://www.theng.dk", 0);
-        public string Name;
-        public CALogLevel LogLevel;
-        public string Server;
+        public readonly string Name;
+        public readonly CALogLevel LogLevel;
+        public readonly string Server;
     }
 }

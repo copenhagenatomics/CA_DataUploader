@@ -7,10 +7,10 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfMap(string row, int lineNum) : base(row, lineNum, "Map")
         {
-            format = "Map;SerialNo/COM1/USB1-1.1;BoxName;[NodeName];[baud rate]";
+            Format = "Map;SerialNo/COM1/USB1-1.1;BoxName;[NodeName];[baud rate]";
 
             var list = ToList();
-            if (list[0] != "Map") throw new Exception($"IOconfMap: wrong format: {row} {format}");
+            if (list[0] != "Map") throw new Exception($"IOconfMap: wrong format: {row} {Format}");
             bool isWindows = RpiVersion.IsWindows();
             if (isWindows && list[1].StartsWith("COM"))
                 USBPort = list[1];
@@ -34,8 +34,8 @@ namespace CA_DataUploaderLib.IOconf
 
             BaudRate = baudrate;
             DistributedNode = distributedNodeName != default 
-                ? IOconfFile.GetEntries<IOconfNode>().SingleOrDefault(n => n.Name == distributedNodeName) ?? throw new Exception($"Failed to find node in configuration for Map: {row}. Format: {format}")
-                : !IOconfFile.GetEntries<IOconfNode>().Any() ? DistributedNode : throw new Exception($"The node name is not optional for distributed deployments: {row}. Format: {format}");
+                ? IOconfFile.GetEntries<IOconfNode>().SingleOrDefault(n => n.Name == distributedNodeName) ?? throw new Exception($"Failed to find node in configuration for Map: {row}. Format: {Format}")
+                : !IOconfFile.GetEntries<IOconfNode>().Any() ? DistributedNode : throw new Exception($"The node name is not optional for distributed deployments: {row}. Format: {Format}");
         }
 
         public event EventHandler<EventArgs> OnBoardDetected;
@@ -54,9 +54,9 @@ namespace CA_DataUploaderLib.IOconf
             return false;
         }
 
-        public string USBPort { get; private set; }
-        private string SerialNumber { get; set; }
-        public string BoxName { get; set; }
+        public string USBPort { get; }
+        private string SerialNumber { get; }
+        public string BoxName { get; }
         public BoardSettings BoardSettings
         {
             get => _boardSettings; 

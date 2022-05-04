@@ -8,7 +8,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfMath(string row, int lineNum) : base(row, lineNum, "Math", false, false, null)
         {
-            format = "Math;Name;math expression";
+            Format = "Math;Name;math expression";
 
             var list = ToList();
 
