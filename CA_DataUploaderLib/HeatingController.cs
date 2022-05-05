@@ -76,16 +76,19 @@ namespace CA_DataUploaderLib
             public override string ArgsHelp => " [0 - 800] [0 - 800]";
             public override string Description => "where the integer value is the oven temperature top and bottom region";
             public override bool IsHiddenCommand {get; }
+
+            private readonly bool IsLightEnabled;
             private readonly List<HeaterElement> _heaters;
 
             public OvenCommand(List<HeaterElement> heaters, bool hidden)
             {
                 _heaters = heaters;
                 IsHiddenCommand = hidden;
+                IsLightEnabled = IOconfFile.GetLight().Any();
             }
 
             protected override Task Command(List<string> args)
-            { 
+            {
                 if (args.Count < 2)
                 {
                     logger.LogError($"Unexpected format: {string.Join(',', args)}. Format: oven temparea1 temparea2 ...");
@@ -96,8 +99,13 @@ namespace CA_DataUploaderLib
                     _heaters.ForEach(x => x.SetTargetTemperature(0));
                 else
                     SetHeatersTargetTemperatures(args.Skip(1).Select(ParseTemperature).ToList());
-                var lightState = _heaters.Any(x => x.IsActive) ? "on" : "off";
-                ExecuteCommand($"light main {lightState}");
+
+                if (IsLightEnabled)
+                {
+                    var lightState = _heaters.Any(x => x.IsActive) ? "on" : "off";
+                    ExecuteCommand($"light main {lightState}");
+                }
+
                 return Task.CompletedTask;
             }
 
