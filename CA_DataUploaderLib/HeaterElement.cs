@@ -36,16 +36,9 @@ namespace CA_DataUploaderLib
             var (hasValidTemperature, temp) = GetOvenTemperatureFromVector(vector);
             // Careful consideration must be taken if changing the order of the below statements.
             var vectorTime = vector.GetVectorTime();
-            var action =
-                ManualTurnOn && !_lastAction.IsOn ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) :
-                MustTurnOff(vectorTime) ? new SwitchboardAction(false, vectorTime) :
-                CanTurnOn(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) :
-                // keep off: retrigger if current is detected
-                MustResendOffCommand(current, vectorTime) ? new SwitchboardAction(false, vectorTime) :
-                // keep on: re-trigger early to avoid switching
-                _lastAction.IsOn && _lastAction.GetRemainingOnSeconds(vectorTime) < 2 ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) : 
-                _lastAction;
-            return _lastAction = action;
+            return _lastAction = CanTurnOn(hasValidTemperature, temp, vectorTime) 
+                ?? MustTurnOff(current, vectorTime) 
+                ?? _lastAction;
         }
 
         public void SetTargetTemperature(int value)
@@ -63,14 +56,22 @@ namespace CA_DataUploaderLib
                     SetTargetTemperature(temperature);
         }
 
-        private bool CanTurnOn(bool hasValidTemperature, double temperature, DateTime vectorTime)
-        {
-            if (_lastAction.IsOn) return false; // already on
-            if (OvenTargetTemperature <= 0) return false; // oven's command is off, skip any extra checks
-            if (!hasValidTemperature) return false; // no valid oven sensors
+        /// <returns>an on action for up to 10 seconds (max time to leave on if we lose switchboard comms) or <c>null</c> when there is no new on action</returns>
+        private SwitchboardAction CanTurnOn(bool hasValidTemperature, double temperature, DateTime vectorTime)
+        { 
+            if (ManualTurnOn && _lastAction.GetRemainingOnSeconds(vectorTime) < 2) return new (true, vectorTime.AddSeconds(10));
+            if (ManualTurnOn) return null;
+            if (OvenTargetTemperature <= 0) return null;
+            if (NeedToExtendCurrentControlPeriodAction()) return new (true, UpTo10Seconds(globalTimeOff));
+            if (!hasValidTemperature) return null;
 
             globalTimeOff = GetProportionalControlTimeOff(temperature, vectorTime);
-            return globalTimeOff != vectorTime;
+            if (globalTimeOff == vectorTime) return null;
+            return new(true, UpTo10Seconds(globalTimeOff));
+
+            DateTime UpTo10Seconds(DateTime timeOff) => Min(timeOff, vectorTime.AddSeconds(10));
+            static DateTime Min(DateTime a, DateTime b) => a < b ? a : b;
+            bool NeedToExtendCurrentControlPeriodAction() => globalTimeOff > _lastAction.TimeToTurnOff && _lastAction.GetRemainingOnSeconds(vectorTime) < 2;
         }
 
         private DateTime GetProportionalControlTimeOff(double currentTemperature, DateTime vectorTime)
@@ -89,14 +90,16 @@ namespace CA_DataUploaderLib
             return vectorTime.AddSeconds(secondsOn);
         }
 
-        private bool MustTurnOff(DateTime vectorTime)
+        /// <returns>the off action or <c>null</c> when there is no new off action</returns>
+        private SwitchboardAction MustTurnOff(double current, DateTime vectorTime)
         {
-            if (!_lastAction.IsOn) return false; // already off
-            if (ManualTurnOn) return false; // heater is on in manual mode, avoid turning off
-            if (OvenTargetTemperature <= 0)
-                return true;
-
-            return vectorTime >= globalTimeOff;
+            if (!_lastAction.IsOn && vectorTime >= _lastAction.TimeToTurnOff.AddSeconds(5) && current > _config.CurrentSensingNoiseTreshold) 
+                return new(false, vectorTime);//current detected with heater off, resending off command every 5 seconds
+            if (!_lastAction.IsOn) return null;
+            if (ManualTurnOn) return null;
+            if (OvenTargetTemperature <= 0 || vectorTime >= globalTimeOff)
+                return new (false, vectorTime);
+            return null;
         }
 
         public void SetManualMode(bool turnOn) => ManualTurnOn = turnOn;
@@ -146,10 +149,6 @@ namespace CA_DataUploaderLib
             CALog.LogErrorAndConsoleLn(LogID.A,message);
             watch.Restart();
         }
-
-        // resends the off command every 5 seconds as long as there is current.
-        private bool MustResendOffCommand(double current, DateTime vectorTime) => 
-            !_lastAction.IsOn && vectorTime >= _lastAction.TimeToTurnOff.AddSeconds(5) && current > _config.CurrentSensingNoiseTreshold;
         public string Name() => _config.Name;
 
         private bool TryGetSwitchboardInputsFromVector(
