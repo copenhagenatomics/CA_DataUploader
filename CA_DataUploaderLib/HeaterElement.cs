@@ -35,9 +35,6 @@ namespace CA_DataUploaderLib
                 return _lastAction; // not connected, we skip this heater and act again when the connection is re-established
             var (hasValidTemperature, temp) = GetOvenTemperatureFromVector(vector);
             // Careful consideration must be taken if changing the order of the below statements.
-            // Note that even though we received indication the board is connected above, 
-            // if the connection is lost after we return the action, the control program can still fail to act on the heater. 
-            // When it happens, the MustResend* methods will resend the expected action after 5 seconds.
             var vectorTime = vector.GetVectorTime();
             var action =
                 ManualTurnOn && !_lastAction.IsOn ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) :
