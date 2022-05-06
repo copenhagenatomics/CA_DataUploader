@@ -77,15 +77,15 @@ namespace CA_DataUploaderLib
         {
             if ((vectorTime - LastAutoOn) < _config.ControlPeriod)
                 return vectorTime; //less than the control period since we last turned it on
+            LastAutoOn = vectorTime;
 
             var gain = _config.ProportionalGain;
             var tempDifference = OvenTargetTemperature - currentTemperature;
             var secondsOn = tempDifference * gain;
-            if (secondsOn < 0.1d) //we can't turn off less than the decision cycle duration (switchboards take at least 1 second so we explicitely shut off on the next cycle).
+            if (secondsOn < 0.1d) //we can't turn on less than the decision cycle duration
                 return vectorTime;
 
             secondsOn = Math.Min(secondsOn, _config.MaxOutputPercentage * _config.ControlPeriod.TotalSeconds); //we act max for this control period so we can re-evaluate where we are for next actuation
-            LastAutoOn = vectorTime;
             return vectorTime.AddSeconds(secondsOn);
         }
 
