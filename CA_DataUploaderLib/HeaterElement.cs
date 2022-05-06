@@ -44,7 +44,7 @@ namespace CA_DataUploaderLib
                 MustTurnOff(vectorTime) ? new SwitchboardAction(false, vectorTime) :
                 CanTurnOn(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) :
                 // keep off: retrigger if current is detected
-                MustResendOffCommand(temp, current, vectorTime) ? new SwitchboardAction(false, vectorTime) :
+                MustResendOffCommand(current, vectorTime) ? new SwitchboardAction(false, vectorTime) :
                 // keep on: re-trigger early to avoid switching
                 _lastAction.IsOn && _lastAction.GetRemainingOnSeconds(vectorTime) < 2 ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) : 
                 _lastAction;
@@ -151,16 +151,9 @@ namespace CA_DataUploaderLib
         }
 
         // resends the off command every 5 seconds as long as there is current.
-        private bool MustResendOffCommand(double temp, double current, DateTime vectorTime) 
-        { 
-            if (_lastAction.IsOn || vectorTime < _lastAction.TimeToTurnOff.AddSeconds(5) || !CurrentIsOn(current)) return false;
-            LogRepeatCommand("off", temp, current);
-            return true;
-        }
-        private bool CurrentIsOn(double current) => current > _config.CurrentSensingNoiseTreshold;
+        private bool MustResendOffCommand(double current, DateTime vectorTime) => 
+            !_lastAction.IsOn && vectorTime >= _lastAction.TimeToTurnOff.AddSeconds(5) && current > _config.CurrentSensingNoiseTreshold;
         public string Name() => _config.Name;
-        private void LogRepeatCommand(string command, double  temp, double current) => 
-            CALog.LogData(LogID.A, $"{command}.={Name()}-{temp:N0}, v#={current}{Environment.NewLine}");
 
         private bool TryGetSwitchboardInputsFromVector(
             NewVectorReceivedArgs vector, out double current)
