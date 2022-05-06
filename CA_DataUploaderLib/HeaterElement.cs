@@ -9,16 +9,12 @@ namespace CA_DataUploaderLib
 {
     public class HeaterElement
     {
-        private int OvenTargetTemperature;
+        private readonly HeaterElementState State = new ();
         private readonly Config _config;
-        private DateTime globalTimeOff;
-        private bool ManualTurnOn;
-        public bool IsActive { get { return OvenTargetTemperature > 0;  } }
+        public bool IsActive => State.OvenOn || State.ManualOn;
         private readonly Stopwatch timeSinceLastNegativeValuesWarning = new();
         private readonly Stopwatch timeSinceLastMissingTemperatureWarning = new();
         private readonly Stopwatch timeSinceLastMissingTemperatureBoardWarning = new();
-        private SwitchboardAction _lastAction = new(false, DateTime.UtcNow);
-        private DateTime LastAutoOn;
 
         public HeaterElement(IOconfHeater heater, IOconfOven oven) : this(ToConfig(heater, oven))
         {
@@ -32,21 +28,16 @@ namespace CA_DataUploaderLib
         public SwitchboardAction MakeNextActionDecision(NewVectorReceivedArgs vector)
         {
             if (!TryGetSwitchboardInputsFromVector(vector, out var current)) 
-                return _lastAction; // not connected, we skip this heater and act again when the connection is re-established
+                return State.Action; // not connected, we skip this heater and act again when the connection is re-established
             var (hasValidTemperature, temp) = GetOvenTemperatureFromVector(vector);
             // Careful consideration must be taken if changing the order of the below statements.
             var vectorTime = vector.GetVectorTime();
-            return _lastAction = CanTurnOn(hasValidTemperature, temp, vectorTime) 
+            return State.Action = CanTurnOn(hasValidTemperature, temp, vectorTime) 
                 ?? MustTurnOff(current, vectorTime) 
-                ?? _lastAction;
+                ?? State.Action;
         }
 
-        public void SetTargetTemperature(int value)
-        { 
-            OvenTargetTemperature = Math.Min(value, _config.MaxTemperature);
-            if (value <= 0)
-                SetManualMode(false); // this ensures that executing oven off also turns off any manual heater.
-        }
+        public void SetTargetTemperature(int value) => State.SetTarget(Math.Min(value, _config.MaxTemperature));
         public void SetTargetTemperature(IEnumerable<(int area, int temperature)> values)
         {
             if (_config.Area == -1) return; // temperature control is not enabled for the heater (no oven or missing temperature hub)
@@ -59,29 +50,28 @@ namespace CA_DataUploaderLib
         /// <returns>an on action for up to 10 seconds (max time to leave on if we lose switchboard comms) or <c>null</c> when there is no new on action</returns>
         private SwitchboardAction CanTurnOn(bool hasValidTemperature, double temperature, DateTime vectorTime)
         { 
-            if (ManualTurnOn && _lastAction.GetRemainingOnSeconds(vectorTime) < 2) return new (true, vectorTime.AddSeconds(10));
-            if (ManualTurnOn) return null;
-            if (OvenTargetTemperature <= 0) return null;
-            if (NeedToExtendCurrentControlPeriodAction()) return new (true, UpTo10Seconds(globalTimeOff));
+            if (State.NeedToExtendManualOnAction(vectorTime)) return new (true, vectorTime.AddSeconds(10));
+            if (State.ManualOn) return null;
+            if (!State.OvenOn) return null;
+            if (State.NeedToExtendCurrentControlPeriodAction(vectorTime)) return new (true, UpTo10Seconds(State.CurrentControlPeriodTimeOff));
             if (!hasValidTemperature) return null;
 
-            globalTimeOff = GetProportionalControlTimeOff(temperature, vectorTime);
-            if (globalTimeOff == vectorTime) return null;
-            return new(true, UpTo10Seconds(globalTimeOff));
+            State.CurrentControlPeriodTimeOff = GetProportionalControlTimeOff(temperature, vectorTime);
+            if (State.CurrentControlPeriodTimeOff == vectorTime) return null;
+            return new(true, UpTo10Seconds(State.CurrentControlPeriodTimeOff));
 
             DateTime UpTo10Seconds(DateTime timeOff) => Min(timeOff, vectorTime.AddSeconds(10));
             static DateTime Min(DateTime a, DateTime b) => a < b ? a : b;
-            bool NeedToExtendCurrentControlPeriodAction() => globalTimeOff > _lastAction.TimeToTurnOff && _lastAction.GetRemainingOnSeconds(vectorTime) < 2;
         }
 
         private DateTime GetProportionalControlTimeOff(double currentTemperature, DateTime vectorTime)
         {
-            if ((vectorTime - LastAutoOn) < _config.ControlPeriod)
+            if ((vectorTime - State.CurrentControlPeriodStart) < _config.ControlPeriod)
                 return vectorTime; //less than the control period since we last turned it on
-            LastAutoOn = vectorTime;
+            State.CurrentControlPeriodStart = vectorTime;
 
             var gain = _config.ProportionalGain;
-            var tempDifference = OvenTargetTemperature - currentTemperature;
+            var tempDifference = State.Target - currentTemperature;
             var secondsOn = tempDifference * gain;
             if (secondsOn < 0.1d) //we can't turn on less than the decision cycle duration
                 return vectorTime;
@@ -93,16 +83,16 @@ namespace CA_DataUploaderLib
         /// <returns>the off action or <c>null</c> when there is no new off action</returns>
         private SwitchboardAction MustTurnOff(double current, DateTime vectorTime)
         {
-            if (!_lastAction.IsOn && vectorTime >= _lastAction.TimeToTurnOff.AddSeconds(5) && current > _config.CurrentSensingNoiseTreshold) 
+            if (!State.Action.IsOn && vectorTime >= State.Action.TimeToTurnOff.AddSeconds(5) && current > _config.CurrentSensingNoiseTreshold) 
                 return new(false, vectorTime);//current detected with heater off, resending off command every 5 seconds
-            if (!_lastAction.IsOn) return null;
-            if (ManualTurnOn) return null;
-            if (OvenTargetTemperature <= 0 || vectorTime >= globalTimeOff)
+            if (!State.Action.IsOn) return null;
+            if (State.ManualOn) return null;
+            if (!State.OvenOn || vectorTime >= State.CurrentControlPeriodTimeOff)
                 return new (false, vectorTime);
             return null;
         }
 
-        public void SetManualMode(bool turnOn) => ManualTurnOn = turnOn;
+        public void SetManualMode(bool turnOn) => State.ManualOn = turnOn;
         private (bool hasValidTemperature, double temp) GetOvenTemperatureFromVector(NewVectorReceivedArgs vector) 
         {
             var sensor = _config.OvenSensor;
@@ -211,6 +201,34 @@ namespace CA_DataUploaderLib
             public double ProportionalGain { get; init; }
             public TimeSpan ControlPeriod { get; init; }
             public double MaxOutputPercentage { get; init; }
+        }
+
+        private class HeaterElementState : IHeaterElementState
+        {
+            public SwitchboardAction Action { get; set; }
+            public int Target { get; private set; }
+            public DateTime CurrentControlPeriodStart { get; set; }
+            public DateTime CurrentControlPeriodTimeOff { get; set; }
+            public bool ManualOn { get; set; }
+            public bool OvenOn => Target > 0;
+
+            public void SetTarget(int temperature)
+            {
+                Target = temperature;
+                if (!OvenOn)
+                    ManualOn = false; // ensures oven off also turns off any manual heater.
+            }
+
+            internal bool NeedToExtendCurrentControlPeriodAction(DateTime vectorTime) => CurrentControlPeriodTimeOff > Action.TimeToTurnOff && Action.GetRemainingOnSeconds(vectorTime) < 2;
+            internal bool NeedToExtendManualOnAction(DateTime vectorTime) => ManualOn && Action.GetRemainingOnSeconds(vectorTime) < 2;
+        }
+        private interface IHeaterElementState
+        {
+            public SwitchboardAction Action { get; }
+            public int Target { get; }
+            public DateTime CurrentControlPeriodStart { get; }
+            public DateTime CurrentControlPeriodTimeOff { get; }
+            public bool ManualOn { get; }
         }
     }
 }
