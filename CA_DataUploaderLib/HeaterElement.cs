@@ -13,7 +13,6 @@ namespace CA_DataUploaderLib
         private readonly Config _config;
         private DateTime globalTimeOff;
         private bool ManualTurnOn;
-        private bool PendingManualModeExecution;
         public bool IsActive { get { return OvenTargetTemperature > 0;  } }
         private readonly Stopwatch timeSinceLastNegativeValuesWarning = new();
         private readonly Stopwatch timeSinceLastMissingTemperatureWarning = new();
@@ -40,26 +39,16 @@ namespace CA_DataUploaderLib
             // if the connection is lost after we return the action, the control program can still fail to act on the heater. 
             // When it happens, the MustResend* methods will resend the expected action after 5 seconds.
             var vectorTime = vector.GetVectorTime();
-            var (executeManualOff, executeManualOn) = MustExecuteManualMode();
             var action =
-                executeManualOn ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) :
+                ManualTurnOn && !_lastAction.IsOn ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) :
                 MustTurnOff(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(false, vectorTime) :
-                CanTurnOn(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) : 
-                // manual off re-enables temp control, so we only turn off if CanTurnOn above didn't decide to turn on
-                executeManualOff ? new SwitchboardAction(false, vectorTime) :
+                CanTurnOn(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) :
                 // keep off: retrigger if current is detected
                 MustResendOffCommand(temp, current, vectorTime) ? new SwitchboardAction(false, vectorTime) :
                 // keep on: re-trigger early to avoid switching
                 _lastAction.IsOn && _lastAction.GetRemainingOnSeconds(vectorTime) < 2 ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) : 
                 _lastAction;
             return _lastAction = action;
-        }
-
-        public (bool manualOff, bool manualOn) MustExecuteManualMode()
-        {
-            if (!PendingManualModeExecution) return (false, false);
-            PendingManualModeExecution = false;
-            return (!ManualTurnOn, ManualTurnOn);
         }
 
         public void SetTargetTemperature(int value)
@@ -106,7 +95,7 @@ namespace CA_DataUploaderLib
         private bool MustTurnOff(bool hasValidTemperature, double temperature, DateTime vectorTime)
         {
             if (!_lastAction.IsOn) return false; // already off
-            if (ManualTurnOn) return false; // heater is on in manual avoid, avoid turning off
+            if (ManualTurnOn) return false; // heater is on in manual mode, avoid turning off
             if (OvenTargetTemperature <= 0)
                 return true; 
 
@@ -116,12 +105,7 @@ namespace CA_DataUploaderLib
             return hasValidTemperature && temperature > OvenTargetTemperature; //turn off if already at target temperature (if we can't read temp we keep the actuation until next control period)
         }
 
-        public void SetManualMode(bool turnOn)
-        { 
-            ManualTurnOn = turnOn;
-            PendingManualModeExecution = true;
-        }
-
+        public void SetManualMode(bool turnOn) => ManualTurnOn = turnOn;
         private (bool hasValidTemperature, double temp) GetOvenTemperatureFromVector(NewVectorReceivedArgs vector) 
         {
             var sensor = _config.OvenSensor;
