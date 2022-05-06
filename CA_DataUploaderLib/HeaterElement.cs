@@ -41,7 +41,7 @@ namespace CA_DataUploaderLib
             var vectorTime = vector.GetVectorTime();
             var action =
                 ManualTurnOn && !_lastAction.IsOn ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) :
-                MustTurnOff(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(false, vectorTime) :
+                MustTurnOff(vectorTime) ? new SwitchboardAction(false, vectorTime) :
                 CanTurnOn(hasValidTemperature, temp, vectorTime) ? new SwitchboardAction(true, vectorTime.AddSeconds(10)) :
                 // keep off: retrigger if current is detected
                 MustResendOffCommand(temp, current, vectorTime) ? new SwitchboardAction(false, vectorTime) :
@@ -92,17 +92,14 @@ namespace CA_DataUploaderLib
             return vectorTime.AddSeconds(secondsOn);
         }
 
-        private bool MustTurnOff(bool hasValidTemperature, double temperature, DateTime vectorTime)
+        private bool MustTurnOff(DateTime vectorTime)
         {
             if (!_lastAction.IsOn) return false; // already off
             if (ManualTurnOn) return false; // heater is on in manual mode, avoid turning off
             if (OvenTargetTemperature <= 0)
-                return true; 
-
-            if (vectorTime >= globalTimeOff)
                 return true;
 
-            return hasValidTemperature && temperature > OvenTargetTemperature; //turn off if already at target temperature (if we can't read temp we keep the actuation until next control period)
+            return vectorTime >= globalTimeOff;
         }
 
         public void SetManualMode(bool turnOn) => ManualTurnOn = turnOn;
