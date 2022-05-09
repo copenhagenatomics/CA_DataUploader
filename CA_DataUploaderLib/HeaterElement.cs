@@ -25,19 +25,20 @@ namespace CA_DataUploaderLib
             _config = config;
         }
 
-        public SwitchboardAction MakeNextActionDecision(NewVectorReceivedArgs vector)
+        public IHeaterElementState MakeNextActionDecision(NewVectorReceivedArgs vector)
         {
             if (!TryGetSwitchboardInputsFromVector(vector, out var current)) 
-                return State.Action; // not connected, we skip this heater and act again when the connection is re-established
+                return State; // not connected, we skip this heater and act again when the connection is re-established
             var (hasValidTemperature, temp) = GetOvenTemperatureFromVector(vector);
             // Careful consideration must be taken if changing the order of the below statements.
             var vectorTime = vector.GetVectorTime();
-            return State.Action = CanTurnOn(hasValidTemperature, temp, vectorTime) 
+            State.Action = CanTurnOn(hasValidTemperature, temp, vectorTime) 
                 ?? MustTurnOff(current, vectorTime) 
                 ?? State.Action;
+            return State;
         }
 
-        public void SetTargetTemperature(int value) => State.SetTarget(Math.Min(value, _config.MaxTemperature));
+        public void SetTargetTemperature(int value) => State.SetTarget(Math.Min(value, _config.MaxTemperature), _config.ControlPeriod);
         public void SetTargetTemperature(IEnumerable<(int area, int temperature)> values)
         {
             if (_config.Area == -1) return; // temperature control is not enabled for the heater (no oven or missing temperature hub)
@@ -47,37 +48,40 @@ namespace CA_DataUploaderLib
                     SetTargetTemperature(temperature);
         }
 
+        public IEnumerable<VectorDescriptionItem> GetStateVectorDescriptionItems() => HeaterElementState.GetVectorDescriptionItems(Name());
+
         /// <returns>an on action for up to 10 seconds (max time to leave on if we lose switchboard comms) or <c>null</c> when there is no new on action</returns>
         private SwitchboardAction CanTurnOn(bool hasValidTemperature, double temperature, DateTime vectorTime)
         { 
             if (State.NeedToExtendManualOnAction(vectorTime)) return new (true, vectorTime.AddSeconds(10));
             if (State.ManualOn) return null;
             if (!State.OvenOn) return null;
-            if (State.NeedToExtendCurrentControlPeriodAction(vectorTime)) return new (true, UpTo10Seconds(State.CurrentControlPeriodTimeOff));
-            if (!hasValidTemperature) return null;
+            var isNextControlPeriod = (vectorTime - State.CurrentControlPeriodStart) >= _config.ControlPeriod;
+            if (!isNextControlPeriod && State.NeedToExtendCurrentControlPeriodAction(vectorTime)) return new (true, UpTo10Seconds(State.CurrentControlPeriodTimeOff));
+            if (!isNextControlPeriod || !hasValidTemperature) return null;
+            State.CurrentControlPeriodStart = vectorTime; //note we postpone the start of the control period above if we don't have valid temperatures
 
-            State.CurrentControlPeriodTimeOff = GetProportionalControlTimeOff(temperature, vectorTime);
-            if (State.CurrentControlPeriodTimeOff == vectorTime) return null;
-            return new(true, UpTo10Seconds(State.CurrentControlPeriodTimeOff));
+            var timeOff = GetProportionalControlTimeOff(temperature, vectorTime);
+            State.CurrentControlPeriodTimeOff = timeOff;
+            //SetTargetTemperature can trigger a new control period with a lower target,
+            //due to this we explicitely issue off actions as a result of the p control
+            //i.e. we can't assume the last control period is always shut off when reaching the end of the control period
+            return new(timeOff != vectorTime, UpTo10Seconds(State.CurrentControlPeriodTimeOff));
+
 
             DateTime UpTo10Seconds(DateTime timeOff) => Min(timeOff, vectorTime.AddSeconds(10));
             static DateTime Min(DateTime a, DateTime b) => a < b ? a : b;
-        }
+            DateTime GetProportionalControlTimeOff(double currentTemperature, DateTime vectorTime)
+            {
+                var gain = _config.ProportionalGain;
+                var tempDifference = State.Target - currentTemperature;
+                var secondsOn = tempDifference * gain;
+                if (secondsOn < 0.1d) //we can't turn on less than the decision cycle duration
+                    return vectorTime;
 
-        private DateTime GetProportionalControlTimeOff(double currentTemperature, DateTime vectorTime)
-        {
-            if ((vectorTime - State.CurrentControlPeriodStart) < _config.ControlPeriod)
-                return vectorTime; //less than the control period since we last turned it on
-            State.CurrentControlPeriodStart = vectorTime;
-
-            var gain = _config.ProportionalGain;
-            var tempDifference = State.Target - currentTemperature;
-            var secondsOn = tempDifference * gain;
-            if (secondsOn < 0.1d) //we can't turn on less than the decision cycle duration
-                return vectorTime;
-
-            secondsOn = Math.Min(secondsOn, _config.MaxOutputPercentage * _config.ControlPeriod.TotalSeconds); //we act max for this control period so we can re-evaluate where we are for next actuation
-            return vectorTime.AddSeconds(secondsOn);
+                secondsOn = Math.Min(secondsOn, _config.MaxOutputPercentage * _config.ControlPeriod.TotalSeconds); //we act max for this control period so we can re-evaluate where we are for next actuation
+                return vectorTime.AddSeconds(secondsOn);
+            }
         }
 
         /// <returns>the off action or <c>null</c> when there is no new off action</returns>
@@ -205,30 +209,56 @@ namespace CA_DataUploaderLib
 
         private class HeaterElementState : IHeaterElementState
         {
-            public SwitchboardAction Action { get; set; }
+            public SwitchboardAction Action { get; set; } = new(false, default);
             public int Target { get; private set; }
             public DateTime CurrentControlPeriodStart { get; set; }
             public DateTime CurrentControlPeriodTimeOff { get; set; }
             public bool ManualOn { get; set; }
             public bool OvenOn => Target > 0;
 
-            public void SetTarget(int temperature)
+            public void SetTarget(int temperature, TimeSpan controlPeriod)
             {
                 Target = temperature;
                 if (!OvenOn)
                     ManualOn = false; // ensures oven off also turns off any manual heater.
+                if (CurrentControlPeriodStart != default)
+                    CurrentControlPeriodStart -= controlPeriod; //ensure we'll start a new control period on the next decision, avoiding slow response to commands.
+            }
+
+            public IEnumerable<SensorSample> ToVectorSamples(string name, DateTime vectorTime)
+            {
+                foreach (var sample in Action.ToVectorSamples(name, vectorTime))
+                    yield return sample;
+                yield return new SensorSample(name + "_target", Target);
+                yield return new SensorSample(name + "_pcontrolstart", CurrentControlPeriodStart.ToVectorDouble());
+                yield return new SensorSample(name + "_pcontroltimeoff", CurrentControlPeriodTimeOff.ToVectorDouble()); //TODO: changing this to seconds would give nice info!
+                yield return new SensorSample(name + "_manualon", ManualOn ? 1.0 : 0.0);
+            }
+
+            internal static IEnumerable<VectorDescriptionItem> GetVectorDescriptionItems(string name)
+            {
+                foreach (var item in SwitchboardAction.GetVectorDescriptionItems(name))
+                    yield return item;
+                yield return new VectorDescriptionItem("double", name + "_target", DataTypeEnum.State);
+                yield return new VectorDescriptionItem("double", name + "_pcontrolstart", DataTypeEnum.State);
+                yield return new VectorDescriptionItem("double", name + "_pcontroltimeoff", DataTypeEnum.State);
+                yield return new VectorDescriptionItem("double", name + "_manualon", DataTypeEnum.State);
             }
 
             internal bool NeedToExtendCurrentControlPeriodAction(DateTime vectorTime) => CurrentControlPeriodTimeOff > Action.TimeToTurnOff && Action.GetRemainingOnSeconds(vectorTime) < 2;
             internal bool NeedToExtendManualOnAction(DateTime vectorTime) => ManualOn && Action.GetRemainingOnSeconds(vectorTime) < 2;
         }
-        private interface IHeaterElementState
+        public interface IHeaterElementState
         {
             public SwitchboardAction Action { get; }
             public int Target { get; }
             public DateTime CurrentControlPeriodStart { get; }
             public DateTime CurrentControlPeriodTimeOff { get; }
             public bool ManualOn { get; }
+            public bool IsOn => Action.IsOn;
+            public DateTime TimeToTurnOff => Action.TimeToTurnOff;
+
+            IEnumerable<SensorSample> ToVectorSamples(string name, DateTime dateTime);
         }
     }
 }

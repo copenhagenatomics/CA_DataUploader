@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib
     {
         public string Title => "Heaters";
         private bool _disposed = false;
-        private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
+        private readonly List<HeaterElement> _heaters = new();
         private readonly PluginsCommandHandler _cmd;
         private readonly SwitchBoardController _switchboardController;
         private readonly OvenCommand _ovenCmd;
@@ -52,7 +52,7 @@ namespace CA_DataUploaderLib
         public Task Run(CancellationToken token) => Task.CompletedTask;
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
         public SubsystemDescriptionItems GetVectorDescriptionItems() => 
-            new (new (), _heaters.SelectMany(x => SwitchboardAction.GetVectorDescriptionItems(x.Name())).ToList());
+            new (new (), _heaters.SelectMany(x => x.GetStateVectorDescriptionItems()).ToList());
         public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs)
         { 
             foreach (var heater in _heaters)
