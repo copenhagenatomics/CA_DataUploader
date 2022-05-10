@@ -69,7 +69,8 @@ namespace CA_DataUploaderLib
             _disposed = true;
         }
 
-        public void ResumeState(NewVectorReceivedArgs args)
+        //note the explicit interface implementation as its a default method
+        void ISubsystemWithVectorData.ResumeState(NewVectorReceivedArgs args) 
         {
             foreach (var heater in _heaters)
                 heater.ResumeState(args);
