@@ -60,6 +60,13 @@ namespace CA_DataUploaderLib
                 yield return sample;
         }
 
+        //note the explicit interface implementation as its a default method
+        void ISubsystemWithVectorData.ResumeState(NewVectorReceivedArgs args)
+        {
+            foreach (var heater in _heaters)
+                heater.ResumeState(args);
+        }
+
         public void Dispose()
         { // class is sealed without unmanaged resources, no need for the full disposable pattern.
             if (_disposed) return;
@@ -67,13 +74,6 @@ namespace CA_DataUploaderLib
             _ovenCmd?.Dispose();
             _heaterCmd?.Dispose();
             _disposed = true;
-        }
-
-        //note the explicit interface implementation as its a default method
-        void ISubsystemWithVectorData.ResumeState(NewVectorReceivedArgs args) 
-        {
-            foreach (var heater in _heaters)
-                heater.ResumeState(args);
         }
 
         // usage: oven 200 220 400
