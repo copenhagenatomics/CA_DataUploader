@@ -84,6 +84,11 @@ namespace CA_DataUploaderLib
             }
         }
 
+        public void ResumeState(NewVectorReceivedArgs args)
+        {
+            State.ResumeFromVectorSamples(Name(), args);
+        }
+
         /// <returns>the off action or <c>null</c> when there is no new off action</returns>
         private SwitchboardAction MustTurnOff(double current, DateTime vectorTime)
         {
@@ -235,7 +240,7 @@ namespace CA_DataUploaderLib
                 yield return new SensorSample(name + "_manualon", ManualOn ? 1.0 : 0.0);
             }
 
-            internal static IEnumerable<VectorDescriptionItem> GetVectorDescriptionItems(string name)
+            public static IEnumerable<VectorDescriptionItem> GetVectorDescriptionItems(string name)
             {
                 foreach (var item in SwitchboardAction.GetVectorDescriptionItems(name))
                     yield return item;
@@ -245,8 +250,16 @@ namespace CA_DataUploaderLib
                 yield return new VectorDescriptionItem("double", name + "_manualon", DataTypeEnum.State);
             }
 
-            internal bool NeedToExtendCurrentControlPeriodAction(DateTime vectorTime) => CurrentControlPeriodTimeOff > Action.TimeToTurnOff && Action.GetRemainingOnSeconds(vectorTime) < 2;
-            internal bool NeedToExtendManualOnAction(DateTime vectorTime) => ManualOn && Action.GetRemainingOnSeconds(vectorTime) < 2;
+            public bool NeedToExtendCurrentControlPeriodAction(DateTime vectorTime) => CurrentControlPeriodTimeOff > Action.TimeToTurnOff && Action.GetRemainingOnSeconds(vectorTime) < 2;
+            public bool NeedToExtendManualOnAction(DateTime vectorTime) => ManualOn && Action.GetRemainingOnSeconds(vectorTime) < 2;
+            public void ResumeFromVectorSamples(string name, NewVectorReceivedArgs args)
+            {
+                Action = SwitchboardAction.FromVectorSamples(args, name);
+                Target = (int)args[name + "_target"];
+                CurrentControlPeriodStart = args[name + "_pcontrolstart"].ToVectorDate();
+                CurrentControlPeriodTimeOff = args[name + "_pcontroltimeoff"].ToVectorDate();
+                ManualOn = args[name + "_manualon"] == 1.0;
+            };
         }
         public interface IHeaterElementState
         {

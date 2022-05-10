@@ -63,6 +63,13 @@ namespace CA_DataUploaderLib
             filterAndMath.AddOutputsToInputVector(samples, outputs);
             return (samples, vectorTime);
         }
+        
+        public void ResumeState(List<SensorSample> fullVector)
+        {
+            var args = new NewVectorReceivedArgs(fullVector.ToDictionary(v => v.Name, v => v.Value));
+            foreach (var subsystem in _subsystems)
+                subsystem.ResumeState(args);
+        }
 
         public Task RunSubsystems()
         {

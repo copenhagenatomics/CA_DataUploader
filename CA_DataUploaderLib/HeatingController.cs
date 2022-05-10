@@ -68,7 +68,13 @@ namespace CA_DataUploaderLib
             _heaterCmd?.Dispose();
             _disposed = true;
         }
- 
+
+        public void ResumeState(NewVectorReceivedArgs args)
+        {
+            foreach (var heater in _heaters)
+                heater.ResumeState(args);
+        }
+
         // usage: oven 200 220 400
         private class OvenCommand : LoopControlCommand
         {

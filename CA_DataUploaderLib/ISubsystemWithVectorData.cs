@@ -15,6 +15,7 @@ namespace CA_DataUploaderLib
         IEnumerable<SensorSample> GetInputValues();
         IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs);
         Task Run(CancellationToken token);
+        void ResumeState(NewVectorReceivedArgs args) { }
     }
 
     public record SubsystemDescriptionItems(List<(IOconfNode node, List<VectorDescriptionItem> items)> Inputs, List<VectorDescriptionItem> Outputs)
