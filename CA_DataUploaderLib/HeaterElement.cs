@@ -259,7 +259,7 @@ namespace CA_DataUploaderLib
                 CurrentControlPeriodStart = args[name + "_pcontrolstart"].ToVectorDate();
                 CurrentControlPeriodTimeOff = args[name + "_pcontroltimeoff"].ToVectorDate();
                 ManualOn = args[name + "_manualon"] == 1.0;
-            };
+            }
         }
         public interface IHeaterElementState
         {
