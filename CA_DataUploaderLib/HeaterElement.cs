@@ -58,29 +58,25 @@ namespace CA_DataUploaderLib
             if (!State.OvenOn) return null;
             var isNextControlPeriod = (vectorTime - State.CurrentControlPeriodStart) >= _config.ControlPeriod;
             if (!isNextControlPeriod && State.NeedToExtendCurrentControlPeriodAction(vectorTime)) return new (true, UpTo10Seconds(State.CurrentControlPeriodTimeOff));
-            if (!isNextControlPeriod || !hasValidTemperature) return null;
-            State.CurrentControlPeriodStart = vectorTime; //note we postpone the start of the control period above if we don't have valid temperatures
+            if (!isNextControlPeriod || !hasValidTemperature) return null;//note we postpone the start of the control period if we don't have valid temperatures
 
-            var timeOff = GetProportionalControlTimeOff(temperature, vectorTime);
-            State.CurrentControlPeriodTimeOff = timeOff;
+            var secondsOn = GetProportionalControlSecondsOn(temperature);
             //SetTargetTemperature can trigger a new control period with a lower target,
-            //due to this we explicitely issue off actions as a result of the p control
+            //due to this we explicitely issue an off action here as a result of the p control
             //i.e. we can't assume the last control period is always shut off when reaching the end of the control period
-            return new(timeOff != vectorTime, UpTo10Seconds(State.CurrentControlPeriodTimeOff));
+            State.SetPControlDecision(vectorTime, secondsOn);
+            return new(secondsOn != 0, UpTo10Seconds(State.CurrentControlPeriodTimeOff));
 
 
             DateTime UpTo10Seconds(DateTime timeOff) => Min(timeOff, vectorTime.AddSeconds(10));
             static DateTime Min(DateTime a, DateTime b) => a < b ? a : b;
-            DateTime GetProportionalControlTimeOff(double currentTemperature, DateTime vectorTime)
+            double GetProportionalControlSecondsOn(double currentTemperature)
             {
-                var gain = _config.ProportionalGain;
                 var tempDifference = State.Target - currentTemperature;
-                var secondsOn = tempDifference * gain;
-                if (secondsOn < 0.1d) //we can't turn on less than the decision cycle duration
-                    return vectorTime;
-
-                secondsOn = Math.Min(secondsOn, _config.MaxOutputPercentage * _config.ControlPeriod.TotalSeconds); //we act max for this control period so we can re-evaluate where we are for next actuation
-                return vectorTime.AddSeconds(secondsOn);
+                var secondsOn = tempDifference * _config.ProportionalGain;
+                return secondsOn < 0.1d 
+                    ? 0d //we can't turn on less than the decision cycle duration
+                    : Math.Min(secondsOn, _config.MaxOutputPercentage * _config.ControlPeriod.TotalSeconds); //we act max for this control period so we can re-evaluate where we are for next actuation
             }
         }
 
@@ -216,8 +212,9 @@ namespace CA_DataUploaderLib
         {
             public SwitchboardAction Action { get; set; } = new(false, default);
             public int Target { get; private set; }
-            public DateTime CurrentControlPeriodStart { get; set; }
-            public DateTime CurrentControlPeriodTimeOff { get; set; }
+            public DateTime CurrentControlPeriodStart { get; private set; }
+            public double CurrentControlPeriodSecondsOn { get; private set; }
+            public DateTime CurrentControlPeriodTimeOff { get; private set; }
             public bool ManualOn { get; set; }
             public bool OvenOn => Target > 0;
 
@@ -236,7 +233,7 @@ namespace CA_DataUploaderLib
                     yield return sample;
                 yield return new SensorSample(name + "_target", Target);
                 yield return new SensorSample(name + "_pcontrolstart", CurrentControlPeriodStart.ToVectorDouble());
-                yield return new SensorSample(name + "_pcontroltimeoff", CurrentControlPeriodTimeOff.ToVectorDouble()); //TODO: changing this to seconds would give nice info!
+                yield return new SensorSample(name + "_pcontrolseconds", CurrentControlPeriodSecondsOn);
                 yield return new SensorSample(name + "_manualon", ManualOn ? 1.0 : 0.0);
             }
 
@@ -246,7 +243,7 @@ namespace CA_DataUploaderLib
                     yield return item;
                 yield return new VectorDescriptionItem("double", name + "_target", DataTypeEnum.State);
                 yield return new VectorDescriptionItem("double", name + "_pcontrolstart", DataTypeEnum.State);
-                yield return new VectorDescriptionItem("double", name + "_pcontroltimeoff", DataTypeEnum.State);
+                yield return new VectorDescriptionItem("double", name + "_pcontrolseconds", DataTypeEnum.State);
                 yield return new VectorDescriptionItem("double", name + "_manualon", DataTypeEnum.State);
             }
 
@@ -257,8 +254,16 @@ namespace CA_DataUploaderLib
                 Action = SwitchboardAction.FromVectorSamples(args, name);
                 Target = (int)args[name + "_target"];
                 CurrentControlPeriodStart = args[name + "_pcontrolstart"].ToVectorDate();
-                CurrentControlPeriodTimeOff = args[name + "_pcontroltimeoff"].ToVectorDate();
+                CurrentControlPeriodSecondsOn = args[name + "_pcontrolseconds"];
+                CurrentControlPeriodTimeOff = CurrentControlPeriodStart.AddSeconds(CurrentControlPeriodSecondsOn);
                 ManualOn = args[name + "_manualon"] == 1.0;
+            }
+
+            public void SetPControlDecision(DateTime vectorTime, double secondsOn)
+            {
+                CurrentControlPeriodStart = vectorTime;
+                CurrentControlPeriodSecondsOn = Math.Round(secondsOn, 4);
+                CurrentControlPeriodTimeOff = vectorTime.AddSeconds(CurrentControlPeriodSecondsOn);
             }
         }
         public interface IHeaterElementState
