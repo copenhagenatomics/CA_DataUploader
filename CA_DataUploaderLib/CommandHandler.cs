@@ -14,7 +14,6 @@ namespace CA_DataUploaderLib
 {
     public sealed class CommandHandler : IDisposable
     {
-        private bool _running = true;
         private readonly SerialNumberMapper _mapper;
         private readonly ICommandRunner _commandRunner;
         private DateTime _start = DateTime.Now;
@@ -23,13 +22,18 @@ namespace CA_DataUploaderLib
         private readonly List<ISubsystemWithVectorData> _subsystems = new();
         private int AcceptedCommandsIndex = -1;
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
+        private readonly CancellationTokenSource _exitCts = new();
+        private readonly TaskCompletionSource _runningTaskTcs = new();
 
         public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
         public event EventHandler<EventFiredArgs> EventFired;
-        public bool IsRunning { get { return _running; } }
+        public bool IsRunning => !_exitCts.IsCancellationRequested;
+        public CancellationToken StopToken => _exitCts.Token;
+        public Task RunningTask { get; set; }
 
         public CommandHandler(SerialNumberMapper mapper = null, ICommandRunner runner = null)
         {
+            _exitCts.Token.Register(() => _runningTaskTcs.TrySetCanceled());
             _commandRunner = runner ?? new DefaultCommandRunner();
             _mapper = mapper;
             _fullsystemFilterAndMath = new Lazy<ExtendedVectorDescription>(GetFullSystemFilterAndMath);
@@ -145,14 +149,14 @@ namespace CA_DataUploaderLib
         public void FireCustomEvent(string msg, DateTime timespan, byte eventType) => EventFired?.Invoke(this, new EventFiredArgs(msg, eventType, timespan));
         private bool Stop(List<string> args)
         {
-            _running = false;
+            _exitCts.Cancel();
             return true;
         }
 
         private void LoopForever()
         {
             _start = DateTime.Now;
-            while (_running)
+            while (IsRunning)
             {
                 try
                 {
@@ -191,7 +195,7 @@ namespace CA_DataUploaderLib
             var info = Console.ReadKey(true);
             while (info.Key != ConsoleKey.Enter)
             {
-                if (!_running)
+                if (!IsRunning)
                     return null; //no longer running, abort
                 else if (info.Key == ConsoleKey.Escape)
                 {
@@ -285,7 +289,7 @@ $@"{GetCurrentNode().Name}
 
         public void Dispose()
         { // class is sealed without unmanaged resources, no need for the full disposable pattern.
-            _running = false;
+            _exitCts.Cancel();
         }
     }
 }
