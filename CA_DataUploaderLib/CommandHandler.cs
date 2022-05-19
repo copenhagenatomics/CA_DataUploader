@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib
         public event EventHandler<EventFiredArgs> EventFired;
         public bool IsRunning => !_exitCts.IsCancellationRequested;
         public CancellationToken StopToken => _exitCts.Token;
-        public Task RunningTask { get; set; }
+        public Task RunningTask => _runningTaskTcs.Task;
 
         public CommandHandler(SerialNumberMapper mapper = null, ICommandRunner runner = null)
         {
