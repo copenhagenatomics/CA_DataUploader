@@ -8,7 +8,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public IOconfSwitchboardSensor(string row, int lineNum) : base(row, lineNum, "SwitchboardSensor", false, true, IOconfOut230Vac.GetNewSwitchboardBoardSettings(row))
         {
-            format = "SwitchboardSensor;Name;BoxName;[SubsystemName]";
+            Format = "SwitchboardSensor;Name;BoxName;[SubsystemName]";
             var list = ToList();
             Subsystem = list.Count > 3 ? list[3].ToLower() : "vibration";
         }

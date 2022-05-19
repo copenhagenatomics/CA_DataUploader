@@ -3,7 +3,6 @@ using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace CA_DataUploaderLib.Helpers
 {
@@ -38,14 +37,6 @@ namespace CA_DataUploaderLib.Helpers
         }
 
         public SensorSample Output { get; }
-
-        public override string ToString()
-        {
-            if (Output.Value > 9000)
-                return "NC";
-
-            return $"{Output.Value}";
-        }
 
         private void CalculateOutput(List<SensorSample> input)
         {
@@ -83,37 +74,6 @@ namespace CA_DataUploaderLib.Helpers
                 // incase of no valid samples
                 Output.Value = _filterQueue.Last().Select(x => x.Value).Average();
                 Output.TimeStamp = _filterQueue.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
-            }
-        }
-
-        public string FilterToString()
-        {
-            lock (_filterQueue)
-            {
-                var sb = new StringBuilder();
-                for(int i = 0;i<_filterQueue.First().Count;i++)
-                    sb.AppendLine(string.Join(",", _filterQueue.Select(x => x[i].Value.ToString("N2").PadLeft(9))));
-
-                return sb.ToString();
-            }
-        }
-
-        public double GetFrequency()
-        {
-            lock (_filterQueue)
-            {
-                if (_filterQueue.Count < 2) 
-                    return 0;
-
-                return (_filterQueue.Count() - 1) / _filterQueue.Last().Select(d => d.TimeStamp.Ticks).AverageTime().Subtract(_filterQueue.First().Select(d => d.TimeStamp.Ticks).AverageTime()).TotalSeconds;
-            }
-        }
-
-        public double FilterCount()
-        {
-            lock (_filterQueue)
-            {
-                return _filterQueue.Where(x => x.All(y => y.Value < 10000 && y.Value != 0)).Count();
             }
         }
 

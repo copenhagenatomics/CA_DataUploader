@@ -9,11 +9,11 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfOven(string row, int lineNum) : base(row, lineNum, "Oven")
         {
-            format = "Oven;Area;HeatingElement;TypeK;[ProportionalGain];[ControlPeriod];[MaxOutputPercentage]";
+            Format = "Oven;Area;HeatingElement;TypeK;[ProportionalGain];[ControlPeriod];[MaxOutputPercentage]";
 
             var list = ToList();
             if (!int.TryParse(list[1], out OvenArea)) 
-                throw new Exception($"IOconfOven: wrong OvenArea number: {row} {format}");
+                throw new Exception($"IOconfOven: wrong OvenArea number: {row} {Format}");
             if (OvenArea < 1)
                 throw new Exception("Oven area must be a number bigger or equal to 1");
             
@@ -50,8 +50,8 @@ namespace CA_DataUploaderLib.IOconf
             MaxOutputPercentage = maxOutputPercentage / 100d;
         }
 
-        public int OvenArea;
-        public IOconfHeater HeatingElement;
+        public readonly int OvenArea;
+        public readonly IOconfHeater HeatingElement;
         public string TemperatureSensorName { get; }
         public IReadOnlyCollection<string> BoardStateSensorNames {get;}
         //with the current formula the gain pretty much means seconds to gain 1C

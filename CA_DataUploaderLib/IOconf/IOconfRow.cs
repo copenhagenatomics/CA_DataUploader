@@ -15,10 +15,10 @@ namespace CA_DataUploaderLib.IOconf
             if (list[0] != Type) throw new Exception("IOconfRow: wrong format: " + Row);
         }
 
-        protected string Row;
-        protected string Type;
-        protected int LineNumber;
-        protected string format;
+        protected readonly string Row;
+        protected readonly string Type;
+        protected readonly int LineNumber;
+        protected string Format { get; init; }
 
         public List<string> ToList() => RowWithoutComment().Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
 

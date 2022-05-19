@@ -11,6 +11,7 @@ namespace CA_DataUploaderLib
 {
     public class Alerts : LoopControlCommand
     {
+        public bool Disabled { get; set; }
         public override string Name => "addalert";
         public override string Description => string.Empty;
         public override bool IsHiddenCommand => true;
@@ -72,6 +73,8 @@ namespace CA_DataUploaderLib
 
         public override void OnNewVectorReceived(object sender, NewVectorReceivedArgs e)
         {
+            if (Disabled) return;
+
             var timestamp = e.GetVectorTime();
             var (alertsToTrigger, noSensorAlerts) = GetAlertsToTrigger(e); // we gather alerts separately from triggering, to reduce time locking the _alerts list
             

@@ -13,17 +13,15 @@ namespace CA_DataUploaderLib
     {
         public string Title => "Heaters";
         private bool _disposed = false;
-        private readonly List<HeaterElement> _heaters = new List<HeaterElement>();
+        private readonly List<HeaterElement> _heaters = new();
         private readonly PluginsCommandHandler _cmd;
         private readonly SwitchBoardController _switchboardController;
         private readonly OvenCommand _ovenCmd;
         private readonly HeaterCommand _heaterCmd;
-        private readonly CommandHandler _cmdUnwrapped;
 
         public HeatingController(CommandHandler cmd)
         {
             _cmd = new PluginsCommandHandler(cmd);
-            _cmdUnwrapped = cmd;
 
             var heatersConfigs = IOconfFile.GetHeater().ToList();
             if (!heatersConfigs.Any())
@@ -54,12 +52,19 @@ namespace CA_DataUploaderLib
         public Task Run(CancellationToken token) => Task.CompletedTask;
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
         public SubsystemDescriptionItems GetVectorDescriptionItems() => 
-            new (new (), _heaters.SelectMany(x => SwitchboardAction.GetVectorDescriptionItems(x.Name())).ToList());
+            new (new (), _heaters.SelectMany(x => x.GetStateVectorDescriptionItems()).ToList());
         public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs)
         { 
             foreach (var heater in _heaters)
             foreach (var sample in heater.MakeNextActionDecision(inputVectorReceivedArgs).ToVectorSamples(heater.Name(), inputVectorReceivedArgs.GetVectorTime()))
                 yield return sample;
+        }
+
+        //note the explicit interface implementation as its a default method
+        void ISubsystemWithVectorData.ResumeState(NewVectorReceivedArgs args)
+        {
+            foreach (var heater in _heaters)
+                heater.ResumeState(args);
         }
 
         public void Dispose()
@@ -70,7 +75,7 @@ namespace CA_DataUploaderLib
             _heaterCmd?.Dispose();
             _disposed = true;
         }
- 
+
         // usage: oven 200 220 400
         private class OvenCommand : LoopControlCommand
         {
@@ -78,16 +83,19 @@ namespace CA_DataUploaderLib
             public override string ArgsHelp => " [0 - 800] [0 - 800]";
             public override string Description => "where the integer value is the oven temperature top and bottom region";
             public override bool IsHiddenCommand {get; }
+
+            private readonly bool IsLightEnabled;
             private readonly List<HeaterElement> _heaters;
 
             public OvenCommand(List<HeaterElement> heaters, bool hidden)
             {
                 _heaters = heaters;
                 IsHiddenCommand = hidden;
+                IsLightEnabled = IOconfFile.GetLight().Any();
             }
 
             protected override Task Command(List<string> args)
-            { 
+            {
                 if (args.Count < 2)
                 {
                     logger.LogError($"Unexpected format: {string.Join(',', args)}. Format: oven temparea1 temparea2 ...");
@@ -98,8 +106,13 @@ namespace CA_DataUploaderLib
                     _heaters.ForEach(x => x.SetTargetTemperature(0));
                 else
                     SetHeatersTargetTemperatures(args.Skip(1).Select(ParseTemperature).ToList());
-                var lightState = _heaters.Any(x => x.IsActive) ? "on" : "off";
-                ExecuteCommand($"light main {lightState}");
+
+                if (IsLightEnabled)
+                {
+                    var lightState = _heaters.Any(x => x.IsActive) ? "on" : "off";
+                    ExecuteCommand($"light main {lightState}");
+                }
+
                 return Task.CompletedTask;
             }
 

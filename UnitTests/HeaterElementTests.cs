@@ -26,11 +26,11 @@ namespace UnitTests
         public void WhenHeaterIsOffCanTurnOn()
         { 
             var element = new HeaterElement(NewConfig.Build());
-            element.SetTargetTemperature(45);
+            element.SetTargetTemperature(54);
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
             var action = element.MakeNextActionDecision(vector);
             Assert.AreEqual(true, action.IsOn);
-            Assert.AreEqual(vector.GetVectorTime().AddSeconds(10), action.TimeToTurnOff);
+            Assert.AreEqual(vector.GetVectorTime().AddSeconds(2), action.TimeToTurnOff);
         }
 
         [TestMethod]
@@ -53,7 +53,7 @@ namespace UnitTests
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
             element.MakeNextActionDecision(vector);
             var newSamples = NewVectorSamples;
-            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(10).ToVectorDouble();
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(30).ToVectorDouble();
             newSamples["temp"] = 101;
             var action = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
             Assert.AreEqual(false, action.IsOn);
@@ -101,7 +101,6 @@ namespace UnitTests
             Assert.AreEqual(true, action.IsOn, "should try heating again 30 seconds after it turned off");
         }
 
-
         [TestMethod]
         public void ProportionalGainUsesMaxOutput()
         {
@@ -140,12 +139,16 @@ namespace UnitTests
         { 
             var element = new HeaterElement(NewConfig.Build());
             element.SetTargetTemperature(45);
-            NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
-            var firstAction = element.MakeNextActionDecision(vector);
+            var vector = new NewVectorReceivedArgs(NewVectorSamples);
+            var firstAction = element.MakeNextActionDecision(vector).Action;
             var newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(10).ToVectorDouble();
             newSamples["box_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
-            var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
+            var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)).Action;
+            Assert.AreEqual(firstAction, newAction);
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(30).ToVectorDouble(); //also checking there is no change on the next control period
+            newSamples["box_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
+            newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)).Action;
             Assert.AreEqual(firstAction, newAction);
         }
 
@@ -155,7 +158,7 @@ namespace UnitTests
             var element = new HeaterElement(NewConfig.Build());
             element.SetTargetTemperature(70);
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
-            var firstAction = element.MakeNextActionDecision(vector);
+            var firstAction = element.MakeNextActionDecision(vector).Action;
             var newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(1).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
@@ -163,7 +166,7 @@ namespace UnitTests
             newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(2).ToVectorDouble();// only 1 second after detecting the disconnect for the first time
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
-            var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
+            var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)).Action; 
             Assert.AreEqual(firstAction, newAction);
         }
 
@@ -173,7 +176,7 @@ namespace UnitTests
             var element = new HeaterElement(NewConfig.Build());
             element.SetTargetTemperature(70);
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
-            var firstAction = element.MakeNextActionDecision(vector);
+            var firstAction = element.MakeNextActionDecision(vector).Action;
             var newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(1).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
@@ -181,7 +184,7 @@ namespace UnitTests
             newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(4).ToVectorDouble();// 3 seconds after detecting the disconnect for the first time
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
-            var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
+            var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)).Action; 
             Assert.AreEqual(firstAction, newAction);
         }
 
@@ -233,24 +236,83 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void ReconnectedOverTargetTemperatureTurnsOff()
+        public void ReconnectedOverTargetTemperatureDoesNotTurnOffUntilNextControlPeriod()
         { 
             var element = new HeaterElement(NewConfig.Build());
             element.SetTargetTemperature(200);
             NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
-            var firstAction = element.MakeNextActionDecision(vector);
+            var firstAction = element.MakeNextActionDecision(vector).Action;
             var newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(1).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.Connecting;
-            var disconnectedAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
+            var disconnectedAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)).Action; 
             newSamples = NewVectorSamples;
             newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(3).ToVectorDouble();
             newSamples["temperature_state"] = (int)BaseSensorBox.ConnectionState.ReceivingValues;
             newSamples["temp"] = 201;
-            var newAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)); 
-            Assert.IsFalse(newAction.IsOn);
+            var reconnecedAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)).Action; 
+            Assert.IsTrue(reconnecedAction.IsOn, "heater was turned off before the end of the control period");
             Assert.AreEqual(firstAction, disconnectedAction, "initial and disconnected action unexpectedly were different");
-            Assert.AreNotEqual(disconnectedAction, newAction, "initial and disconnected action unexpectedly were the same");
+            Assert.AreEqual(disconnectedAction, reconnecedAction, "initial and disconnected action unexpectedly were the same");
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(30).ToVectorDouble();
+            var nextControlPeriodAction = element.MakeNextActionDecision(new NewVectorReceivedArgs(newSamples)).Action;
+            Assert.IsFalse(nextControlPeriodAction.IsOn, "heater was still on on the next control period");
+            Assert.AreNotEqual(reconnecedAction, nextControlPeriodAction, "reconnected and next control period action unexpectedly were the same");
+        }
+
+        [TestMethod]
+        public void StateReflectLatestChanges()
+        {
+            var element = new HeaterElement(NewConfig.Build());
+            element.SetTargetTemperature(200);
+            NewVectorReceivedArgs vector = new NewVectorReceivedArgs(NewVectorSamples);
+            var state = element.MakeNextActionDecision(vector);
+            Assert.AreEqual(200, state.Target);
+            Assert.IsFalse(state.ManualOn, "manual unexpectedly on");
+            Assert.AreEqual(vector.GetVectorTime(), state.CurrentControlPeriodStart);
+            Assert.AreEqual(vector.GetVectorTime().AddSeconds(30), state.CurrentControlPeriodTimeOff);
+            var newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(1).ToVectorDouble();
+            element.SetTargetTemperature(94);
+            state = element.MakeNextActionDecision(new (newSamples));
+            Assert.AreEqual(94, state.Target);
+            Assert.AreEqual(vector.GetVectorTime().AddSeconds(1), state.CurrentControlPeriodStart, "control period not restarted after a temp change");
+            Assert.AreEqual(vector.GetVectorTime().AddSeconds(11), state.CurrentControlPeriodTimeOff, "control period time off not as expected after a temp change");
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(31).ToVectorDouble();
+            newSamples["temp"] = 150; //setting temp higher than last target to ensure we show the heater stays on regardless
+            element.SetManualMode(true);
+            state = element.MakeNextActionDecision(new(newSamples));
+            Assert.AreEqual(94, state.Target, "target unexpectedly changed when specifying manual mode");
+            Assert.IsTrue(state.ManualOn, "manual on not reflected on state");
+            Assert.IsTrue(state.IsOn, "heater not on on manual mode");
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(32).ToVectorDouble();
+            newSamples["temp"] = 150; //still keeping the temp high as manual mode off means doing a regular cycle again
+            element.SetManualMode(false);
+            state = element.MakeNextActionDecision(new(newSamples));
+            Assert.IsFalse(state.ManualOn, "manual off not reflected on state");
+            Assert.IsFalse(state.IsOn, "heater not off after shutting off manual mode");
+        }
+
+
+        [TestMethod]
+        public void WhenTargetIsChangedActuatesInmediately()
+        {
+            var element = new HeaterElement(NewConfig.Build());
+            element.SetTargetTemperature(40);
+            NewVectorReceivedArgs vector = new (NewVectorSamples);
+            element.MakeNextActionDecision(vector);
+            var newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(1).ToVectorDouble();
+            element.SetTargetTemperature(100);
+            var state = element.MakeNextActionDecision(new(newSamples));
+            Assert.IsTrue(state.IsOn);
+            newSamples = NewVectorSamples;
+            newSamples["vectortime"] = vector.GetVectorTime().AddSeconds(2).ToVectorDouble();
+            element.SetTargetTemperature(40);
+            state = element.MakeNextActionDecision(new(newSamples));
+            Assert.IsFalse(state.IsOn);
         }
 
         private class HeaterElementConfigBuilder

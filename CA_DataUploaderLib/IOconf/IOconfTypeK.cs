@@ -4,10 +4,10 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfTypeK : IOconfInput
     {
-        public bool AllJunction { get; private set; }
+        public bool AllJunction { get; }
         public IOconfTypeK(string row, int lineNum) : base(row, lineNum, "TypeK", false, true, null)
         {
-            format = "TypeK;Name;BoxName;[port number];[skip/all]";
+            Format = "TypeK;Name;BoxName;[port number];[skip/all]";
 
             var list = ToList();
             AllJunction = false;

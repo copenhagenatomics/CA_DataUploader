@@ -8,25 +8,25 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfFilter : IOconfRow
     {
-        public FilterType filterType;
-        public double filterLength;  // in seconds. 
-        public string Name { get; set; }
+        public readonly FilterType filterType;
+        public readonly double filterLength;  // in seconds. 
+        public string Name { get; }
         public string NameInVector => Name + "_filter";
 
-        public List<string> SourceNames;
-        public bool HideSource { get; private set; }
+        public readonly List<string> SourceNames;
+        public bool HideSource { get; }
 
         public IOconfFilter(string row, int lineNum) : base(row, lineNum, "Filter")
         {
-            format = "Filter;Name;FilterType;FilterLength;SourceNames;[hidesource]";
+            Format = "Filter;Name;FilterType;FilterLength;SourceNames;[hidesource]";
 
             var list = ToList();
             Name = list[1];
             if (!Enum.TryParse(list[2], out filterType))
-                throw new Exception($"Wrong filter type: {row} {Environment.NewLine}{format}");
+                throw new Exception($"Wrong filter type: {row} {Environment.NewLine}{Format}");
 
             if (!list[3].TryToDouble(out filterLength))
-                throw new Exception($"Wrong filter length: {row} {Environment.NewLine}{format}");
+                throw new Exception($"Wrong filter length: {row} {Environment.NewLine}{Format}");
 
             var sources = list.Skip(4).ToList();
             if (sources.Last() == "hidesource")

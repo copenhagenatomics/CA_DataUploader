@@ -6,7 +6,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfSamplingRates(string row, int lineNum) : base(row, lineNum, "SamplingRates")
         {
-            format = "SamplingRates;MainLoop;VectorUploads";
+            Format = "SamplingRates;MainLoop;VectorUploads";
 
             var list = ToList();
             if (list[0] != "SamplingRates" || list.Count != 3) throw new Exception("IOconfSamplingRates: wrong format: " + row);
@@ -25,7 +25,7 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        public int MainLoopDelay;
-        public int VectorUploadDelay;
+        public readonly int MainLoopDelay;
+        public readonly int VectorUploadDelay;
     }
 }

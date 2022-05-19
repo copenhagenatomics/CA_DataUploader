@@ -34,16 +34,6 @@ namespace CA_DataUploaderLib.IOconf
                 (RateLimitMinutes, Command) = (DefaultRateLimitMinutes, list[3]);
         }
 
-        public IOconfAlert(string name, string expression, int? rateLimit = DefaultRateLimitMinutes, bool triggersEmergencyShutdown = true) : base("DynamicAlert", 0, "DynamicAlert")
-        {
-            Name = name;
-            (Sensor, Value, MessageTemplate, type) = ParseExpression(
-                name, expression, "alert expression - wrong format: " + expression + ". Expression format: SensorName comparison value.");
-            Message = MessageTemplate;
-            RateLimitMinutes = rateLimit ?? DefaultRateLimitMinutes;
-            Command = triggersEmergencyShutdown ? "emergencyshutdown" : null;
-        }
-
         public IOconfAlert(string name, string expressionWithOptions) : base("DynamicAlert", 0, "DynamicAlert")
         {
             Name = name;
@@ -52,10 +42,10 @@ namespace CA_DataUploaderLib.IOconf
             Message = MessageTemplate;
         }
 
-        public string Name { get; set; }
-        public string Sensor { get; set; }
+        public string Name { get; }
+        public string Sensor { get; }
         public string Message { get; private set; }
-        public string Command { get; private set; }
+        public string Command { get; }
         private readonly AlertCompare type;
         private readonly double Value;
         private double LastValue;

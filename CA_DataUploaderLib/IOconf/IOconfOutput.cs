@@ -8,7 +8,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfOutput(string row, int lineNum, string type, bool parsePort = true, BoardSettings settings = null) : base(row, lineNum, type) 
         { 
-            format = $"{type};Name;BoxName;[port number]";
+            Format = $"{type};Name;BoxName;[port number]";
             var list = ToList();
             Name = list[1];
             BoxName = list[2];
@@ -17,10 +17,10 @@ namespace CA_DataUploaderLib.IOconf
             if (PortNumber < 1) throw new Exception($"{type}: port numbers must start at 1 {row}");
         }
 
-        public string Name { get; set; }
-        public string BoxName { get; set; }
-        public int PortNumber = 1;
-        public IOconfMap Map { get; set; }
+        public string Name { get; }
+        public string BoxName { get; }
+        public readonly int PortNumber = 1;
+        public IOconfMap Map { get; private set; }
 
         protected void SetMap(string boxName, BoardSettings settings)
         {

@@ -18,13 +18,13 @@ namespace CA_DataUploaderLib.IOconf
 
         public IOconfNode(string row, int lineNum) : base(row, lineNum, "Node")
         {
-            format = "Node;Name;ipaddress:port;[role]";
+            Format = "Node;Name;ipaddress:port;[role]";
             var list = ToList();
             if (list.Count < 3)
-                throw new Exception($"IOconfNode: wrong format: {row} {format}");
+                throw new Exception($"IOconfNode: wrong format: {row} {Format}");
             Name = list[1];
             if (!IPEndPoint.TryParse(list[2], out var endPoint))
-                throw new Exception($"IOconfNode: failed to parse the passed ip address. format: {row} {format}");
+                throw new Exception($"IOconfNode: failed to parse the passed ip address. format: {row} {Format}");
             _endPoint = endPoint;
             NodeIndex = _nodeInstances++;
             if (list.Count > 3)

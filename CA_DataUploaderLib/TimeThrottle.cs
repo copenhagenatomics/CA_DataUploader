@@ -8,7 +8,7 @@ namespace CA_DataUploaderLib
     ///<summary>Throttle calls to mantain a given frequency</summary>
     public class TimeThrottle
     {
-        private Stopwatch _watch = Stopwatch.StartNew();
+        private readonly Stopwatch _watch = Stopwatch.StartNew();
         private long _nextTriggerElapsedMilliseconds;
         private readonly int _milliseconds;
 
@@ -20,6 +20,7 @@ namespace CA_DataUploaderLib
 
         public Task WaitAsync() => Task.Delay(GetWaitMilliseconds());
         public void Wait() => Thread.Sleep(GetWaitMilliseconds());
+        public void Restart() => _watch.Restart();
 
         private int GetWaitMilliseconds()
         {
