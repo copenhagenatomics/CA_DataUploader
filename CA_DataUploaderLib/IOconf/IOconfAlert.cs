@@ -102,6 +102,13 @@ namespace CA_DataUploaderLib.IOconf
             return ParseExpression(name, expression, match);
         }
 
+        public void ResetState()
+        {
+            LastValue = default;
+            LastTriggered = default;
+            _isFirstCheck = true;
+        }
+
         private static (string sensor, double value, string messageTemplate, AlertCompare type) ParseExpression(string name, string expression, Match match)
         {
             var sensor = match.Groups[1].Value;

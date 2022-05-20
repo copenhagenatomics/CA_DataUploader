@@ -11,12 +11,23 @@ namespace CA_DataUploaderLib
 {
     public class Alerts : LoopControlCommand
     {
-        public bool Disabled { get; set; }
+        public bool Disabled
+        {
+            get => disabled; 
+            set
+            {
+                disabled = value;
+                if (!value)
+                    ResetAlertsState();
+            }
+        }
+
         public override string Name => "addalert";
         public override string Description => string.Empty;
         public override bool IsHiddenCommand => true;
         private readonly List<IOconfAlert> _alerts;
         private readonly CommandHandler _cmd;
+        private bool disabled;
 
         public Alerts(VectorDescription vectorDescription, CommandHandler cmd) : base()
         {
@@ -48,7 +59,7 @@ namespace CA_DataUploaderLib
                 return true;
             }
 
-            lock (_alerts) 
+            lock (_alerts)
                 _alerts.RemoveAll(a => a.Name == args[1]);
             return true;
         }
@@ -62,7 +73,7 @@ namespace CA_DataUploaderLib
             }
 
             var alert = new IOconfAlert(args[1], string.Join(' ', args.Skip(2)));
-            lock (_alerts) 
+            lock (_alerts)
             {
                 _alerts.RemoveAll(a => a.Name == args[1]);
                 _alerts.Add(alert);
@@ -77,7 +88,7 @@ namespace CA_DataUploaderLib
 
             var timestamp = e.GetVectorTime();
             var (alertsToTrigger, noSensorAlerts) = GetAlertsToTrigger(e); // we gather alerts separately from triggering, to reduce time locking the _alerts list
-            
+
             foreach (var a in alertsToTrigger ?? Enumerable.Empty<IOconfAlert>())
                 TriggerAlert(a, timestamp, a.Message);
 
@@ -101,9 +112,9 @@ namespace CA_DataUploaderLib
                     else if (a.CheckValue(val, e.GetVectorTime()))
                         EnsureInitialized(ref alertsToTrigger).Add(a);
                 }
-            
+
             return (
-                alertsToTrigger ?? Enumerable.Empty<IOconfAlert>(), 
+                alertsToTrigger ?? Enumerable.Empty<IOconfAlert>(),
                 noSensorAlerts ?? Enumerable.Empty<IOconfAlert>());
         }
 
@@ -118,5 +129,10 @@ namespace CA_DataUploaderLib
         }
 
         private static List<T> EnsureInitialized<T>(ref List<T> list) => list = list ?? new List<T>();
+        private void ResetAlertsState()
+        {
+            foreach (var a in _alerts)
+                a.ResetState();
+        }
     }
 }
