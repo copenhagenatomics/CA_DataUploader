@@ -241,7 +241,7 @@ namespace CA_DataUploaderLib
             var initialBaudrate = map != null && map.BaudRate != 0 ? map.BaudRate : 115200;
             bool skipAutoDetection = (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;
             if (skipAutoDetection)
-                CALog.LogInfoAndConsoleLn(LogID.A, $"type detection disabled for board {map}");
+                CALog.LogInfoAndConsoleLn(LogID.A, $"device detection disabled for board {map}");
             var mcu = await Create(name, initialBaudrate, skipAutoDetection);
             if (!mcu.InitialConnectionSucceeded)
                 mcu = await OpenWithAutoDetection(name, initialBaudrate);
