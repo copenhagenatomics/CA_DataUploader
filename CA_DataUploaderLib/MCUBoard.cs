@@ -237,7 +237,7 @@ namespace CA_DataUploaderLib
         public async static Task<MCUBoard> OpenDeviceConnection(string name)
         {
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
-            var map = File.Exists("IO.conf") ? IOconfFile.GetMap().SingleOrDefault(m => m.USBPort == name) : null;
+            var map = File.Exists("IO.conf") ? IOconfFile.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name) : null;
             var initialBaudrate = map != null && map.BaudRate != 0 ? map.BaudRate : 115200;
             bool skipAutoDetection = (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;
             if (skipAutoDetection)
