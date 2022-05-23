@@ -41,7 +41,7 @@ namespace CA_DataUploaderLib.IOconf
         public event EventHandler<EventArgs> OnBoardDetected;
         public bool SetMCUboard(MCUBoard board)
         {
-            if (DistributedNode.IsCurrentSystem == false)
+            if (!IsLocalBoard)
                 return false; //when using a distributed deployment, the map entries are only valid in the specified node.
 
             if ((board.serialNumber == SerialNumber && SerialNumber != null) || board.PortName == USBPort)
