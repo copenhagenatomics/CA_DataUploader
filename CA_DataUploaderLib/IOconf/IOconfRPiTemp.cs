@@ -37,7 +37,7 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        public static bool IsLocalCpuSensor(IOconfInput input) => input.Map.DistributedNode.IsCurrentSystem && input.Name.EndsWith("Cpu");
-        public static bool IsLocalGpuSensor(IOconfInput input) => input.Map.DistributedNode.IsCurrentSystem && input.Name.EndsWith("Gpu");
+        public static bool IsLocalCpuSensor(IOconfInput input) => input.Map.IsLocalBoard && input.Name.EndsWith("Cpu");
+        public static bool IsLocalGpuSensor(IOconfInput input) => input.Map.IsLocalBoard && input.Name.EndsWith("Gpu");
     }
 }
