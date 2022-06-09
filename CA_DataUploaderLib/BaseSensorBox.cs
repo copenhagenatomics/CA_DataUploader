@@ -108,7 +108,7 @@ namespace CA_DataUploaderLib
         public void AddBuildInWriteAction(MCUBoard board, Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> writeAction, Func<MCUBoard, CancellationToken, Task> exitAction)
         {
             if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = new() { (writeAction, exitAction ) };
-            actions.Add((writeAction, exitAction));
+            else actions.Add((writeAction, exitAction));
         }
 
         protected bool ShowQueue(List<string> args)
