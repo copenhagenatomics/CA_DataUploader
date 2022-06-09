@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Collections;
 using CA.LoopControlPluginBase;
 using System.Threading.Tasks;
+using System.Threading.Channels;
 
 namespace CA_DataUploaderLib
 {
@@ -28,6 +29,7 @@ namespace CA_DataUploaderLib
         private readonly string mainSubsystem;
         private readonly PluginsCommandHandler _cmdAdvanced;
         private readonly Dictionary<MCUBoard, List<(Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
+        private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = new();
 
         public BaseSensorBox(
             CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values)
@@ -51,6 +53,23 @@ namespace CA_DataUploaderLib
             var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray())).ToArray();
             _boards = allBoards.Where(b => b.map.IsLocalBoard).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
+            foreach (var board in _boards.Where(b => b.map.CustomWritesEnabled))
+                RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived);
+
+            static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived)
+            {
+                var channel = Channel.CreateUnbounded<string>();
+                var channelWriter = channel.Writer;
+                boardCustomCommandsReceived.Add(map.Board, channel.Reader);
+                cmd.AddCommand("custom", CustomCommand);
+
+                bool CustomCommand(List<string> args)
+                {
+                    if (args.Count < 2) return false;
+                    channelWriter.TryWrite(args[1]);
+                    return true;
+                }
+            }
         }
 
         public Task Run(CancellationToken token) => RunBoardLoops(_boards, token);
@@ -162,7 +181,10 @@ namespace CA_DataUploaderLib
 
         private async Task BoardWriteLoop(MCUBoard board, CancellationToken token)
         {
-            if (!_buildInWriteActions.TryGetValue(board, out var actions)) return; //TODO: add support for custom actions!
+            var customWritesEnabled = _boardCustomCommandsReceived.TryGetValue(board, out var customCommandsChannel);
+            var buildInActionsEnabled = _buildInWriteActions.TryGetValue(board, out var buildInActions);
+            if (!buildInActionsEnabled && !customWritesEnabled) return;
+
             var boardStateName = board.BoxName + "_state";
             // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operation.
             // we might still get lots of entries for problems that alternate between normal and failed states, but for now is a good data point to know if that case is happening.
@@ -173,11 +195,16 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
+                    if (customWritesEnabled && customCommandsChannel.TryRead(out var command))
+                        await board.SafeWriteLine(command, token);
+
+                    if (!buildInActionsEnabled) continue;
+
                     var vector = await _cmdAdvanced.When(_ => true, token);
                     if (!CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector))
                         continue; // no point trying to send commands while there is no connection to the board.
 
-                    foreach (var (writeAction, _) in actions)
+                    foreach (var (writeAction, _) in buildInActions)
                         await writeAction(vector, board, token);
 
                     EnsureResumeAfterTimeoutIsReported();
@@ -195,9 +222,11 @@ namespace CA_DataUploaderLib
                 }
             }
 
+            if (!buildInActionsEnabled) return;
+
             try
             {
-                foreach (var (_, exitAction) in actions)
+                foreach (var (_, exitAction) in buildInActions)
                 {
                     using var timeoutToken = new CancellationTokenSource(3000);
                     await exitAction(board, timeoutToken.Token);
