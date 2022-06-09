@@ -20,8 +20,6 @@ namespace CA_DataUploaderLib.IOconf
                 SerialNumber = list[1];
 
             BoxName = list[2];
-            if (list.Count <= 3)
-                return;
 
             var customWritesIndex = list.IndexOf("customwrites");
             CustomWritesEnabled = customWritesIndex > -1;
@@ -29,6 +27,9 @@ namespace CA_DataUploaderLib.IOconf
                 list.RemoveAt(customWritesIndex);//remove it from the list wherever it was for easier parsing below
 
             //parsing from here assumes customwrites is not in the list i.e. Map;SerialNo/COM1/USB1-1.1;BoxName;[NodeName];[baud rate]
+            if (list.Count <= 3)
+                return;
+
             string distributedNodeName = list.Count == 5 ? list[3] : default;
             var baudrate = 0;
             if (list.Count >= 5 && !int.TryParse(list[4], out baudrate))
