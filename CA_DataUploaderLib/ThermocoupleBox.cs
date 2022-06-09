@@ -19,9 +19,9 @@ namespace CA_DataUploaderLib
             _rpiCpuSample = _values.FirstOrDefault(x => IOconfRPiTemp.IsLocalCpuSensor(x.Input));
         }
 
-        protected override List<Task> StartReadLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
+        protected override List<Task> StartLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
         {
-            var loops = base.StartReadLoops(boards, token);
+            var loops = base.StartLoops(boards, token);
             if (_rpiGpuSample != null && _rpiCpuSample != null && !OperatingSystem.IsWindows()) 
                 loops.Add(ReadRpiTemperaturesLoop(_rpiGpuSample, _rpiCpuSample, token));
             return loops;

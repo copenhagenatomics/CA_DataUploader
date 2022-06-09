@@ -7,7 +7,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfMap(string row, int lineNum) : base(row, lineNum, "Map")
         {
-            Format = "Map;SerialNo/COM1/USB1-1.1;BoxName;[NodeName];[baud rate]";
+            Format = "Map;SerialNo/COM1/USB1-1.1;BoxName;[NodeName];[baud rate];[customwrites]";
 
             var list = ToList();
             if (list[0] != "Map") throw new Exception($"IOconfMap: wrong format: {row} {Format}");
@@ -20,6 +20,13 @@ namespace CA_DataUploaderLib.IOconf
                 SerialNumber = list[1];
 
             BoxName = list[2];
+
+            var customWritesIndex = list.IndexOf("customwrites");
+            CustomWritesEnabled = customWritesIndex > -1;
+            if (CustomWritesEnabled)
+                list.RemoveAt(customWritesIndex);//remove it from the list wherever it was for easier parsing below
+
+            //parsing from here assumes customwrites is not in the list i.e. Map;SerialNo/COM1/USB1-1.1;BoxName;[NodeName];[baud rate]
             if (list.Count <= 3)
                 return;
 
@@ -72,7 +79,7 @@ namespace CA_DataUploaderLib.IOconf
         /// <summary>the cluster node that is directly connected to the device or <c>default</c> when using </summary>
         public IOconfNode DistributedNode { get; } = IOconfNode.SingleNode;
         public bool IsLocalBoard => DistributedNode.IsCurrentSystem;
-
+        public bool CustomWritesEnabled { get; } = false;
         public MCUBoard Board;
         private BoardSettings _boardSettings = BoardSettings.Default;
 
