@@ -23,15 +23,18 @@ namespace CA_DataUploaderLib
         protected readonly List<SensorSample> _localValues;
         private readonly (IOconfMap map, SensorSample[] values)[] _boards;
         protected readonly AllBoardsState _boardsState;
-        private readonly CancellationTokenSource _boardLoopsStopTokenSource = new CancellationTokenSource();
-        private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamplesLookup = new Dictionary<MCUBoard, SensorSample[]>();
+        private readonly CancellationTokenSource _boardLoopsStopTokenSource = new();
+        private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamplesLookup = new();
         private readonly string mainSubsystem;
+        private readonly PluginsCommandHandler _cmdAdvanced;
+        private readonly Dictionary<MCUBoard, List<(Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
 
         public BaseSensorBox(
             CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values)
         { 
             Title = commandName;
             _cmd = cmd;
+            _cmdAdvanced = new PluginsCommandHandler(cmd);
             _values = values.Select(x => new SensorSample(x)).ToList();
             _localValues = _values.Where(x => x.Input.Map.IsLocalBoard).ToList();
             if (!_values.Any())
@@ -50,7 +53,7 @@ namespace CA_DataUploaderLib
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
         }
 
-        public Task Run(CancellationToken token) => RunBoardReadLoops(_boards, token);
+        public Task Run(CancellationToken token) => RunBoardLoops(_boards, token);
         private void SubscribeCommandsToSubsystems(CommandHandler cmd, string mainSubsystem, List<SensorSample> values)
         {
             cmd.AddCommand(mainSubsystem, ShowQueue);
@@ -81,6 +84,13 @@ namespace CA_DataUploaderLib
                 n.Where(v => !v.Input.Skip).GroupBy(v => v.Input.Map).Select(b => b.Key);
         }
 
+        /// <remarks>must be called before <see cref="Run"/> is called</remarks>
+        public void AddBuildInWriteAction(MCUBoard board, Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> writeAction, Func<MCUBoard, CancellationToken, Task> exitAction)
+        {
+            if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = new() { (writeAction, exitAction ) };
+            actions.Add((writeAction, exitAction));
+        }
+
         protected bool ShowQueue(List<string> args)
         {
             var subsystem = args[0].ToLower();
@@ -106,21 +116,20 @@ namespace CA_DataUploaderLib
         }
 
         private double GetAvgLoopTime() => _values.Average(x => x.ReadSensor_LoopTime);
-
-        private async Task RunBoardReadLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
+        private async Task RunBoardLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
         {
             DateTime start = DateTime.Now;
             try
             {
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, _boardLoopsStopTokenSource.Token);
-                var readLoops = StartReadLoops(boards, linkedCts.Token);
-                await Task.WhenAll(readLoops);
-                if (readLoops.Count > 0) //we only report the exit when we actually ran loops with detected boards. If a board was not detected StartReadLoops already reports the missing boards.
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardReadLoops() " + DateTime.Now.Subtract(start).Humanize(5));
+                var loops = StartLoops(boards, linkedCts.Token);
+                await Task.WhenAll(loops);
+                if (loops.Count > 0) //we only report the exit when we actually ran loops with detected boards. If a board was not detected StartReadLoops already reports the missing boards.
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardLoops() " + DateTime.Now.Subtract(start).Humanize(5));
             }
             catch (Exception ex)
             {
-                CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
+                CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} - unexpected error detected", ex);
             }
 
             Stopping?.Invoke(this, EventArgs.Empty);
@@ -139,7 +148,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected virtual List<Task> StartReadLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
+        protected virtual List<Task> StartLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
         {
             var missingBoards = boards.Where(h => h.map.Board == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
@@ -147,11 +156,91 @@ namespace CA_DataUploaderLib
 
             return boards
                 .Where(b => b.map.Board != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
-                .Select(b => BoardLoop(b.map.Board, b.values, token))
+                .SelectMany(b => new []{ BoardReadLoop(b.map.Board, b.values, token), BoardWriteLoop(b.map.Board, token) })
                 .ToList();
         }
 
-        private async Task BoardLoop(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
+        private async Task BoardWriteLoop(MCUBoard board, CancellationToken token)
+        {
+            if (!_buildInWriteActions.TryGetValue(board, out var actions)) return; //TODO: add support for custom actions!
+            var boardStateName = board.BoxName + "_state";
+            // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operation.
+            // we might still get lots of entries for problems that alternate between normal and failed states, but for now is a good data point to know if that case is happening.
+            var waitingBoardReconnect = false;
+            var tryingToRecoverAfterTimeoutWatch = new Stopwatch();
+
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    var vector = await _cmdAdvanced.When(_ => true, token);
+                    if (!CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector))
+                        continue; // no point trying to send commands while there is no connection to the board.
+
+                    foreach (var (writeAction, _) in actions)
+                        await writeAction(vector, board, token);
+
+                    EnsureResumeAfterTimeoutIsReported();
+                }
+                catch (TimeoutException)
+                {
+                    EnsureTimeoutIsReportedOnce();
+                    await Task.WhenAny(Task.Delay(500, token)); //reduce action frequency / the WhenAny avoids exceptions if the token is canceled
+                }
+                catch (OperationCanceledException ex) when (ex.CancellationToken == token)
+                {}
+                catch (Exception ex)
+                {
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Error detected writting to board: {board.ToShortDescription()}", ex);
+                }
+            }
+
+            try
+            {
+                foreach (var (_, exitAction) in actions)
+                {
+                    using var timeoutToken = new CancellationTokenSource(3000);
+                    await exitAction(board, timeoutToken.Token);
+                }
+            }
+            catch (Exception ex)
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Error running exit actions for board: {board.ToShortDescription()}", ex);
+            }
+
+            void EnsureTimeoutIsReportedOnce()
+            {
+                if (tryingToRecoverAfterTimeoutWatch.IsRunning) return;
+                CALog.LogInfoAndConsoleLn(LogID.A, $"timed out writing to board, reducing action frequency until reconnect - {board.ToShortDescription()}");
+                tryingToRecoverAfterTimeoutWatch.Restart();
+            }
+
+            void EnsureResumeAfterTimeoutIsReported()
+            {
+                if (!tryingToRecoverAfterTimeoutWatch.IsRunning) return;
+                tryingToRecoverAfterTimeoutWatch.Stop();
+                CALog.LogInfoAndConsoleLn(LogID.A, $"wrote to board without time outs after {tryingToRecoverAfterTimeoutWatch.Elapsed}, resuming normal action frequency - {board.ToShortDescription()}");
+            }
+
+            static bool CheckConnectedStateInVector(MCUBoard board, string boardStateName, ref bool waitingBoardReconnect, NewVectorReceivedArgs vector)
+            {
+                var vectorState = (ConnectionState)(int)vector[boardStateName];
+                var connected = vectorState >= ConnectionState.Connected;
+                if (waitingBoardReconnect && connected)
+                {
+                    CALog.LogData(LogID.B, $"resuming writes after reconnect on {board.ToShortDescription()}");
+                    waitingBoardReconnect = false;
+                }
+                else if (!waitingBoardReconnect && !connected)
+                {
+                    CALog.LogData(LogID.B, $"stopping writes until connection is reestablished (state: {vectorState}) on: - {board.ToShortDescription()}");
+                    waitingBoardReconnect = true;
+                }
+                return connected;
+            }
+        }
+
+        private async Task BoardReadLoop(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
         {
             while (!token.IsCancellationRequested)
             {
@@ -161,7 +250,7 @@ namespace CA_DataUploaderLib
                     if (!stillConnected || CheckFails(board, targetSamples))
                         await ReconnectBoard(board, token);
                 }
-                catch (TaskCanceledException ex)
+                catch (OperationCanceledException ex)
                 { //if the token is canceled we are about to exit the loop so we do nothing. Otherwise we consider it like any other exception and log it.
                     if (!token.IsCancellationRequested)
                     {
@@ -185,7 +274,7 @@ namespace CA_DataUploaderLib
             {
                 return await ReadSensors(board, targetSamples, token);
             }
-            catch (TaskCanceledException ex)
+            catch (OperationCanceledException ex)
             { 
                 if (token.IsCancellationRequested)
                     throw; // if the token is cancelled we bubble up the cancel so the caller can abort.
