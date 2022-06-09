@@ -65,8 +65,9 @@ namespace CA_DataUploaderLib
 
                 bool CustomCommand(List<string> args)
                 {
-                    if (args.Count < 2) return false;
-                    channelWriter.TryWrite(args[1]);
+                    if (args.Count < 3) return false;
+                    if (args[1] != map.BoxName) return false;
+                    channelWriter.TryWrite(string.Join(' ', args.Skip(2)));
                     return true;
                 }
             }
