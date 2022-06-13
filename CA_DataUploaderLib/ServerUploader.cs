@@ -151,17 +151,14 @@ namespace CA_DataUploaderLib
             try
             {
                 await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
-                var timeSinceLastStartingUploadCycle = Stopwatch.StartNew();
-                var nextTargetToReportSlowUploadCycle = 2500;
-                var timeSinceLastPostingVector = Stopwatch.StartNew();
-                var nextTargetToReportSlowPostingVector = 2500;
-                var timeSinceLastPostedVector = Stopwatch.StartNew();
-                var nextTargetToReportSlowPostedVector = 2500;
+                var startingUploadCheckArgs = (Stopwatch.StartNew(), 2500);
+                var postingVectorCheckArgs = (Stopwatch.StartNew(), 2500);
+                var postedVectorCheckArgs = (Stopwatch.StartNew(), 2500);
                 await foreach (var state in _executedActionChannel.Reader.ReadAllAsync(token))
                 {
-                    DetectSlowActionOnNewAction(timeSinceLastStartingUploadCycle, ref nextTargetToReportSlowUploadCycle, UploadState.StartingUploadCycle, state);
-                    DetectSlowActionOnNewAction(timeSinceLastPostingVector, ref nextTargetToReportSlowPostingVector, UploadState.PostingVector, state);
-                    DetectSlowActionOnNewAction(timeSinceLastPostedVector, ref nextTargetToReportSlowPostedVector, UploadState.PostedVector, state);
+                    DetectSlowActionOnNewAction(ref startingUploadCheckArgs, UploadState.StartingUploadCycle, state);
+                    DetectSlowActionOnNewAction(ref postingVectorCheckArgs, UploadState.PostingVector, state);
+                    DetectSlowActionOnNewAction(ref postedVectorCheckArgs, UploadState.PostedVector, state);
                 }
             }
             catch (OperationCanceledException ex) when (ex.CancellationToken == token) { }
@@ -170,18 +167,18 @@ namespace CA_DataUploaderLib
                 OnError("Unexpected error tracking upload state", ex);
             }
 
-            static void DetectSlowActionOnNewAction(Stopwatch timeSinceLastAction, ref int nextTargetToReportSlowAction, UploadState expectedState, UploadState state)
+            static void DetectSlowActionOnNewAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction) stateCheckArgs, UploadState expectedState, UploadState state)
             {
-                if (timeSinceLastAction.ElapsedMilliseconds > nextTargetToReportSlowAction)
+                if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
                 {
-                    OnError($"detected slow {expectedState} - time passed: {timeSinceLastAction.Elapsed}", null);
-                    nextTargetToReportSlowAction *= 2;
+                    OnError($"detected slow {expectedState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed}", null);
+                    stateCheckArgs.nextTargetToReportSlowAction *= 2;
                 }
 
                 if (state != expectedState) return;
 
-                timeSinceLastAction.Restart();
-                nextTargetToReportSlowAction = 2500;
+                stateCheckArgs.timeSinceLastAction.Restart();
+                stateCheckArgs.nextTargetToReportSlowAction = 2500;
             }
         }
 
