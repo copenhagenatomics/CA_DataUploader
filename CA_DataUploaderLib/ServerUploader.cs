@@ -2,6 +2,7 @@
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -11,6 +12,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
 
@@ -27,6 +29,7 @@ namespace CA_DataUploaderLib
         private bool _running;
         private readonly VectorDescription _vectorDescription;
         private readonly CommandHandler _cmd;
+        private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(10000);
 
         public ServerUploader(VectorDescription vectorDescription) : this(vectorDescription, null)
         {
@@ -91,25 +94,29 @@ namespace CA_DataUploaderLib
         private void LoopForever()
         {
             _running = true;
+            _ = Task.Run(TrackUploadState);
+
             var vectorUploadDelay = IOconfFile.GetVectorUploadDelay();
             var throttle = new TimeThrottle(vectorUploadDelay);
+            var writer = _executedActionChannel.Writer;
             while (_running)
             {
                 throttle.Wait();
-                SendQueuedData(false);
+                writer.TryWrite(UploadState.StartingUploadCycle);
+                SendQueuedData(false, writer);
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued messages");
-            SendQueuedData(true);
+            SendQueuedData(true, writer);
 
-            async void SendQueuedData(bool stopping)
+            async void SendQueuedData(bool stopping, ChannelWriter<UploadState> writer)
             {
                 try
                 {
                     var list = DequeueAllEntries(_queue);
                     if (list != null)
                     {
-                        var task = PostVectorAsync(GetSignedVectors(list), list.First().timestamp);
+                        var task = PostVectorAsync(GetSignedVectors(list), list.First().timestamp, writer);
                         if (stopping) await task;
                     }
 
@@ -124,7 +131,10 @@ namespace CA_DataUploaderLib
                     }
 
                     if (stopping)
+                    {
                         await PostEventAsync(new EventFiredArgs("uploader has stopped", EventType.Log, DateTime.UtcNow));
+                        writer.Complete();
+                    }
 
                     PrintBadPackagesMessage(stopping);
                 }
@@ -132,6 +142,46 @@ namespace CA_DataUploaderLib
                 {//we don't normally expect to reach here, as the post method above capture and log any exceptions
                     CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message, ex);
                 }
+            }
+        }
+
+        private async Task TrackUploadState()
+        {
+            var token = _cmd.StopToken;
+            try
+            {
+                await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
+                var timeSinceLastStartingUploadCycle = Stopwatch.StartNew();
+                var nextTargetToReportSlowUploadCycle = 2500;
+                var timeSinceLastPostingVector = Stopwatch.StartNew();
+                var nextTargetToReportSlowPostingVector = 2500;
+                var timeSinceLastPostedVector = Stopwatch.StartNew();
+                var nextTargetToReportSlowPostedVector = 2500;
+                await foreach (var state in _executedActionChannel.Reader.ReadAllAsync(token))
+                {
+                    DetectSlowActionOnNewAction(timeSinceLastStartingUploadCycle, ref nextTargetToReportSlowUploadCycle, UploadState.StartingUploadCycle, state);
+                    DetectSlowActionOnNewAction(timeSinceLastPostingVector, ref nextTargetToReportSlowPostingVector, UploadState.PostingVector, state);
+                    DetectSlowActionOnNewAction(timeSinceLastPostedVector, ref nextTargetToReportSlowPostedVector, UploadState.PostedVector, state);
+                }
+            }
+            catch (OperationCanceledException ex) when (ex.CancellationToken == token) { }
+            catch (Exception ex)
+            {
+                OnError("Unexpected error tracking upload state", ex);
+            }
+
+            static void DetectSlowActionOnNewAction(Stopwatch timeSinceLastAction, ref int nextTargetToReportSlowAction, UploadState expectedState, UploadState state)
+            {
+                if (timeSinceLastAction.ElapsedMilliseconds > nextTargetToReportSlowAction)
+                {
+                    OnError($"detected slow {expectedState} - time passed: {timeSinceLastAction.Elapsed}", null);
+                    nextTargetToReportSlowAction *= 2;
+                }
+
+                if (state != expectedState) return;
+
+                timeSinceLastAction.Restart();
+                nextTargetToReportSlowAction = 2500;
             }
         }
 
@@ -186,18 +236,24 @@ namespace CA_DataUploaderLib
 
         private static void OnError(string message, Exception ex)
         {
-            CALog.LogError(LogID.A, message, ex); //note we don't use LogErrorAndConsoleLn variation, as CALog.LoggerForUserOutput may be set to generate events that are only visible on the event log.
+            if (ex != null)
+                CALog.LogError(LogID.A, message, ex); //note we don't use LogErrorAndConsoleLn variation, as CALog.LoggerForUserOutput may be set to generate events that are only visible on the event log.
+            else
+                CALog.LogData(LogID.A, $"{DateTime.Now:MM.dd HH:mm:ss} - {message}");
             Console.WriteLine(message);
         }
 
-        private async Task PostVectorAsync(byte[] buffer, DateTime timestamp)
+        private async Task PostVectorAsync(byte[] buffer, DateTime timestamp, ChannelWriter<UploadState> writer)
         {
             try
             {
+                writer.TryWrite(UploadState.PostingVector);
                 await _plot.PostVectorAsync(buffer, timestamp);
+                writer.TryWrite(UploadState.PostedVector);
             }
             catch (Exception ex)
             {
+                writer.TryWrite(UploadState.FailedPostingVector);
                 lock (_badPackages)
                 {
                     _badPackages.Add(DateTime.UtcNow);
@@ -430,6 +486,14 @@ namespace CA_DataUploaderLib
             public byte[] GetPublicKey() => _rsaWriter.ExportCspBlob(false);
 
             public byte[] GetSignature(byte[] data) => _rsaWriter.SignData(data, SHA1.Create());
+        }
+
+        private enum UploadState
+        {
+            StartingUploadCycle,
+            PostingVector,
+            PostedVector,
+            FailedPostingVector
         }
     }
 }
