@@ -489,8 +489,7 @@ namespace CA_DataUploaderLib
         {
             StartingUploadCycle,
             PostingVector,
-            PostedVector,
-            FailedPostingVector
+            PostedVector
         }
     }
 }
