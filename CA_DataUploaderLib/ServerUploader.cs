@@ -250,7 +250,6 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                writer.TryWrite(UploadState.FailedPostingVector);
                 lock (_badPackages)
                 {
                     _badPackages.Add(DateTime.UtcNow);
