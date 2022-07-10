@@ -9,6 +9,8 @@ namespace CA_DataUploaderLib
         public DateTime timestamp;
         public List<double> vector;
 
+        public DataVector(List<double> input, DateTime time) { vector = input; timestamp = time; }
+
         public byte[] buffer {
             get
             {
@@ -18,5 +20,7 @@ namespace CA_DataUploaderLib
                 return raw;
             }
         }
+
+        public int Count() { return vector == null?0:vector.Count(); }
     }
 }

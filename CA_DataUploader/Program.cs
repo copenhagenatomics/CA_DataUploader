@@ -42,8 +42,8 @@ namespace CA_DataUploader
                     var uploadThrottle = new TimeThrottle(100);
                     while (cmd.IsRunning)
                     {
-                        var (sensorsSamples, vectorTime) = cmd.GetFullSystemVectorValues();
-                        cloud.SendVector(sensorsSamples.Select(v => v.Value).ToList(), vectorTime);
+                        var dataVector = cmd.GetFullSystemVectorValues();
+                        cloud.SendVector(dataVector);
                         Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
                         uploadThrottle.Wait();
                         if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());

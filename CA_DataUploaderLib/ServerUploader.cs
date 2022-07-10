@@ -66,26 +66,21 @@ namespace CA_DataUploaderLib
                     _eventsQueue.Enqueue(e);
         }
 
-        public void SendVector(List<double> vector, DateTime timestamp)
+        public void SendVector(DataVector vector)
         {
             if (vector.Count() != _vectorDescription.Length)
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescription.Length}");
-            if (timestamp <= _lastTimestamp)
+            if (vector.timestamp <= _lastTimestamp)
             {
-                CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {timestamp}");
+                CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.timestamp}");
                 return;
             }
 
             lock (_queue)
                 if (_queue.Count < 10000)  // if sending thread can't catch up, then drop packages.
                 {
-                    _queue.Enqueue(new DataVector
-                    {
-                        timestamp = timestamp,
-                        vector = vector
-                    });
-
-                    _lastTimestamp = timestamp;
+                    _queue.Enqueue(vector);
+                    _lastTimestamp = vector.timestamp;
                 }
         }
 
