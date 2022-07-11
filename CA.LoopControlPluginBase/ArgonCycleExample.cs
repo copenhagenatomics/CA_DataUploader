@@ -22,6 +22,7 @@ namespace CA.LoopControlPluginBase
         public abstract void MakeDecision(VectorArgs args);
         public bool After(VectorArgs args, double timeoutMs) => args.After(StateWaitName, timeoutMs);
         public bool After(VectorArgs args, string timeoutNameInVector) => After(args, args[timeoutNameInVector]);
+        public void ResetWaitTime(VectorArgs args) => args.ResetWaitTime(StateWaitName);
     }
 
     public class ArgonCycleExample : ILoopControlPlugin
@@ -183,7 +184,7 @@ namespace CA.LoopControlPluginBase
                 var s => s
             };
             if (newState != currState)
-                args.ResetWaitTime(state_argoncycle_waittime);
+                ResetWaitTime(args);
             args[out_argonin_on] = newState == States.OpenInput ? 1.0 : 0.0;
             args[out_argonin_on] = newState == States.CloseOutput ? 1.0 : 0.0;
         }
@@ -223,7 +224,7 @@ namespace CA.LoopControlPluginBase
                 var s => s
             };
             if (newState != currState)
-                args.ResetWaitTime("state_argoncycle_waittime");
+                ResetWaitTime(args);
             args["out_argonin_on"] = newState == States.OpenInput ? 1.0 : 0.0;
             args["out_argonin_on"] = newState == States.CloseOutput ? 1.0 : 0.0;
         }
