@@ -55,7 +55,7 @@ namespace CA_DataUploaderLib
         {
             var (samples, vectorTime) = MakeDecision(GetNodeInputs().ToList(), DateTime.UtcNow);
             OnNewVectorReceived(samples.WithVectorTime(vectorTime));
-            return new DataVector(samples.Select(x => x.Value).ToList(), vectorTime);
+            return new DataVector(samples.Select(x => x.Value).ToList(), vectorTime, GetFullSystemVectorDescription());
         }
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
         public (IEnumerable<SensorSample>, DateTime vectorTime) MakeDecision(List<SensorSample> inputs, DateTime vectorTime)

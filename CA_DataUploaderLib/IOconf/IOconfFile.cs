@@ -18,10 +18,11 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        public static void Reload()
-        { // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization / static ctor rejects the custom entries.
+        public static void Reload(string filename = "IO.conf")
+        { 
+            // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization / static ctor rejects the custom entries.
             Table.Clear();
-            var (rawFile, entries) = IOconfFileLoader.Load(Table);
+            var (rawFile, entries) = IOconfFileLoader.Load();
             Table.AddRange(entries);
             RawFile = rawFile;
             CheckRules();

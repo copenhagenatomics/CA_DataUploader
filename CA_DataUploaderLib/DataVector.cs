@@ -6,10 +6,11 @@ namespace CA_DataUploaderLib
 {
     public class DataVector
     {
-        public DateTime timestamp;
-        public List<double> vector;
+        public readonly DateTime timestamp;
+        public readonly List<double> vector;
+        public readonly VectorDescription _vectorDescription;
 
-        public DataVector(List<double> input, DateTime time) { vector = input; timestamp = time; }
+        public DataVector(List<double> input, DateTime time, VectorDescription vectorDescription) { vector = input; timestamp = time; _vectorDescription = vectorDescription; }
 
         public byte[] buffer {
             get
