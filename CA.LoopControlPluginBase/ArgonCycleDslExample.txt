@@ -1,0 +1,16 @@
+﻿name: argoncycle
+steps:
+	Off when command = argoncycle on: OpenInput
+	_ when command = argoncycle off: Off
+	_ when command = argoncycle on: CloseOutput
+	OpenInput after conf_reachpressuremilliseconds: Off
+	OpenInput when LuminoxP >= conf_highpressure: CloseInput
+	CloseInput after conf_highpressuremilliseconds: OpenOutput
+	OpenOutput after conf_reachpressuremilliseconds: Off
+	OpenOutput when LuminoxP <= conf_lowpressure: CloseOutput
+	CloseOutput after 200: OpenInput
+
+onenter:
+	OpenInput: out_argonin_on = 1.0, out_argonout_on = 0.0
+	CloseOutput: out_argonin_on = 0.0, out_argonout_on = 1.0
+	_: out_argonin_on = 0.0, out_argonout_on = 0.0
