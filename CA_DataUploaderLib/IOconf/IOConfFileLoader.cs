@@ -29,15 +29,14 @@ namespace CA_DataUploaderLib.IOconf
             ("Node", (r, l) => new IOconfNode(r, l)),
         };
 
-        public static (string, IEnumerable<IOconfRow>) Load(string filename = "IO.conf")
+        public static (string, IEnumerable<IOconfRow>) Load()
         {
-            if (!File.Exists(filename))
+            if (!File.Exists("IO.conf"))
             {
-                filename = (filename == "IO.conf") ? Directory.GetCurrentDirectory() + "\\IO.conf" : filename;
-                throw new Exception($"Could not find the file {filename}");
+                throw new Exception($"Could not find the file {Directory.GetCurrentDirectory() + "\\IO.conf"}");
             }
 
-            return ParseLines(File.ReadAllLines(filename));
+            return ParseLines(File.ReadAllLines("IO.conf"));
         }
 
         public static (string, IEnumerable<IOconfRow>) ParseLines(IEnumerable<string> lines)
