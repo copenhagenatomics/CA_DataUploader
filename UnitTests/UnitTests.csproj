@@ -16,10 +16,4 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\CA_DataUploaderLib\CA_DataUploaderLib.csproj" />
 	</ItemGroup>
-
-	<ItemGroup>
-	  <None Update="IO.conf">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	</ItemGroup>
 </Project>

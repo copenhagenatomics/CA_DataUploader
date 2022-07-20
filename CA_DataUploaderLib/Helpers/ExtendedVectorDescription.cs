@@ -37,7 +37,7 @@ namespace CA_DataUploaderLib.Helpers
             VectorDescription = new VectorDescription(allItems, hardware, software);
         }
 
-        public int GetIndex(string name) { return VectorDescription._items.Single(x => x.Descriptor == name).FullVectorIndex; }
+        public int? GetIndex(string name) { return VectorDescription._items.SingleOrDefault(x => x.Descriptor == name)?.FullVectorIndex; }
 
         private static List<FilterSample> GetFilters(List<VectorDescriptionItem> inputs)
         {

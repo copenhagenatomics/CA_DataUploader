@@ -44,7 +44,7 @@ namespace CA_DataUploaderLib
                     throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", duplicates));
                 var loopName = IOconfFile.GetLoopName();
                 _signing = new Signing(loopName);
-                vectorDescription.IOconf = IOconfFile.RawFile;
+                vectorDescription.IOconf = IOconfFile.GetRawFile();
                 _vectorDescription = vectorDescription;
                 _plot = PlotConnection.Establish(loopName, _signing.GetPublicKey(), GetSignedVectorDescription(vectorDescription)).GetAwaiter().GetResult();
                 new Thread(() => this.LoopForever()).Start();
