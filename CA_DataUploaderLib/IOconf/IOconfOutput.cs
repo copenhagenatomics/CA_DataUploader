@@ -10,14 +10,12 @@ namespace CA_DataUploaderLib.IOconf
         { 
             Format = $"{type};Name;BoxName;[port number]";
             var list = ToList();
-            Name = list[1];
             BoxName = list[2];
             SetMap(BoxName, settings); 
             if (parsePort && !int.TryParse(list[3], out PortNumber)) throw new Exception($"{type}: wrong port number: {row}");
             if (PortNumber < 1) throw new Exception($"{type}: port numbers must start at 1 {row}");
         }
 
-        public string Name { get; }
         public string BoxName { get; }
         public readonly int PortNumber = 1;
         public IOconfMap Map { get; private set; }

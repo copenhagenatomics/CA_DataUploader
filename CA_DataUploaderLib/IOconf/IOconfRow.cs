@@ -13,11 +13,13 @@ namespace CA_DataUploaderLib.IOconf
             LineNumber = lineNum;
             var list = ToList();
             if (list[0] != Type && type != "Unknown") throw new Exception("IOconfRow: wrong format: " + Row);
+            Name = list[1]; // could be overwritten elsewhere. 
         }
 
         protected readonly string Row;
         protected readonly string Type;
         protected readonly int LineNumber;
+        public string Name { get; init; } 
         protected string Format { get; init; }
 
         public List<string> ToList() => RowWithoutComment().Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
@@ -38,6 +40,11 @@ namespace CA_DataUploaderLib.IOconf
             if (pos > 2 && !Row.Contains("https://") && !Row.Contains("http://"))
                 temp = Row.Substring(0, pos);  // remove any comments in the end of the line. 
             return temp;
+        }
+
+        public override string ToString()
+        {
+            return Type.PadRight(20) + " " + Name;
         }
     }
 }

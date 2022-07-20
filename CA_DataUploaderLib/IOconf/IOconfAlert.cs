@@ -22,7 +22,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             var list = ToList();
             if (list[0] != "Alert" || list.Count < 3) throw new Exception("IOconfAlert: wrong format: " + row);
-            Name = list[1];
+   
             (Sensor, Value, MessageTemplate, type) = ParseExpression(
                 Name, list[2], "IOconfAlert: wrong format: " + row + ". Format: Alert;Name;SensorName comparison value;[rateMinutes];[command].");
             Message = MessageTemplate;
@@ -42,7 +42,6 @@ namespace CA_DataUploaderLib.IOconf
             Message = MessageTemplate;
         }
 
-        public string Name { get; }
         public string Sensor { get; }
         public string Message { get; private set; }
         public string Command { get; }

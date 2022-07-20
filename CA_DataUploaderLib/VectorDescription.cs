@@ -19,9 +19,6 @@ namespace CA_DataUploaderLib
             _items = items; 
             Hardware = hardware; 
             Software = software;
-            for (int i = 0; i < _items.Count; i++)
-                _items[i].FullVectorIndex = i;
-
         }
 
         public string GetVectorItemDescriptions() { return string.Join(Environment.NewLine, _items.Select(x => x.Descriptor)); }
@@ -47,7 +44,6 @@ namespace CA_DataUploaderLib
         public string Descriptor { get; set; }  // Name of data line in webchart. 
         public DataTypeEnum DirectionType { get; set; }
         public string DataType { get; set; }
-        public int FullVectorIndex { get; set; } // set in ExtendedVectorDescription constructor
 
     }
 }

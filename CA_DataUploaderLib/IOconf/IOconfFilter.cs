@@ -10,7 +10,6 @@ namespace CA_DataUploaderLib.IOconf
     {
         public readonly FilterType filterType;
         public readonly double filterLength;  // in seconds. 
-        public string Name { get; }
         public string NameInVector => Name + "_filter";
 
         public readonly List<string> SourceNames;
@@ -21,7 +20,6 @@ namespace CA_DataUploaderLib.IOconf
             Format = "Filter;Name;FilterType;FilterLength;SourceNames;[hidesource]";
 
             var list = ToList();
-            Name = list[1];
             if (!Enum.TryParse(list[2], out filterType))
                 throw new Exception($"Wrong filter type: {row} {Environment.NewLine}{Format}");
 
