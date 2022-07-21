@@ -22,6 +22,8 @@ namespace CA.LoopControlPluginBase
         public abstract void MakeDecision(VectorArgs args);
         public bool After(VectorArgs args, double timeoutMs) => args.After(StateWaitName, timeoutMs);
         public bool After(VectorArgs args, string timeoutNameInVector) => After(args, args[timeoutNameInVector]);
+        public bool Timeout(VectorArgs args, double timeoutMs) => After(args, timeoutMs);
+        public bool Timeout(VectorArgs args, string timeoutNameInVector) => After(args, timeoutNameInVector);
         public void ResetWaitTime(VectorArgs args) => args.ResetWaitTime(StateWaitName);
     }
 
@@ -215,18 +217,18 @@ namespace CA.LoopControlPluginBase
                 States.Off when args.UserCommands.Contains("argoncycle on") => States.OpenInput,
                 _ when args.UserCommands.Contains("argoncycle off") => States.Off,
                 _ when args.UserCommands.Contains("argoncycle on") => States.CloseOutput,
-                States.OpenInput when After(args, "conf_reachpressuremilliseconds") => States.Off,
+                States.OpenInput when Timeout(args, "conf_reachpressuremilliseconds") => States.Off,
                 States.OpenInput when args["LuminoxP"] >= args["conf_highpressure"] => States.CloseInput,
-                States.CloseInput when After(args, "conf_highpressuremilliseconds") => States.OpenOutput,
-                States.OpenOutput when After(args, "conf_reachpressuremilliseconds") => States.Off,
+                States.CloseInput when Timeout(args, "conf_highpressuremilliseconds") => States.OpenOutput,
+                States.OpenOutput when Timeout(args, "conf_reachpressuremilliseconds") => States.Off,
                 States.OpenOutput when args["LuminoxP"] <= args["conf_lowpressure"] => States.CloseOutput,
-                States.CloseOutput when After(args, 200) => States.OpenInput,
+                States.CloseOutput when Timeout(args, 200) => States.OpenInput,
                 var s => s
             };
             if (newState != currState)
                 ResetWaitTime(args);
             args["out_argonin_on"] = newState == States.OpenInput ? 1.0 : 0.0;
-            args["out_argonin_on"] = newState == States.CloseOutput ? 1.0 : 0.0;
+            args["out_argonout_on"] = newState == States.CloseOutput ? 1.0 : 0.0;
         }
 
         public enum States
