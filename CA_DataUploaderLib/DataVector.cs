@@ -8,9 +8,8 @@ namespace CA_DataUploaderLib
     {
         public readonly DateTime timestamp;
         public readonly List<double> vector;
-        public readonly VectorDescription _vectorDescription;
 
-        public DataVector(List<double> input, DateTime time, VectorDescription vectorDescription) { vector = input; timestamp = time; _vectorDescription = vectorDescription; }
+        public DataVector(List<double> input, DateTime time) { vector = input; timestamp = time; }
 
         public byte[] buffer {
             get
