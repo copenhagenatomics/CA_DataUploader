@@ -33,7 +33,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             if (!File.Exists("IO.conf"))
             {
-                throw new Exception($"Could not find the file {Directory.GetCurrentDirectory() + "\\IO.conf"}");
+                throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
             }
 
             var list = File.ReadAllLines("IO.conf").ToList();

@@ -12,7 +12,7 @@ namespace CA_DataUploaderLib.IOconf
             Type = type;
             LineNumber = lineNum;
             var list = ToList();
-            if (list[0] != Type && type != "Unknown") throw new Exception("IOconfRow: wrong format: " + Row);
+            if (list[0] != Type) throw new Exception("IOconfRow: wrong format: " + Row);
             Name = list[1]; // could be overwritten elsewhere. 
         }
 
