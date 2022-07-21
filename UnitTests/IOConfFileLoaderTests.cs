@@ -10,7 +10,7 @@ namespace UnitTests
         [TestMethod]
         public void CanLoadAccountLine()
         {
-            var (_, rowsEnum) = IOconfFileLoader.ParseLines(new[] { "Account;john;john.doe@example.com;johndoepass" });
+            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "Account;john;john.doe@example.com;johndoepass" });
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
             Assert.IsInstanceOfType(rows[0], typeof(IOconfAccount));
@@ -21,7 +21,7 @@ namespace UnitTests
         [TestMethod]
         public void CanLoadMathLine()
         {
-            var (_, rowsEnum) = IOconfFileLoader.ParseLines(new[] { "Math;mymath;heater1 + 5" });
+            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "Math;mymath;heater1 + 5" });
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
             Assert.IsInstanceOfType(rows[0], typeof(IOconfMath));
@@ -35,7 +35,7 @@ namespace UnitTests
         public void CanLoadCustomConfigWithoutMixingPrefix()
         {
             IOconfFileLoader.AddLoader("Mathing", (row, lineIndex) => new IOConfMathing(row, lineIndex));
-            var (_, rowsEnum) = IOconfFileLoader.ParseLines(new[] { "Mathing;mymath;heater1 + 5" });
+            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "Mathing;mymath;heater1 + 5" });
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
             Assert.IsInstanceOfType(rows[0], typeof(IOConfMathing));

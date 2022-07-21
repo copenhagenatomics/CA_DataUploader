@@ -8,7 +8,7 @@ namespace CA_DataUploaderLib.IOconf
     public static class IOconfFile
     {
         private static readonly List<IOconfRow> Table = new List<IOconfRow>();
-        public static string RawFile { get; private set; }
+        public static List<string> RawLines { get; private set; }
 
         static IOconfFile()
         {
@@ -19,11 +19,12 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public static void Reload()
-        { // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization / static ctor rejects the custom entries.
+        { 
+            // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization / static ctor rejects the custom entries.
             Table.Clear();
-            var (rawFile, entries) = IOconfFileLoader.Load(Table);
+            var (rawLines, entries) = IOconfFileLoader.Load();
             Table.AddRange(entries);
-            RawFile = rawFile;
+            RawLines = rawLines;
             CheckRules();
         }
 
@@ -79,7 +80,10 @@ namespace CA_DataUploaderLib.IOconf
         public static IEnumerable<IOconfAlert> GetAlerts()=> GetEntries<IOconfAlert>();
         public static IEnumerable<IOconfMath> GetMath() => GetEntries<IOconfMath>();
         public static IEnumerable<IOconfFilter> GetFilters() => GetEntries<IOconfFilter>();
+        public static IEnumerable<IOconfOutput> GetOutputs() => GetEntries<IOconfOutput>();
+        public static IEnumerable<IOconfState> GetStates() => GetEntries<IOconfState>();
         public static IEnumerable<IOconfInput> GetInputs() => GetEntries<IOconfInput>();
         public static IEnumerable<T> GetEntries<T>() => Table.OfType<T>();
+        public static string GetRawFile() => string.Join(Environment.NewLine, RawLines);
     }
 }

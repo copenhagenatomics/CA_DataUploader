@@ -10,7 +10,6 @@ namespace CA_DataUploaderLib.IOconf
         {
             Format = $"{type};Name;BoxName;[port number]";
             var list = ToList();
-            Name = list[1];
 
             if (parsePortRequired && list.Count < 4)
                 throw new Exception($"{type}: wrong port number: {row}");
@@ -35,7 +34,6 @@ namespace CA_DataUploaderLib.IOconf
 
         public virtual bool IsSpecialDisconnectValue(double value) => false;
 
-        public string Name { get; init; }
         public string BoxName { get; init; }
         /// <summary>the 1-based port number</summary>
         public string BoardStateSensorName { get; }

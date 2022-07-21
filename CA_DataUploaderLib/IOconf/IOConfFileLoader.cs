@@ -29,21 +29,23 @@ namespace CA_DataUploaderLib.IOconf
             ("Node", (r, l) => new IOconfNode(r, l)),
         };
 
-        public static (string, IEnumerable<IOconfRow>) Load(List<IOconfRow> target)
+        public static (List<string>, IEnumerable<IOconfRow>) Load()
         {
             if (!File.Exists("IO.conf"))
+            {
                 throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
+            }
 
-            return ParseLines(File.ReadAllLines("IO.conf"));
+            var list = File.ReadAllLines("IO.conf").ToList();
+            return (list, ParseLines(list));
         }
 
-        public static (string, IEnumerable<IOconfRow>) ParseLines(IEnumerable<string> lines)
+        public static IEnumerable<IOconfRow> ParseLines(IEnumerable<string> lines)
         {
             var linesList = lines.ToList();
-            var rawFile = string.Join(Environment.NewLine, linesList);
             // remove empty lines and commented out lines
             var lines2 = linesList.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
-            return (rawFile, lines2.Select(x => CreateType(x, linesList.IndexOf(x))));
+            return lines2.Select(x => CreateType(x, linesList.IndexOf(x)));
         }
 
         public static void AddLoader(string rowType, Func<string, int, IOconfRow> loader)

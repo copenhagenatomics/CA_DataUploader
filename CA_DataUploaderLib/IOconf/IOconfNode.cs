@@ -22,7 +22,7 @@ namespace CA_DataUploaderLib.IOconf
             var list = ToList();
             if (list.Count < 3)
                 throw new Exception($"IOconfNode: wrong format: {row} {Format}");
-            Name = list[1];
+
             if (!IPEndPoint.TryParse(list[2], out var endPoint))
                 throw new Exception($"IOconfNode: failed to parse the passed ip address. format: {row} {Format}");
             _endPoint = endPoint;
@@ -31,15 +31,12 @@ namespace CA_DataUploaderLib.IOconf
                 Role = list[3];
         }
 
-        private IOconfNode(string name) : base($"Node;{name}", 0, "Node")
-        {
-            Name = name;
-        }
+        private IOconfNode(string name) : base($"Node;{name}", 0, "Node") { }
+        
 
         /// <summary>resets the node instance count used to determine the node index, used for testing purposes</summary>
         public static void ResetNodeIndexCount() => _nodeInstances = 0;
         public static IOconfNode SingleNode => _singleNode.Value;
-        public string Name { get; }
         public IPEndPoint EndPoint => _endPoint ?? throw new InvalidOperationException($"Endpoint is only supported when running with distributed configuration");
         public bool IsCurrentSystem { get; set; }
         /// <summary>position of the node in the config (starting at 0)</summary>

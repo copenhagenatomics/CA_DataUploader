@@ -9,14 +9,13 @@ namespace CA_DataUploaderLib.IOconf
             Format = "LoopName;Name;DebugLevel;[Server]";
 
             var list = ToList();
-            Name = list[1];
             if(!Enum.TryParse<CALogLevel>(list[2], out LogLevel)) throw new Exception("IOconfLoopName: wrong LogLevel: " + row);
             Server = list.Count > 3 ? list[3] : "https://www.theng.dk";
         }
 
         public static IOconfLoopName Default { get; } = 
             new IOconfLoopName($"LoopName;{ Environment.MachineName };Normal;https://www.theng.dk", 0);
-        public readonly string Name;
+
         public readonly CALogLevel LogLevel;
         public readonly string Server;
     }

@@ -37,6 +37,8 @@ namespace CA_DataUploaderLib.Helpers
             VectorDescription = new VectorDescription(allItems, hardware, software);
         }
 
+        public int GetIndex(VectorDescriptionItem item) { return VectorDescription._items.IndexOf(item); }
+
         private static List<FilterSample> GetFilters(List<VectorDescriptionItem> inputs)
         {
             var filters = IOconfFile.GetFilters().ToList();

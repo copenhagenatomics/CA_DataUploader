@@ -7,19 +7,21 @@ namespace CA_DataUploaderLib
     [Serializable]
     public class VectorDescription
     {
-        public List<VectorDescriptionItem> _items;  // only public because we need to Serialize
+        public List<VectorDescriptionItem> _items;  // only public because we need to Serialize  -> Do NOT add or remove anything from this list. 
         public string Hardware;
         public string Software;
         public string IOconf;
         public int Length { get { return _items.Count; } }
 
         public VectorDescription() { }
-        public VectorDescription(List<VectorDescriptionItem> items, string hardware, string software) { _items = items; Hardware = hardware; Software = software; }
+        public VectorDescription(List<VectorDescriptionItem> items, string hardware, string software) 
+        { 
+            _items = items; 
+            Hardware = hardware; 
+            Software = software;
+        }
 
         public string GetVectorItemDescriptions() { return string.Join(Environment.NewLine, _items.Select(x => x.Descriptor)); }
-        public string GetVectorItemTypes() { return string.Join(Environment.NewLine, _items.Select(x => x.DataType)); }
-        public string GetVectorInputOutput() { return string.Join(Environment.NewLine, _items.Select(x => x.DirectionType.ToString())); }
-
         public bool HasItem(string descriptor) => _items.Any(i => i.Descriptor == descriptor);
 
         public override string ToString()
@@ -42,5 +44,6 @@ namespace CA_DataUploaderLib
         public string Descriptor { get; set; }  // Name of data line in webchart. 
         public DataTypeEnum DirectionType { get; set; }
         public string DataType { get; set; }
+
     }
 }

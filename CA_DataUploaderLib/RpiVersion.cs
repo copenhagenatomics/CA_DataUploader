@@ -1,4 +1,5 @@
-﻿using CA_DataUploaderLib.Helpers;
+﻿using CA_DataUploaderLib.Extensions;
+using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
@@ -95,7 +96,7 @@ $@"{hostAssembly.GetName()}
             using (Stream stream = assembly.GetManifestResourceStream("CA_DataUploaderLib.RPi_versions.csv"))
             using (StreamReader reader = new StreamReader(stream))
             {
-                var lines = reader.ReadToEnd().Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                var lines = reader.ReadToEnd().SplitNewLine();
                 var header = lines.First().Split(';').Select(x => x.PadRight(15) + ": ").ToArray();
                 return lines.Skip(1).ToDictionary(x => GetKey(x), x => FormatString(header, x.Split(';')));
             }
@@ -183,7 +184,7 @@ $@"{hostAssembly.GetName()}
         private static string GetCPU()
         {
             if (_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).First().Substring(18).Trim();
+                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").SplitNewLine().First().Substring(18).Trim();
 
             return System.Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE");
         }
@@ -199,7 +200,7 @@ $@"{hostAssembly.GetName()}
         private static int GetNumberOfCores()
         {
             if(_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).Count();
+                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").SplitNewLine().Count();
 
             return Environment.ProcessorCount;
         }
