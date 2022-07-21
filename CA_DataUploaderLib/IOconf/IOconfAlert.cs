@@ -34,7 +34,7 @@ namespace CA_DataUploaderLib.IOconf
                 (RateLimitMinutes, Command) = (DefaultRateLimitMinutes, list[3]);
         }
 
-        public IOconfAlert(string name, string expressionWithOptions) : base("DynamicAlert", 0, "DynamicAlert")
+        public IOconfAlert(string name, string expressionWithOptions) : base("DynamicAlert;name", 0, "DynamicAlert")
         {
             Name = name;
             (Sensor, Value, MessageTemplate, type, RateLimitMinutes, Command) = ParseExpressionWithOptions(
