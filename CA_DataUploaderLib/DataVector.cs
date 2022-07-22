@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.IO;
 
 namespace CA_DataUploaderLib
 {
@@ -24,17 +25,19 @@ namespace CA_DataUploaderLib
 
         // DataVector["HeaterTop1_on_off"] = 1;
         // currentTemperature = DataVector["HeaterTop1_degc"];
-        public double? this[string index]
+        public double? this[string name]
         {
             get
             {
-                return (_vectorDescription.HasItem(index)) ? null: vector[_vectorDescription.IndexOf(index)];
+                return (_vectorDescription.HasItem(name)) ? null: vector[_vectorDescription.IndexOf(name)];
             }
             set
             {
-                var vdi = _vectorDescription._items.SingleOrDefault(x => x.Descriptor == index);
-                if(vdi != null && vdi.DirectionType != DataTypeEnum.Input && value != null) 
-                    vector[_vectorDescription.IndexOf(index)] = value.Value;
+                var vdi = _vectorDescription._items.SingleOrDefault(x => x.Descriptor == name);
+                if (vdi != null && vdi.DirectionType != DataTypeEnum.Input && value != null)
+                    vector[_vectorDescription.IndexOf(name)] = value.Value;
+                else
+                    throw new InvalidDataException($"trying to save impossible value({value}) to DataVector[\"{name}\"]");
             }
         }
 
