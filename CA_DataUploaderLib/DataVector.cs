@@ -29,12 +29,12 @@ namespace CA_DataUploaderLib
         {
             get
             {
-                return (_vectorDescription.HasItem(name)) ? null: vector[_vectorDescription.IndexOf(name)];
+                return (_vectorDescription.HasItem(name)) ? vector[_vectorDescription.IndexOf(name)]: null;
             }
             set
             {
                 var vdi = _vectorDescription._items.SingleOrDefault(x => x.Descriptor == name);
-                if (vdi != null && vdi.DirectionType != DataTypeEnum.Input && value != null)
+                if (vdi != null && value != null && vdi.DirectionType != DataTypeEnum.Input)
                     vector[_vectorDescription.IndexOf(name)] = value.Value;
                 else
                     throw new InvalidDataException($"trying to save impossible value({value}) to DataVector[\"{name}\"]");
