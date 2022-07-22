@@ -39,9 +39,6 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                var duplicates = vectorDescription._items.GroupBy(x => x.Descriptor).Where(x => x.Count() > 1).Select(x => x.Key);
-                if (duplicates.Any())
-                    throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", duplicates));
                 var loopName = IOconfFile.GetLoopName();
                 _signing = new Signing(loopName);
                 vectorDescription.IOconf = IOconfFile.GetRawFile();

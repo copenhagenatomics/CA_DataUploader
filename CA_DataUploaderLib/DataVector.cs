@@ -23,8 +23,8 @@ namespace CA_DataUploaderLib
             }
         }
 
-        // DataVector["HeaterTop1_on_off"] = 1;
-        // currentTemperature = DataVector["HeaterTop1_degc"];
+        // set: DataVector["HeaterTop1_on_off"] = 1;
+        // get: currentTemperature = DataVector["HeaterTop1_degc"];
         public double? this[string name]
         {
             get
@@ -33,8 +33,7 @@ namespace CA_DataUploaderLib
             }
             set
             {
-                var vdi = _vectorDescription._items.SingleOrDefault(x => x.Descriptor == name);
-                if (vdi != null && value != null && vdi.DirectionType != DataTypeEnum.Input)
+                if(_vectorDescription.CanUpdateValue(name) && value != null)
                     vector[_vectorDescription.IndexOf(name)] = value.Value;
                 else
                     throw new InvalidDataException($"trying to save impossible value({value}) to DataVector[\"{name}\"]");
