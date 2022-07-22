@@ -1,15 +1,20 @@
 ﻿using System;
+using System.Runtime.Serialization;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace CA_DataUploaderLib
 {
-    [Serializable]
+    [DataContract]
     public class VectorDescription
     {
-        public List<VectorDescriptionItem> _items;  // only public because we need to Serialize  -> please Do NOT access directly from outside
-        public string Hardware;
-        public string Software;
+        [DataMember]
+        public List<VectorDescriptionItem> _items { get; private set; } // only public because we need to Serialize  -> please Do NOT access from outside this class
+        [DataMember] 
+        public string Hardware { get; private set; }
+        [DataMember] 
+        public string Software { get; private set; }
+        [DataMember] 
         public string IOconf;
         public int Length { get { return _items.Count; } }
         private Dictionary<string, int> _toIndex = new Dictionary<string, int>();
@@ -17,7 +22,7 @@ namespace CA_DataUploaderLib
         public VectorDescription() { }
         public VectorDescription(List<VectorDescriptionItem> items, string hardware, string software) 
         { 
-            _items = items; 
+            _items = items;  // shall not change after it has been assigned. See _toIndex
             Hardware = hardware; 
             Software = software;
 
@@ -45,14 +50,17 @@ namespace CA_DataUploaderLib
 
     }
 
-    [Serializable]
+    [DataContract]
     public class VectorDescriptionItem
     {
         public VectorDescriptionItem() { }
         public VectorDescriptionItem(string datatype, string descriptor, DataTypeEnum direction) { Descriptor = descriptor; DataType = datatype; DirectionType = direction; }
-        public string Descriptor { get; set; }  // Name of data line in webchart. 
-        public DataTypeEnum DirectionType { get; set; }
-        public string DataType { get; set; }
+        [DataMember] 
+        public string Descriptor { get; private set; }  // Name of data line in webchart. 
+        [DataMember] 
+        public DataTypeEnum DirectionType { get; private set; }
+        [DataMember] 
+        public string DataType { get; private set; }
 
     }
 }
