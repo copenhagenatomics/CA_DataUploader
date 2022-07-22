@@ -24,6 +24,8 @@ namespace CA_DataUploaderLib
         public string GetVectorItemDescriptions() { return string.Join(Environment.NewLine, _items.Select(x => x.Descriptor)); }
         public bool HasItem(string descriptor) => _items.Any(i => i.Descriptor == descriptor);
 
+        public int IndexOf(string descriptor) => _items.IndexOf(_items.Single(i => i.Descriptor == descriptor));
+
         public override string ToString()
         {
             string msg = string.Empty;
