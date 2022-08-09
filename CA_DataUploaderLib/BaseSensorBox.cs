@@ -199,7 +199,12 @@ namespace CA_DataUploaderLib
                     if (customWritesEnabled && customCommandsChannel.TryRead(out var command))
                         await board.SafeWriteLine(command, token);
 
-                    if (!buildInActionsEnabled) continue;
+                    if (!buildInActionsEnabled)
+                    {
+                        EnsureResumeAfterTimeoutIsReported();
+                        await customCommandsChannel.WaitToReadAsync(token);
+                        continue;
+                    }
 
                     var vector = await _cmdAdvanced.When(_ => true, token);
                     if (!CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector))
