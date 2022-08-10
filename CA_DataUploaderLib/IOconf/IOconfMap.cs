@@ -19,7 +19,7 @@ namespace CA_DataUploaderLib.IOconf
             else
                 SerialNumber = list[1];
 
-            BoxName = list[2];
+            Name = BoxName = list[2];
 
             var customWritesIndex = list.IndexOf("customwrites");
             CustomWritesEnabled = customWritesIndex > -1;
