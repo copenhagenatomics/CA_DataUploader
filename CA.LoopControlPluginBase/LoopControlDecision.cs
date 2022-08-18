@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace CA.LoopControlPluginBase
 {
@@ -21,36 +20,5 @@ namespace CA.LoopControlPluginBase
         /// However, these strings are very flexible and simple, so we will keep these at the moment
         /// </remarks>
         public abstract void MakeDecision(DataVector vector, List<string> events);
-    }
-
-    public ref struct DataVector
-    {
-        private readonly Span<double> _data;
-        public DataVector(DateTime time, Span<double> data)
-        {
-            Time = time;
-            _data = data;
-        }
-
-        public DateTime Time { get; }
-        /// <summary>gets the vector data at the specified vector index</summary>
-        public ref double this[int i] { get => ref _data[i]; }
-
-        public double TimeAfter(int milliseconds) => Time.AddMilliseconds(milliseconds).ToOADate();
-        public bool Reached(double sa_t_0_timeEvent_0) => DateTime.FromOADate(sa_t_0_timeEvent_0) > Time;
-    }
-
-    public class VectorDescription
-    {
-        private string[] Fields { get; }
-        /// <summary>gets the amount of fields in the vector</summary>
-        public int Count => Fields.Length;
-        /// <summary>gets the vector field at the specified vector index</summary>
-        public string this[int i] { get => Fields[i]; set { Fields[i] = value; } }
-
-        public VectorDescription(string[] fields)
-        {
-            Fields = fields;
-        }
     }
 }
