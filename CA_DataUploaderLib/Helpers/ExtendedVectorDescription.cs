@@ -63,7 +63,7 @@ namespace CA_DataUploaderLib.Helpers
         }
 
         /// <remarks>the input vector is expected to contains all input + state initially sent in the vector description passed to the constructor.</remarks>
-        public List<SensorSample> Apply(List<SensorSample> inputVector)
+        public DataVector Apply(List<SensorSample> inputVector, DateTime vectorTime)
         {
             foreach (var filter in _values)
             {
@@ -75,11 +75,21 @@ namespace CA_DataUploaderLib.Helpers
             _mathVectorExpansion.Expand(inputVector);
             if (inputVector.Count + _outputCount != VectorDescription.Length)
                 throw new ArgumentException($"wrong input vector length (input, expected): {inputVector.Count} <> {VectorDescription.Length - _outputCount}");
-            return inputVector;
+
+            var data = new double[VectorDescription.Length]; //allocating an array for now, but at some point it might make sense to review this whole method and related calling code to remove some allocations
+            for (int i = 0; i < inputVector.Count; i++)
+                data[i] = inputVector[i].Value;
+            return new DataVector(data, vectorTime);
         }
 
         /// <summary>appends the specified outputs to the end of the input vector</summary>
         /// <remarks>the input vector is expected to be the expanded version returned by the <see cref="Apply" /> method</remarks>
-        public void AddOutputsToInputVector(List<SensorSample> expandedInputVector, IEnumerable<SensorSample> outputs) => expandedInputVector.AddRange(outputs);
+        public void AddOutputs(DataVector vector, IEnumerable<SensorSample> outputs)
+        {
+            var outputVector = vector.data.AsSpan()[(VectorDescription.Length - _outputCount)..];
+            int i = 0;
+            foreach (var output in outputs)
+                outputVector[i] = output.Value;
+        }
     }
 }

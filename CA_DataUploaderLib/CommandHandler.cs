@@ -21,6 +21,7 @@ namespace CA_DataUploaderLib
         private readonly List<string> AcceptedCommands = new();
         private readonly List<ISubsystemWithVectorData> _subsystems = new();
         private int AcceptedCommandsIndex = -1;
+        private readonly List<LoopControlDecision> _decisions = new();
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
         private readonly CancellationTokenSource _exitCts = new();
         private readonly TaskCompletionSource _runningTaskTcs = new();
@@ -44,6 +45,7 @@ namespace CA_DataUploaderLib
             AddCommand("version", GetVersion);
         }
 
+        internal void AddDecisions(IEnumerable<LoopControlDecision> decisions) => _decisions.AddRange(decisions);
         /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>
         public Action AddCommand(string name, Func<List<string>, bool> func) => _commandRunner.AddCommand(name, func);
         public void Execute(string command, bool isUserCommand = false) => HandleCommand(command, isUserCommand);
@@ -53,21 +55,38 @@ namespace CA_DataUploaderLib
         /// <remarks>This method is only aimed at single host scenarios where a single system has all the inputs</remarks>
         public DataVector GetFullSystemVectorValues() 
         {
-            var (samples, vectorTime) = MakeDecision(GetNodeInputs().ToList(), DateTime.UtcNow);
-            OnNewVectorReceived(samples.WithVectorTime(vectorTime));
-            return new DataVector(samples.Select(x => x.Value).ToList(), vectorTime);
+            var time = DateTime.UtcNow;
+            var vector = MakeDecision(GetNodeInputs().ToList(), time);
+            OnNewVectorReceived(ToNewVectorReceivedArgs(vector, _fullsystemFilterAndMath.Value.VectorDescription._items));
+            return vector;
         }
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
-        public (IEnumerable<SensorSample>, DateTime vectorTime) MakeDecision(List<SensorSample> inputs, DateTime vectorTime)
+        public DataVector MakeDecision(List<SensorSample> inputs, DateTime vectorTime)
         {
             var filterAndMath = _fullsystemFilterAndMath.Value;
-            var samples = filterAndMath.Apply(inputs);
-            var inputVectorReceivedArgs = new NewVectorReceivedArgs(samples.WithVectorTime(vectorTime).ToDictionary(v => v.Name, v => v.Value));
+            var vector = filterAndMath.Apply(inputs, vectorTime);
+            var inputVectorReceivedArgs = ToNewVectorReceivedArgs(vector, filterAndMath.VectorDescription._items);
             var outputs = _subsystems.SelectMany(s => s.GetDecisionOutputs(inputVectorReceivedArgs));
-            filterAndMath.AddOutputsToInputVector(samples, outputs);
-            return (samples, vectorTime);
+            filterAndMath.AddOutputs(vector, outputs);
+            //TODO: states fields of decisions must be initialized with the last seen value from the previous cycle!
+            var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.timestamp, vector.data.AsSpan());
+            foreach (var decision in _decisions)
+                decision.MakeDecision(decisionsVector, new()); //TODO: send events here!
+            return vector;
         }
-        
+
+        //note: the below is only needed to support the GetDecisionOutputs style, if all moves to the LoopControlDecision contract this can be removed
+        static NewVectorReceivedArgs ToNewVectorReceivedArgs(DataVector vector, List<VectorDescriptionItem> fields)
+        {
+            var data = vector.data;
+            var vectorDic = new Dictionary<string, double>();
+            for (int i = 0; i < vector.Count(); i++)
+                vectorDic.Add(fields[i].Descriptor, data[i]);
+
+            vectorDic.Add("vectortime", vector.timestamp.ToVectorDouble());
+            return new NewVectorReceivedArgs(vectorDic);
+        }
+
         public void ResumeState(List<SensorSample> fullVector)
         {
             var args = new NewVectorReceivedArgs(fullVector.ToDictionary(v => v.Name, v => v.Value));
@@ -112,7 +131,10 @@ namespace CA_DataUploaderLib
                 .Where(n => n.inputs.Count > 0)
                 .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
                 .ToList();
-            var outputs = descItemsPerSubsystem.SelectMany(s => s.Outputs).ToList();
+            var outputs = descItemsPerSubsystem
+                .SelectMany(s => s.Outputs)
+                .Concat(_decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f, DataTypeEnum.State))))
+                .ToList();
             return new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
         }
 
@@ -137,6 +159,7 @@ namespace CA_DataUploaderLib
 
         public void OnNewVectorReceived(IEnumerable<SensorSample> vector) =>
             NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector.ToDictionary(v => v.Name, v => v.Value)));
+        public void OnNewVectorReceived(NewVectorReceivedArgs args) => NewVectorReceived?.Invoke(this, args);
 
         public void FireAlert(string msg, DateTime timespan)
         {
