@@ -53,26 +53,37 @@ namespace CA_DataUploaderLib
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
         /// <remarks>This method is only aimed at single host scenarios where a single system has all the inputs</remarks>
-        public DataVector GetFullSystemVectorValues() 
+        public DataVector GetFullSystemVectorValues(DataVector lastVector, List<string> events) 
         {
             var time = DateTime.UtcNow;
-            var vector = MakeDecision(GetNodeInputs().ToList(), time);
+            var vector = MakeDecision(GetNodeInputs().ToList(), time, lastVector, events);
             OnNewVectorReceived(ToNewVectorReceivedArgs(vector, _fullsystemFilterAndMath.Value.VectorDescription._items));
             return vector;
         }
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
-        public DataVector MakeDecision(List<SensorSample> inputs, DateTime vectorTime)
+        public DataVector MakeDecision(List<SensorSample> inputs, DateTime vectorTime, DataVector lastVector, List<string> events)
         {
             var filterAndMath = _fullsystemFilterAndMath.Value;
             var vector = filterAndMath.Apply(inputs, vectorTime);
+            CopyStatesFieldsToNewVector(lastVector, vector, filterAndMath.VectorDescription);
             var inputVectorReceivedArgs = ToNewVectorReceivedArgs(vector, filterAndMath.VectorDescription._items);
             var outputs = _subsystems.SelectMany(s => s.GetDecisionOutputs(inputVectorReceivedArgs));
             filterAndMath.AddOutputs(vector, outputs);
-            //TODO: states fields of decisions must be initialized with the last seen value from the previous cycle!
-            var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.timestamp, vector.data.AsSpan());
+            var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.timestamp, vector.data);
             foreach (var decision in _decisions)
-                decision.MakeDecision(decisionsVector, new()); //TODO: send events here!
+                decision.MakeDecision(decisionsVector, events);
             return vector;
+        }
+
+        static void CopyStatesFieldsToNewVector(DataVector lastVector, DataVector newVector, VectorDescription desc)
+        {
+            var oldData = lastVector.data;
+            var newData = newVector.data;
+            for (int i = 0; i < desc._items.Count; i++)
+            {
+                if (desc._items[i].Descriptor.StartsWith("state_"))
+                    newData[i] = oldData[i];
+            }
         }
 
         //note: the below is only needed to support the GetDecisionOutputs style, if all moves to the LoopControlDecision contract this can be removed
