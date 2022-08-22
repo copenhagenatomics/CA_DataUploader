@@ -70,9 +70,9 @@ namespace CA_DataUploaderLib
         {
             if (vector.Count() != _vectorDescription.Length)
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescription.Length}");
-            if (vector.timestamp <= _lastTimestamp)
+            if (vector.Timestamp <= _lastTimestamp)
             {
-                CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.timestamp}");
+                CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.Timestamp}");
                 return;
             }
 
@@ -80,7 +80,7 @@ namespace CA_DataUploaderLib
                 if (_queue.Count < 10000)  // if sending thread can't catch up, then drop packages.
                 {
                     _queue.Enqueue(vector);
-                    _lastTimestamp = vector.timestamp;
+                    _lastTimestamp = vector.Timestamp;
                 }
         }
 
@@ -111,7 +111,7 @@ namespace CA_DataUploaderLib
                     var list = DequeueAllEntries(_queue);
                     if (list != null)
                     {
-                        var task = PostVectorAsync(GetSignedVectors(list), list.First().timestamp, writer);
+                        var task = PostVectorAsync(GetSignedVectors(list), list.First().Timestamp, writer);
                         if (stopping) await task;
                     }
 
@@ -215,8 +215,8 @@ namespace CA_DataUploaderLib
 
         private byte[] GetSignedVectors(List<DataVector> vectors) 
         {
-            byte[] listLen = BitConverter.GetBytes((ushort)vectors.Count());
-            var theData = vectors.SelectMany(a => a.buffer).ToArray();
+            byte[] listLen = BitConverter.GetBytes((ushort)vectors.Count);
+            var theData = vectors.SelectMany(a => a.Buffer).ToArray();
             return SignAndCompress(listLen.Concat(theData).ToArray());
         }
 

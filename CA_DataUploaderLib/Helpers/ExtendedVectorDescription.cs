@@ -63,30 +63,29 @@ namespace CA_DataUploaderLib.Helpers
         }
 
         /// <remarks>the input vector is expected to contains all input + state initially sent in the vector description passed to the constructor.</remarks>
-        public DataVector Apply(List<SensorSample> inputVector, DateTime vectorTime)
+        public void Apply(List<SensorSample> inputs, DataVector vector)
         {
             foreach (var filter in _values)
             {
-                filter.Input(inputVector);
-                inputVector.Add(filter.Output);
+                filter.Input(inputs);
+                inputs.Add(filter.Output);
             }
 
-            RemoveHiddenSources(inputVector, i => i.Name);
-            _mathVectorExpansion.Expand(inputVector);
-            if (inputVector.Count + _outputCount != VectorDescription.Length)
-                throw new ArgumentException($"wrong input vector length (input, expected): {inputVector.Count} <> {VectorDescription.Length - _outputCount}");
+            RemoveHiddenSources(inputs, i => i.Name);
+            _mathVectorExpansion.Expand(inputs);
+            if (inputs.Count + _outputCount != VectorDescription.Length)
+                throw new ArgumentException($"wrong input vector length (input, expected): {inputs.Count} <> {VectorDescription.Length - _outputCount}");
 
-            var data = new double[VectorDescription.Length]; //allocating an array for now, but at some point it might make sense to review this whole method and related calling code to remove some allocations
-            for (int i = 0; i < inputVector.Count; i++)
-                data[i] = inputVector[i].Value;
-            return new DataVector(data, vectorTime);
+            var data = vector.Data;
+            for (int i = 0; i < inputs.Count; i++)
+                data[i] = inputs[i].Value;
         }
 
         /// <summary>appends the specified outputs to the end of the input vector</summary>
         /// <remarks>the input vector is expected to be the expanded version returned by the <see cref="Apply" /> method</remarks>
-        public void AddOutputs(DataVector vector, IEnumerable<SensorSample> outputs)
+        public void ApplyOutputs(DataVector vector, IEnumerable<SensorSample> outputs)
         {
-            var outputVector = vector.data.AsSpan()[(VectorDescription.Length - _outputCount)..];
+            var outputVector = vector.Data.AsSpan()[(VectorDescription.Length - _outputCount)..];
             int i = 0;
             foreach (var output in outputs)
                 outputVector[i] = output.Value;

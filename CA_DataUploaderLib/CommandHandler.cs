@@ -53,48 +53,35 @@ namespace CA_DataUploaderLib
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
         /// <remarks>This method is only aimed at single host scenarios where a single system has all the inputs</remarks>
-        public DataVector GetFullSystemVectorValues(DataVector lastVector, List<string> events) 
+        public void GetFullSystemVectorValues(ref DataVector vector, List<string> events) 
         {
             var time = DateTime.UtcNow;
-            var vector = MakeDecision(GetNodeInputs().ToList(), time, lastVector, events);
+            MakeDecision(GetNodeInputs().ToList(), time, ref vector, events);
             OnNewVectorReceived(ToNewVectorReceivedArgs(vector, _fullsystemFilterAndMath.Value.VectorDescription._items));
-            return vector;
         }
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
-        public DataVector MakeDecision(List<SensorSample> inputs, DateTime vectorTime, DataVector lastVector, List<string> events)
+        public void MakeDecision(List<SensorSample> inputs, DateTime vectorTime, ref DataVector vector, List<string> events)
         {
-            var filterAndMath = _fullsystemFilterAndMath.Value;
-            var vector = filterAndMath.Apply(inputs, vectorTime);
-            CopyStatesFieldsToNewVector(lastVector, vector, filterAndMath.VectorDescription);
-            var inputVectorReceivedArgs = ToNewVectorReceivedArgs(vector, filterAndMath.VectorDescription._items);
+            var extendedDesc = _fullsystemFilterAndMath.Value;
+            DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, vectorTime);
+            extendedDesc.Apply(inputs, vector);
+            var inputVectorReceivedArgs = ToNewVectorReceivedArgs(vector, extendedDesc.VectorDescription._items);
             var outputs = _subsystems.SelectMany(s => s.GetDecisionOutputs(inputVectorReceivedArgs));
-            filterAndMath.AddOutputs(vector, outputs);
-            var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.timestamp, vector.data);
+            extendedDesc.ApplyOutputs(vector, outputs);
+            var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.Timestamp, vector.Data);
             foreach (var decision in _decisions)
                 decision.MakeDecision(decisionsVector, events);
-            return vector;
-        }
-
-        static void CopyStatesFieldsToNewVector(DataVector lastVector, DataVector newVector, VectorDescription desc)
-        {
-            var oldData = lastVector.data;
-            var newData = newVector.data;
-            for (int i = 0; i < desc._items.Count; i++)
-            {
-                if (desc._items[i].Descriptor.StartsWith("state_"))
-                    newData[i] = oldData[i];
-            }
         }
 
         //note: the below is only needed to support the GetDecisionOutputs style, if all moves to the LoopControlDecision contract this can be removed
         static NewVectorReceivedArgs ToNewVectorReceivedArgs(DataVector vector, List<VectorDescriptionItem> fields)
         {
-            var data = vector.data;
+            var data = vector.Data;
             var vectorDic = new Dictionary<string, double>();
             for (int i = 0; i < vector.Count(); i++)
                 vectorDic.Add(fields[i].Descriptor, data[i]);
 
-            vectorDic.Add("vectortime", vector.timestamp.ToVectorDouble());
+            vectorDic.Add("vectortime", vector.Timestamp.ToVectorDouble());
             return new NewVectorReceivedArgs(vectorDic);
         }
 
