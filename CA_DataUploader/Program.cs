@@ -1,6 +1,7 @@
 ﻿using CA_DataUploaderLib;
 using CA_DataUploaderLib.Helpers;
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,6 +17,9 @@ namespace CA_DataUploader
 
         static async Task MainAsync(string[] args)
         {
+            Queue<string> receivedCommandsInThisCycleQueue = new();
+            List<string> receivedCommandsInThisCycle = new();
+
             try
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
@@ -34,15 +38,17 @@ namespace CA_DataUploader
                     using var usb = new ThermocoupleBox(cmd);
                     using var cloud = new ServerUploader(cmd.GetFullSystemVectorDescription(), cmd);
                     cmd.EventFired += cloud.SendEvent;
+                    cmd.EventFired += AddToReceivedCommandsQueue;
                     CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
                     cmd.Execute("help");
                     _ = Task.Run(() => cmd.RunSubsystems());
 
                     int i = 0;
                     var uploadThrottle = new TimeThrottle(100);
+                    DataVector dataVector = null;
                     while (cmd.IsRunning)
                     {
-                        var dataVector = cmd.GetFullSystemVectorValues();
+                        cmd.GetFullSystemVectorValues(ref dataVector, GetReceivedCommandsInThisCycle());
                         cloud.SendVector(dataVector);
                         Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
                         uploadThrottle.Wait();
@@ -57,6 +63,29 @@ namespace CA_DataUploader
             }
 
             Console.ReadKey();
+
+            void AddToReceivedCommandsQueue(object source, EventFiredArgs args)
+            {
+                lock (receivedCommandsInThisCycleQueue)
+                {
+                    if (args.EventType == (byte)EventType.Command)
+                        return;
+
+                    receivedCommandsInThisCycleQueue.Enqueue(args.Data);
+                }
+            }
+
+            List<string> GetReceivedCommandsInThisCycle()
+            {
+                lock (receivedCommandsInThisCycleQueue)
+                {
+                    receivedCommandsInThisCycle.Clear();
+                    while (receivedCommandsInThisCycleQueue.TryDequeue(out var command))
+                        receivedCommandsInThisCycle.Add(command);
+
+                    return receivedCommandsInThisCycle;
+                }
+            }
         }
 
         private static void ShowHumanErrorMessages(Exception ex)
