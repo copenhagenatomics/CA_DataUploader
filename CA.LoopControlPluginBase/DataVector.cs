@@ -16,6 +16,6 @@ namespace CA.LoopControlPluginBase
         public ref double this[int i] { get => ref _data[i]; }
 
         public double TimeAfter(int milliseconds) => Time.AddMilliseconds(milliseconds).ToOADate();
-        public bool Reached(double sa_t_0_timeEvent_0) => DateTime.FromOADate(sa_t_0_timeEvent_0) > Time;
+        public bool Reached(double sa_t_0_timeEvent_0) => Time > DateTime.FromOADate(sa_t_0_timeEvent_0);
     }
 }
