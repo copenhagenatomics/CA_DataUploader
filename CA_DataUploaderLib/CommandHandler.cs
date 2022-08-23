@@ -45,7 +45,20 @@ namespace CA_DataUploaderLib
             AddCommand("version", GetVersion);
         }
 
-        internal void AddDecisions(IEnumerable<LoopControlDecision> decisions) => _decisions.AddRange(decisions);
+        internal void AddDecisions(List<LoopControlDecision> decisions)
+        {
+            foreach (var e in decisions.SelectMany(d => d.HandledEvents))
+            {
+                //This just avoids the commands being reported as rejected for now, but the way to go about in the long run is to add detection of the executed commands by looking at the vectors.
+                //Note that even then, the decisions are not reporting which commands they actually handled or ignore, specially as they are receiving all commands and then handle what applies to the decision.
+                var firstWhitespace = e.IndexOf(' ');
+                var firstWordInEvent = firstWhitespace != -1 ? e[..firstWhitespace] : e;
+                AddCommand(firstWordInEvent, _ => true);
+            }
+
+            _decisions.AddRange(decisions);
+        }
+
         /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>
         public Action AddCommand(string name, Func<List<string>, bool> func) => _commandRunner.AddCommand(name, func);
         public void Execute(string command, bool isUserCommand = false) => HandleCommand(command, isUserCommand);
@@ -133,7 +146,10 @@ namespace CA_DataUploaderLib
                 .SelectMany(s => s.Outputs)
                 .Concat(_decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f, DataTypeEnum.State))))
                 .ToList();
-            return new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
+            var desc = new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
+            foreach (var decision in _decisions)
+                decision.Initialize(new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray()));
+            return desc;
         }
 
         private static IOconfNode GetCurrentNode() => GetNodes().Single(n => n.IsCurrentSystem);

@@ -37,7 +37,7 @@ namespace CA_DataUploaderLib
             foreach (var assemblyFullPath in Directory.GetFiles(targetFolder, "*.dll"))
                 LoadPlugin(assemblyFullPath, preventLoadOfDecisionPlugins);
 
-            handler.AddDecisions(_runningPlugins.SelectMany(p => p.Value.instances.OfType<LoopControlDecision>()));
+            handler.AddDecisions(_runningPlugins.SelectMany(p => p.Value.instances.OfType<LoopControlDecision>()).ToList());
 
             if (automaticallyLoadPluginChanges)
             {
