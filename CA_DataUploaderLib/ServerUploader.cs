@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -192,7 +193,7 @@ namespace CA_DataUploaderLib
 
         /// <returns>a signature of the original data followed by the data compressed with gzip.</returns>
         private byte[] SignAndCompress(byte[] buffer)
-        { 
+        {
             using (var memory = new MemoryStream())
             {
                 using (var gzip = new GZipStream(memory, CompressionMode.Compress))
@@ -213,7 +214,7 @@ namespace CA_DataUploaderLib
             return SignAndCompress(buffer);
         }
 
-        private byte[] GetSignedVectors(List<DataVector> vectors) 
+        private byte[] GetSignedVectors(List<DataVector> vectors)
         {
             byte[] listLen = BitConverter.GetBytes((ushort)vectors.Count());
             var theData = vectors.SelectMany(a => a.buffer).ToArray();
@@ -223,7 +224,7 @@ namespace CA_DataUploaderLib
         private byte[] GetSignedEvent(EventFiredArgs @event)
         { //this can be made more efficient to avoid extra allocations and/or use a memory pool, but these are for low frequency events so postponing looking at that.
             var bytes = @event.ToByteArray();
-            return _signing.GetSignature(bytes).Concat(bytes).ToArray(); 
+            return _signing.GetSignature(bytes).Concat(bytes).ToArray();
         }
 
         private static void OnError(string message, Exception ex)
@@ -273,13 +274,13 @@ namespace CA_DataUploaderLib
             }
 
             Task Post(EventFiredArgs args) => _plot.PostEventAsync(GetSignedEvent(args));
-            Task PostBoardsSerialInfo(SystemChangeNotificationData data, DateTime timeSpan) => 
+            Task PostBoardsSerialInfo(SystemChangeNotificationData data, DateTime timeSpan) =>
                 _plot.PostBoardsSerialInfo(SignAndCompress(data.ToBoardsSerialInfoJsonUtf8Bytes(timeSpan)));
             Task PostSystemChangeNotificationAsync(EventFiredArgs args)
             {
                 var data = SystemChangeNotificationData.ParseJson(args.Data);
                 return Task.WhenAll(
-                    PostBoardsSerialInfo(data, args.TimeSpan), 
+                    PostBoardsSerialInfo(data, args.TimeSpan),
                     Post(new EventFiredArgs(ToShortEventData(data), args.EventType, args.TimeSpan)));
             }
             static string ToShortEventData(SystemChangeNotificationData data)
@@ -348,23 +349,26 @@ namespace CA_DataUploaderLib
             }
 
             public string PlotName { get; private set; }
-            public async Task PostVectorAsync(byte[] buffer, DateTime timestamp) 
+            public async Task PostVectorAsync(byte[] buffer, DateTime timestamp)
             {
-                string query = $"api/LoopApi?plotnameID={_plotID}&Ticks={timestamp.Ticks}";
+                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+                string query = $"/api/v2/Timeserie?plotNameId={_plotID}&ticks={timestamp.Ticks}";
                 var response = await _client.PutAsJsonAsync(query, buffer);
                 response.EnsureSuccessStatusCode();
             }
 
             public async Task PostEventAsync(byte[] signedMessage)
             {
-                string query = $"api/LoopApi/LogEvent?plotnameID={_plotID}";
+                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+                string query = $"/api/v2/Event?plotNameId={_plotID}";
                 var response = await _client.PutAsJsonAsync(query, signedMessage);
                 response.EnsureSuccessStatusCode();
             }
 
             public async Task PostBoardsSerialInfo(byte[] signedMessage)
             {
-                string query = $"api/MCUboard?plotnameID={_plotID}";
+                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+                string query = $"/api/v1/McuSerialnumber?plotNameId={_plotID}";
                 var response = await _client.PutAsJsonAsync(query, signedMessage);
                 response.EnsureSuccessStatusCode();
             }
@@ -380,11 +384,13 @@ namespace CA_DataUploaderLib
 
             private static async Task<(int plotId, string plotName)> GetPlotIDAsync(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription)
             {
+                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                 HttpResponseMessage response = null;
                 try
                 {
-                    string query = $"api/LoopApi?LoopName={loopName}&ticks={DateTime.UtcNow.Ticks}&loginToken={loginToken}";
-                    response = await client.PutAsJsonAsync(query, publicKey.Concat(signedVectorDescription));
+                    string query = $"/api/v1/Plotdata/GetPlotnameId?loopname={loopName}&ticks={DateTime.UtcNow.Ticks}&logintoken={loginToken}";
+                    var signedValue = publicKey.Concat(signedVectorDescription).ToArray(); // Note that it will only work if converted to array and not IEnummerable
+                    response = await client.PutAsJsonAsync(query, signedValue);
                     response.EnsureSuccessStatusCode();
                     var result = await response.Content.ReadFromJsonAsync<string>();
                     return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
@@ -412,7 +418,7 @@ namespace CA_DataUploaderLib
                 {
                     try
                     {
-                        var token = await GetLoginToken(client, accountInfo);
+                        var token = await GetLoginToken(client, info);
                         if (failureCount > 0)
                             CALog.LogInfoAndConsoleLn(LogID.A, $"Reconnected after {failureCount} failed attempts.");
                         return token;
@@ -428,26 +434,29 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            private static async Task<string> GetLoginToken(HttpClient client, Dictionary<string, string> accountInfo)
+            private static async Task<string> GetLoginToken(HttpClient client, ConnectionInfo accountInfo)
             {
-                var (status, message) = await Post(client, accountInfo, "Login");
-                if (message == "email or password does not match")
-                    (status, message) = await Post(client, accountInfo, "Login/CreateAccount"); // attempt to create account assuming it did not exist
-                if (status == "success")
-                    return message;
+                string token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}");
+                if (string.IsNullOrEmpty(token))
+                    token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.email}&password={accountInfo.password}&fullName={accountInfo.Fullname}"); // attempt to create account assuming it did not exist
+                if (!string.IsNullOrEmpty(token))
+                    return token;
 
-                throw new Exception(message);
+                throw new Exception("Unable to login or create token");
             }
-            
-            private static async Task<(string status, string message)> Post(HttpClient client, Dictionary<string, string> accountInfo, string requestUri)
+
+            private static async Task<string> Post(HttpClient client, string requestUri)
             {
-                var response = await client.PostAsync(requestUri, new FormUrlEncodedContent(accountInfo));
+                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+                var response = await client.PostAsync(requestUri, null);
                 if (response.StatusCode == System.Net.HttpStatusCode.OK && response.Content != null)
                 {
-                    var dic = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
-                    return (dic["status"], dic["message"]);
+                    return (await response.Content.ReadAsStringAsync())?.Replace("\"","");
+
                 }
-            
+                else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    return null;
+
                 throw new Exception(response.ReasonPhrase);
             }
 
