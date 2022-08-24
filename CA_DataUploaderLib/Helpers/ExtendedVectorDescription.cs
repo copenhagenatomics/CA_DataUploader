@@ -88,7 +88,7 @@ namespace CA_DataUploaderLib.Helpers
             var outputVector = vector.Data.AsSpan()[(VectorDescription.Length - _outputCount)..];
             int i = 0;
             foreach (var output in outputs)
-                outputVector[i] = output.Value;
+                outputVector[i++] = output.Value;
         }
     }
 }
