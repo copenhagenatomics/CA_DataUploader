@@ -44,7 +44,7 @@ namespace CA_DataUploaderLib
             var lastActions = Enumerable.Range(0, ports.Max(p => p.PortNumber))
                 .Select(_ => (isOn: false, timeToRepeat: default(DateTime), timeRunnin: Stopwatch.StartNew()))
                 .ToArray();
-            var portsFields = ports.Select(p => (field: p.Name + "_On/Off", number: p.PortNumber)).ToArray();
+            var portsFields = ports.Select(p => (field: p.Name + "_onoff", number: p.PortNumber)).ToArray();
             reader.AddBuildInWriteAction(board, WriteAction, ExitAction);
 
             Task ExitAction(MCUBoard board, CancellationToken token) => AllOff(board, ports, token);

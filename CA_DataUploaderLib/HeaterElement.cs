@@ -179,7 +179,7 @@ namespace CA_DataUploaderLib
 
             internal IEnumerable<SensorSample> ToVectorSamples(string name)
             {
-                yield return new SensorSample(name + "_On/Off", IsOn ? 1.0 : 0.0); //TODO: hotvalves and valves need the same treatment!
+                yield return new SensorSample(name + "_onoff", IsOn ? 1.0 : 0.0); //TODO: hotvalves and valves need the same treatment!
                 yield return new SensorSample(name + "_target", Target);
                 yield return new SensorSample(name + "_pcontrolstart", CurrentControlPeriodStart.ToVectorDouble());
                 yield return new SensorSample(name + "_pcontrolseconds", CurrentControlPeriodSecondsOn);
@@ -188,7 +188,7 @@ namespace CA_DataUploaderLib
 
             internal static IEnumerable<VectorDescriptionItem> GetVectorDescriptionItems(string name)
             {
-                yield return new VectorDescriptionItem("double", name + "_On/Off", DataTypeEnum.Output);
+                yield return new VectorDescriptionItem("double", name + "_onoff", DataTypeEnum.Output);
                 yield return new VectorDescriptionItem("double", name + "_target", DataTypeEnum.State);
                 yield return new VectorDescriptionItem("double", name + "_pcontrolstart", DataTypeEnum.State);
                 yield return new VectorDescriptionItem("double", name + "_pcontrolseconds", DataTypeEnum.State);
@@ -196,7 +196,7 @@ namespace CA_DataUploaderLib
             }
             internal void ResumeFromVectorSamples(string name, NewVectorReceivedArgs args)
             {
-                IsOn = args[name + "_On/Off"] == 1.0;
+                IsOn = args[name + "_onoff"] == 1.0;
                 Target = (int)args[name + "_target"];
                 CurrentControlPeriodStart = args[name + "_pcontrolstart"].ToVectorDate();
                 CurrentControlPeriodSecondsOn = args[name + "_pcontrolseconds"];
