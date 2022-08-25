@@ -25,16 +25,13 @@ namespace CA_DataUploaderLib
             _config = config;
         }
 
-        public IHeaterElementState MakeNextActionDecision(NewVectorReceivedArgs vector)
+        public IEnumerable<SensorSample> MakeNextActionDecision(NewVectorReceivedArgs vector) => GetUpdatedDecisionState(vector).ToVectorSamples(_config.Name);
+        public HeaterElementState GetUpdatedDecisionState(NewVectorReceivedArgs vector)
         {
-            if (!TryGetSwitchboardInputsFromVector(vector, out var current)) 
-                return State; // not connected, we skip this heater and act again when the connection is re-established
+            var vectorTime = vector.GetVectorTime();
             var (hasValidTemperature, temp) = GetOvenTemperatureFromVector(vector);
             // Careful consideration must be taken if changing the order of the below statements.
-            var vectorTime = vector.GetVectorTime();
-            State.Action = CanTurnOn(hasValidTemperature, temp, vectorTime) 
-                ?? MustTurnOff(current, vectorTime) 
-                ?? State.Action;
+            State.IsOn = IsOn(hasValidTemperature, temp, vectorTime);
             return State;
         }
 
@@ -49,27 +46,22 @@ namespace CA_DataUploaderLib
         }
 
         public IEnumerable<VectorDescriptionItem> GetStateVectorDescriptionItems() => HeaterElementState.GetVectorDescriptionItems(Name());
-
-        /// <returns>an on action for up to 10 seconds (max time to leave on if we lose switchboard comms) or <c>null</c> when there is no new on action</returns>
-        private SwitchboardAction CanTurnOn(bool hasValidTemperature, double temperature, DateTime vectorTime)
+        private bool IsOn(bool hasValidTemperature, double temperature, DateTime vectorTime)
         { 
-            if (State.NeedToExtendManualOnAction(vectorTime)) return new (true, vectorTime.AddSeconds(10));
-            if (State.ManualOn) return null;
-            if (!State.OvenOn) return null;
+            if (State.ManualOn) return true;
+            if (!State.OvenOn) return false;
             var isNextControlPeriod = (vectorTime - State.CurrentControlPeriodStart) >= _config.ControlPeriod;
-            if (!isNextControlPeriod && State.NeedToExtendCurrentControlPeriodAction(vectorTime)) return new (true, UpTo10Seconds(State.CurrentControlPeriodTimeOff));
-            if (!isNextControlPeriod || !hasValidTemperature) return null;//note we postpone the start of the control period if we don't have valid temperatures
+            if (!isNextControlPeriod && State.CurrentControlPeriodTimeOff > vectorTime) return true;
+            if (!isNextControlPeriod) return false;
+            if (!hasValidTemperature) return false; //postpone the start of the control period until we get valid temperatures
 
             var secondsOn = GetProportionalControlSecondsOn(temperature);
             //SetTargetTemperature can trigger a new control period with a lower target,
             //due to this we explicitely issue an off action here as a result of the p control
             //i.e. we can't assume the last control period is always shut off when reaching the end of the control period
             State.SetPControlDecision(vectorTime, secondsOn);
-            return new(secondsOn != 0, UpTo10Seconds(State.CurrentControlPeriodTimeOff));
+            return secondsOn != 0;
 
-
-            DateTime UpTo10Seconds(DateTime timeOff) => Min(timeOff, vectorTime.AddSeconds(10));
-            static DateTime Min(DateTime a, DateTime b) => a < b ? a : b;
             double GetProportionalControlSecondsOn(double currentTemperature)
             {
                 var tempDifference = State.Target - currentTemperature;
@@ -80,23 +72,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public void ResumeState(NewVectorReceivedArgs args)
-        {
-            State.ResumeFromVectorSamples(Name(), args);
-        }
-
-        /// <returns>the off action or <c>null</c> when there is no new off action</returns>
-        private SwitchboardAction MustTurnOff(double current, DateTime vectorTime)
-        {
-            if (!State.Action.IsOn && vectorTime >= State.Action.TimeToTurnOff.AddSeconds(5) && current > _config.CurrentSensingNoiseTreshold) 
-                return new(false, vectorTime);//current detected with heater off, resending off command every 5 seconds
-            if (!State.Action.IsOn) return null;
-            if (State.ManualOn) return null;
-            if (!State.OvenOn || vectorTime >= State.CurrentControlPeriodTimeOff)
-                return new (false, vectorTime);
-            return null;
-        }
-
+        public void ResumeState(NewVectorReceivedArgs args) => State.ResumeFromVectorSamples(Name(), args);
         public void SetManualMode(bool turnOn) => State.ManualOn = turnOn;
         private (bool hasValidTemperature, double temp) GetOvenTemperatureFromVector(NewVectorReceivedArgs vector) 
         {
@@ -145,23 +121,6 @@ namespace CA_DataUploaderLib
             watch.Restart();
         }
         public string Name() => _config.Name;
-
-        private bool TryGetSwitchboardInputsFromVector(
-            NewVectorReceivedArgs vector, out double current)
-        {
-            if (!vector.TryGetValue(_config.SwitchBoardStateSensorName, out var state))
-                throw new InvalidOperationException($"missing heater's board connection state: {_config.SwitchBoardStateSensorName}");
-            if (state != (int)BaseSensorBox.ConnectionState.ReceivingValues)
-            {
-                current = 0;
-                return false;
-            }
-
-            if (!vector.TryGetValue(_config.CurrentSensorName, out current))
-                throw new InvalidOperationException($"missing heater current: {_config.CurrentSensorName}");
-            return true;
-        }
-
         private static Config ToConfig(IOconfHeater heater, IOconfOven oven)
         {
             if (oven == null)
@@ -170,20 +129,14 @@ namespace CA_DataUploaderLib
                 return new ()
                 {
                     MaxTemperature = heater.MaxTemperature,
-                    CurrentSensingNoiseTreshold = heater.CurrentSensingNoiseTreshold,
-                    Name = heater.Name,
-                    SwitchBoardStateSensorName = heater.BoardStateSensorName,
-                    CurrentSensorName = heater.CurrentSensorName,
+                    Name = heater.Name
                 };
             }
             
             return new ()
             {
                 MaxTemperature = heater.MaxTemperature,
-                CurrentSensingNoiseTreshold = heater.CurrentSensingNoiseTreshold,
                 Name = heater.Name,
-                SwitchBoardStateSensorName = heater.BoardStateSensorName,
-                CurrentSensorName = heater.CurrentSensorName,
                 Area = oven.OvenArea,
                 OvenSensor = oven.TemperatureSensorName,
                 ProportionalGain = oven.ProportionalGain,
@@ -198,27 +151,24 @@ namespace CA_DataUploaderLib
             public int Area { get; init; } = -1; // -1 when not set
             public string OvenSensor { get; init; } // sensor inside the oven somewhere.
             public int MaxTemperature { get; init; }
-            public double CurrentSensingNoiseTreshold { get; init; }
             public string Name { get; init; }
-            public string SwitchBoardStateSensorName { get; init; }
-            public string CurrentSensorName { get; init; }
             public IReadOnlyCollection<string> TemperatureBoardStateSensorNames { get; init; }
             public double ProportionalGain { get; init; }
             public TimeSpan ControlPeriod { get; init; }
             public double MaxOutputPercentage { get; init; }
         }
 
-        private class HeaterElementState : IHeaterElementState
+        public class HeaterElementState
         {
-            public SwitchboardAction Action { get; set; } = new(false, default);
+            public bool IsOn { get; internal set; }
             public int Target { get; private set; }
             public DateTime CurrentControlPeriodStart { get; private set; }
             public double CurrentControlPeriodSecondsOn { get; private set; }
             public DateTime CurrentControlPeriodTimeOff { get; private set; }
-            public bool ManualOn { get; set; }
+            public bool ManualOn { get; internal set; }
             public bool OvenOn => Target > 0;
 
-            public void SetTarget(int temperature, TimeSpan controlPeriod)
+            internal void SetTarget(int temperature, TimeSpan controlPeriod)
             {
                 Target = temperature;
                 if (!OvenOn)
@@ -227,56 +177,38 @@ namespace CA_DataUploaderLib
                     CurrentControlPeriodStart -= controlPeriod; //ensure we'll start a new control period on the next decision, avoiding slow response to commands.
             }
 
-            public IEnumerable<SensorSample> ToVectorSamples(string name, DateTime vectorTime)
+            internal IEnumerable<SensorSample> ToVectorSamples(string name)
             {
-                foreach (var sample in Action.ToVectorSamples(name, vectorTime))
-                    yield return sample;
+                yield return new SensorSample(name + "_On/Off", IsOn ? 1.0 : 0.0); //TODO: hotvalves and valves need the same treatment!
                 yield return new SensorSample(name + "_target", Target);
                 yield return new SensorSample(name + "_pcontrolstart", CurrentControlPeriodStart.ToVectorDouble());
                 yield return new SensorSample(name + "_pcontrolseconds", CurrentControlPeriodSecondsOn);
                 yield return new SensorSample(name + "_manualon", ManualOn ? 1.0 : 0.0);
             }
 
-            public static IEnumerable<VectorDescriptionItem> GetVectorDescriptionItems(string name)
+            internal static IEnumerable<VectorDescriptionItem> GetVectorDescriptionItems(string name)
             {
-                foreach (var item in SwitchboardAction.GetVectorDescriptionItems(name))
-                    yield return item;
+                yield return new VectorDescriptionItem("double", name + "_On/Off", DataTypeEnum.Output);
                 yield return new VectorDescriptionItem("double", name + "_target", DataTypeEnum.State);
                 yield return new VectorDescriptionItem("double", name + "_pcontrolstart", DataTypeEnum.State);
                 yield return new VectorDescriptionItem("double", name + "_pcontrolseconds", DataTypeEnum.State);
                 yield return new VectorDescriptionItem("double", name + "_manualon", DataTypeEnum.State);
             }
-
-            public bool NeedToExtendCurrentControlPeriodAction(DateTime vectorTime) => CurrentControlPeriodTimeOff > Action.TimeToTurnOff && Action.GetRemainingOnSeconds(vectorTime) < 2;
-            public bool NeedToExtendManualOnAction(DateTime vectorTime) => ManualOn && Action.GetRemainingOnSeconds(vectorTime) < 2;
-            public void ResumeFromVectorSamples(string name, NewVectorReceivedArgs args)
+            internal void ResumeFromVectorSamples(string name, NewVectorReceivedArgs args)
             {
-                Action = SwitchboardAction.FromVectorSamples(args, name);
+                IsOn = args[name + "_On/Off"] == 1.0;
                 Target = (int)args[name + "_target"];
                 CurrentControlPeriodStart = args[name + "_pcontrolstart"].ToVectorDate();
                 CurrentControlPeriodSecondsOn = args[name + "_pcontrolseconds"];
                 CurrentControlPeriodTimeOff = CurrentControlPeriodStart.AddSeconds(CurrentControlPeriodSecondsOn);
                 ManualOn = args[name + "_manualon"] == 1.0;
             }
-
-            public void SetPControlDecision(DateTime vectorTime, double secondsOn)
+            internal void SetPControlDecision(DateTime vectorTime, double secondsOn)
             {
                 CurrentControlPeriodStart = vectorTime;
                 CurrentControlPeriodSecondsOn = Math.Round(secondsOn, 4);
                 CurrentControlPeriodTimeOff = vectorTime.AddSeconds(CurrentControlPeriodSecondsOn);
             }
-        }
-        public interface IHeaterElementState
-        {
-            public SwitchboardAction Action { get; }
-            public int Target { get; }
-            public DateTime CurrentControlPeriodStart { get; }
-            public DateTime CurrentControlPeriodTimeOff { get; }
-            public bool ManualOn { get; }
-            public bool IsOn => Action.IsOn;
-            public DateTime TimeToTurnOff => Action.TimeToTurnOff;
-
-            IEnumerable<SensorSample> ToVectorSamples(string name, DateTime dateTime);
         }
     }
 }

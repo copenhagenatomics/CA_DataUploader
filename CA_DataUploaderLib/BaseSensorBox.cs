@@ -206,14 +206,25 @@ namespace CA_DataUploaderLib
                         continue;
                     }
 
-                    var vector = await _cmdAdvanced.When(_ => true, token);
-                    if (!CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector))
-                        continue; // no point trying to send commands while there is no connection to the board.
+                    var receivedVector = false;
+                    do
+                    {
+                        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                        linkedCts.CancelAfter(2000);
+                        var nextVectorTask = _cmdAdvanced.When(_ => true, linkedCts.Token);
+                        await Task.WhenAny(nextVectorTask); //wrap on Task.Any so we can explicitely deal with global cancellation vs. timeout of the linked token
+                        token.ThrowIfCancellationRequested(); //we are stopping, let's break of the top loop so stop actions run
+                        receivedVector = nextVectorTask.IsCompletedSuccessfully;
+                        NewVectorReceivedArgs vector = nextVectorTask.IsCompletedSuccessfully ? await nextVectorTask : null;
+                        if (receivedVector && !CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector))
+                            continue; // no point trying to send commands while there is no connection to the board.
 
-                    foreach (var (writeAction, _) in buildInActions)
-                        await writeAction(vector, board, token);
+                        foreach (var (writeAction, _) in buildInActions)
+                            await writeAction(vector, board, token);
 
-                    EnsureResumeAfterTimeoutIsReported();
+                        EnsureResumeAfterTimeoutIsReported();
+                    }
+                    while (!receivedVector);
                 }
                 catch (TimeoutException)
                 {

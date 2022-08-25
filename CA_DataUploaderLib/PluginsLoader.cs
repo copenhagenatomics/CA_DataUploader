@@ -122,7 +122,7 @@ namespace CA_DataUploaderLib
 
         static (AssemblyLoadContext context, Assembly assembly) LoadAssembly(string assemblyFullPath)
         {
-            PluginLoadContext context = new PluginLoadContext(assemblyFullPath);
+            var context = new PluginLoadContext(assemblyFullPath);
             using var fs = new FileStream(assemblyFullPath, FileMode.Open, FileAccess.Read); // force no file lock
             return (context, context.LoadFromStream(fs));
         }
@@ -162,7 +162,7 @@ namespace CA_DataUploaderLib
         {
             private const int MillisecondsWithoutChanges = 1000;
             readonly FileSystemWatcher watcher;
-            readonly Dictionary<string, object> _postponedChangeLocks = new Dictionary<string, object>();
+            readonly Dictionary<string, object> _postponedChangeLocks = new();
             public delegate void FileChangedDelegate(string fullpath);
             public event FileChangedDelegate Changed;
             public event FileChangedDelegate Deleted;

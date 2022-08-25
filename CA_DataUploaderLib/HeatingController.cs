@@ -56,7 +56,7 @@ namespace CA_DataUploaderLib
         public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs)
         { 
             foreach (var heater in _heaters)
-            foreach (var sample in heater.MakeNextActionDecision(inputVectorReceivedArgs).ToVectorSamples(heater.Name(), inputVectorReceivedArgs.GetVectorTime()))
+            foreach (var sample in heater.MakeNextActionDecision(inputVectorReceivedArgs))
                 yield return sample;
         }
 
