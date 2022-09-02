@@ -352,7 +352,7 @@ namespace CA_DataUploaderLib
             public async Task PostVectorAsync(byte[] buffer, DateTime timestamp)
             {
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-                string query = $"/api/v2/Timeserie?plotNameId={_plotID}&ticks={timestamp.Ticks}";
+                string query = $"/api/v2/Timeserie/UploadVectorRetroAsync?plotNameId={_plotID}&ticks={timestamp.Ticks}";
                 var response = await _client.PutAsJsonAsync(query, buffer);
                 response.EnsureSuccessStatusCode();
             }
