@@ -1,4 +1,5 @@
-﻿using CA.LoopControlPluginBase;
+﻿#nullable enable
+using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using CA_DataUploaderLib.Extensions;
@@ -9,12 +10,13 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CA_DataUploaderLib
 {
     public sealed class CommandHandler : IDisposable
     {
-        private readonly SerialNumberMapper _mapper;
+        private readonly SerialNumberMapper? _mapper;
         private readonly ICommandRunner _commandRunner;
         private DateTime _start = DateTime.Now;
         private readonly StringBuilder inputCommand = new();
@@ -22,17 +24,18 @@ namespace CA_DataUploaderLib
         private readonly List<ISubsystemWithVectorData> _subsystems = new();
         private int AcceptedCommandsIndex = -1;
         private readonly List<LoopControlDecision> _decisions = new();
+        private readonly List<LoopControlDecision> _safetydecisions = new();
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
         private readonly CancellationTokenSource _exitCts = new();
         private readonly TaskCompletionSource _runningTaskTcs = new();
 
-        public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
-        public event EventHandler<EventFiredArgs> EventFired;
+        public event EventHandler<NewVectorReceivedArgs>? NewVectorReceived;
+        public event EventHandler<EventFiredArgs>? EventFired;
         public bool IsRunning => !_exitCts.IsCancellationRequested;
         public CancellationToken StopToken => _exitCts.Token;
         public Task RunningTask => _runningTaskTcs.Task;
 
-        public CommandHandler(SerialNumberMapper mapper = null, ICommandRunner runner = null)
+        public CommandHandler(SerialNumberMapper? mapper = null, ICommandRunner? runner = null)
         {
             _exitCts.Token.Register(() => _runningTaskTcs.TrySetCanceled());
             _commandRunner = runner ?? new DefaultCommandRunner();
@@ -45,7 +48,10 @@ namespace CA_DataUploaderLib
             AddCommand("version", GetVersion);
         }
 
-        internal void AddDecisions(List<LoopControlDecision> decisions)
+        /// <remarks>all decisions must be added before running any subsystem, making decisions or getting vector descriptions i.e. add these early on</remarks>
+        public void AddDecisions<T>(List<T> decisions) where T: LoopControlDecision => AddDecisions(decisions, _decisions);
+        public void AddSafetyDecisions<T>(List<T> decisions) where T : LoopControlDecision => AddDecisions(decisions, _safetydecisions);
+        private void AddDecisions<T>(List<T> decisions, List<LoopControlDecision> targetList) where T : LoopControlDecision
         {
             foreach (var e in decisions.SelectMany(d => d.HandledEvents))
             {
@@ -56,7 +62,7 @@ namespace CA_DataUploaderLib
                 AddCommand(firstWordInEvent, _ => true);
             }
 
-            _decisions.AddRange(decisions);
+            targetList.AddRange(decisions);
         }
 
         /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>
@@ -66,23 +72,22 @@ namespace CA_DataUploaderLib
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
         /// <remarks>This method is only aimed at single host scenarios where a single system has all the inputs</remarks>
-        public void GetFullSystemVectorValues(ref DataVector vector, List<string> events) 
+        public void GetFullSystemVectorValues(ref DataVector? vector, List<string> events) 
         {
             var time = DateTime.UtcNow;
             MakeDecision(GetNodeInputs().ToList(), time, ref vector, events);
             OnNewVectorReceived(ToNewVectorReceivedArgs(vector, _fullsystemFilterAndMath.Value.VectorDescription._items));
         }
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
-        public void MakeDecision(List<SensorSample> inputs, DateTime vectorTime, ref DataVector vector, List<string> events)
+        public void MakeDecision(List<SensorSample> inputs, DateTime vectorTime, [NotNull]ref DataVector? vector, List<string> events)
         {
             var extendedDesc = _fullsystemFilterAndMath.Value;
             DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, vectorTime);
             extendedDesc.Apply(inputs, vector);
-            var inputVectorReceivedArgs = ToNewVectorReceivedArgs(vector, extendedDesc.VectorDescription._items);
-            var outputs = _subsystems.SelectMany(s => s.GetDecisionOutputs(inputVectorReceivedArgs));
-            extendedDesc.ApplyOutputs(vector, outputs);
             var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.Timestamp, vector.Data);
             foreach (var decision in _decisions)
+                decision.MakeDecision(decisionsVector, events);
+            foreach (var decision in _safetydecisions)
                 decision.MakeDecision(decisionsVector, events);
         }
 
@@ -98,13 +103,6 @@ namespace CA_DataUploaderLib
             return new NewVectorReceivedArgs(vectorDic);
         }
 
-        public void ResumeState(List<SensorSample> fullVector)
-        {
-            var args = new NewVectorReceivedArgs(fullVector.ToDictionary(v => v.Name, v => v.Value));
-            foreach (var subsystem in _subsystems)
-                subsystem.ResumeState(args);
-        }
-
         public Task RunSubsystems()
         {
             SendDeviceDetectionEvent();
@@ -113,6 +111,12 @@ namespace CA_DataUploaderLib
 
         private void SendDeviceDetectionEvent()
         {
+            if (_mapper == null) 
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, "can't send detection event due to CommandHandler being invoked with a null SerialNumberMapper");
+                return;
+            }
+
             var data = new SystemChangeNotificationData() { NodeName = GetCurrentNode().Name, Boards = _mapper.McuBoards.Select(ToBoardInfo).ToList() }.ToJson();
             FireCustomEvent(data, DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
 
@@ -142,12 +146,10 @@ namespace CA_DataUploaderLib
                 .Where(n => n.inputs.Count > 0)
                 .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
                 .ToList();
-            var outputs = descItemsPerSubsystem
-                .SelectMany(s => s.Outputs)
-                .Concat(_decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f, DataTypeEnum.State))))
-                .ToList();
+            var decisions = _decisions.Concat(_safetydecisions);
+            var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type))).ToList();
             var desc = new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
-            foreach (var decision in _decisions)
+            foreach (var decision in decisions)
                 decision.Initialize(new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray()));
             return desc;
         }
@@ -226,7 +228,7 @@ namespace CA_DataUploaderLib
         }
 
         /// <returns>the text line <c>null</c> if we are no longer running (_running is false)</returns>
-        private string GetCommand()
+        private string? GetCommand()
         {
             inputCommand.Clear();
             var info = Console.ReadKey(true);
@@ -320,7 +322,7 @@ $@"{GetCurrentNode().Name}
 {RpiVersion.GetSoftware()}
 {RpiVersion.GetHardware()}
 {connInfo.LoopName} - {connInfo.email}
-{string.Join(Environment.NewLine, _mapper.McuBoards.Select(x => x.ToString()))}");
+{(_mapper != null ? string.Join(Environment.NewLine, _mapper.McuBoards.Select(x => x.ToString())) : "")}");
             return true;
         }
 

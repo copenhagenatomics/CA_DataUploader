@@ -1,4 +1,5 @@
-﻿namespace CA.LoopControlPluginBase
+﻿#nullable enable
+namespace CA.LoopControlPluginBase
 {
     public class VectorDescription
     {

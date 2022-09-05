@@ -65,6 +65,8 @@ namespace CA_DataUploaderLib.Helpers
         /// <remarks>the input vector is expected to contains all input + state initially sent in the vector description passed to the constructor.</remarks>
         public void Apply(List<SensorSample> inputs, DataVector vector)
         {
+            //removing all this manipulation below that requires some allocations is tricky,
+            //but a part of it might be moving to a decisions like approach where the subsystems precalculate the field indexes + maybe we keep an original and an extended version and use some field indexes mapping to move data around
             foreach (var filter in _values)
             {
                 filter.Input(inputs);
@@ -79,16 +81,6 @@ namespace CA_DataUploaderLib.Helpers
             var data = vector.Data;
             for (int i = 0; i < inputs.Count; i++)
                 data[i] = inputs[i].Value;
-        }
-
-        /// <summary>appends the specified outputs to the end of the input vector</summary>
-        /// <remarks>the input vector is expected to be the expanded version returned by the <see cref="Apply" /> method</remarks>
-        public void ApplyOutputs(DataVector vector, IEnumerable<SensorSample> outputs)
-        {
-            var outputVector = vector.Data.AsSpan()[(VectorDescription.Length - _outputCount)..];
-            int i = 0;
-            foreach (var output in outputs)
-                outputVector[i++] = output.Value;
         }
     }
 }

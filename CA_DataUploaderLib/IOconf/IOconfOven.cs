@@ -1,5 +1,7 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using CA_DataUploaderLib.Extensions;
 
@@ -53,7 +55,7 @@ namespace CA_DataUploaderLib.IOconf
         public readonly int OvenArea;
         public readonly IOconfHeater HeatingElement;
         public string TemperatureSensorName { get; }
-        public IReadOnlyCollection<string> BoardStateSensorNames {get;}
+        public ReadOnlyCollection<string> BoardStateSensorNames {get;}
         //with the current formula the gain pretty much means seconds to gain 1C
         //by default we assume the HeatingElement can heat TypeK 5 degrees x second on. 
         public double ProportionalGain { get; } = 0.2d; 

@@ -1,4 +1,6 @@
-﻿using System;
+﻿#nullable enable
+using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CA_DataUploaderLib
 {
@@ -20,7 +22,7 @@ namespace CA_DataUploaderLib
         public double[] Data { get; }
         public int Count() => Data.Length;
 
-        internal static void InitializeOrUpdateTime(ref DataVector vector, int length, DateTime vectorTime)
+        internal static void InitializeOrUpdateTime([NotNull]ref DataVector? vector, int length, DateTime vectorTime)
         {
             if (vector == null)
                 vector = new DataVector(new double[length], vectorTime);
