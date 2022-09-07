@@ -13,49 +13,49 @@ namespace UnitTests
         [TestMethod]
         public void VectorDescriptionIncludesMath()
         {
-            static IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
-            var math = new MathVectorExpansion(GetTestMath);
+            var math = GetNewMathExpansion(new("Math;MyMath;MyName + 2", 2));
             Assert.AreEqual("MyMath", string.Join(Environment.NewLine, math.GetVectorDescriptionEntries().Select(e => e.Descriptor)));
         }
 
         [TestMethod]
         public void ExpandsVector()
         {
-            static IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
-            var math = new MathVectorExpansion(GetTestMath);
-            var values = new List<SensorSample>() { new SensorSample(new IOconfInput("KType;MyName", 1, "KType", false, false, null), 0.2) };
-            math.Expand(values);
-            CollectionAssert.AreEqual(new[] { 0.2, 2.2 }, values.Select(v => v.Value).ToArray());
+            var math = GetInitializedMathExpansion(new("Math;MyMath;MyName + 2", 2), new[] { "MyName", "MyMath" });
+            var values = new[]{0.2, 0};
+            math.Apply(values);
+            CollectionAssert.AreEqual(new[] { 0.2, 2.2 }, values);
         }
 
         [TestMethod]
         public void IgnoresUnusedValues()
         {
-            static IEnumerable<IOconfMath> GetTestMath() => new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
-            var math = new MathVectorExpansion(GetTestMath);
-            var values = new List<SensorSample>() {
-                new SensorSample(new IOconfInput("KType;MyName", 1, "KType", false, false, null), 0.2),
-                new SensorSample(new IOconfInput("KType;UnusedValue", 1, "KType", false, false, null), 3)
-            };
-            math.Expand(values);
-            CollectionAssert.AreEqual(new[] { 0.2, 3, 2.2 }, values.Select(v => v.Value).ToArray());
+            var math = GetInitializedMathExpansion(new("Math;MyMath;MyName + 2", 2), new[] { "MyName", "UnusedValue", "MyMath" });
+            var values = new[]{0.2, 3, 0};
+            math.Apply(values);
+            CollectionAssert.AreEqual(new[] { 0.2, 3, 2.2 }, values);
         }
 
         [TestMethod]
         public void IgnoresIOConfMathChanges()
         {
-            var ioconfEntries = new[] { new IOconfMath("Math;MyMath;MyName + 2", 2) };
+            var ioconfEntries = new IOconfMath[] { new("Math;MyMath;MyName + 2", 2) };
             IEnumerable<IOconfMath> GetTestMath() => ioconfEntries;
             var math = new MathVectorExpansion(GetTestMath);
-            var values = new List<SensorSample>() { new SensorSample(new IOconfInput("KType;MyName", 1, "KType", false, false, null), 0.2) };
+            math.Initialize(new[] { "MyName", "MyMath", "MyOutput" });
+            var values = new[]{0.2,0,100};
 
-            ioconfEntries = new[] { new IOconfMath("Math;MyMath;MyName + 2", 2), new IOconfMath("Math;MyMath2;MyName + 3", 2) };
-            math.Expand(values);
+            ioconfEntries = new IOconfMath[] { new("Math;MyMath;MyName + 2", 2), new("Math;MyMath2;MyName + 3", 2) };
+            math.Apply(values);
 
-            CollectionAssert.AreEqual(
-                new[] { 0.2, 2.2 }, 
-                values.Select(v => v.Value).ToArray(), 
-                "only the single math statement sent to the constructor must be used");
+            CollectionAssert.AreEqual(new[] { 0.2, 2.2, 100 }, values, "the extra math statement must be ignored and must not incorrectly update the output");
         }
+
+        public static MathVectorExpansion GetInitializedMathExpansion(IOconfMath math, IEnumerable<string> allvectorfields)
+        {
+            var expansion = GetNewMathExpansion(math);
+            expansion.Initialize(allvectorfields);
+            return expansion;
+        }
+        public static MathVectorExpansion GetNewMathExpansion(IOconfMath math) => new(() => new[] { math });
     }
 }

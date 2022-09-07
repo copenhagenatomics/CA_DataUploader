@@ -1,4 +1,5 @@
-﻿using CA_DataUploaderLib.IOconf;
+﻿#nullable enable
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -34,6 +35,7 @@ namespace CA_DataUploaderLib.Helpers
             allItems.AddRange(_mathVectorExpansion.GetVectorDescriptionEntries());
             allItems.AddRange(outputs);
             _outputCount = outputs.Count;
+            _mathVectorExpansion.Initialize(allItems.Select(i => i.Descriptor));
             VectorDescription = new VectorDescription(allItems, hardware, software);
         }
 
@@ -74,13 +76,14 @@ namespace CA_DataUploaderLib.Helpers
             }
 
             RemoveHiddenSources(inputs, i => i.Name);
-            _mathVectorExpansion.Expand(inputs);
-            if (inputs.Count + _outputCount != VectorDescription.Length)
-                throw new ArgumentException($"wrong input vector length (input, expected): {inputs.Count} <> {VectorDescription.Length - _outputCount}");
-
+            var expectedInputsCount = VectorDescription.Length - _mathVectorExpansion.Count - _outputCount;
+            if (inputs.Count != expectedInputsCount)
+                throw new ArgumentException($"wrong input vector length (input, expected): {inputs.Count} <> {expectedInputsCount}");
             var data = vector.Data;
             for (int i = 0; i < inputs.Count; i++)
                 data[i] = inputs[i].Value;
+
+            _mathVectorExpansion.Apply(data);
         }
     }
 }

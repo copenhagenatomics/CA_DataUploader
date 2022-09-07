@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -14,7 +15,7 @@ namespace CA_DataUploaderLib
     {
         private readonly BaseSensorBox _boardsLoops;
         private static readonly object ControllerInitializationLock = new();
-        private static SwitchBoardController _instance;
+        private static SwitchBoardController? _instance;
 
         private SwitchBoardController(CommandHandler cmd) 
         {
@@ -63,6 +64,7 @@ namespace CA_DataUploaderLib
                 await board.SafeWriteLine($"p{port.number} off", token);
                 lastActions[port.number - 1].isOn = false;
                 lastActions[port.number - 1].timeToRepeat = DateTime.MaxValue;//max forces execution on the next vector / also note we don't restart time running for the same reason.
+                return;
             }
 
             var isOn = vector[port.field] == 1.0;
