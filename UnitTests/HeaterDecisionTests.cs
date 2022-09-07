@@ -216,10 +216,33 @@ namespace UnitTests
             Assert.AreEqual(0.0, Field("heater_onoff"));
         }
 
+        [TestMethod]
+        public void CanRunWithoutOven()
+        {
+            NewHeaterDecisionConfig(NewConfig.WithoutOven().Build());
+            MakeDecisions();
+            Assert.AreEqual(0.0, Field("heater_onoff"));
+            MakeDecisions("heater heater on", vector.Timestamp.AddSeconds(5));
+            Assert.AreEqual(1.0, Field("heater_onoff"));
+            MakeDecisions("heater heater off", vector.Timestamp.AddSeconds(10));
+            Assert.AreEqual(0.0, Field("heater_onoff"), "should be off after turning off again");
+        }
+
+        [TestMethod]
+        public void CanEmergencyShutdownWithoutOven()
+        {
+            NewHeaterDecisionConfig(NewConfig.WithoutOven().Build());
+            MakeDecisions("heater heater on", vector.Timestamp.AddSeconds(5));
+            Assert.AreEqual(1.0, Field("heater_onoff"));
+            MakeDecisions("emergencyshutdown", vector.Timestamp.AddSeconds(10));
+            Assert.AreEqual(0.0, Field("heater_onoff"));
+        }
+
         private class HeaterDecisionConfigBuilder
         {
             private double _proportionalGain = 0.2d;
             private double _maxOutput = 1d;
+            private bool _ovenDisabled = false;
 
             public HeaterDecisionConfigBuilder WithProportionalGain(double value)
             { 
@@ -233,8 +256,15 @@ namespace UnitTests
                 return this;
             }
 
-            public HeatingController.HeaterDecision.Config Build() =>
-                new("heater", new List<string>(){"temperature_state"}.AsReadOnly())
+            public HeaterDecisionConfigBuilder WithoutOven()
+            {
+                _ovenDisabled = true;
+                return this;
+            }
+
+            public HeatingController.HeaterDecision.Config Build() => _ovenDisabled
+                ? new("heater", new List<string>().AsReadOnly())
+                : new("heater", new List<string>() { "temperature_state" }.AsReadOnly())
                 {
                     ProportionalGain = _proportionalGain,
                     ControlPeriod = TimeSpan.FromSeconds(30),

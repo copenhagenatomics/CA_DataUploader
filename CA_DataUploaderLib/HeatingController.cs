@@ -38,7 +38,7 @@ namespace CA_DataUploaderLib
 
         public class HeaterDecision : LoopControlDecision
         {
-            public enum States { initial, WaitingControlPeriod, ManualOn, InControlPeriod, TemperatureBoardsDisconnected, NegativeOrZeroTemperature, TemperatureReadError }
+            public enum States { initial, WaitingControlPeriod, ManualOn, InControlPeriod, TemperatureBoardsDisconnected, NegativeOrZeroTemperature, TemperatureReadError, WaitingManualCommand }
             public enum Events { none, vector, heateroff, heateron, emergencyshutdown, oven };
             private readonly Dictionary<string, Events> _eventsMap;
             private readonly Config _config;
@@ -73,7 +73,7 @@ namespace CA_DataUploaderLib
                 if (oven == null)
                 {
                     CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heater.Name}");
-                    return new(heater.Name, new List<string>().AsReadOnly()) { MaxTemperature = heater.MaxTemperature };
+                    return new(heater.Name, new List<string>().AsReadOnly());//notice we don't set the maxtemperature configured at the heater level, as there is no way to enforce as the oven config owns the temperature sensor
                 }
 
                 return new(heater.Name, oven.BoardStateSensorNames)
@@ -94,7 +94,6 @@ namespace CA_DataUploaderLib
                     Name = name;
                     TemperatureBoardStateSensorNames = temperatureBoardStateSensorNames;
                 }
-
                 public int Area { get; init; } = -1; // -1 when not set
                 public string AreaName => $"ovenarea_{Area}";
                 public string? OvenSensor { get; init; } // sensor inside the oven somewhere.
@@ -121,7 +120,9 @@ namespace CA_DataUploaderLib
                 }
                 public States State { get => (States)_latestVector[_indexes.state]; set => _latestVector[_indexes.state] = (int)value; }
                 public double ovensensor { get => _latestVector[_indexes.ovensensor]; set => _latestVector[_indexes.ovensensor] = value; }
+                public bool ovensensor_defined => _indexes.ovensensor > -1;
                 public double target { get => _latestVector[_indexes.target]; set => _latestVector[_indexes.target] = value; }
+                public bool target_defined => _indexes.target > -1;
                 public double on { get => _latestVector[_indexes.on]; set => _latestVector[_indexes.on] = value; }
                 public double nextcontrolperiod { get => _latestVector[_indexes.nextcontrolperiod]; set => _latestVector[_indexes.nextcontrolperiod] = value; }
                 public double controlperiodtimeoff { get => _latestVector[_indexes.controlperiodtimeoff]; set => _latestVector[_indexes.controlperiodtimeoff] = value; }
@@ -149,6 +150,7 @@ namespace CA_DataUploaderLib
                         (States.ManualOn, Events.emergencyshutdown) => States.WaitingControlPeriod, //manual on is the only state not controlled by the oven area which must already set to 0 by OvenAreaDecision
                         (States.ManualOn, Events.heateroff) => States.WaitingControlPeriod,
                         //Note that direct changes by plugins to the oven area target changes are only being applied on the next control period (requires being able to detect the target changed since our last decision which requires an extra field).
+                        (States.WaitingControlPeriod, _) when !target_defined || !ovensensor_defined => States.WaitingManualCommand,
                         (States.WaitingControlPeriod, _) when !TemperatureBoardsConnected => States.TemperatureBoardsDisconnected,
                         (States.WaitingControlPeriod, _) when ovensensor <= 0 => States.NegativeOrZeroTemperature,
                         (States.WaitingControlPeriod, _) when ovensensor >= 10000 => States.TemperatureReadError,
@@ -264,7 +266,7 @@ namespace CA_DataUploaderLib
                     }
 
                     if (state == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: state_{_config.Name}", nameof(desc));
-                    if (target == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.AreaName}", nameof(desc));
+                    if (target == -1 && _config.Area != -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.AreaName}", nameof(desc));
                     if (on == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_onoff", nameof(desc));
                     if (nextcontrolperiod == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_nextcontrolperiod", nameof(desc));
                     if (controlperiodtimeoff == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_controlperiodtimeoff", nameof(desc));
@@ -425,7 +427,7 @@ namespace CA_DataUploaderLib
                     }
 
                     if (state == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: state_{_config.Name}", nameof(desc));
-                    if (target == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_target", nameof(desc));
+                    if (target == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}", nameof(desc));
                 }
             }
 #pragma warning restore IDE1006 // Naming Styles
