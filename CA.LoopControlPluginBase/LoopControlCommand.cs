@@ -5,6 +5,11 @@ using System.Threading.Tasks;
 
 namespace CA.LoopControlPluginBase
 {
+    /// <remarks>
+    /// Important: plugins using this are not supported in distributed deployments and <see cref="LoopControlDecision"/> should be used instead.
+    /// Only a specialized cluster where the commands always run in the same node can use them, 
+    /// but it creates a single point of failure as there is no support to stop and resume in a different node if needed.
+    /// </remarks>
     public abstract class LoopControlCommand : IDisposable
     { 
         public abstract string Name { get; }
