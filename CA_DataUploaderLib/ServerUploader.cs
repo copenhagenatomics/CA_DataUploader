@@ -351,7 +351,7 @@ namespace CA_DataUploaderLib
             public string PlotName { get; private set; }
             public async Task PostVectorAsync(byte[] buffer, DateTime timestamp)
             {
-                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                 string query = $"/api/v2/Timeserie/UploadVectorRetroAsync?plotNameId={_plotID}&ticks={timestamp.Ticks}";
                 var response = await _client.PutAsJsonAsync(query, buffer);
                 response.EnsureSuccessStatusCode();
@@ -359,7 +359,7 @@ namespace CA_DataUploaderLib
 
             public async Task PostEventAsync(byte[] signedMessage)
             {
-                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                 string query = $"/api/v2/Event?plotNameId={_plotID}";
                 var response = await _client.PutAsJsonAsync(query, signedMessage);
                 response.EnsureSuccessStatusCode();
@@ -367,7 +367,7 @@ namespace CA_DataUploaderLib
 
             public async Task PostBoardsSerialInfo(byte[] signedMessage)
             {
-                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                 string query = $"/api/v1/McuSerialnumber?plotNameId={_plotID}";
                 var response = await _client.PutAsJsonAsync(query, signedMessage);
                 response.EnsureSuccessStatusCode();
@@ -384,7 +384,7 @@ namespace CA_DataUploaderLib
 
             private static async Task<(int plotId, string plotName)> GetPlotIDAsync(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription)
             {
-                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                 HttpResponseMessage response = null;
                 try
                 {
@@ -447,7 +447,7 @@ namespace CA_DataUploaderLib
 
             private static async Task<string> Post(HttpClient client, string requestUri)
             {
-                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                 var response = await client.PostAsync(requestUri, null);
                 if (response.StatusCode == System.Net.HttpStatusCode.OK && response.Content != null)
                 {
