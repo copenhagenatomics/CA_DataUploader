@@ -41,12 +41,12 @@ namespace CA_DataUploaderLib
 
             //note that not only we have all the innecesary copying of data here, but even though the dictionary its reused we have boxing of the values (IOConfMath.Calculate requires a Dictionary<string, object>.
             //one option to improve both is to have a different math expression engine that allows preprocessing the expression in a way that allows to specify the parameters by index
-            //and allows to specify them in a single desired type.
+            //and allows to specify them in a single desired type. Also note the engine also causes boxing of the result as it returns an object we convert to a double.
             for (int i = 0; i < _fieldsByIndex.Count; i++)
                 _reusableFiedsDictionary[_fieldsByIndex[i]] = vector[i];
 
             foreach (var (math, index) in _mathWithFieldIndexes)
-                vector[index] = math.Calculate(_reusableFiedsDictionary).Value;
+                vector[index] = math.Calculate(_reusableFiedsDictionary);
         }
     }
 }

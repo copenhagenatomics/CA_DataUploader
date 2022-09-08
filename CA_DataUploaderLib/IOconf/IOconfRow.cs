@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -19,8 +20,8 @@ namespace CA_DataUploaderLib.IOconf
         protected readonly string Row;
         protected readonly string Type;
         protected readonly int LineNumber;
-        public string Name { get; init; } 
-        protected string Format { get; init; }
+        public string Name { get; init; }
+        protected string Format { get; init; } = string.Empty;
 
         public List<string> ToList() => RowWithoutComment().Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
 
@@ -38,7 +39,7 @@ namespace CA_DataUploaderLib.IOconf
             var temp = Row;
             var pos = Row.IndexOf("//");
             if (pos > 2 && !Row.Contains("https://") && !Row.Contains("http://"))
-                temp = Row.Substring(0, pos);  // remove any comments in the end of the line. 
+                temp = Row[..pos];  // remove any comments in the end of the line. 
             return temp;
         }
 
