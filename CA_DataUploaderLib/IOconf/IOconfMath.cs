@@ -1,26 +1,33 @@
-﻿using NCalc;
+﻿#nullable enable
+using NCalc;
 using System;
 using System.Collections.Generic;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfMath : IOconfInput
+    public class IOconfMath : IOconfRow
     {
-        public IOconfMath(string row, int lineNum) : base(row, lineNum, "Math", false, false, null)
+        /// <summary>gets the sources (other vector values) listed explicitely in the math expression</summary>
+        /// <remarks>
+        /// Note the sources may include the math expression itself, which is the expression refering to its value in the previous cycle.
+        /// Also note that the sources returned may also refer to the math expression.
+        /// </remarks>
+        public List<string> SourceNames { get; }
+        public IOconfMath(string row, int lineNum) : base(row, lineNum, "Math")
         {
             Format = "Math;Name;math expression";
 
-            var list = ToList();
-
             try
             {
-                var compiledExpression = Expression.Compile(row.Substring(Name.Length + 6), true);
+                var compiledExpression = Expression.Compile(row[(Name.Length + 6)..], true);
                 expression = new Expression(compiledExpression);
             }
             catch (Exception ex)
             {
                 throw new Exception("IOconfMath: wrong format - expression: " + row, ex);
             }
+
+            SourceNames = GetSources();
         }
 
         private readonly Expression expression;
@@ -30,17 +37,17 @@ namespace CA_DataUploaderLib.IOconf
         // https://github.com/sklose/NCalc2
         // examples:
         // https://github.com/sklose/NCalc2/blob/master/test/NCalc.Tests/Fixtures.cs
-        public SensorSample Calculate(Dictionary<string, object> values)
+        public double Calculate(Dictionary<string, object> values)
         {
             expression.Parameters = values;
             // Convert.ToDouble allows some expressions that return int, decimals or even boolean to work
             // note that some expression may even return different values depending on the branch hit i.e. when using if(...)
-            return new SensorSample(this, Convert.ToDouble(expression.Evaluate())) { TimeStamp = DateTime.UtcNow };
+            return Convert.ToDouble(expression.Evaluate());
         }
 
-        public List<string> GetSources() 
+        private List<string> GetSources() 
         {
-            HashSet<string> parameters = new HashSet<string>();
+            HashSet<string> sources = new();
             expression.EvaluateFunction += EvalFunction; 
             expression.EvaluateParameter += EvalParameter;
             try
@@ -52,17 +59,17 @@ namespace CA_DataUploaderLib.IOconf
                 expression.EvaluateFunction -= EvalFunction; 
                 expression.EvaluateParameter -= EvalParameter;
             }
-            return new List<string>(parameters);
+            return new List<string>(sources);
 
-            void EvalFunction(string name, NCalc.FunctionArgs args) 
+            void EvalFunction(string name, FunctionArgs args) 
             {
                 args.EvaluateParameters();
                 args.Result = 1;
             };
 
-            void EvalParameter(string name, NCalc.ParameterArgs args) 
+            void EvalParameter(string name, ParameterArgs args) 
             {
-                parameters.Add(name);
+                sources.Add(name);
                 args.Result = 1;
             };
         }

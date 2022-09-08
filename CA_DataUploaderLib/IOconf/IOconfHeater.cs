@@ -7,16 +7,15 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfHeater(string row, int lineNum) : base(row, lineNum, "Heater")
         {
-            Format = "Heater;Name;BoxName;port number;MaxTemperature;CurrentSensingNoiseTreshold";
+            //note: the format used to be "Heater;Name;BoxName;port number;MaxTemperature;CurrentSensingNoiseTreshold",
+            //but CurrentSensingNoiseTreshold got removed as its no longer relevant to the current decision logic
+            //(used to influence repeat of off commands, but now they run unconditionally by the SwitchboardController.
+            Format = "Heater;Name;BoxName;port number;MaxTemperature";
 
             var list = ToList();
             if (list.Count < 5 || !int.TryParse(list[4], out MaxTemperature)) throw new Exception("IOconfHeater: missing max temperature: " + row);
-            if (list.Count == 6 && !list[5].TryToDouble(out CurrentSensingNoiseTreshold)) throw new Exception("IOconfHeater: failed to parse CurrentSensingNoiseTreshold: " + row);
         }
 
         public readonly int MaxTemperature;
-        /// <summary>the heater is considered off below this current level (in amps)</summary>
-        /// <remarks>at the time of writting, this can not be lowered for the current version of the AC switchboard</remarks>
-        public readonly double CurrentSensingNoiseTreshold = 0.4;
     }
 }

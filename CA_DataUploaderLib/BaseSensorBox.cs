@@ -89,12 +89,11 @@ namespace CA_DataUploaderLib
             .Select(s => s.Clone())
             .Concat(_boardsState.Select(b => new SensorSample(b.sensorName, (int)b.State)));
 
-        public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs) => Enumerable.Empty<SensorSample>();
         public virtual SubsystemDescriptionItems GetVectorDescriptionItems()
         {
             var nodes = _values.GroupBy(v => v.Input.Map.DistributedNode);
             var valuesByNode = nodes.Select(n => (n.Key, GetNodeDescItems(n))).ToList();
-            return new SubsystemDescriptionItems(valuesByNode, new());
+            return new SubsystemDescriptionItems(valuesByNode);
 
             static List<VectorDescriptionItem> GetNodeDescItems(IEnumerable<SensorSample> values) =>
                 values.Select(v => new VectorDescriptionItem("double", v.Input.Name, DataTypeEnum.Input))
@@ -206,14 +205,25 @@ namespace CA_DataUploaderLib
                         continue;
                     }
 
-                    var vector = await _cmdAdvanced.When(_ => true, token);
-                    if (!CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector))
-                        continue; // no point trying to send commands while there is no connection to the board.
+                    var receivedVector = false;
+                    do
+                    {
+                        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                        linkedCts.CancelAfter(2000);
+                        var nextVectorTask = _cmdAdvanced.When(_ => true, linkedCts.Token);
+                        await Task.WhenAny(nextVectorTask); //wrap on Task.Any so we can explicitely deal with global cancellation vs. timeout of the linked token
+                        token.ThrowIfCancellationRequested(); //we are stopping, let's break of the top loop so stop actions run
+                        receivedVector = nextVectorTask.IsCompletedSuccessfully;
+                        NewVectorReceivedArgs vector = nextVectorTask.IsCompletedSuccessfully ? await nextVectorTask : null;
+                        if (receivedVector && !CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector))
+                            continue; // no point trying to send commands while there is no connection to the board.
 
-                    foreach (var (writeAction, _) in buildInActions)
-                        await writeAction(vector, board, token);
+                        foreach (var (writeAction, _) in buildInActions)
+                            await writeAction(vector, board, token);
 
-                    EnsureResumeAfterTimeoutIsReported();
+                        EnsureResumeAfterTimeoutIsReported();
+                    }
+                    while (!receivedVector);
                 }
                 catch (TimeoutException)
                 {

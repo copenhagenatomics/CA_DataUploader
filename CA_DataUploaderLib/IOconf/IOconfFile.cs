@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,8 +8,8 @@ namespace CA_DataUploaderLib.IOconf
 {
     public static class IOconfFile
     {
-        private static readonly List<IOconfRow> Table = new List<IOconfRow>();
-        public static List<string> RawLines { get; private set; }
+        private static readonly List<IOconfRow> Table = new();
+        public static List<string> RawLines { get; private set; } = new();
 
         static IOconfFile()
         {
@@ -85,5 +86,37 @@ namespace CA_DataUploaderLib.IOconf
         public static IEnumerable<IOconfInput> GetInputs() => GetEntries<IOconfInput>();
         public static IEnumerable<T> GetEntries<T>() => Table.OfType<T>();
         public static string GetRawFile() => string.Join(Environment.NewLine, RawLines);
+        ///<remarks>for filters and math it returs the board state of all their sources.</remarks>
+        public static IEnumerable<string> GetBoardStateNames(string sensor)
+        {
+            var sensorsChecked = new HashSet<string>();
+            return GetBoardStateNamesForSensors(new[] { sensor }, sensorsChecked);
+
+            static IEnumerable<string> GetBoardStateNamesForSensors(IEnumerable<string> sensors, HashSet<string> sensorsChecked)
+            {
+                var newSensors = sensors.ToHashSet();
+                newSensors.ExceptWith(sensorsChecked);
+                sensorsChecked.UnionWith(sensors);
+                foreach (var input in GetInputs())
+                {
+                    if (newSensors.Contains(input.Name))
+                        yield return input.BoardStateSensorName;
+                }
+
+                foreach (var filter in GetFilters())
+                {
+                    if (!newSensors.Contains(filter.NameInVector)) continue;
+                    foreach (var boardState in GetBoardStateNamesForSensors(filter.SourceNames, sensorsChecked))
+                        yield return boardState;
+                }
+
+                foreach (var math in GetMath())
+                {
+                    if (!newSensors.Contains(math.Name)) continue;
+                    foreach (var boardState in GetBoardStateNamesForSensors(math.SourceNames, sensorsChecked))
+                        yield return boardState;
+                }
+            }
+        }
     }
 }

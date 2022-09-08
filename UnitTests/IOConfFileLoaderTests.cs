@@ -27,7 +27,7 @@ namespace UnitTests
             Assert.IsInstanceOfType(rows[0], typeof(IOconfMath));
             var math = (IOconfMath)rows[0];
             Assert.AreEqual("mymath", math.Name);
-            Assert.AreEqual(405, math.Calculate(new() { {"heater1", 400} }).Value);
+            Assert.AreEqual(405, math.Calculate(new() { {"heater1", 400} }));
         }
 
 

@@ -1,4 +1,5 @@
-﻿using CA_DataUploaderLib.Helpers;
+﻿#nullable enable
+using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.Extensions;
 using System;
 using System.Collections.Generic;
@@ -11,8 +12,7 @@ namespace CA_DataUploaderLib.IOconf
         public readonly FilterType filterType;
         public readonly double filterLength;  // in seconds. 
         public string NameInVector => Name + "_filter";
-
-        public readonly List<string> SourceNames;
+        public List<string> SourceNames { get; }
         public bool HideSource { get; }
 
         public IOconfFilter(string row, int lineNum) : base(row, lineNum, "Filter")

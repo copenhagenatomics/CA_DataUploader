@@ -18,7 +18,7 @@ namespace CA_DataUploaderLib.IOconf
         public bool HasOnSafeState { get; } = false;
         public bool IsSwitchboardControllerOutput { get; }
         public IEnumerable<IOconfInput> GetExpandedInputConf()
-        { // note "_On/Off" is not included as its not an input but the current expected on/off state as seen by the control loop.
+        { // note "_onoff" is not included as its not an input but the current expected on/off state as seen by the control loop.
             yield return NewPortInput(CurrentSensorName, 0 + PortNumber);
         }
 

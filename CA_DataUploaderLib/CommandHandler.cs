@@ -1,4 +1,5 @@
-﻿using CA.LoopControlPluginBase;
+﻿#nullable enable
+using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using CA_DataUploaderLib.Extensions;
@@ -9,29 +10,32 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CA_DataUploaderLib
 {
     public sealed class CommandHandler : IDisposable
     {
-        private readonly SerialNumberMapper _mapper;
+        private readonly SerialNumberMapper? _mapper;
         private readonly ICommandRunner _commandRunner;
         private DateTime _start = DateTime.Now;
         private readonly StringBuilder inputCommand = new();
         private readonly List<string> AcceptedCommands = new();
         private readonly List<ISubsystemWithVectorData> _subsystems = new();
         private int AcceptedCommandsIndex = -1;
+        private readonly List<LoopControlDecision> _decisions = new();
+        private readonly List<LoopControlDecision> _safetydecisions = new();
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
         private readonly CancellationTokenSource _exitCts = new();
         private readonly TaskCompletionSource _runningTaskTcs = new();
 
-        public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
-        public event EventHandler<EventFiredArgs> EventFired;
+        public event EventHandler<NewVectorReceivedArgs>? NewVectorReceived;
+        public event EventHandler<EventFiredArgs>? EventFired;
         public bool IsRunning => !_exitCts.IsCancellationRequested;
         public CancellationToken StopToken => _exitCts.Token;
         public Task RunningTask => _runningTaskTcs.Task;
 
-        public CommandHandler(SerialNumberMapper mapper = null, ICommandRunner runner = null)
+        public CommandHandler(SerialNumberMapper? mapper = null, ICommandRunner? runner = null)
         {
             _exitCts.Token.Register(() => _runningTaskTcs.TrySetCanceled());
             _commandRunner = runner ?? new DefaultCommandRunner();
@@ -44,6 +48,23 @@ namespace CA_DataUploaderLib
             AddCommand("version", GetVersion);
         }
 
+        /// <remarks>all decisions must be added before running any subsystem, making decisions or getting vector descriptions i.e. add these early on</remarks>
+        public void AddDecisions<T>(List<T> decisions) where T: LoopControlDecision => AddDecisions(decisions, _decisions);
+        public void AddSafetyDecisions<T>(List<T> decisions) where T : LoopControlDecision => AddDecisions(decisions, _safetydecisions);
+        private void AddDecisions<T>(List<T> decisions, List<LoopControlDecision> targetList) where T : LoopControlDecision
+        {
+            foreach (var e in decisions.SelectMany(d => d.HandledEvents))
+            {
+                //This just avoids the commands being reported as rejected for now, but the way to go about in the long run is to add detection of the executed commands by looking at the vectors.
+                //Note that even then, the decisions are not reporting which commands they actually handled or ignore, specially as they are receiving all commands and then handle what applies to the decision.
+                var firstWhitespace = e.IndexOf(' ');
+                var firstWordInEvent = firstWhitespace != -1 ? e[..firstWhitespace] : e;
+                AddCommand(firstWordInEvent, _ => true);
+            }
+
+            targetList.AddRange(decisions);
+        }
+
         /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>
         public Action AddCommand(string name, Func<List<string>, bool> func) => _commandRunner.AddCommand(name, func);
         public void Execute(string command, bool isUserCommand = false) => HandleCommand(command, isUserCommand);
@@ -51,28 +72,35 @@ namespace CA_DataUploaderLib
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
         /// <remarks>This method is only aimed at single host scenarios where a single system has all the inputs</remarks>
-        public DataVector GetFullSystemVectorValues() 
+        public void GetFullSystemVectorValues(ref DataVector? vector, List<string> events) 
         {
-            var (samples, vectorTime) = MakeDecision(GetNodeInputs().ToList(), DateTime.UtcNow);
-            OnNewVectorReceived(samples.WithVectorTime(vectorTime));
-            return new DataVector(samples.Select(x => x.Value).ToList(), vectorTime);
+            var time = DateTime.UtcNow;
+            MakeDecision(GetNodeInputs().ToList(), time, ref vector, events);
+            OnNewVectorReceived(ToNewVectorReceivedArgs(vector, _fullsystemFilterAndMath.Value.VectorDescription._items));
         }
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
-        public (IEnumerable<SensorSample>, DateTime vectorTime) MakeDecision(List<SensorSample> inputs, DateTime vectorTime)
+        public void MakeDecision(List<SensorSample> inputs, DateTime vectorTime, [NotNull]ref DataVector? vector, List<string> events)
         {
-            var filterAndMath = _fullsystemFilterAndMath.Value;
-            var samples = filterAndMath.Apply(inputs);
-            var inputVectorReceivedArgs = new NewVectorReceivedArgs(samples.WithVectorTime(vectorTime).ToDictionary(v => v.Name, v => v.Value));
-            var outputs = _subsystems.SelectMany(s => s.GetDecisionOutputs(inputVectorReceivedArgs));
-            filterAndMath.AddOutputsToInputVector(samples, outputs);
-            return (samples, vectorTime);
+            var extendedDesc = _fullsystemFilterAndMath.Value;
+            DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, vectorTime);
+            extendedDesc.Apply(inputs, vector);
+            var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.Timestamp, vector.Data);
+            foreach (var decision in _decisions)
+                decision.MakeDecision(decisionsVector, events);
+            foreach (var decision in _safetydecisions)
+                decision.MakeDecision(decisionsVector, events);
         }
-        
-        public void ResumeState(List<SensorSample> fullVector)
+
+        //note: the below is only needed to support the GetDecisionOutputs style, if all moves to the LoopControlDecision contract this can be removed
+        static NewVectorReceivedArgs ToNewVectorReceivedArgs(DataVector vector, List<VectorDescriptionItem> fields)
         {
-            var args = new NewVectorReceivedArgs(fullVector.ToDictionary(v => v.Name, v => v.Value));
-            foreach (var subsystem in _subsystems)
-                subsystem.ResumeState(args);
+            var data = vector.Data;
+            var vectorDic = new Dictionary<string, double>();
+            for (int i = 0; i < vector.Count(); i++)
+                vectorDic.Add(fields[i].Descriptor, data[i]);
+
+            vectorDic.Add("vectortime", vector.Timestamp.ToVectorDouble());
+            return new NewVectorReceivedArgs(vectorDic);
         }
 
         public Task RunSubsystems()
@@ -83,6 +111,12 @@ namespace CA_DataUploaderLib
 
         private void SendDeviceDetectionEvent()
         {
+            if (_mapper == null) 
+            {
+                CALog.LogErrorAndConsoleLn(LogID.A, "can't send detection event due to CommandHandler being invoked with a null SerialNumberMapper");
+                return;
+            }
+
             var data = new SystemChangeNotificationData() { NodeName = GetCurrentNode().Name, Boards = _mapper.McuBoards.Select(ToBoardInfo).ToList() }.ToJson();
             FireCustomEvent(data, DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
 
@@ -112,8 +146,12 @@ namespace CA_DataUploaderLib
                 .Where(n => n.inputs.Count > 0)
                 .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
                 .ToList();
-            var outputs = descItemsPerSubsystem.SelectMany(s => s.Outputs).ToList();
-            return new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
+            var decisions = _decisions.Concat(_safetydecisions);
+            var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type))).ToList();
+            var desc = new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
+            foreach (var decision in decisions)
+                decision.Initialize(new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray()));
+            return desc;
         }
 
         private static IOconfNode GetCurrentNode() => GetNodes().Single(n => n.IsCurrentSystem);
@@ -137,6 +175,7 @@ namespace CA_DataUploaderLib
 
         public void OnNewVectorReceived(IEnumerable<SensorSample> vector) =>
             NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector.ToDictionary(v => v.Name, v => v.Value)));
+        public void OnNewVectorReceived(NewVectorReceivedArgs args) => NewVectorReceived?.Invoke(this, args);
 
         public void FireAlert(string msg, DateTime timespan)
         {
@@ -189,7 +228,7 @@ namespace CA_DataUploaderLib
         }
 
         /// <returns>the text line <c>null</c> if we are no longer running (_running is false)</returns>
-        private string GetCommand()
+        private string? GetCommand()
         {
             inputCommand.Clear();
             var info = Console.ReadKey(true);
@@ -283,7 +322,7 @@ $@"{GetCurrentNode().Name}
 {RpiVersion.GetSoftware()}
 {RpiVersion.GetHardware()}
 {connInfo.LoopName} - {connInfo.email}
-{string.Join(Environment.NewLine, _mapper.McuBoards.Select(x => x.ToString()))}");
+{(_mapper != null ? string.Join(Environment.NewLine, _mapper.McuBoards.Select(x => x.ToString())) : "")}");
             return true;
         }
 

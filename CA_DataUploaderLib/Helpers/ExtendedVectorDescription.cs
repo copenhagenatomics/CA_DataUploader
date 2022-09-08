@@ -1,4 +1,5 @@
-﻿using CA_DataUploaderLib.IOconf;
+﻿#nullable enable
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -34,6 +35,7 @@ namespace CA_DataUploaderLib.Helpers
             allItems.AddRange(_mathVectorExpansion.GetVectorDescriptionEntries());
             allItems.AddRange(outputs);
             _outputCount = outputs.Count;
+            _mathVectorExpansion.Initialize(allItems.Select(i => i.Descriptor));
             VectorDescription = new VectorDescription(allItems, hardware, software);
         }
 
@@ -63,23 +65,25 @@ namespace CA_DataUploaderLib.Helpers
         }
 
         /// <remarks>the input vector is expected to contains all input + state initially sent in the vector description passed to the constructor.</remarks>
-        public List<SensorSample> Apply(List<SensorSample> inputVector)
+        public void Apply(List<SensorSample> inputs, DataVector vector)
         {
+            //removing all this manipulation below that requires some allocations is tricky,
+            //but a part of it might be moving to a decisions like approach where the subsystems precalculate the field indexes + maybe we keep an original and an extended version and use some field indexes mapping to move data around
             foreach (var filter in _values)
             {
-                filter.Input(inputVector);
-                inputVector.Add(filter.Output);
+                filter.Input(inputs);
+                inputs.Add(filter.Output);
             }
 
-            RemoveHiddenSources(inputVector, i => i.Name);
-            _mathVectorExpansion.Expand(inputVector);
-            if (inputVector.Count + _outputCount != VectorDescription.Length)
-                throw new ArgumentException($"wrong input vector length (input, expected): {inputVector.Count} <> {VectorDescription.Length - _outputCount}");
-            return inputVector;
-        }
+            RemoveHiddenSources(inputs, i => i.Name);
+            var expectedInputsCount = VectorDescription.Length - _mathVectorExpansion.Count - _outputCount;
+            if (inputs.Count != expectedInputsCount)
+                throw new ArgumentException($"wrong input vector length (input, expected): {inputs.Count} <> {expectedInputsCount}");
+            var data = vector.Data;
+            for (int i = 0; i < inputs.Count; i++)
+                data[i] = inputs[i].Value;
 
-        /// <summary>appends the specified outputs to the end of the input vector</summary>
-        /// <remarks>the input vector is expected to be the expanded version returned by the <see cref="Apply" /> method</remarks>
-        public void AddOutputsToInputVector(List<SensorSample> expandedInputVector, IEnumerable<SensorSample> outputs) => expandedInputVector.AddRange(outputs);
+            _mathVectorExpansion.Apply(data);
+        }
     }
 }

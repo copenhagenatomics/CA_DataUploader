@@ -1,5 +1,7 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,7 +15,7 @@ namespace CA_DataUploaderLib
     {
         private readonly BaseSensorBox _boardsLoops;
         private static readonly object ControllerInitializationLock = new();
-        private static SwitchBoardController _instance;
+        private static SwitchBoardController? _instance;
 
         private SwitchBoardController(CommandHandler cmd) 
         {
@@ -40,31 +42,47 @@ namespace CA_DataUploaderLib
 
         private static void RegisterBoardWriteActions(BaseSensorBox reader, MCUBoard board, List<IOconfOut230Vac> ports)
         {
-            var lastActions = new SwitchboardAction[ports.Max(p => p.PortNumber)];
-            reader.AddBuildInWriteAction(board, WriteAction, ExitAction); 
+            var lastActions = Enumerable.Range(0, ports.Max(p => p.PortNumber))
+                .Select(_ => (isOn: false, timeToRepeat: default(DateTime), timeRunnin: Stopwatch.StartNew()))
+                .ToArray();
+            var portsFields = ports.Select(p => (field: p.Name + "_onoff", number: p.PortNumber)).ToArray();
+            reader.AddBuildInWriteAction(board, WriteAction, ExitAction);
 
             Task ExitAction(MCUBoard board, CancellationToken token) => AllOff(board, ports, token);
             async Task WriteAction(NewVectorReceivedArgs vector, MCUBoard board, CancellationToken token)
             {
-                foreach (var port in ports)
+                foreach (var port in portsFields)
                     await DoPortActions(vector, board, port, lastActions, token);
             }
         }
 
-        private static async Task DoPortActions(NewVectorReceivedArgs vector, MCUBoard board, IOconfOut230Vac port, SwitchboardAction[] lastActions, CancellationToken token)
+        private static async Task DoPortActions(NewVectorReceivedArgs vector, MCUBoard board, (string field, int number) port, (bool isOn, DateTime timeToRepeat, Stopwatch timeRunning)[] lastActions, CancellationToken token)
         {
-            var action = SwitchboardAction.FromVectorSamples(vector, port.Name);
-            if (action.Equals(lastActions[port.PortNumber - 1]))
-                return; // no action changes has been requested since the last action was executed
+            if (vector == null)
+            { //too long time without receiving a vector, lets ensure the port is off.
+              //note: we are assuming we get called periodically at a reasonable frequency to reassert the off, but for now we are not guarding against too frequent executions
+                await board.SafeWriteLine($"p{port.number} off", token);
+                lastActions[port.number - 1].isOn = false;
+                lastActions[port.number - 1].timeToRepeat = DateTime.MaxValue;//max forces execution on the next vector / also note we don't restart time running for the same reason.
+                return;
+            }
+
+            var isOn = vector[port.field] == 1.0;
+            var lastAction = lastActions[port.number - 1];
+            var currentVectorTime = vector.GetVectorTime();
+            if (lastAction.isOn == isOn && lastAction.timeRunning.ElapsedMilliseconds < 2000 && lastAction.timeToRepeat < currentVectorTime)
+                // no action changes has been requested since the last action was executed and there has been less than 2 seconds
+                // note the 2 seconds is checked in 2 diff ways to avoid it being missed due to bit flips.
+                // Note that this does not guard on too frequent executions, but at least we are resetting both values on each execution.
+                return; 
                 
-            var onSeconds = action.GetRemainingOnSeconds(vector.GetVectorTime());
-            if (onSeconds <= 0)
-                await board.SafeWriteLine($"p{port.PortNumber} off", token);
-            else if (onSeconds == int.MaxValue)
-                await board.SafeWriteLine($"p{port.PortNumber} on", token);
+            if (!isOn)
+                await board.SafeWriteLine($"p{port.number} off", token);
             else
-                await board.SafeWriteLine($"p{port.PortNumber} on {onSeconds}", token);
-            lastActions[port.PortNumber - 1] = action;
+                await board.SafeWriteLine($"p{port.number} on 3", token);
+            lastActions[port.number - 1].isOn = isOn;
+            lastActions[port.number - 1].timeToRepeat = currentVectorTime.AddMilliseconds(2000);
+            lastActions[port.number - 1].timeRunning.Restart();
         }
 
         private static async Task AllOff(MCUBoard board, List<IOconfOut230Vac> ports, CancellationToken token)

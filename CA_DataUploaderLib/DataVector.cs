@@ -1,26 +1,33 @@
-﻿using System;
-using System.Linq;
-using System.Collections.Generic;
+﻿#nullable enable
+using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CA_DataUploaderLib
 {
     public class DataVector
     {
-        public readonly DateTime timestamp;
-        public readonly List<double> vector;
+        public DataVector(double[] data, DateTime time) { this.Data = data; Timestamp = time; }
 
-        public DataVector(List<double> input, DateTime time) { vector = input; timestamp = time; }
-
-        public byte[] buffer {
+        public byte[] Buffer {
             get
             {
-                var raw = new byte[vector.Count() * sizeof(double) + sizeof(long)];
-                Buffer.BlockCopy(BitConverter.GetBytes(timestamp.Ticks), 0, raw, 0, 8);
-                Buffer.BlockCopy(vector.ToArray(), 0, raw, 8, raw.Length - sizeof(long));
+                var raw = new byte[Data.Length * sizeof(double) + sizeof(long)];
+                System.Buffer.BlockCopy(BitConverter.GetBytes(Timestamp.Ticks), 0, raw, 0, 8);
+                System.Buffer.BlockCopy(Data, 0, raw, 8, raw.Length - sizeof(long));
                 return raw;
             }
         }
 
-        public int Count() { return vector == null?0:vector.Count(); }
+        public DateTime Timestamp { get; private set; }
+        public double[] Data { get; }
+        public int Count() => Data.Length;
+
+        internal static void InitializeOrUpdateTime([NotNull]ref DataVector? vector, int length, DateTime vectorTime)
+        {
+            if (vector == null)
+                vector = new DataVector(new double[length], vectorTime);
+            else
+                vector.Timestamp = vectorTime;
+        }
     }
 }

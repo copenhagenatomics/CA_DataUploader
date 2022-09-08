@@ -10,7 +10,7 @@ namespace CommandHandlerTester
         static void Main(string[] args)
         {
             using var cmd = new CommandHandler();
-            new PluginsLoader(cmd).LoadPlugins();
+            new PluginsLoader(cmd).LoadPlugins(true);
             Console.WriteLine("run help for available commands");
             int i = 0;
             while (cmd.IsRunning)

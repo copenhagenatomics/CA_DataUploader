@@ -7,18 +7,20 @@ using System.Runtime.Loader;
 using System.Threading;
 using System.Threading.Tasks;
 using CA.LoopControlPluginBase;
+using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
 {
     public class PluginsLoader
     { // see https://docs.microsoft.com/en-us/dotnet/core/tutorials/creating-app-with-plugin-support
         private readonly string targetFolder;
-        readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances)> _runningPlugins =
-            new Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances)>();
+        readonly Dictionary<string, (AssemblyLoadContext ctx, IEnumerable<object> instances)> _runningPlugins = new();
         SingleFireFileWatcher _pluginChangesWatcher;
-        readonly object[] plugingArgs = {};
+        readonly object[] plugingArgs = Array.Empty<object>();
         readonly CommandHandler handler;
-        UpdatePluginsCommand updatePluginsCommand;
+#pragma warning disable IDE0052 // Remove unread private members - used implicitely to handle commands
+        readonly UpdatePluginsCommand updatePluginsCommand;
+#pragma warning restore IDE0052 // Remove unread private members
 
         public PluginsLoader(CommandHandler handler, Func<(string pluginName, string targetFolder), Task> pluginDownloader = null, string targetFolder = "plugins")
         {
@@ -28,19 +30,19 @@ namespace CA_DataUploaderLib
                 this.updatePluginsCommand = new UpdatePluginsCommand(handler, pluginDownloader, this, targetFolder);
         }
 
-        public IEnumerable<string> GetRunningPluginsNames() => _runningPlugins.Keys.Select(v => Path.GetFileNameWithoutExtension(v));
-
-        public void LoadPlugins(bool automaticallyLoadPluginChanges = true)
+        public void LoadPlugins(bool automaticallyLoadPluginChanges, bool preventLoadOfDecisionPlugins = false)
         {
             Directory.CreateDirectory(targetFolder);
             // load all
             foreach (var assemblyFullPath in Directory.GetFiles(targetFolder, "*.dll"))
-                LoadPlugin(assemblyFullPath);
+                LoadPlugin(assemblyFullPath, preventLoadOfDecisionPlugins);
+
+            handler.AddDecisions(_runningPlugins.SelectMany(p => p.Value.instances.OfType<LoopControlDecision>()).ToList());
 
             if (automaticallyLoadPluginChanges)
             {
                 _pluginChangesWatcher = new SingleFireFileWatcher(targetFolder, "*.dll");
-                _pluginChangesWatcher.Deleted += UnloadPlugin;
+                _pluginChangesWatcher.Deleted += s => UnloadPlugin(s);
                 _pluginChangesWatcher.Changed += ReloadPlugin;
             }
         }
@@ -52,38 +54,54 @@ namespace CA_DataUploaderLib
             GC.Collect(); // triggers the unload of the assembly (after DoUnloadExtension we no longer have references to the instances)
         }
 
-        void LoadPlugin(string assemblyFullPath)
+        bool LoadPlugin(string assemblyFullPath, bool preventLoadOfDecisionPlugins)
         {
-            var (context, plugins) = Load(assemblyFullPath, plugingArgs);
-            var initializedPlugins = plugins.ToList();
-            if (initializedPlugins.Count == 0)
+            var (context, commands, decisions) = Load(assemblyFullPath, plugingArgs);
+            if (commands.Count == 0 && decisions.Count == 0)
             {
                 context.Unload();
-                return;
+                return true;
             }
 
-            foreach (var plugin in initializedPlugins)
-                plugin.Initialize(new PluginsCommandHandler(handler), new PluginsLogger(plugin.Name)); 
+            if (decisions.Count > 0 && preventLoadOfDecisionPlugins)
+            {
+                CALog.LogData(LogID.A, $"decision plugins do not support live unloaded, skipped loading {assemblyFullPath}");
+                context.Unload();
+                return false;
+            }
 
-            _runningPlugins[assemblyFullPath] = (context, initializedPlugins);
-            CALog.LogData(LogID.A, $"loaded plugins from {assemblyFullPath} - {string.Join(",", initializedPlugins.Select(e => e.GetType().Name))}");
+            foreach (var plugin in commands)
+                plugin.Initialize(new PluginsCommandHandler(handler), new PluginsLogger(plugin.Name));
+
+            var allPlugins = commands.AsEnumerable<object>().Concat(decisions).ToList();
+            _runningPlugins[assemblyFullPath] = (context, allPlugins);
+            CALog.LogData(LogID.A, $"loaded plugins from {assemblyFullPath} - {string.Join(",", allPlugins.Select(e => e.GetType().Name))}");
+            return true;
         }
 
-        void UnloadPlugin(string assemblyFullPath)
+        bool UnloadPlugin(string assemblyFullPath)
         {
-            if (!_runningPlugins.TryGetValue(assemblyFullPath, out var runningPluginEntry))
-                CALog.LogData(LogID.A, $"running plugin not found: {Path.GetFileNameWithoutExtension(assemblyFullPath)}");
-            else
-                UnloadPlugin(assemblyFullPath, runningPluginEntry);
+            if (_runningPlugins.TryGetValue(assemblyFullPath, out var runningPluginEntry))
+                return UnloadPlugin(assemblyFullPath, runningPluginEntry);
+            
+            CALog.LogData(LogID.A, $"running plugin not found: {Path.GetFileNameWithoutExtension(assemblyFullPath)}");
+            return true;
         }
 
-        void UnloadPlugin(string assemblyFullPath, (AssemblyLoadContext ctx, IEnumerable<LoopControlCommand> instances) entry)
+        bool UnloadPlugin(string assemblyFullPath, (AssemblyLoadContext ctx, IEnumerable<object> instances) entry)
         {
+            if (entry.instances.OfType<LoopControlDecision>().Any())
+            {
+                CALog.LogData(LogID.A, $"decision plugins do not support live unloaded, skipped {assemblyFullPath}");
+                return false;
+            }
+
             foreach (var instance in entry.instances)
-                instance.Dispose();
+                (instance as IDisposable)?.Dispose();
             _runningPlugins.Remove(assemblyFullPath);
             entry.ctx.Unload();
             CALog.LogData(LogID.A, $"unloaded plugins from {assemblyFullPath}");
+            return true;
         }
 
         /// <remarks>
@@ -91,19 +109,20 @@ namespace CA_DataUploaderLib
         /// </remarks>
         void ReloadPlugin(string fullpath)
         {
-            UnloadPlugin(fullpath);
-            LoadPlugin(fullpath);
+            if (!UnloadPlugin(fullpath)) 
+                return;
+            LoadPlugin(fullpath, preventLoadOfDecisionPlugins: true);
         }
 
-        static (AssemblyLoadContext context, IEnumerable<LoopControlCommand> plugins) Load(string assemblyFullPath, params object[] args)
+        static (AssemblyLoadContext context, List<LoopControlCommand> commands, List<LoopControlDecision> decisions) Load(string assemblyFullPath, params object[] args)
         {
             var (context, assembly) = LoadAssembly(assemblyFullPath);
-            return (context, CreateInstances<LoopControlCommand>(assembly, args));
+            return (context, CreateInstances<LoopControlCommand>(assembly, args).ToList(), CreateInstances<LoopControlDecision>(assembly, args).ToList());
         }
 
         static (AssemblyLoadContext context, Assembly assembly) LoadAssembly(string assemblyFullPath)
         {
-            PluginLoadContext context = new PluginLoadContext(assemblyFullPath);
+            var context = new PluginLoadContext(assemblyFullPath);
             using var fs = new FileStream(assemblyFullPath, FileMode.Open, FileAccess.Read); // force no file lock
             return (context, context.LoadFromStream(fs));
         }
@@ -143,7 +162,7 @@ namespace CA_DataUploaderLib
         {
             private const int MillisecondsWithoutChanges = 1000;
             readonly FileSystemWatcher watcher;
-            readonly Dictionary<string, object> _postponedChangeLocks = new Dictionary<string, object>();
+            readonly Dictionary<string, object> _postponedChangeLocks = new();
             public delegate void FileChangedDelegate(string fullpath);
             public event FileChangedDelegate Changed;
             public event FileChangedDelegate Deleted;
@@ -177,6 +196,9 @@ namespace CA_DataUploaderLib
 
         }
 
+        /// <remarks>
+        /// This command is not supported on multi node deployments. Additionally it does not support decisions plugins.
+        /// </remarks>
         private class UpdatePluginsCommand : LoopControlCommand
         {
             private readonly Func<(string pluginName, string targetFolder), Task> pluginDownloader;
@@ -197,12 +219,26 @@ namespace CA_DataUploaderLib
                 this.targetFolder = targetFolder;
             }
 
-            protected override Task Command(List<string> args) => args.Count > 1 ? UpdatePlugin(args[1]) : UpdateAllPlugins();
+            protected override Task Command(List<string> args)
+            {
+                if (IOconfFile.GetEntries<IOconfNode>().Count() <= 1)
+                    return args.Count > 1 ? UpdatePlugin(args[1]) : UpdateAllPlugins();
+
+                CALog.LogErrorAndConsoleLn(LogID.A, "updateplugins is not supported in multipi deployments");
+                return Task.CompletedTask;
+            }
 
             private async Task UpdateAllPlugins()
             {
-                foreach (var pluginName in loader.GetRunningPluginsNames())
+                foreach (var plugin in loader._runningPlugins)
                 {
+                    var pluginName = Path.GetFileNameWithoutExtension(plugin.Key);
+                    if (plugin.Value.instances.OfType<LoopControlDecision>().Any())
+                    {
+                        CALog.LogInfoAndConsoleLn(LogID.A, $"decision plugins do not support live updates, skipped: {pluginName}");
+                        continue;
+                    }
+
                     CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
                     await pluginDownloader((pluginName, targetFolder));
                 }
@@ -210,19 +246,27 @@ namespace CA_DataUploaderLib
                 CALog.LogInfoAndConsoleLn(LogID.A, $"unloading running plugins");
                 loader.UnloadPlugins();
                 CALog.LogInfoAndConsoleLn(LogID.A, $"loading plugins");
-                loader.LoadPlugins();
+                loader.LoadPlugins(false, preventLoadOfDecisionPlugins: true);
                 CALog.LogInfoAndConsoleLn(LogID.A, $"plugins updated");
             }
 
             private async Task UpdatePlugin(string pluginName)
             {
+                if (loader._runningPlugins.Any(p => p.Key == pluginName && p.Value.instances.OfType<LoopControlDecision>().Any()))
+                {
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"decision plugins do not support live updates, skipped: {pluginName}");
+                    return;
+                }
+
                 CALog.LogInfoAndConsoleLn(LogID.A, $"downloading plugin: {pluginName}");
                 await pluginDownloader((pluginName, targetFolder));
                 var assemblyFullPath = Path.GetFullPath(Path.Combine(targetFolder, pluginName + ".dll"));
                 CALog.LogInfoAndConsoleLn(LogID.A, $"unloading plugin: {pluginName}");
-                loader.UnloadPlugin(assemblyFullPath);
+                if (!loader.UnloadPlugin(assemblyFullPath))
+                    return;
                 CALog.LogInfoAndConsoleLn(LogID.A, $"loading plugin: {pluginName}");
-                loader.LoadPlugin(assemblyFullPath);
+                if (!loader.LoadPlugin(assemblyFullPath, preventLoadOfDecisionPlugins: true))
+                    return;
                 CALog.LogInfoAndConsoleLn(LogID.A, $"plugins updated");
             }
         }
