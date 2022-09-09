@@ -147,6 +147,15 @@ namespace CA_DataUploaderLib
                 .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
                 .ToList();
             var decisions = _decisions.Concat(_safetydecisions);
+            var decisionsNames = new HashSet<string>(_decisions.Select(d => d.Name));
+            var configEntries = IOconfFile.GetEntries<IOconfRow>();
+            var unknownEntriesWithoutDecisions = configEntries.Where(e => e.IsUnknown && !decisionsNames.Contains(e.Type)).Select(r => r.Row).ToList();
+            if (unknownEntriesWithoutDecisions.Count > 0)
+                throw new NotSupportedException($"invalid config lines detected: {Environment.NewLine + string.Join(Environment.NewLine, unknownEntriesWithoutDecisions)}");
+            var configEntriesLookup = configEntries.ToLookup(l => l.Type);
+            foreach (var decision in decisions)
+                if (configEntriesLookup.Contains(decision.Name))
+                    decision.SetConfig(new DecisionConfig(decision.Name, configEntriesLookup[decision.Name].ToDictionary(e => e.Name, e => string.Join(';', e.ToList().Skip(2)))));
             var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type))).ToList();
             var desc = new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
             foreach (var decision in decisions)

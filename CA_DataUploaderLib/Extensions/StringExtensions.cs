@@ -27,7 +27,7 @@ namespace CA_DataUploaderLib.Extensions
         {
             int pos = s.IndexOf(match);
             if (pos == -1)
-                return String.Empty;
+                return string.Empty;
             else
                 return s.Substring(0, pos);
         }

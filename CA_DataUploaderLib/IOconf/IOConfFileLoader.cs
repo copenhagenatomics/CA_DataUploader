@@ -62,7 +62,7 @@ namespace CA_DataUploaderLib.IOconf
             {
                 var separatorIndex = row.IndexOf(';');
                 var rowType = separatorIndex > -1 ? row.AsSpan()[..separatorIndex].Trim() : row;
-                var loader = GetLoader(rowType) ?? ((r, l) => new IOconfRow(r, l, "Unknown"));
+                var loader = GetLoader(rowType) ?? ((r, l) => new IOconfRow(r, l, "Unknown", true));
                 return loader(row, lineNum);
             }
             catch (Exception ex)

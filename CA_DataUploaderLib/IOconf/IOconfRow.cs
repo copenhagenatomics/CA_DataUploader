@@ -7,21 +7,23 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfRow
     {
-        public IOconfRow(string row, int lineNum, string type)
+        public IOconfRow(string row, int lineNum, string type, bool isUnknown = false)
         {
             Row = row;
-            Type = type;
             LineNumber = lineNum;
+            IsUnknown = isUnknown;
             var list = ToList();
-            if (list[0] != Type) throw new Exception("IOconfRow: wrong format: " + Row);
+            if (!isUnknown && list[0] != type) throw new Exception("IOconfRow: wrong format: " + row);
+            Type = list[0];
             Name = list[1]; // could be overwritten elsewhere. 
         }
 
-        protected readonly string Row;
-        protected readonly string Type;
+        public string Row { get; }
+        public string Type { get; }
         protected readonly int LineNumber;
         public string Name { get; init; }
         protected string Format { get; init; } = string.Empty;
+        public bool IsUnknown { get; }
 
         public List<string> ToList() => RowWithoutComment().Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
 
