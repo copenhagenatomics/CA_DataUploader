@@ -21,6 +21,14 @@ namespace CA.LoopControlPluginBase
         /// However, these strings are very flexible and simple, so we will keep these at the moment
         /// </remarks>
         public abstract void MakeDecision(DataVector vector, List<string> events);
+        /// <summary>allows the plugin to use values defined in the configuration and is called before <see cref="PluginFields"/></summary>
+        /// <param name="config">the <see cref="IDecisionConfig"/> to read from the configuration</param>
+        /// <remarks>
+        /// Plugins are expected to read the expected configuration values right away and copy them locally to avoid any type of lookups and string manipulations when making decisions
+        /// 
+        /// The plugins may also call <see cref="IDecisionConfig.ValidateConfiguredFields(IEnumerable{string})"/> to ensure no unexpected plugin configuration is in the config, for example, mispelling of valid configuration fields
+        /// </remarks>
+        public virtual void SetConfig(IDecisionConfig config) { }
     }
     public enum FieldType { Input = 1, State = 2, Output = 3 }
     public record PluginField(string Name, FieldType Type)
