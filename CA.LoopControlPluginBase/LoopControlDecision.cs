@@ -31,9 +31,10 @@ namespace CA.LoopControlPluginBase
         public virtual void SetConfig(IDecisionConfig config) { }
     }
     public enum FieldType { Input = 1, State = 2, Output = 3 }
-    public record PluginField(string Name, FieldType Type)
+    public record PluginField(string Name, FieldType Type = FieldType.State)
     {
-        public static implicit operator PluginField(string name) => new(name, FieldType.State);
+        public bool Upload { get; init; } = true;
+        public static implicit operator PluginField(string name) => new(name);
         public static implicit operator PluginField((string name, FieldType type) tuple) => new(tuple.name, tuple.type);
     }
 }
