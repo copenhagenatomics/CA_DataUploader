@@ -156,7 +156,7 @@ namespace CA_DataUploaderLib
             foreach (var decision in decisions)
                 if (configEntriesLookup.Contains(decision.Name))
                     decision.SetConfig(new DecisionConfig(decision.Name, configEntriesLookup[decision.Name].ToDictionary(e => e.Name, e => string.Join(';', e.ToList().Skip(2)))));
-            var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type))).ToList();
+            var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type) { Upload = f.Upload })).ToList();
             var desc = new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
             foreach (var decision in decisions)
                 decision.Initialize(new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray()));

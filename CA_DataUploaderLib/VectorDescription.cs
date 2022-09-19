@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Serialization;
 
 namespace CA_DataUploaderLib
 {
@@ -33,7 +34,6 @@ namespace CA_DataUploaderLib
 
             return msg;
         }
-
     }
 
     [Serializable]
@@ -44,6 +44,13 @@ namespace CA_DataUploaderLib
         public string Descriptor { get; set; }  // Name of data line in webchart. 
         public DataTypeEnum DirectionType { get; set; }
         public string DataType { get; set; }
-
+        /// <summary>whether the item should be included in the description and vector uploaded and available in the plots</summary>
+        /// <remarks>
+        /// The <see cref="Upload"/> property itself is not included in the uploaded <see cref="VectorDescriptionItem"/>
+        /// 
+        /// Note that even though the property is not uploaded to the plots, it is still available in the local vector and distributed hosts must include it in the vector information used by the decisions in the cluster
+        /// </remarks>
+        [XmlIgnore]
+        public bool Upload { get; init; } = true;
     }
 }
