@@ -6,7 +6,6 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -28,7 +27,9 @@ namespace CA_DataUploaderLib
         private readonly List<DateTime> _badPackages = new List<DateTime>();
         private DateTime _lastTimestamp;
         private bool _running;
-        private readonly VectorDescription _vectorDescription;
+        private readonly int _localVectorLength;
+        private readonly int _uploadVectorLength;
+        private readonly bool[] _fieldUploadMap;
         private readonly CommandHandler _cmd;
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(10000);
 
@@ -45,10 +46,12 @@ namespace CA_DataUploaderLib
                     throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", duplicates));
                 var loopName = IOconfFile.GetLoopName();
                 _signing = new Signing(loopName);
-                vectorDescription.IOconf = IOconfFile.GetRawFile();
-                _vectorDescription = vectorDescription;
-                _plot = PlotConnection.Establish(loopName, _signing.GetPublicKey(), GetSignedVectorDescription(vectorDescription)).GetAwaiter().GetResult();
-                new Thread(() => this.LoopForever()).Start();
+                _localVectorLength = vectorDescription.Length;
+                _fieldUploadMap = vectorDescription._items.Select(v => v.Upload).ToArray();
+                var uploadDescription = new VectorDescription(vectorDescription._items.Where(v => v.Upload).ToList(), vectorDescription.Hardware, vectorDescription.Software) { IOconf = IOconfFile.GetRawFile() };
+                _uploadVectorLength = uploadDescription.Length;
+                _plot = PlotConnection.Establish(loopName, _signing.GetPublicKey(), GetSignedVectorDescription(uploadDescription)).GetAwaiter().GetResult();
+                new Thread(() => LoopForever()).Start();
                 _cmd = cmd;
                 cmd?.AddCommand("escape", Stop);
 
@@ -69,8 +72,8 @@ namespace CA_DataUploaderLib
 
         public void SendVector(DataVector vector)
         {
-            if (vector.Count() != _vectorDescription.Length)
-                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescription.Length}");
+            if (vector.Count() != _localVectorLength)
+                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_localVectorLength}");
             if (vector.Timestamp <= _lastTimestamp)
             {
                 CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.Timestamp}");
@@ -80,9 +83,23 @@ namespace CA_DataUploaderLib
             lock (_queue)
                 if (_queue.Count < 10000)  // if sending thread can't catch up, then drop packages.
                 {
-                    _queue.Enqueue(vector);
+                    _queue.Enqueue(WithOnlyUploadFields(vector));
                     _lastTimestamp = vector.Timestamp;
                 }
+
+            DataVector WithOnlyUploadFields(DataVector fullVector)
+            {
+                var fullVectorData = fullVector.Data;
+                var uploadData = new double[_uploadVectorLength];
+                int j = 0;
+                for (int i = 0; i < fullVector.Data.Length; i++)
+                {
+                    if (_fieldUploadMap[i])
+                        uploadData[j++] = fullVectorData[i];
+                }
+
+                return new(uploadData, fullVector.Timestamp);
+            }
         }
 
         public string GetPlotUrl() => "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plot.PlotName;

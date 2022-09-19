@@ -44,7 +44,8 @@ namespace CA_DataUploaderLib
             private readonly Config _config;
             private Indexes? _indexes;
             public override string Name => _config.Name;
-            public override PluginField[] PluginFields => new PluginField[] { $"state_{Name}", ($"{Name}_onoff", FieldType.Output), $"{Name}_nextcontrolperiod", $"{Name}_controlperiodtimeoff" };
+            public override PluginField[] PluginFields => new PluginField[] { 
+                $"state_{Name}", ($"{Name}_onoff", FieldType.Output), new($"{Name}_nextcontrolperiod") { Upload = false }, new($"{Name}_controlperiodtimeoff") { Upload = false} };
             public override string[] HandledEvents => new List<string>(_eventsMap.Keys).ToArray();
             public HeaterDecision(IOconfHeater heater, IOconfOven? oven) : this(ToConfig(heater, oven)) { }
             public HeaterDecision(Config config)
