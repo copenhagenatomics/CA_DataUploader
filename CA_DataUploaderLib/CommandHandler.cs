@@ -146,21 +146,51 @@ namespace CA_DataUploaderLib
                 .Where(n => n.inputs.Count > 0)
                 .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
                 .ToList();
+            OrderDecisionsBasedOnIOconf(_decisions);
             var decisions = _decisions.Concat(_safetydecisions);
-            var decisionsNames = new HashSet<string>(_decisions.Select(d => d.Name));
-            var configEntries = IOconfFile.GetEntries<IOconfRow>();
-            var unknownEntriesWithoutDecisions = configEntries.Where(e => e.IsUnknown && !decisionsNames.Contains(e.Type)).Select(r => r.Row).ToList();
-            if (unknownEntriesWithoutDecisions.Count > 0)
-                throw new NotSupportedException($"invalid config lines detected: {Environment.NewLine + string.Join(Environment.NewLine, unknownEntriesWithoutDecisions)}");
-            var configEntriesLookup = configEntries.ToLookup(l => l.Type);
-            foreach (var decision in decisions)
-                if (configEntriesLookup.Contains(decision.Name))
-                    decision.SetConfig(new DecisionConfig(decision.Name, configEntriesLookup[decision.Name].ToDictionary(e => e.Name, e => string.Join(';', e.ToList().Skip(2)))));
+            SetConfigBasedOnIOconf(decisions);
+            CALog.LogData(LogID.A, $"decisions order 2: {string.Join(',', decisions.Select(d => d.Name))}");
             var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type) { Upload = f.Upload })).ToList();
             var desc = new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
             foreach (var decision in decisions)
                 decision.Initialize(new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray()));
             return desc;
+
+            /// <summary>gets a comparer that can be used to order plugins based on the order listed in IO.conf</summary>
+            /// <remarks>all decisions listed in the IO.conf come after the decisions not listed. The decisions that are not listed keep the order in which they were added</remarks>
+            static void OrderDecisionsBasedOnIOconf(List<LoopControlDecision> decisions)
+            {
+                //indexes are the original position at first and we later change the index of those found in IO.conf to decisions.Count + the conf order/index (so those in IO.conf come after non listed + in conf order).
+                var decisionsIndexes = decisions.Select((decision, index) => (decision, index)).ToDictionary(tuple => tuple.decision.Name, tuple => (tuple.decision, tuple.index)); 
+                var confDecisions = IOconfFile.GetEntries<IOconfCode>();
+                foreach (var conf in confDecisions)
+                {
+                    if (!decisionsIndexes.TryGetValue(conf.Name, out var decisionAndIndex)) 
+                        throw new FormatException($"decision listed in IO.conf was not found: {conf.Name}");
+                    var decisionVersion = decisionAndIndex.decision.GetType().Assembly.GetName().Version ?? throw new FormatException($"Failed to retrieve assembly version for decision {conf.Name}");
+                    if (decisionVersion.Major != conf.Version.Major || decisionVersion.Minor != conf.Version.Minor || decisionVersion.Build != conf.Version.Build )
+                        //the 3 digits the user sees/configures does not match the 4 digits the scxmltocode tool produces, so we compare the 3 digits explicitly above i.e. 1.0.2.0 vs. 1.0.2
+                        throw new FormatException($"decision listed in IO.conf did not match expected version: {conf.Version} - Actual: {decisionVersion}");
+                        //throw new FormatException($"decision listed in IO.conf did not match expected version: {conf.Version} - Actual: {decisionVersion}");
+                    decisionsIndexes[conf.Name] = (decisionAndIndex.decision, decisions.Count + conf.Index); 
+                }
+
+                decisions.Sort((x, y) => decisionsIndexes[x.Name].index.CompareTo(decisionsIndexes[y.Name].index));
+                CALog.LogData(LogID.A, $"decisions order: {string.Join(',', decisions.Select(d => d.Name))}");
+            }
+
+            void SetConfigBasedOnIOconf(IEnumerable<LoopControlDecision> decisions)
+            {
+                var decisionsNames = new HashSet<string>(decisions.Select(d => d.Name));
+                var configEntries = IOconfFile.GetEntries<IOconfRow>();
+                var unknownEntriesWithoutDecisions = configEntries.Where(e => e.IsUnknown && !decisionsNames.Contains(e.Type)).Select(r => r.Row).ToList();
+                if (unknownEntriesWithoutDecisions.Count > 0)
+                    throw new NotSupportedException($"invalid config lines detected: {Environment.NewLine + string.Join(Environment.NewLine, unknownEntriesWithoutDecisions)}");
+                var configEntriesLookup = configEntries.ToLookup(l => l.Type);
+                foreach (var decision in decisions)
+                    if (configEntriesLookup.Contains(decision.Name))
+                        decision.SetConfig(new DecisionConfig(decision.Name, configEntriesLookup[decision.Name].ToDictionary(e => e.Name, e => string.Join(';', e.ToList().Skip(2)))));
+            }
         }
 
         private static IOconfNode GetCurrentNode() => GetNodes().Single(n => n.IsCurrentSystem);
