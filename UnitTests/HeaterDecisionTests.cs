@@ -45,7 +45,7 @@ namespace UnitTests
         public void Setup()
         {
             decisions = new List<LoopControlDecision>() {
-                new HeatingController.OvenAreaDecision(new($"ovenarea_0", 0, areasCount: 2)),
+                new HeatingController.OvenAreaDecision(new($"ovenarea0", 0, areasCount: 2)),
                 new HeatingController.HeaterDecision(NewConfig.Build())};
             var samples = NewVectorSamples
                 .Select(kvp => (field: kvp.Key, value: kvp.Value))
@@ -186,22 +186,22 @@ namespace UnitTests
         public void StateReflectLatestChangesDoneWithTheOvenCommand() 
         {
             MakeDecisions("oven 200");
-            Assert.AreEqual(200, Field("ovenarea_0"));
-            Assert.AreEqual(HeatingController.HeaterDecision.States.InControlPeriod, (HeatingController.HeaterDecision.States)Field("state_heater"));
+            Assert.AreEqual(200, Field("ovenarea0_target"));
+            Assert.AreEqual(HeatingController.HeaterDecision.States.InControlPeriod, (HeatingController.HeaterDecision.States)Field("heater_state"));
             Assert.AreEqual(vector.Timestamp.AddSeconds(30), Field("heater_nextcontrolperiod").ToVectorDate());
             Assert.AreEqual(vector.Timestamp.AddSeconds(30), Field("heater_controlperiodtimeoff").ToVectorDate());
             MakeDecisions("oven 94", vector.Timestamp.AddSeconds(1));
-            Assert.AreEqual(94, Field("ovenarea_0"));
-            Assert.AreEqual(HeatingController.HeaterDecision.States.InControlPeriod, (HeatingController.HeaterDecision.States)Field("state_heater"));
+            Assert.AreEqual(94, Field("ovenarea0_target"));
+            Assert.AreEqual(HeatingController.HeaterDecision.States.InControlPeriod, (HeatingController.HeaterDecision.States)Field("heater_state"));
             Assert.AreEqual(vector.Timestamp.AddSeconds(30), Field("heater_nextcontrolperiod").ToVectorDate());
             Assert.AreEqual(vector.Timestamp.AddSeconds(10), Field("heater_controlperiodtimeoff").ToVectorDate(), "time off not as expected after a temp change (10 seconds after the cycle started)");
             Field("temp") = 150; //setting temp higher than last target to ensure we show the heater stays on regardless
             MakeDecisions("heater heater on", time: vector.Timestamp.AddSeconds(31));
-            Assert.AreEqual(94, Field("ovenarea_0"), "target unexpectedly changed when specifying manual mode");
-            Assert.AreEqual(HeatingController.HeaterDecision.States.ManualOn, (HeatingController.HeaterDecision.States)Field("state_heater"), "manual on not reflected on state");
+            Assert.AreEqual(94, Field("ovenarea0_target"), "target unexpectedly changed when specifying manual mode");
+            Assert.AreEqual(HeatingController.HeaterDecision.States.ManualOn, (HeatingController.HeaterDecision.States)Field("heater_state"), "manual on not reflected on state");
             Assert.AreEqual(1.0, Field("heater_onoff"), "heater not on on manual mode");
             MakeDecisions("heater heater off", time: vector.Timestamp.AddSeconds(32));
-            Assert.AreEqual(HeatingController.HeaterDecision.States.InControlPeriod, (HeatingController.HeaterDecision.States)Field("state_heater"), "manual off not reflected on state");
+            Assert.AreEqual(HeatingController.HeaterDecision.States.InControlPeriod, (HeatingController.HeaterDecision.States)Field("heater_state"), "manual off not reflected on state");
             Assert.AreEqual(0.0, Field("heater_onoff"), "heater not off after shutting off manual mode");
         }
 
