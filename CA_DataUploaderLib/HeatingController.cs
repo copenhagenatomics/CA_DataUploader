@@ -24,7 +24,7 @@ namespace CA_DataUploaderLib
             var allAreasWithArgIndex = IOconfFile.GetOven().Select(x => x.OvenArea).Distinct().OrderBy(x => x).Select((a,i) => (a, i)).ToDictionary(v => v.a, v => v.i);
 
             //notice that the decisions states and outputs are handled by the registered decisions, while the switchboard inputs and actuations are handled by the switchboard controller
-            cmd.AddDecisions(allAreasWithArgIndex.Select(a => new OvenAreaDecision(new($"ovenarea_{a.Key}", a.Value, allAreasWithArgIndex.Count))).ToList());
+            cmd.AddDecisions(allAreasWithArgIndex.Select(a => new OvenAreaDecision(new($"ovenarea{a.Key}", a.Value, allAreasWithArgIndex.Count))).ToList());
             cmd.AddDecisions(heatersConfigs.Select(h => new HeaterDecision(h, ovens.SingleOrDefault(x => x.HeatingElement.Name == h.Name))).ToList());
             _switchboardController = SwitchBoardController.GetOrCreate(cmd);
         }
@@ -45,7 +45,7 @@ namespace CA_DataUploaderLib
             private Indexes? _indexes;
             public override string Name => _config.Name;
             public override PluginField[] PluginFields => new PluginField[] { 
-                $"state_{Name}", ($"{Name}_onoff", FieldType.Output), new($"{Name}_nextcontrolperiod") { Upload = false }, new($"{Name}_controlperiodtimeoff") { Upload = false} };
+                $"{Name}_state", ($"{Name}_onoff", FieldType.Output), new($"{Name}_nextcontrolperiod") { Upload = false }, new($"{Name}_controlperiodtimeoff") { Upload = false} };
             public override string[] HandledEvents => new List<string>(_eventsMap.Keys).ToArray();
             public HeaterDecision(IOconfHeater heater, IOconfOven? oven) : this(ToConfig(heater, oven)) { }
             public HeaterDecision(Config config)
@@ -96,7 +96,7 @@ namespace CA_DataUploaderLib
                     TemperatureBoardStateSensorNames = temperatureBoardStateSensorNames;
                 }
                 public int Area { get; init; } = -1; // -1 when not set
-                public string AreaName => $"ovenarea_{Area}";
+                public string AreaName => $"ovenarea{Area}_target";
                 public string? OvenSensor { get; init; } // sensor inside the oven somewhere.
                 public int MaxTemperature { get; init; }
                 public string Name { get; }
@@ -249,7 +249,7 @@ namespace CA_DataUploaderLib
                     for (int i = 0; i < desc.Count; i++)
                     {
                         var field = desc[i];
-                        if (field == $"state_{_config.Name}")
+                        if (field == $"{_config.Name}_state")
                             state = i;
                         if (field == _config.AreaName)
                             target = i;
@@ -266,7 +266,7 @@ namespace CA_DataUploaderLib
                                 TemperatureBoardsStates[j] = i;
                     }
 
-                    if (state == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: state_{_config.Name}", nameof(desc));
+                    if (state == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_state", nameof(desc));
                     if (target == -1 && _config.Area != -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.AreaName}", nameof(desc));
                     if (on == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_onoff", nameof(desc));
                     if (nextcontrolperiod == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_nextcontrolperiod", nameof(desc));
@@ -288,7 +288,7 @@ namespace CA_DataUploaderLib
 
             private Indexes? _indexes;
             public override string Name => _config.Name;
-            public override PluginField[] PluginFields => new PluginField[] { $"state_{Name}", Name };
+            public override PluginField[] PluginFields => new PluginField[] { $"{Name}_state", $"{Name}_target" };
             public override string[] HandledEvents => new[] { "oven", "emergencyshutdown" };
             public OvenAreaDecision(Config config)
             {
@@ -421,14 +421,14 @@ namespace CA_DataUploaderLib
                     for (int i = 0; i < desc.Count; i++)
                     {
                         var field = desc[i];
-                        if (field == $"state_{_config.Name}")
+                        if (field == $"{_config.Name}_state")
                             state = i;
-                        if (field == $"{_config.Name}")
+                        if (field == $"{_config.Name}_target")
                             target = i;
                     }
 
-                    if (state == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: state_{_config.Name}", nameof(desc));
-                    if (target == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}", nameof(desc));
+                    if (state == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_state", nameof(desc));
+                    if (target == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_target", nameof(desc));
                 }
             }
 #pragma warning restore IDE1006 // Naming Styles
