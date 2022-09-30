@@ -34,7 +34,7 @@ jobs:
         name: nugetpackages
         path: out
     - name: Push generated package to nuget
-      if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') || startsWith(github.ref, 'refs/tags') }}
+      if: ${{ (github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref,'refs/heads/release'))) || startsWith(github.ref, 'refs/tags') }}
       run: dotnet nuget push out/*.nupkg -s https://api.nuget.org/v3/index.json -k ${{ secrets.CA_NUGET_PACKAGES_KEY }}
   main-executable: # this creates plenty of files and takes plenty of time, only do it for tags
     if: ${{ startsWith(github.ref, 'refs/tags') }}
