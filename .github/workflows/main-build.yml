@@ -4,9 +4,9 @@ on:
   push:
     tags-ignore: 'plugins*'
     paths-ignore: 'CA.LoopControlPluginBase/**'
-    branches: [ master ]
+    branches: [ master, 'release/**' ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, 'release/**' ]
     paths-ignore: 'CA.LoopControlPluginBase/**'
 
 jobs:
