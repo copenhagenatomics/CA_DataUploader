@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib
     {
         private readonly SensorSample _rpiGpuSample;
         private readonly SensorSample _rpiCpuSample;
-        public ThermocoupleBox(CommandHandler cmd) : base(cmd, "Temperatures", string.Empty, "show all temperatures in input queue", GetSensors()) 
+        public ThermocoupleBox(CommandHandler cmd) : base(cmd, "Temperatures", GetSensors()) 
         { // these are disabled / null when RpiTemp is disabled
             _rpiGpuSample = _values.FirstOrDefault(x => IOconfRPiTemp.IsLocalGpuSensor(x.Input));
             _rpiCpuSample = _values.FirstOrDefault(x => IOconfRPiTemp.IsLocalCpuSensor(x.Input));

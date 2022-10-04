@@ -28,10 +28,9 @@ namespace CA_DataUploaderLib
         private readonly string mainSubsystem;
         private readonly Dictionary<MCUBoard, List<(Func<DataVector?, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
         private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = new();
-        private Channel<DataVector>? _receivedVectors;
+        private ChannelReader<DataVector>? _receivedVectors;
 
-        public BaseSensorBox(
-            CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values)
+        public BaseSensorBox(CommandHandler cmd, string commandName, IEnumerable<IOconfInput> values)
         { 
             mainSubsystem = commandName.ToLower();
             Title = commandName;
@@ -81,19 +80,15 @@ namespace CA_DataUploaderLib
             bool hasBoardWithBuildInActions = false;
             for (int i = 0; i < _boards.Length; i++)
             {
-                var (map, values, boardStateIndexInFullVector) = _boards[i];
+                var (map, values, _) = _boards[i];
                 string name = map.BoxName + "_state";
                 if (!indexes.TryGetValue(name, out var index)) throw new ArgumentException($"failed to find box state in full vector: {name}");
-                _boards[i] = (map, values, boardStateIndexInFullVector);
-                if (_buildInWriteActions.TryGetValue(map.Board, out var actions))
-                    hasBoardWithBuildInActions = true;
+                _boards[i] = (map, values, index);
+                hasBoardWithBuildInActions |= _buildInWriteActions.TryGetValue(map.Board, out var _);
             }
 
             if (hasBoardWithBuildInActions)
-            {
-                _receivedVectors = Channel.CreateUnbounded<DataVector>();
-                _cmd.NewVectorReceived += (s, e) => _receivedVectors.Writer.TryWrite(e);
-            }
+                _receivedVectors = _cmd.ReceivedVectorsReader;
         }
 
         public Task Run(CancellationToken token) => RunBoardLoops(_boards, token);
@@ -207,7 +202,7 @@ namespace CA_DataUploaderLib
             var buildInActionsEnabled = _buildInWriteActions.TryGetValue(board, out var buildInActions);
             if (!buildInActionsEnabled && !customWritesEnabled) return;
             ChannelReader<DataVector>? vectorsChannel = buildInActionsEnabled 
-                ? (_receivedVectors ?? throw new InvalidOperationException("build actions detected without receiving vectors channel being initialized")).Reader 
+                ? (_receivedVectors ?? throw new InvalidOperationException("build actions detected without receiving vectors channel being initialized"))
                 : null;
 
             // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operation.

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
@@ -39,7 +40,38 @@ namespace CA_DataUploaderLib
         {
             _cmd = cmd;
             _alerts = GetAlerts(vectorDescription, cmd).ToArray();
-            cmd.NewVectorReceived += OnNewVectorReceived;
+            _ = Task.Run(CheckAlertsOnReceivedVectors);
+        }
+
+        private async void CheckAlertsOnReceivedVectors()
+        {
+            await foreach (var vector in _cmd.ReceivedVectorsReader.ReadAllAsync(_cmd.StopToken))
+            {
+                if (Disabled) continue;
+
+                var timestamp = vector.Timestamp;
+                foreach (var (alert, sensorIndex) in _alerts)
+                {
+                    if (!alert.CheckValue(vector[sensorIndex], timestamp)) 
+                        continue;
+
+                    _cmd.FireAlert(alert.Message, timestamp);
+                    if (alert.Command == default)
+                        continue;
+
+                    foreach (var commands in alert.Command.Split('|'))
+                    {
+                        try
+                        {
+                            _cmd.Execute(commands, true);
+                        }
+                        catch (Exception ex)
+                        {//note that a distributed host might postpone the execution of the command above, but it would then be responsible of logging information about any error.
+                            CALog.LogError(LogID.A, $"unexpected error running command for alert {alert.Name}", ex);
+                        }
+                    }
+                }
+            }    
         }
 
         private static List<(IOconfAlert alert, int sensorIndex)> GetAlerts(VectorDescription vectorDesc, CommandHandler cmd)
@@ -56,24 +88,6 @@ namespace CA_DataUploaderLib
             }
 
             return alerts;
-        }
-
-        public void OnNewVectorReceived(object? sender, DataVector vector)
-        {
-            if (Disabled) return;
-
-            var timestamp = vector.Timestamp;
-            foreach (var (alert, sensorIndex) in _alerts)
-            {
-                if (!alert.CheckValue(vector[sensorIndex], timestamp)) continue;
-
-                _cmd.FireAlert(alert.Message, timestamp);
-                if (alert.Command != default)
-                {
-                    foreach (var commands in alert.Command.Split('|'))
-                        _cmd.Execute(commands, true);
-                }
-            }
         }
     }
 }
