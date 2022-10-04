@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib
             var boardsLoops = new BaseSensorBox(cmd, "switchboards", string.Empty, "show switchboards inputs", inputs);
             //we ignore remote boards and boards missing during the start sequence (as we don't have auto reconnect logic yet for those). Note the BaseSensorBox already reports the missing local boards.
             foreach (var board in ports.Where(p => p.Map.IsLocalBoard && p.Map.Board != null).GroupBy(v => v.Map.Board))
-                RegisterBoardWriteActions(boardsLoops, board.Key, board.ToList());
+                RegisterBoardWriteActions(cmd, boardsLoops, board.Key, board.ToList());
         }
 
         public static void Initialize(CommandHandler cmd)
@@ -33,15 +33,16 @@ namespace CA_DataUploaderLib
                 _instance ??= new SwitchBoardController(cmd);
         }
 
-        private static void RegisterBoardWriteActions(BaseSensorBox reader, MCUBoard board, List<IOconfOut230Vac> ports)
+        private static void RegisterBoardWriteActions(CommandHandler cmd, BaseSensorBox reader, MCUBoard board, List<IOconfOut230Vac> ports)
         {
             var lastActions = Enumerable.Range(0, ports.Max(p => p.PortNumber))
                 .Select(_ => (isOn: false, timeToRepeat: default(DateTime), timeRunnin: Stopwatch.StartNew()))
                 .ToArray();
             (int fieldIndex, int number)[] portsFields = Array.Empty<(int fieldIndex, int number)>();
-            reader.AddBuildInWriteAction(board, InitializeAction, WriteAction, ExitAction);
+            cmd.FullVectorIndexesCreated += InitializeAction;
+            reader.AddBuildInWriteAction(board, WriteAction, ExitAction);
 
-            void InitializeAction(MCUBoard board, IReadOnlyDictionary<string, int> indexes) => 
+            void InitializeAction(object? sender, IReadOnlyDictionary<string, int> indexes) => 
                 portsFields = ports.Select(p => (
                     fieldIndex: indexes.TryGetValue(p.Name + "_onoff", out var index) 
                         ? index 

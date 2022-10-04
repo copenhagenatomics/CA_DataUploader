@@ -26,10 +26,7 @@ namespace CA_DataUploaderLib
         protected readonly AllBoardsState _boardsState = new(Enumerable.Empty<IOconfMap>());
         private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamplesLookup = new();
         private readonly string mainSubsystem;
-        private readonly Dictionary<
-                MCUBoard, 
-                List<(Action<MCUBoard, IReadOnlyDictionary<string, int>> initialize, Func<DataVector?, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> 
-            _buildInWriteActions = new();
+        private readonly Dictionary<MCUBoard, List<(Func<DataVector?, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
         private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = new();
         private Channel<DataVector>? _receivedVectors;
 
@@ -89,11 +86,7 @@ namespace CA_DataUploaderLib
                 if (!indexes.TryGetValue(name, out var index)) throw new ArgumentException($"failed to find box state in full vector: {name}");
                 _boards[i] = (map, values, boardStateIndexInFullVector);
                 if (_buildInWriteActions.TryGetValue(map.Board, out var actions))
-                {
                     hasBoardWithBuildInActions = true;
-                    foreach (var (initialize, _, _) in actions)
-                        initialize(map.Board, indexes);
-                }
             }
 
             if (hasBoardWithBuildInActions)
@@ -134,10 +127,10 @@ namespace CA_DataUploaderLib
         }
 
         /// <remarks>must be called before <see cref="CommandHandler.FullVectorDescriptionCreated"/> and <see cref="Run"/> are called</remarks>
-        public void AddBuildInWriteAction(MCUBoard board, Action<MCUBoard, IReadOnlyDictionary<string, int>> initializeAction, Func<DataVector?, MCUBoard, CancellationToken, Task> writeAction, Func<MCUBoard, CancellationToken, Task> exitAction)
+        public void AddBuildInWriteAction(MCUBoard board, Func<DataVector?, MCUBoard, CancellationToken, Task> writeAction, Func<MCUBoard, CancellationToken, Task> exitAction)
         {
-            if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = new() { (initializeAction, writeAction, exitAction ) };
-            else actions.Add((initializeAction, writeAction, exitAction));
+            if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = new() { (writeAction, exitAction ) };
+            else actions.Add((writeAction, exitAction));
         }
 
         protected bool ShowQueue(List<string> args)
@@ -249,7 +242,7 @@ namespace CA_DataUploaderLib
                         if (vector != null && !CheckConnectedStateInVector(board, boardStateIndexInFullVector, ref waitingBoardReconnect, vector))
                             continue; // no point trying to send commands while there is no connection to the board.
 
-                        foreach (var (_, writeAction, _) in buildInActions!)
+                        foreach (var (writeAction, _) in buildInActions!)
                             await writeAction(vector, board, token);
 
                         EnsureResumeAfterTimeoutIsReported();
@@ -273,7 +266,7 @@ namespace CA_DataUploaderLib
 
             try
             {
-                foreach (var (_, _, exitAction) in buildInActions!)
+                foreach (var (_, exitAction) in buildInActions!)
                 {
                     using var timeoutToken = new CancellationTokenSource(3000);
                     await exitAction(board, timeoutToken.Token);
