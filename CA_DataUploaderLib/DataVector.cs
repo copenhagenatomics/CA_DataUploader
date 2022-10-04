@@ -21,6 +21,7 @@ namespace CA_DataUploaderLib
         public DateTime Timestamp { get; private set; }
         public double[] Data { get; }
         public int Count() => Data.Length;
+        public double this[int index] => Data[index];
 
         internal static void InitializeOrUpdateTime([NotNull]ref DataVector? vector, int length, DateTime vectorTime)
         {

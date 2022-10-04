@@ -9,11 +9,8 @@ using System.Linq;
 
 namespace CA_DataUploaderLib
 {
-    public sealed class HeatingController : IDisposable
+    public sealed class HeatingController
     {
-        private bool _disposed = false;
-        private readonly SwitchBoardController? _switchboardController;
-
         public HeatingController(CommandHandler cmd)
         {
             var heatersConfigs = IOconfFile.GetHeater().ToList();
@@ -26,14 +23,7 @@ namespace CA_DataUploaderLib
             //notice that the decisions states and outputs are handled by the registered decisions, while the switchboard inputs and actuations are handled by the switchboard controller
             cmd.AddDecisions(allAreasWithArgIndex.Select(a => new OvenAreaDecision(new($"ovenarea{a.Key}", a.Value, allAreasWithArgIndex.Count))).ToList());
             cmd.AddDecisions(heatersConfigs.Select(h => new HeaterDecision(h, ovens.SingleOrDefault(x => x.HeatingElement.Name == h.Name))).ToList());
-            _switchboardController = SwitchBoardController.GetOrCreate(cmd);
-        }
-
-        public void Dispose()
-        { // class is sealed without unmanaged resources, no need for the full disposable pattern.
-            if (_disposed) return;
-            _switchboardController?.Dispose();
-            _disposed = true;
+            SwitchBoardController.Initialize(cmd);
         }
 
         public class HeaterDecision : LoopControlDecision

@@ -34,14 +34,6 @@ namespace CA_DataUploaderLib.IOconf
                 (RateLimitMinutes, Command) = (DefaultRateLimitMinutes, list[3]);
         }
 
-        public IOconfAlert(string name, string expressionWithOptions) : base("DynamicAlert;name", 0, "DynamicAlert")
-        {
-            Name = name;
-            (Sensor, Value, MessageTemplate, type, RateLimitMinutes, Command) = ParseExpressionWithOptions(
-                name, expressionWithOptions, "alert expression with options - wrong format: " + expressionWithOptions + ". Expression with options format: SensorName comparison value [rateMinutes] [command].");
-            Message = MessageTemplate;
-        }
-
         public string Sensor { get; }
         public string Message { get; private set; }
         public string Command { get; }
@@ -126,18 +118,6 @@ namespace CA_DataUploaderLib.IOconf
             };
 
             return (sensor, value, messageTemplate, type);
-        }
-
-        private static (string Sensor, double Value, string MessageTemplate, AlertCompare type, int RateLimitMinutes, string Command) ParseExpressionWithOptions(string name, string expression, string formatErrorMessage)
-        {
-            var match = expressionWithOptionsRegex.Match(expression);
-            if (!match.Success)
-                throw new Exception(formatErrorMessage + " Supported comparisons: =,!=, >, <, >=, <=");
-            var (sensor, value, messageTemplate, type) = ParseExpression(name, expression, match);
-            var rateLimit = match.Groups[4].Success ? match.Groups[4].Value.ToInt() : DefaultRateLimitMinutes;
-            var command = match.Groups[5].Value.Trim();
-            command = command == string.Empty ? null : command; //we explicitely use null if there is no command to properly signal the error
-            return (sensor, value, messageTemplate, type, rateLimit, command);
         }
     }
 }
