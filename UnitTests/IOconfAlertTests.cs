@@ -84,18 +84,5 @@ namespace UnitTests
             var ex = Assert.ThrowsException<Exception>(() => new IOconfAlert(row, 0));
             Assert.AreEqual($"IOconfAlert: wrong format: {row}. Format: Alert;Name;SensorName comparison value;[rateMinutes];[command]. Supported comparisons: =,!=, >, <, >=, <=", ex.Message);
         }
-
-        [DataRow("Sensorx > 123", 124d, 30, null)]
-        [DataRow("Sensorx > 123 20", 124d, 20, null)]
-        [DataRow("Sensorx > 123 20 oven 0", 124d, 20, "oven 0")]
-        [DataRow("Sensorx > 123 oven 10", 124d, 30, "oven 10")]
-        [DataTestMethod]
-        public void SupportsDynamicAlertsFormat(string expressionWithOptions, double value, int rateLimit, string command)
-        {
-            var alert = new IOconfAlert("dynamicalert", expressionWithOptions);
-            Assert.IsTrue(alert.CheckValue(value, DateTime.UtcNow));
-            Assert.AreEqual(rateLimit, alert.RateLimitMinutes);
-            Assert.AreEqual(command, alert.Command);
-        }
     }
 }

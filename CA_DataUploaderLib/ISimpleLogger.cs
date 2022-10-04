@@ -1,6 +1,6 @@
 using System;
 
-namespace CA.LoopControlPluginBase
+namespace CA_DataUploaderLib
 {
     public interface ISimpleLogger
     {

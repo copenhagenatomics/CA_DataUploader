@@ -14,8 +14,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ScreenShots", "ScreenShots"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UnitTests", "UnitTests\UnitTests.csproj", "{C74C4DFC-74A1-40D4-A8DB-A0546ED810FD}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommandHandlerTester", "CommandHandlerTester\CommandHandlerTester.csproj", "{1DDB4198-46EB-4DB7-AB68-AC73D232A834}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CA_DataUploaderLib", "CA_DataUploaderLib\CA_DataUploaderLib.csproj", "{C86BB1C7-DCDE-4EFB-87A2-94F5B08AC0D1}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CA_DataUploader", "CA_DataUploader\CA_DataUploader.csproj", "{DCD62830-D180-4614-9B8D-FE76722850E5}"
@@ -38,8 +36,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TemperatureUnit10pin", "Tem
 		Arduino\TemperatureUnit10pin\TemperatureUnit10pin.ino = Arduino\TemperatureUnit10pin\TemperatureUnit10pin.ino
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommandHandlerTesterLib", "CommandHandlerTesterLib\CommandHandlerTesterLib.csproj", "{CAF9DD5A-36B1-4395-BA4A-CF8AD198E85E}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CA.LoopControlPluginBase", "CA.LoopControlPluginBase\CA.LoopControlPluginBase.csproj", "{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{38A9A2D0-B67C-4DD1-8AF4-49D5EE4E6A87}"
@@ -59,10 +55,6 @@ Global
 		{C74C4DFC-74A1-40D4-A8DB-A0546ED810FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C74C4DFC-74A1-40D4-A8DB-A0546ED810FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C74C4DFC-74A1-40D4-A8DB-A0546ED810FD}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1DDB4198-46EB-4DB7-AB68-AC73D232A834}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1DDB4198-46EB-4DB7-AB68-AC73D232A834}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1DDB4198-46EB-4DB7-AB68-AC73D232A834}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1DDB4198-46EB-4DB7-AB68-AC73D232A834}.Release|Any CPU.Build.0 = Release|Any CPU
 		{C86BB1C7-DCDE-4EFB-87A2-94F5B08AC0D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{C86BB1C7-DCDE-4EFB-87A2-94F5B08AC0D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C86BB1C7-DCDE-4EFB-87A2-94F5B08AC0D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -71,10 +63,6 @@ Global
 		{DCD62830-D180-4614-9B8D-FE76722850E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DCD62830-D180-4614-9B8D-FE76722850E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DCD62830-D180-4614-9B8D-FE76722850E5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CAF9DD5A-36B1-4395-BA4A-CF8AD198E85E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CAF9DD5A-36B1-4395-BA4A-CF8AD198E85E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CAF9DD5A-36B1-4395-BA4A-CF8AD198E85E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CAF9DD5A-36B1-4395-BA4A-CF8AD198E85E}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}.Release|Any CPU.ActiveCfg = Release|Any CPU

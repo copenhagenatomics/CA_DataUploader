@@ -1,4 +1,5 @@
-﻿using CA_DataUploaderLib.Extensions;
+﻿#nullable enable
+using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
@@ -22,22 +23,22 @@ namespace CA_DataUploaderLib
     {
         private readonly PlotConnection _plot;
         private readonly Signing _signing;
-        private readonly Queue<DataVector> _queue = new Queue<DataVector>();
-        private readonly Queue<EventFiredArgs> _eventsQueue = new Queue<EventFiredArgs>();
-        private readonly List<DateTime> _badPackages = new List<DateTime>();
+        private readonly Queue<DataVector> _queue = new();
+        private readonly Queue<EventFiredArgs> _eventsQueue = new();
+        private readonly List<DateTime> _badPackages = new();
         private DateTime _lastTimestamp;
-        private bool _running;
+        private readonly CancellationTokenSource _stopTokenSource;
         private readonly int _localVectorLength;
         private readonly int _uploadVectorLength;
         private readonly bool[] _fieldUploadMap;
-        private readonly CommandHandler _cmd;
+        private readonly CommandHandler? _cmd;
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(10000);
 
         public ServerUploader(VectorDescription vectorDescription) : this(vectorDescription, null)
         {
         }
 
-        public ServerUploader(VectorDescription vectorDescription, CommandHandler cmd)
+        public ServerUploader(VectorDescription vectorDescription, CommandHandler? cmd)
         {
             try
             {
@@ -51,9 +52,9 @@ namespace CA_DataUploaderLib
                 var uploadDescription = new VectorDescription(vectorDescription._items.Where(v => v.Upload).ToList(), vectorDescription.Hardware, vectorDescription.Software) { IOconf = IOconfFile.GetRawFile() };
                 _uploadVectorLength = uploadDescription.Length;
                 _plot = PlotConnection.Establish(loopName, _signing.GetPublicKey(), GetSignedVectorDescription(uploadDescription)).GetAwaiter().GetResult();
-                new Thread(() => LoopForever()).Start();
+                _stopTokenSource = cmd != null ? CancellationTokenSource.CreateLinkedTokenSource(cmd.StopToken) : new();
+                new Thread(() => LoopForever(_stopTokenSource.Token)).Start();
                 _cmd = cmd;
-                cmd?.AddCommand("escape", Stop);
 
             }
             catch (Exception ex)
@@ -63,7 +64,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public void SendEvent(object sender, EventFiredArgs e)
+        public void SendEvent(object? sender, EventFiredArgs e)
         {
             lock (_eventsQueue)
                 if (_eventsQueue.Count < 10000)  // if sending thread can't catch up, then drop packages.
@@ -104,15 +105,14 @@ namespace CA_DataUploaderLib
 
         public string GetPlotUrl() => "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plot.PlotName;
 
-        private void LoopForever()
+        private void LoopForever(CancellationToken token)
         {
-            _running = true;
-            _ = Task.Run(TrackUploadState);
+            _ = Task.Run(() => TrackUploadState(token), token);
 
             var vectorUploadDelay = IOconfFile.GetVectorUploadDelay();
             var throttle = new TimeThrottle(vectorUploadDelay);
             var writer = _executedActionChannel.Writer;
-            while (_running)
+            while (!token.IsCancellationRequested)
             {
                 throttle.Wait();
                 writer.TryWrite(UploadState.StartingUploadCycle);
@@ -158,9 +158,8 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private async Task TrackUploadState()
+        private async Task TrackUploadState(CancellationToken token)
         {
-            var token = _cmd.StopToken;
             try
             {
                 await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
@@ -195,13 +194,13 @@ namespace CA_DataUploaderLib
             }
         }
 
-        List<T> DequeueAllEntries<T>(Queue<T> queue)
+        static List<T>? DequeueAllEntries<T>(Queue<T> queue)
         {
-            List<T> list = null; // delayed initialization to avoid creating lists when there is no data.
+            List<T>? list = null; // delayed initialization to avoid creating lists when there is no data.
             lock (queue)
                 while (queue.Any())  // dequeue all. 
                 {
-                    list = list ?? new List<T>(); // ensure initialized
+                    list ??= new List<T>(); // ensure initialized
                     list.Add(queue.Dequeue());
                 }
 
@@ -211,15 +210,13 @@ namespace CA_DataUploaderLib
         /// <returns>a signature of the original data followed by the data compressed with gzip.</returns>
         private byte[] SignAndCompress(byte[] buffer)
         {
-            using (var memory = new MemoryStream())
+            using var memory = new MemoryStream();
+            using (var gzip = new GZipStream(memory, CompressionMode.Compress))
             {
-                using (var gzip = new GZipStream(memory, CompressionMode.Compress))
-                {
-                    gzip.Write(buffer, 0, buffer.Length);
-                }
-
-                return _signing.GetSignature(buffer).Concat(memory.ToArray()).ToArray();
+                gzip.Write(buffer, 0, buffer.Length);
             }
+
+            return _signing.GetSignature(buffer).Concat(memory.ToArray()).ToArray();
         }
 
         private byte[] GetSignedVectorDescription(VectorDescription vectorDescription)
@@ -244,7 +241,7 @@ namespace CA_DataUploaderLib
             return _signing.GetSignature(bytes).Concat(bytes).ToArray();
         }
 
-        private static void OnError(string message, Exception ex)
+        private static void OnError(string message, Exception? ex)
         {
             if (ex != null)
                 CALog.LogError(LogID.A, message, ex); //note we don't use LogErrorAndConsoleLn variation, as CALog.LoggerForUserOutput may be set to generate events that are only visible on the event log.
@@ -343,15 +340,9 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private bool Stop(List<string> args)
-        {
-            _running = false;
-            return true;
-        }
-
         public void Dispose()
         { // class is sealed so don't need full blown IDisposable pattern.
-            _running = false;
+            _stopTokenSource.Cancel();
         }
 
         private class PlotConnection
@@ -402,7 +393,7 @@ namespace CA_DataUploaderLib
             private static async Task<(int plotId, string plotName)> GetPlotIDAsync(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription)
             {
                 //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-                HttpResponseMessage response = null;
+                HttpResponseMessage? response = null;
                 try
                 {
                     string query = $"/api/v1/Plotdata/GetPlotnameId?loopname={loopName}&ticks={DateTime.UtcNow.Ticks}&logintoken={loginToken}";
@@ -429,7 +420,6 @@ namespace CA_DataUploaderLib
 
             private static async Task<string> GetLoginTokenWithRetries(HttpClient client, ConnectionInfo info)
             {
-                var accountInfo = new Dictionary<string, string> { { "email", info.email }, { "password", info.password }, { "fullname", info.Fullname } };
                 int failureCount = 0;
                 while (true)
                 {
@@ -453,7 +443,7 @@ namespace CA_DataUploaderLib
 
             private static async Task<string> GetLoginToken(HttpClient client, ConnectionInfo accountInfo)
             {
-                string token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}");
+                string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}");
                 if (string.IsNullOrEmpty(token))
                     token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.email}&password={accountInfo.password}&fullName={accountInfo.Fullname}"); // attempt to create account assuming it did not exist
                 if (!string.IsNullOrEmpty(token))
@@ -462,15 +452,11 @@ namespace CA_DataUploaderLib
                 throw new Exception("Unable to login or create token");
             }
 
-            private static async Task<string> Post(HttpClient client, string requestUri)
+            private static async Task<string?> Post(HttpClient client, string requestUri)
             {
-                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                 var response = await client.PostAsync(requestUri, null);
                 if (response.StatusCode == System.Net.HttpStatusCode.OK && response.Content != null)
-                {
-                    return (await response.Content.ReadAsStringAsync())?.Replace("\"","");
-
-                }
+                    return (await response.Content.ReadAsStringAsync()).Replace("\"","");
                 else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                     return null;
 
@@ -489,7 +475,7 @@ namespace CA_DataUploaderLib
 
         private class Signing
         {
-            private RSACryptoServiceProvider _rsaWriter = new RSACryptoServiceProvider(1024);
+            private readonly RSACryptoServiceProvider _rsaWriter = new(1024);
 
             public Signing(string loopName)
             {

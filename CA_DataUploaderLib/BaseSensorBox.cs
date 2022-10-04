@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -7,36 +8,37 @@ using CA_DataUploaderLib.IOconf;
 using Humanizer;
 using System.Diagnostics;
 using System.Collections;
-using CA.LoopControlPluginBase;
 using System.Threading.Tasks;
 using System.Threading.Channels;
 
 namespace CA_DataUploaderLib
 {
-    public class BaseSensorBox : IDisposable, ISubsystemWithVectorData
+    public class BaseSensorBox : ISubsystemWithVectorData
     {
         public string Title { get; protected set; }
         /// <summary>runs when the subsystem is about to stop running, but before all boards are closed</summary>
         /// <remarks>some boards might be closed, specially if the system is stopping due to losing connection to one of the boards</remarks>
-        public event EventHandler Stopping;
+        public event EventHandler? Stopping;
         private readonly CommandHandler _cmd;
         protected readonly List<SensorSample> _values;
         protected readonly List<SensorSample> _localValues;
-        private readonly (IOconfMap map, SensorSample[] values)[] _boards;
-        protected readonly AllBoardsState _boardsState;
-        private readonly CancellationTokenSource _boardLoopsStopTokenSource = new();
+        private readonly (IOconfMap map, SensorSample[] values, int boardStateIndexInFullVector)[] _boards = Array.Empty<(IOconfMap map, SensorSample[] values, int boardStateIndexInFullVector)>();
+        protected readonly AllBoardsState _boardsState = new(Enumerable.Empty<IOconfMap>());
         private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamplesLookup = new();
         private readonly string mainSubsystem;
-        private readonly PluginsCommandHandler _cmdAdvanced;
-        private readonly Dictionary<MCUBoard, List<(Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
+        private readonly Dictionary<
+                MCUBoard, 
+                List<(Action<MCUBoard, IReadOnlyDictionary<string, int>> initialize, Func<DataVector?, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> 
+            _buildInWriteActions = new();
         private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = new();
+        private Channel<DataVector>? _receivedVectors;
 
         public BaseSensorBox(
             CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values)
         { 
+            mainSubsystem = commandName.ToLower();
             Title = commandName;
             _cmd = cmd;
-            _cmdAdvanced = new PluginsCommandHandler(cmd);
             _values = values.Select(x => new SensorSample(x)).ToList();
             _localValues = _values.Where(x => x.Input.Map.IsLocalBoard).ToList();
             if (!_values.Any())
@@ -44,13 +46,12 @@ namespace CA_DataUploaderLib
 
             if (cmd != null)
             {
-                mainSubsystem = commandName.ToLower();
                 SubscribeCommandsToSubsystems(cmd, mainSubsystem, _values);
-                cmd.AddCommand("escape", Stop);
                 cmd.AddSubsystem(this);
+                cmd.FullVectorIndexesCreated += InitializeBuiltInActionsIndexesAndVectorsChannel;
             }
 
-            var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray())).ToArray();
+            var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray(), boardStateIndexInFullVector: -1)).ToArray();
             _boards = allBoards.Where(b => b.map.IsLocalBoard).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
             var localBoardNames = _boards.Select(b => b.map.Name).ToHashSet();
@@ -58,12 +59,12 @@ namespace CA_DataUploaderLib
                 RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived, localBoardNames);
 
             static void RegisterCustomBoardCommand(
-                IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived, HashSet<string> localBoards)
+                IOconfMap map, CommandHandler? cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived, HashSet<string> localBoards)
             {
                 var channel = Channel.CreateUnbounded<string>();
                 var channelWriter = channel.Writer;
                 boardCustomCommandsReceived.Add(map.Board, channel.Reader);
-                cmd.AddCommand("custom", CustomCommand);
+                cmd?.AddCommand("custom", CustomCommand);
 
                 bool CustomCommand(List<string> args)
                 {
@@ -75,6 +76,30 @@ namespace CA_DataUploaderLib
                     channelWriter.TryWrite(string.Join(' ', args.Skip(2)));
                     return true;
                 }
+            }
+        }
+
+        private void InitializeBuiltInActionsIndexesAndVectorsChannel(object? _, IReadOnlyDictionary<string, int> indexes)
+        {
+            bool hasBoardWithBuildInActions = false;
+            for (int i = 0; i < _boards.Length; i++)
+            {
+                var (map, values, boardStateIndexInFullVector) = _boards[i];
+                string name = map.BoxName + "_state";
+                if (!indexes.TryGetValue(name, out var index)) throw new ArgumentException($"failed to find box state in full vector: {name}");
+                _boards[i] = (map, values, boardStateIndexInFullVector);
+                if (_buildInWriteActions.TryGetValue(map.Board, out var actions))
+                {
+                    hasBoardWithBuildInActions = true;
+                    foreach (var (initialize, _, _) in actions)
+                        initialize(map.Board, indexes);
+                }
+            }
+
+            if (hasBoardWithBuildInActions)
+            {
+                _receivedVectors = Channel.CreateUnbounded<DataVector>();
+                _cmd.NewVectorReceived += (s, e) => _receivedVectors.Writer.TryWrite(e);
             }
         }
 
@@ -108,11 +133,11 @@ namespace CA_DataUploaderLib
                 n.Where(v => !v.Input.Skip).GroupBy(v => v.Input.Map).Select(b => b.Key);
         }
 
-        /// <remarks>must be called before <see cref="Run"/> is called</remarks>
-        public void AddBuildInWriteAction(MCUBoard board, Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> writeAction, Func<MCUBoard, CancellationToken, Task> exitAction)
+        /// <remarks>must be called before <see cref="CommandHandler.FullVectorDescriptionCreated"/> and <see cref="Run"/> are called</remarks>
+        public void AddBuildInWriteAction(MCUBoard board, Action<MCUBoard, IReadOnlyDictionary<string, int>> initializeAction, Func<DataVector?, MCUBoard, CancellationToken, Task> writeAction, Func<MCUBoard, CancellationToken, Task> exitAction)
         {
-            if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = new() { (writeAction, exitAction ) };
-            else actions.Add((writeAction, exitAction));
+            if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = new() { (initializeAction, writeAction, exitAction ) };
+            else actions.Add((initializeAction, writeAction, exitAction));
         }
 
         protected bool ShowQueue(List<string> args)
@@ -140,13 +165,12 @@ namespace CA_DataUploaderLib
         }
 
         private double GetAvgLoopTime() => _values.Average(x => x.ReadSensor_LoopTime);
-        private async Task RunBoardLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
+        private async Task RunBoardLoops((IOconfMap map, SensorSample[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             DateTime start = DateTime.Now;
             try
             {
-                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, _boardLoopsStopTokenSource.Token);
-                var loops = StartLoops(boards, linkedCts.Token);
+                var loops = StartLoops(boards, token);
                 await Task.WhenAll(loops);
                 if (loops.Count > 0) //we only report the exit when we actually ran loops with detected boards. If a board was not detected StartReadLoops already reports the missing boards.
                     CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardLoops() " + DateTime.Now.Subtract(start).Humanize(5));
@@ -157,7 +181,7 @@ namespace CA_DataUploaderLib
             }
 
             Stopping?.Invoke(this, EventArgs.Empty);
-            foreach (var (map, _) in boards)
+            foreach (var (map, _, _) in boards)
             {
                 try
                 {
@@ -172,7 +196,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected virtual List<Task> StartLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
+        protected virtual List<Task> StartLoops((IOconfMap map, SensorSample[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             var missingBoards = boards.Where(h => h.map.Board == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
@@ -180,17 +204,19 @@ namespace CA_DataUploaderLib
 
             return boards
                 .Where(b => b.map.Board != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
-                .SelectMany(b => new []{ BoardReadLoop(b.map.Board, b.values, token), BoardWriteLoop(b.map.Board, token) })
+                .SelectMany(b => new []{ BoardReadLoop(b.map.Board, b.values, token), BoardWriteLoop(b.map.Board, b.boardStateIndexInFullVector, token) })
                 .ToList();
         }
 
-        private async Task BoardWriteLoop(MCUBoard board, CancellationToken token)
+        private async Task BoardWriteLoop(MCUBoard board, int boardStateIndexInFullVector, CancellationToken token)
         {
             var customWritesEnabled = _boardCustomCommandsReceived.TryGetValue(board, out var customCommandsChannel);
             var buildInActionsEnabled = _buildInWriteActions.TryGetValue(board, out var buildInActions);
             if (!buildInActionsEnabled && !customWritesEnabled) return;
+            ChannelReader<DataVector>? vectorsChannel = buildInActionsEnabled 
+                ? (_receivedVectors ?? throw new InvalidOperationException("build actions detected without receiving vectors channel being initialized")).Reader 
+                : null;
 
-            var boardStateName = board.BoxName + "_state";
             // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operation.
             // we might still get lots of entries for problems that alternate between normal and failed states, but for now is a good data point to know if that case is happening.
             var waitingBoardReconnect = false;
@@ -200,13 +226,13 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    if (customWritesEnabled && customCommandsChannel.TryRead(out var command))
+                    if (customWritesEnabled && customCommandsChannel!.TryRead(out var command))
                         await board.SafeWriteLine(command, token);
 
                     if (!buildInActionsEnabled)
                     {
                         EnsureResumeAfterTimeoutIsReported();
-                        await customCommandsChannel.WaitToReadAsync(token);
+                        await customCommandsChannel!.WaitToReadAsync(token);
                         continue;
                     }
 
@@ -215,15 +241,15 @@ namespace CA_DataUploaderLib
                     {
                         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token);
                         linkedCts.CancelAfter(2000);
-                        var nextVectorTask = _cmdAdvanced.When(_ => true, linkedCts.Token);
+                        var nextVectorTask = vectorsChannel!.ReadAsync(linkedCts.Token).AsTask();
                         await Task.WhenAny(nextVectorTask); //wrap on Task.Any so we can explicitely deal with global cancellation vs. timeout of the linked token
                         token.ThrowIfCancellationRequested(); //we are stopping, let's break of the top loop so stop actions run
                         receivedVector = nextVectorTask.IsCompletedSuccessfully;
-                        NewVectorReceivedArgs vector = nextVectorTask.IsCompletedSuccessfully ? await nextVectorTask : null;
-                        if (receivedVector && !CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector))
+                        var vector = receivedVector ? await nextVectorTask : null;
+                        if (vector != null && !CheckConnectedStateInVector(board, boardStateIndexInFullVector, ref waitingBoardReconnect, vector))
                             continue; // no point trying to send commands while there is no connection to the board.
 
-                        foreach (var (writeAction, _) in buildInActions)
+                        foreach (var (_, writeAction, _) in buildInActions!)
                             await writeAction(vector, board, token);
 
                         EnsureResumeAfterTimeoutIsReported();
@@ -247,7 +273,7 @@ namespace CA_DataUploaderLib
 
             try
             {
-                foreach (var (_, exitAction) in buildInActions)
+                foreach (var (_, _, exitAction) in buildInActions!)
                 {
                     using var timeoutToken = new CancellationTokenSource(3000);
                     await exitAction(board, timeoutToken.Token);
@@ -272,9 +298,9 @@ namespace CA_DataUploaderLib
                 CALog.LogInfoAndConsoleLn(LogID.A, $"wrote to board without time outs after {tryingToRecoverAfterTimeoutWatch.Elapsed}, resuming normal action frequency - {board.ToShortDescription()}");
             }
 
-            static bool CheckConnectedStateInVector(MCUBoard board, string boardStateName, ref bool waitingBoardReconnect, NewVectorReceivedArgs vector)
+            static bool CheckConnectedStateInVector(MCUBoard board, int boardState, ref bool waitingBoardReconnect, DataVector vector)
             {
-                var vectorState = (ConnectionState)(int)vector[boardStateName];
+                var vectorState = (ConnectionState)(int)vector[boardState];
                 var connected = vectorState >= ConnectionState.Connected;
                 if (waitingBoardReconnect && connected)
                 {
@@ -387,7 +413,7 @@ namespace CA_DataUploaderLib
         ///Both in the above case and when the MCUBoard.ReadTimeout is exceeded a message is written to the log (but not the console to reduce operational noise),
         ///specially as it can now be observed on the graphs if board these events are happening + CheckFailure & reconnects will display relevant messages if appropiate.
         ///</remarks>
-        private async Task<(bool, string)> TryReadLineWithStallDetection(MCUBoard board, int msBetweenReads, CancellationToken token)
+        private async Task<(bool, string?)> TryReadLineWithStallDetection(MCUBoard board, int msBetweenReads, CancellationToken token)
         {
             var readLineTask = board.SafeReadLine(token);
             var noDataAvailableTask = Task.Delay(msBetweenReads, token); 
@@ -474,12 +500,6 @@ namespace CA_DataUploaderLib
             return false;
         }
 
-        protected bool Stop(List<string> args)
-        {
-            _boardLoopsStopTokenSource.Cancel();
-            return true;
-        }
-
         public virtual void ProcessLine(IEnumerable<double> numbers, MCUBoard board, SensorSample[] targetSamples)
         {
             int i = 1;
@@ -532,13 +552,6 @@ namespace CA_DataUploaderLib
         private void LogError(MCUBoard board, string message) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}");
         private void LogData(MCUBoard board, string message) => CALog.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
         private void LogInfo(MCUBoard board, string message) => CALog.LogInfoAndConsoleLn(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
-        protected virtual void Dispose(bool disposing) => _boardLoopsStopTokenSource.Cancel();
-        public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method. See https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/implementing-dispose#dispose-and-disposebool
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
-        }
 
         protected class AllBoardsState : IEnumerable<(string sensorName, ConnectionState State)>
         {

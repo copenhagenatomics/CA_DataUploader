@@ -5,39 +5,32 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using CA.LoopControlPluginBase;
-using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
 {
-    public sealed class SwitchBoardController : IDisposable
+    public sealed class SwitchBoardController
     {
-        private readonly BaseSensorBox _boardsLoops;
         private static readonly object ControllerInitializationLock = new();
         private static SwitchBoardController? _instance;
 
         private SwitchBoardController(CommandHandler cmd) 
         {
             var ports = IOconfFile.GetEntries<IOconfOut230Vac>().Where(p => p.IsSwitchboardControllerOutput).ToList();
-            var boardsTemperatures = ports.GroupBy(p => p.BoxName).Select(b => b.Select(p => p.GetBoardTemperatureInputConf()).FirstOrDefault());
+            var boardsTemperatures = ports.GroupBy(p => p.BoxName).Select(g => g.First().GetBoardTemperatureInputConf());
             var sensorPortsInputs = IOconfFile.GetEntries<IOconfSwitchboardSensor>().SelectMany(i => i.GetExpandedConf());
             var inputs = ports.SelectMany(p => p.GetExpandedInputConf()).Concat(boardsTemperatures).Concat(sensorPortsInputs);
-            _boardsLoops = new BaseSensorBox(cmd, "switchboards", string.Empty, "show switchboards inputs", inputs);
+            var boardsLoops = new BaseSensorBox(cmd, "switchboards", string.Empty, "show switchboards inputs", inputs);
             //we ignore remote boards and boards missing during the start sequence (as we don't have auto reconnect logic yet for those). Note the BaseSensorBox already reports the missing local boards.
             foreach (var board in ports.Where(p => p.Map.IsLocalBoard && p.Map.Board != null).GroupBy(v => v.Map.Board))
-                RegisterBoardWriteActions(_boardsLoops, board.Key, board.ToList());
+                RegisterBoardWriteActions(boardsLoops, board.Key, board.ToList());
         }
 
-        public void Dispose() => _boardsLoops.Dispose();
-        public static SwitchBoardController GetOrCreate(CommandHandler cmd)
+        public static void Initialize(CommandHandler cmd)
         {
-            if (_instance != null) return _instance;
+            if (_instance != null) return;
             lock (ControllerInitializationLock)
-            {
-                if (_instance != null) return _instance;
-                return _instance = new SwitchBoardController(cmd);
-            }
+                _instance ??= new SwitchBoardController(cmd);
         }
 
         private static void RegisterBoardWriteActions(BaseSensorBox reader, MCUBoard board, List<IOconfOut230Vac> ports)
@@ -45,18 +38,24 @@ namespace CA_DataUploaderLib
             var lastActions = Enumerable.Range(0, ports.Max(p => p.PortNumber))
                 .Select(_ => (isOn: false, timeToRepeat: default(DateTime), timeRunnin: Stopwatch.StartNew()))
                 .ToArray();
-            var portsFields = ports.Select(p => (field: p.Name + "_onoff", number: p.PortNumber)).ToArray();
-            reader.AddBuildInWriteAction(board, WriteAction, ExitAction);
+            (int fieldIndex, int number)[] portsFields = Array.Empty<(int fieldIndex, int number)>();
+            reader.AddBuildInWriteAction(board, InitializeAction, WriteAction, ExitAction);
 
+            void InitializeAction(MCUBoard board, IReadOnlyDictionary<string, int> indexes) => 
+                portsFields = ports.Select(p => (
+                    fieldIndex: indexes.TryGetValue(p.Name + "_onoff", out var index) 
+                        ? index 
+                        : throw new InvalidOperationException($"failed to find {p.Name + "_onoff"} in the full vector"), 
+                    number: p.PortNumber)).ToArray();
             Task ExitAction(MCUBoard board, CancellationToken token) => AllOff(board, ports, token);
-            async Task WriteAction(NewVectorReceivedArgs vector, MCUBoard board, CancellationToken token)
+            async Task WriteAction(DataVector? vector, MCUBoard board, CancellationToken token)
             {
                 foreach (var port in portsFields)
                     await DoPortActions(vector, board, port, lastActions, token);
             }
         }
 
-        private static async Task DoPortActions(NewVectorReceivedArgs vector, MCUBoard board, (string field, int number) port, (bool isOn, DateTime timeToRepeat, Stopwatch timeRunning)[] lastActions, CancellationToken token)
+        private static async Task DoPortActions(DataVector? vector, MCUBoard board, (int fieldIndex, int number) port, (bool isOn, DateTime timeToRepeat, Stopwatch timeRunning)[] lastActions, CancellationToken token)
         {
             if (vector == null)
             { //too long time without receiving a vector, lets ensure the port is off.
@@ -67,9 +66,9 @@ namespace CA_DataUploaderLib
                 return;
             }
 
-            var isOn = vector[port.field] == 1.0;
+            var isOn = vector[port.fieldIndex] == 1.0;
             var lastAction = lastActions[port.number - 1];
-            var currentVectorTime = vector.GetVectorTime();
+            var currentVectorTime = vector.Timestamp;
             if (lastAction.isOn == isOn && lastAction.timeRunning.ElapsedMilliseconds < 2000 && lastAction.timeToRepeat < currentVectorTime)
                 // no action changes has been requested since the last action was executed and there has been less than 2 seconds
                 // note the 2 seconds is checked in 2 diff ways to avoid it being missed due to bit flips.
