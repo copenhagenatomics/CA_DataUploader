@@ -84,7 +84,7 @@ namespace CA_DataUploaderLib
                 string name = map.BoxName + "_state";
                 if (!indexes.TryGetValue(name, out var index)) throw new ArgumentException($"failed to find box state in full vector: {name}");
                 _boards[i] = (map, values, index);
-                hasBoardWithBuildInActions |= _buildInWriteActions.TryGetValue(map.Board, out var _);
+                hasBoardWithBuildInActions |= map.Board != null && _buildInWriteActions.TryGetValue(map.Board, out var _);
             }
 
             if (hasBoardWithBuildInActions)
