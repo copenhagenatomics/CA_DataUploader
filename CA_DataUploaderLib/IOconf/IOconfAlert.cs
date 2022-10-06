@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Globalization;
 using static System.FormattableString;
 using CA_DataUploaderLib.Extensions;
@@ -36,7 +37,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public string Sensor { get; }
         public string Message { get; private set; }
-        public string Command { get; }
+        public string? Command { get; }
         private readonly AlertCompare type;
         private readonly double Value;
         private double LastValue;
@@ -45,7 +46,6 @@ namespace CA_DataUploaderLib.IOconf
         //expression captures groups: 1-sensor, 2-comparison, 3-value
         //sample expression: SomeValue < 202
         private static readonly Regex comparisonRegex = new(@"^\s*([\w%]+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)\s*$");
-        private static readonly Regex expressionWithOptionsRegex = new(@"^\s*([\w%]+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)\s*(\d+\s*)?\s*(.+)?$");
         public int RateLimitMinutes { get; }
         private const int DefaultRateLimitMinutes = 30; // by default fire the same alert max once every 30 mins.
         private DateTime LastTriggered;

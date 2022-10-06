@@ -99,10 +99,11 @@ namespace CA_DataUploaderLib
                 decision.MakeDecision(decisionsVector, events);
         }
 
-        public Task RunSubsystems()
+        public Task RunSubsystems() => RunSubsystems(StopToken);
+        public Task RunSubsystems(CancellationToken token)
         {
             SendDeviceDetectionEvent();
-            return Task.WhenAll(_subsystems.Select(s => s.Run(StopToken)));
+            return Task.WhenAll(_subsystems.Select(s => s.Run(token)));
         }
 
         private void SendDeviceDetectionEvent()
@@ -145,7 +146,7 @@ namespace CA_DataUploaderLib
             OrderDecisionsBasedOnIOconf(_decisions);
             var decisions = _decisions.Concat(_safetydecisions);
             SetConfigBasedOnIOconf(decisions);
-            CALog.LogData(LogID.A, $"decisions order 2: {string.Join(',', decisions.Select(d => d.Name))}");
+            CALog.LogData(LogID.A, $"decisions order: {string.Join(',', decisions.Select(d => d.Name))}");
             var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type) { Upload = f.Upload })).ToList();
             var desc = new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
             CA.LoopControlPluginBase.VectorDescription inmutableVectorDesc = new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray());
@@ -175,7 +176,6 @@ namespace CA_DataUploaderLib
                 }
 
                 decisions.Sort((x, y) => decisionsIndexes[x.Name].index.CompareTo(decisionsIndexes[y.Name].index));
-                CALog.LogData(LogID.A, $"decisions order: {string.Join(',', decisions.Select(d => d.Name))}");
             }
 
             void SetConfigBasedOnIOconf(IEnumerable<LoopControlDecision> decisions)
