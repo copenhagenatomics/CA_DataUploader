@@ -41,7 +41,7 @@ namespace CA_DataUploaderLib
             public HeaterDecision(Config config)
             {
                 _config = config;
-                _eventsMap = new() { { $"heater {Name} on", Events.heateron }, { $"heater {Name} off", Events.heateroff }, { "emergencyshutdown", Events.emergencyshutdown }, { "oven", Events.oven } };
+                _eventsMap = new(StringComparer.OrdinalIgnoreCase) { { $"heater {Name} on", Events.heateron }, { $"heater {Name} off", Events.heateroff }, { "emergencyshutdown", Events.emergencyshutdown }, { "oven", Events.oven } };
             }
 
             public override void Initialize(CA.LoopControlPluginBase.VectorDescription desc) => _indexes = new(desc, _config);
@@ -52,7 +52,7 @@ namespace CA_DataUploaderLib
 
                 foreach (var @event in events)
                 {
-                    if (_eventsMap.TryGetValue(@event.StartsWith("oven") ? "oven" : @event, out var e))
+                    if (_eventsMap.TryGetValue(@event.StartsWith("oven", StringComparison.OrdinalIgnoreCase) ? "oven" : @event, out var e))
                         model.MakeDecision(e);
                 }
 
@@ -297,7 +297,7 @@ namespace CA_DataUploaderLib
                 foreach (var e in events)
                 foreach (var (prefix, func) in _eventsMap)
                 {
-                    if (!e.StartsWith(prefix)) continue;
+                    if (!e.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
                     var (typedEvent, data) = func(e);
                     model.MakeDecision(typedEvent, data);
                 }
