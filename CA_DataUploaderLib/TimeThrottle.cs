@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Diagnostics;
 using System.Threading;
@@ -18,7 +19,8 @@ namespace CA_DataUploaderLib
             _milliseconds = milliseconds;
         }
 
-        public Task WaitAsync() => Task.Delay(GetWaitMilliseconds());
+        public Task WaitAsync() => WaitAsync(CancellationToken.None);
+        public Task WaitAsync(CancellationToken token) => Task.Delay(GetWaitMilliseconds(), token);
         public void Wait() => Thread.Sleep(GetWaitMilliseconds());
         public void Restart() => _watch.Restart();
 
