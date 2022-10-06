@@ -10,10 +10,9 @@ namespace CA_DataUploaderLib
     /// </remarks>
     public class DefaultCommandRunner : ICommandRunner
     {
-        private readonly Dictionary<string, List<Func<List<string>, bool>>> _commands = new();
+        private readonly Dictionary<string, List<Func<List<string>, bool>>> _commands = new(StringComparer.OrdinalIgnoreCase);
         public Action AddCommand(string name, Func<List<string>, bool> func)
         {
-            name = name.ToLower();
             if (_commands.ContainsKey(name))
                 _commands[name].Add(func);
             else
@@ -34,7 +33,7 @@ namespace CA_DataUploaderLib
             if (!cmd.Any())
                 return false;
 
-            string commandName = cmd[0].ToLower();
+            string commandName = cmd[0];
             if (!_commands.TryGetValue(commandName, out var commandFunctions))
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - unknown command");
@@ -42,7 +41,7 @@ namespace CA_DataUploaderLib
             }
 
             var res = RunCommandFunctions(cmdString, cmd, commandFunctions);
-            if (commandName == "help")
+            if (commandName.Equals("help", StringComparison.OrdinalIgnoreCase))
                 CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");  // end help menu divider
             else if (res == false)
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command");
