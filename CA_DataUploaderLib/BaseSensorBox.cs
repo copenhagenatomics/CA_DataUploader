@@ -404,6 +404,7 @@ namespace CA_DataUploaderLib
                     return;
                 }
 
+                timeSinceLastLog.Restart();
                 logAction(message);
                 logSkipped = 0;
             }
