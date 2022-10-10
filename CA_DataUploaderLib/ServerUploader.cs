@@ -86,7 +86,7 @@ namespace CA_DataUploaderLib
             void RemoveExpiredEvents()
             {
                 var now = DateTime.UtcNow;
-                while (_duplicateEventsExpirationTimes.TryPeek(out var e) && e.expirationTime > now)
+                while (_duplicateEventsExpirationTimes.TryPeek(out var e) && now > e.expirationTime)
                 {
                     e = _duplicateEventsExpirationTimes.Dequeue();
                     if (_duplicateEventsDetection.TryGetValue(e.@event, out var repeatCount) && repeatCount > 1)
