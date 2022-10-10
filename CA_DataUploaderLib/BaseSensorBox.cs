@@ -360,6 +360,8 @@ namespace CA_DataUploaderLib
             var timeSinceLastValidRead = Stopwatch.StartNew();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
             var msBetweenReads = (int)Math.Ceiling(board.ConfigSettings.MillisecondsBetweenReads * 1.5); 
+            var timeSinceLastLog = new Stopwatch();
+            var logSkipped = 0;
             //We set the state early if we detect no data is being returned or if we received values,
             //but we only set ReturningNonValues if it has passed msBetweenReads since the last valid read
             while (true) // we only stop reading if a disconnect or timeout is detected
@@ -380,17 +382,30 @@ namespace CA_DataUploaderLib
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
-                        LogInfo(board, $"unexpected board response {line.Replace("\r", "\\r")}"); // we avoid \r as it makes the output hard to read
+                        LowFrequencyLog(msg => LogInfo(board, msg), $"unexpected board response {line.Replace("\r", "\\r")}");// we avoid \r as it makes the output hard to read
                         if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                             _boardsState.SetState(board, ConnectionState.ReturningNonValues);
                     }
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in msBetweenReads
-                    LogError(board, $"failed handling board response {line.Replace("\r", "\\r")}", ex); // we avoid \r as it makes the output hard to read
+                    LowFrequencyLog(msg => LogError(board, msg, ex), $"failed handling board response {line.Replace("\r", "\\r")}"); // we avoid \r as it makes the output hard to read
                     if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                         _boardsState.SetState(board, ConnectionState.ReturningNonValues);
                 }
+            }
+
+            void LowFrequencyLog(Action<string> logAction, string message)
+            {
+                if (timeSinceLastLog.IsRunning && timeSinceLastLog.ElapsedMilliseconds < 5 * 60000)
+                {
+                    if (logSkipped++ == 0)
+                        LogError(board, $"{message}{Environment.NewLine}Skipping further messages for this board (max 2 messages every 5 minutes)");
+                    return;
+                }
+
+                logAction(message);
+                logSkipped = 0;
             }
         }
 
