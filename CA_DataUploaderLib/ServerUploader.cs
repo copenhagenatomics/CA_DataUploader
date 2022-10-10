@@ -71,7 +71,6 @@ namespace CA_DataUploaderLib
             lock (_eventsQueue)
             {
                 if (_eventsQueue.Count >= 10000) return;  // if sending thread can't catch up, then drop packages.
-                RemoveExpiredEvents();
                 if (_duplicateEventsDetection.TryGetValue(e.Data, out var repeatCount))
                 {
                     _duplicateEventsDetection[e.Data] = repeatCount + 1;
@@ -82,8 +81,11 @@ namespace CA_DataUploaderLib
                 _duplicateEventsDetection[e.Data] = 1;
                 _duplicateEventsExpirationTimes.Enqueue((DateTime.UtcNow.AddMinutes(5), e.Data));
             }
+        }
 
-            void RemoveExpiredEvents()
+        void RemoveExpireduplicateEvents()
+        {
+            lock (_eventsQueue)
             {
                 var now = DateTime.UtcNow;
                 while (_duplicateEventsExpirationTimes.TryPeek(out var e) && e.expirationTime > now)
@@ -158,6 +160,7 @@ namespace CA_DataUploaderLib
                         if (stopping) await task;
                     }
 
+                    RemoveExpireduplicateEvents();
                     var events = DequeueAllEntries(_eventsQueue);
                     if (events != null)
                     {
