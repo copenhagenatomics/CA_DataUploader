@@ -38,11 +38,11 @@ namespace CA_DataUploaderLib
             }
             catch (UnauthorizedAccessException ex)
             {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex.Message}" + Environment.NewLine);
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex.Message}");
             }
             catch (Exception ex)
             {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex}" + Environment.NewLine);
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}, Exception: {ex}");
             }
 
             return default;

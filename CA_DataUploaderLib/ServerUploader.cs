@@ -271,7 +271,7 @@ namespace CA_DataUploaderLib
             if (ex != null)
                 CALog.LogError(LogID.A, message, ex); //note we don't use LogErrorAndConsoleLn variation, as CALog.LoggerForUserOutput may be set to generate events that are only visible on the event log.
             else
-                CALog.LogData(LogID.A, $"{DateTime.Now:MM.dd HH:mm:ss} - {message}");
+                CALog.LogData(LogID.A, message);
             Console.WriteLine(message);
         }
 

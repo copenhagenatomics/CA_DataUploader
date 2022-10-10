@@ -1,10 +1,11 @@
-﻿using CA.LoopControlPluginBase;
+﻿#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 
 namespace CA_DataUploaderLib
-{ 
+{
     public enum LogID
     {
         A, B, C, D, E, F, G, H
@@ -12,65 +13,48 @@ namespace CA_DataUploaderLib
 
     public static class CALog
     {
-        private static Dictionary<LogID, DateTime> _nextSizeCheck;
+        private static Dictionary<LogID, DateTime>? _nextSizeCheck;
         private static readonly string _logDir = Directory.GetCurrentDirectory();
-        public static int MaxLogSizeMB = 100;
+
         /// <remarks>any output before a custom logger is set is written to the console.</remarks>
         public static ISimpleLogger LoggerForUserOutput { get; set; } = new ConsoleLogger();
+        public static int MaxLogSizeMB { get; set; } = 100;
 
-        public static void LogData(LogID logID, string msg)
-        {
-            WriteToFile(logID, msg);            
-        }
-
+        public static void LogData(LogID logID, string msg) => WriteToFile(logID, msg);
         public static void LogException(LogID logID, Exception ex)
         {
-            var msg = $"{DateTime.Now:MM.dd HH:mm:ss} - {ex}{Environment.NewLine}";
-            LoggerForUserOutput.LogError(msg);
+            var msg = ex.ToString();
+            LoggerForUserOutput.LogError(ex);
             WriteToFile(logID, msg);
         }
 
         public static void LogInfoAndConsoleLn(LogID logID, string msg)
         {
             LoggerForUserOutput.LogInfo(msg);
-            WriteToFile(logID, msg + Environment.NewLine);
+            WriteToFile(logID, msg);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error)
         {
-            error = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + error;
             LoggerForUserOutput.LogError(error);
-            WriteToFile(logID, error + Environment.NewLine);
+            WriteToFile(logID, error);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error, Exception ex)
         {
-            error = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + error;
             LoggerForUserOutput.LogError(error);
-            WriteToFile(logID, error + Environment.NewLine + ex.ToString() + Environment.NewLine);
+            WriteToFile(logID, error + Environment.NewLine + ex.ToString());
         }
 
-        public static void LogError(LogID logID, string error, Exception ex)
-        {
-            error = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + error;
-            WriteToFile(logID, error + Environment.NewLine + ex.ToString() + Environment.NewLine);
-        }
-
+        public static void LogError(LogID logID, string error, Exception ex) => WriteToFile(logID, error + Environment.NewLine + ex.ToString());
         private static void WriteToFile(LogID logID, string msg)
         {
             try
             {
                 lock (_logDir)
                 {
-                    // allways add a NewLine
-                    if (!msg.EndsWith(Environment.NewLine))
-                        msg += Environment.NewLine;
-
-                    var time = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ");
-                    if (!msg.StartsWith(time))
-                        msg = time + msg;
-
-                    // allways add timestamp. 
+                    // allways add timestamp and a NewLine
+                    msg = $"{DateTime.Now:MM.dd HH:mm:ss.fff} - {msg}{Environment.NewLine}";
                     File.AppendAllText(GetFilename(logID), msg);
                 }
             }
@@ -84,7 +68,7 @@ namespace CA_DataUploaderLib
         private static string GetFilename(LogID logID)
         {
             if (_nextSizeCheck == null)
-                InitDictionary();
+                InitDictionary(ref _nextSizeCheck);
 
             var filepath = Path.Combine(_logDir, logID.ToString() + ".log");
             if (DateTime.Now > _nextSizeCheck[logID] && File.Exists(filepath))
@@ -98,17 +82,21 @@ namespace CA_DataUploaderLib
             return filepath;
         }
 
-        private static void InitDictionary()
+        private static void InitDictionary([NotNull]ref Dictionary<LogID, DateTime>? dictionary)
         {
-            _nextSizeCheck = new Dictionary<LogID, DateTime>();
-            _nextSizeCheck.Add(LogID.A, DateTime.Now);
-            _nextSizeCheck.Add(LogID.B, DateTime.Now);
-            _nextSizeCheck.Add(LogID.C, DateTime.Now);
-            _nextSizeCheck.Add(LogID.D, DateTime.Now);
-            _nextSizeCheck.Add(LogID.E, DateTime.Now);
-            _nextSizeCheck.Add(LogID.F, DateTime.Now);
-            _nextSizeCheck.Add(LogID.G, DateTime.Now);
-            _nextSizeCheck.Add(LogID.H, DateTime.Now);
+            if (dictionary != null) return;
+
+            dictionary = new Dictionary<LogID, DateTime>
+            {
+                { LogID.A, DateTime.Now },
+                { LogID.B, DateTime.Now },
+                { LogID.C, DateTime.Now },
+                { LogID.D, DateTime.Now },
+                { LogID.E, DateTime.Now },
+                { LogID.F, DateTime.Now },
+                { LogID.G, DateTime.Now },
+                { LogID.H, DateTime.Now }
+            };
         }
 
         public class ConsoleLogger : ISimpleLogger
