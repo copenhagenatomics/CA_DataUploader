@@ -25,6 +25,8 @@ namespace CA_DataUploaderLib
         private readonly Signing _signing;
         private readonly Queue<DataVector> _queue = new();
         private readonly Queue<EventFiredArgs> _eventsQueue = new();
+        private readonly Dictionary<string, int> _duplicateEventsDetection = new();
+        private readonly Queue<(DateTime expirationTime, string @event)> _duplicateEventsExpirationTimes = new();
         private readonly List<DateTime> _badPackages = new();
         private DateTime _lastTimestamp;
         private readonly CancellationTokenSource _stopTokenSource;
@@ -67,8 +69,31 @@ namespace CA_DataUploaderLib
         public void SendEvent(object? sender, EventFiredArgs e)
         {
             lock (_eventsQueue)
-                if (_eventsQueue.Count < 10000)  // if sending thread can't catch up, then drop packages.
-                    _eventsQueue.Enqueue(e);
+            {
+                if (_eventsQueue.Count >= 10000) return;  // if sending thread can't catch up, then drop packages.
+                RemoveExpiredEvents();
+                if (_duplicateEventsDetection.TryGetValue(e.Data, out var repeatCount))
+                {
+                    _duplicateEventsDetection[e.Data] = repeatCount + 1;
+                    return;
+                }
+
+                _eventsQueue.Enqueue(e);
+                _duplicateEventsDetection[e.Data] = 1;
+                _duplicateEventsExpirationTimes.Enqueue((DateTime.UtcNow.AddMinutes(5), e.Data));
+            }
+
+            void RemoveExpiredEvents()
+            {
+                var now = DateTime.UtcNow;
+                while (_duplicateEventsExpirationTimes.TryPeek(out var e) && e.expirationTime > now)
+                {
+                    e = _duplicateEventsExpirationTimes.Dequeue();
+                    if (_duplicateEventsDetection.TryGetValue(e.@event, out var repeatCount) && repeatCount > 1)
+                        _eventsQueue.Enqueue(new EventFiredArgs($"Skipped {repeatCount} duplicate messages detected within 5 minute: {e.@event}", EventType.LogError, DateTime.UtcNow));
+                    _duplicateEventsDetection.Remove(e.@event);
+                }
+            }
         }
 
         public void SendVector(DataVector vector)
