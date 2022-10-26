@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -17,7 +18,7 @@ namespace CA_DataUploaderLib.IOconf
         public bool SkipBoardAutoDetection { get; set; } = false;
         public LineParser Parser { get; set; } = LineParser.Default;
         public char ValuesEndOfLineChar { get; set; } = '\n';
-        public string Calibration { get; set; }
+        public string? Calibration { get; set; }
 
         ///<remarks>index is 0 based</remarks>
         public void SetCalibrationAtIndex(string defaultCalibration, char value, int index)
@@ -33,10 +34,10 @@ namespace CA_DataUploaderLib.IOconf
         public class LineParser
         {
             public static LineParser Default { get; } = new LineParser();
-            private static readonly Regex _hasCommaSeparatedNumbers = new Regex(@"^\s*-?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*-?(?:[0-9]*[.])?[0-9]+\s*)*,?\s*$");
+            private static readonly Regex _hasCommaSeparatedNumbers = new(@"^\s*-?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*-?(?:[0-9]*[.])?[0-9]+\s*)*,?\s*$");
 
             /// <returns>the list of doubles, or null when the line did not match the expected format</returns>
-            public virtual List<double> TryParseAsDoubleList(string line)
+            public virtual List<double>? TryParseAsDoubleList(string line)
             {
                 if (!_hasCommaSeparatedNumbers.IsMatch(line))
                     return null;

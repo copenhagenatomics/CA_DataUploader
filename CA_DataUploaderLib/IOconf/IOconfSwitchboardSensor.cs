@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 
 namespace CA_DataUploaderLib.IOconf
@@ -20,7 +21,7 @@ namespace CA_DataUploaderLib.IOconf
             NewPortInput($"{Name}_maxIn100ms", 7),
             };
 
-        private IOconfInput NewPortInput(string name, int portNumber) => new IOconfInput(Row, LineNumber, Type, false, false, null)
+        private IOconfInput NewPortInput(string name, int portNumber) => new(Row, LineNumber, Type, false, false, null)
             { Name = name, BoxName = BoxName, Map = Map, PortNumber = portNumber, SubsystemOverride = Subsystem };
     }
 }
