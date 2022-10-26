@@ -1,4 +1,5 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿#nullable enable
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using CA_DataUploaderLib.IOconf;
 
 namespace UnitTests

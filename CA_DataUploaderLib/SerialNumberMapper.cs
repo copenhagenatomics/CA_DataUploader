@@ -1,4 +1,5 @@
-﻿using CA_DataUploaderLib.Extensions;
+﻿#nullable enable
+using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using System;
@@ -22,16 +23,22 @@ namespace CA_DataUploaderLib
         {
             var logLevel = File.Exists("IO.conf") ? IOconfFile.GetOutputLevel() : CALogLevel.Normal;
             var boards = await Task.WhenAll(RpiVersion.GetUSBports().Select(name => AttemptToOpenDeviceConnection(name, logLevel)));
-            return new SerialNumberMapper(boards);
+            return new SerialNumberMapper(boards.OfType<MCUBoard>());
         }
 
         public static Task<SerialNumberMapper> SkipDetection() => Task.FromResult(new SerialNumberMapper(Enumerable.Empty<MCUBoard>()));
-        private static async Task<MCUBoard> AttemptToOpenDeviceConnection(string name, CALogLevel logLevel)
+        private static async Task<MCUBoard?> AttemptToOpenDeviceConnection(string name, CALogLevel logLevel)
         {
             try
             {
                 var mcu = await MCUBoard.OpenDeviceConnection(name);
-                mcu.productType = mcu.productType ?? GetStringFromDmesg(mcu.PortName);
+                if (mcu == null)
+                {
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}");
+                    return default;
+                }
+
+                mcu.productType ??= GetStringFromDmesg(mcu.PortName);
                 string logline = logLevel == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
                 CALog.LogInfoAndConsoleLn(LogID.A, logline);
                 return mcu;
@@ -48,7 +55,7 @@ namespace CA_DataUploaderLib
             return default;
         }
 
-        private static string GetStringFromDmesg(string portName)
+        private static string? GetStringFromDmesg(string portName)
         {
             if (portName.StartsWith("COM"))
                 return null;

@@ -57,6 +57,12 @@ namespace CA_DataUploaderLib
             static void RegisterCustomBoardCommand(
                 IOconfMap map, CommandHandler? cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived, HashSet<string> localBoards)
             {
+                if (map.Board == null)
+                {
+                    CALog.LogData(LogID.A, $"missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
+                    return;
+                }
+
                 var channel = Channel.CreateUnbounded<string>();
                 var channelWriter = channel.Writer;
                 boardCustomCommandsReceived.Add(map.Board, channel.Reader);
@@ -192,7 +198,7 @@ namespace CA_DataUploaderLib
 
             return boards
                 .Where(b => b.map.Board != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
-                .SelectMany(b => new []{ BoardReadLoop(b.map.Board, b.values, token), BoardWriteLoop(b.map.Board, b.boardStateIndexInFullVector, token) })
+                .SelectMany(b => new []{ BoardReadLoop(b.map.Board!, b.map.BoxName, b.values, token), BoardWriteLoop(b.map.Board!, b.boardStateIndexInFullVector, token) })
                 .ToList();
         }
 
@@ -304,58 +310,58 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private async Task BoardReadLoop(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
+        private async Task BoardReadLoop(MCUBoard board, string boxName, SensorSample[] targetSamples, CancellationToken token)
         {
             while (!token.IsCancellationRequested)
             {
                 try
                 {
-                    var stillConnected = await SafeReadSensors(board, targetSamples, token);
+                    var stillConnected = await SafeReadSensors(board, boxName, targetSamples, token);
                     if (!stillConnected || CheckFails(board, targetSamples))
-                        await ReconnectBoard(board, token);
+                        await ReconnectBoard(board, boxName, token);
                 }
                 catch (OperationCanceledException ex)
                 { //if the token is canceled we are about to exit the loop so we do nothing. Otherwise we consider it like any other exception and log it.
                     if (!token.IsCancellationRequested)
                     {
-                        _boardsState.SetReadSensorsExceptionState(board);
+                        _boardsState.SetReadSensorsExceptionState(boxName);
                         LogError(board, "unexpected error on board read loop", ex);
                     }
                 }
                 catch (Exception ex)
                 { // we expect most errors to be handled within SafeReadSensors and in the SafeReopen of the ReconnectBoard,
                   // so seeing this in the log is most likely a bug handling some error case.
-                    _boardsState.SetReadSensorsExceptionState(board);
+                    _boardsState.SetReadSensorsExceptionState(boxName);
                     LogError(board, "unexpected error on board read loop", ex);
                 }
             }
         }
 
         ///<returns><c>false</c> if a board disconnect was detected</returns>
-        private async Task<bool> SafeReadSensors(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
+        private async Task<bool> SafeReadSensors(MCUBoard board, string boxName, SensorSample[] targetSamples, CancellationToken token)
         { //we use this to prevent read exceptions from interfering with failure checks and reconnects
             try
             {
-                return await ReadSensors(board, targetSamples, token);
+                return await ReadSensors(board, boxName, targetSamples, token);
             }
             catch (OperationCanceledException ex)
             { 
                 if (token.IsCancellationRequested)
                     throw; // if the token is cancelled we bubble up the cancel so the caller can abort.
-                _boardsState.SetReadSensorsExceptionState(board);
+                _boardsState.SetReadSensorsExceptionState(boxName);
                 LogError(board, "error reading sensor data", ex);
                 return true; //ReadSensor normally should return false if the board is detected as disconnected, so we say the board is still connected here since the caller will still do stale values detection
             }
             catch (Exception ex)
             { // seeing this is the log is not unexpected in cases where we have trouble communicating to a board.
-                _boardsState.SetReadSensorsExceptionState(board);
+                _boardsState.SetReadSensorsExceptionState(boxName);
                 LogError(board, "error reading sensor data", ex);
                 return true; //ReadSensor normally should return false if the board is detected as disconnected, so we say the board is still connected here since the caller will still do stale values detection
             }
         }
 
         ///<returns><c>false</c> if a board disconnect was detected</returns>
-        private async Task<bool> ReadSensors(MCUBoard board, SensorSample[] targetSamples, CancellationToken token)
+        private async Task<bool> ReadSensors(MCUBoard board, string boxName, SensorSample[] targetSamples, CancellationToken token)
         {
             var timeSinceLastValidRead = Stopwatch.StartNew();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
@@ -366,7 +372,7 @@ namespace CA_DataUploaderLib
             //but we only set ReturningNonValues if it has passed msBetweenReads since the last valid read
             while (true) // we only stop reading if a disconnect or timeout is detected
             {
-                var (stillConnected, line) = await TryReadLineWithStallDetection(board, msBetweenReads, token);
+                var (stillConnected, line) = await TryReadLineWithStallDetection(board, boxName, msBetweenReads, token);
                 if (!stillConnected)
                     return false;  //board disconnect detected, let caller know 
                 if (line == default) 
@@ -378,20 +384,20 @@ namespace CA_DataUploaderLib
                     {
                         ProcessLine(numbers, board, targetSamples);
                         timeSinceLastValidRead.Restart();
-                        _boardsState.SetState(board, ConnectionState.ReceivingValues);
+                        _boardsState.SetState(boxName, ConnectionState.ReceivingValues);
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
                         LowFrequencyLog(msg => LogInfo(board, msg), $"unexpected board response {line.Replace("\r", "\\r")}");// we avoid \r as it makes the output hard to read
                         if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
-                            _boardsState.SetState(board, ConnectionState.ReturningNonValues);
+                            _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                     }
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in msBetweenReads
                     LowFrequencyLog(msg => LogError(board, msg, ex), $"failed handling board response {line.Replace("\r", "\\r")}"); // we avoid \r as it makes the output hard to read
                     if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
-                        _boardsState.SetState(board, ConnectionState.ReturningNonValues);
+                        _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                 }
             }
 
@@ -417,14 +423,14 @@ namespace CA_DataUploaderLib
         ///Both in the above case and when the MCUBoard.ReadTimeout is exceeded a message is written to the log (but not the console to reduce operational noise),
         ///specially as it can now be observed on the graphs if board these events are happening + CheckFailure & reconnects will display relevant messages if appropiate.
         ///</remarks>
-        private async Task<(bool, string?)> TryReadLineWithStallDetection(MCUBoard board, int msBetweenReads, CancellationToken token)
+        private async Task<(bool, string?)> TryReadLineWithStallDetection(MCUBoard board, string boxName, int msBetweenReads, CancellationToken token)
         {
             var readLineTask = board.SafeReadLine(token);
             var noDataAvailableTask = Task.Delay(msBetweenReads, token); 
             if (await Task.WhenAny(readLineTask, noDataAvailableTask) == noDataAvailableTask)
             {
                 LogData(board, "no data available");
-                _boardsState.SetState(board, ConnectionState.NoDataAvailable); //report the state early before waiting up to 2 seconds for the data (readLineTask)
+                _boardsState.SetState(boxName, ConnectionState.NoDataAvailable); //report the state early before waiting up to 2 seconds for the data (readLineTask)
             }
 
             try
@@ -452,7 +458,7 @@ namespace CA_DataUploaderLib
         }
 
         /// <returns>the list of doubles, otherwise <c>null</c></returns>
-        protected virtual List<double> TryParseAsDoubleList(MCUBoard board, string line) => 
+        protected virtual List<double>? TryParseAsDoubleList(MCUBoard board, string line) => 
             board.ConfigSettings.Parser.TryParseAsDoubleList(line);
 
         private bool CheckFails(MCUBoard board, SensorSample[] values)
@@ -461,7 +467,7 @@ namespace CA_DataUploaderLib
             foreach (var item in values)
             {
                 var msSinceLastRead = DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds;
-                if (msSinceLastRead <= item.Input.Map.Board.ConfigSettings.MaxMillisecondsWithoutNewValues)
+                if (msSinceLastRead <= board.ConfigSettings.MaxMillisecondsWithoutNewValues)
                     continue;
                 hasStaleValues = true; 
                 LogInfo(board, $"stale sensor detected: {item.Input.Name}. {msSinceLastRead} milliseconds since last read");
@@ -470,15 +476,15 @@ namespace CA_DataUploaderLib
             return hasStaleValues;
         }
 
-        private async Task ReconnectBoard(MCUBoard board, CancellationToken token)
+        private async Task ReconnectBoard(MCUBoard board, string boxName, CancellationToken token)
         {
-            _boardsState.SetAttemptingReconnectState(board);
+            _boardsState.SetAttemptingReconnectState(boxName);
             LogInfo(board, "attempting to reconnect");
             var lostSensorAttempts = 100;
             var delayBetweenAttempts = TimeSpan.FromSeconds(board.ConfigSettings.SecondsBetweenReopens);
             while (!(await board.SafeReopen(token)))
             {
-                _boardsState.SetDisconnectedState(board);
+                _boardsState.SetDisconnectedState(boxName);
                 if (ExactSensorAttemptsCheck(ref lostSensorAttempts)) 
                 { // we run this once when there has been 100 attempts
                     LogError(board, "reconnect limit exceeded, reducing reconnect frequency to 15 minutes");
@@ -488,7 +494,7 @@ namespace CA_DataUploaderLib
                 await Task.Delay(delayBetweenAttempts, token);
             }
 
-            _boardsState.SetConnectedState(board);
+            _boardsState.SetConnectedState(boxName);
             LogInfo(board, "board reconnection succeeded");
         }
 
@@ -584,13 +590,13 @@ namespace CA_DataUploaderLib
                     yield return (_sensorNames[i], _states[i]);
             }
 
-            public void SetReadSensorsExceptionState(MCUBoard board) => SetState(board, ConnectionState.ReadError);
-            public void SetAttemptingReconnectState(MCUBoard board) => SetState(board, ConnectionState.Connecting);
-            public void SetDisconnectedState(MCUBoard board) => SetState(board, ConnectionState.Disconnected);
+            public void SetReadSensorsExceptionState(string boxName) => SetState(boxName, ConnectionState.ReadError);
+            public void SetAttemptingReconnectState(string boxName) => SetState(boxName, ConnectionState.Connecting);
+            public void SetDisconnectedState(string boxName) => SetState(boxName, ConnectionState.Disconnected);
             public void SetDisconnectedState(IOconfMap board) => SetState(board, ConnectionState.Disconnected);
-            public void SetConnectedState(MCUBoard board) => SetState(board, ConnectionState.Connected);
-            public void SetState(MCUBoard board, ConnectionState state) => _states[_boardsIndexes[board.BoxName]] = state;
-            public void SetState(IOconfMap board, ConnectionState state) => _states[_boardsIndexes[board.BoxName]] = state;
+            public void SetConnectedState(string boxName) => SetState(boxName, ConnectionState.Connected);
+            public void SetState(IOconfMap board, ConnectionState state) => SetState(board.Name, state);
+            public void SetState(string boxName, ConnectionState state) => _states[_boardsIndexes[boxName]] = state;
 
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }

@@ -1,8 +1,8 @@
-﻿using CA_DataUploaderLib.Extensions;
+﻿#nullable enable
+using CA_DataUploaderLib.Extensions;
 using System;
 using System.Threading;
 using System.IO.Ports;
-using System.Diagnostics;
 using CA_DataUploaderLib.IOconf;
 using System.Collections.Generic;
 using System.IO;
@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Buffers;
 using System.Text;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CA_DataUploaderLib
 {
@@ -20,65 +21,66 @@ namespace CA_DataUploaderLib
     /// </remarks>
     public class MCUBoard
     {
-        public string BoxName = null;
+        public string? BoxName = null;
         public const string BoxNameHeader = "IOconf.Map BoxName: ";
 
-        public string serialNumber = null;
+        public string? serialNumber = null;
         public const string serialNumberHeader = "Serial Number: ";
 
-        public string productType = null;
+        public string? productType = null;
         public const string boardFamilyHeader = "Board Family: ";
         public const string productTypeHeader = "Product Type: ";
 
-        public string subProductType = null;
+        public string? subProductType = null;
         public const string subProductTypeHeader = "Sub Product Type: ";
 
-        public string softwareVersion = null;
+        public string? softwareVersion = null;
         public const string softwareVersionHeader = "Software Version: ";
         public const string boardSoftwareHeader = "Board Software: ";
 
-        public string softwareCompileDate = null;
+        public string? softwareCompileDate = null;
         public const string softwareCompileDateHeader = "Software Compile Date: ";
         public const string compileDateHeader = "Compile Date: ";
 
-        public string pcbVersion = null;
+        public string? pcbVersion = null;
         public const string pcbVersionHeader = "PCB version: ";
         public const string boardVersionHeader = "Board Version: ";
 
-        public string mcuFamily = null;
+        public string? mcuFamily = null;
         public const string mcuFamilyHeader = "MCU Family: ";
         public bool InitialConnectionSucceeded {get; private set;} = false;
 
         public const string CalibrationHeader = "Calibration: ";
-        public string Calibration { get; private set; }
-        public string UpdatedCalibration { get; private set; }
+        public string? Calibration { get; private set; }
+        public string? UpdatedCalibration { get; private set; }
 
         public const string GitShaHeader = "Git SHA: ";
         public const string GitShaHeader2 = "Git SHA ";
-        public string GitSha { get; private set; }
+        public string? GitSha { get; private set; }
 
         private static int _detectedUnknownBoards;
         // the "writer" for this lock are operations that close/reopens the connection, while the readers are any other operation including SafeWriteLine.
         // This prevents operations being ran when the connections are being closed/reopened.
-        private readonly AsyncReaderWriterLock _reconnectionLock = new AsyncReaderWriterLock();
+        private readonly AsyncReaderWriterLock _reconnectionLock = new();
 
         public BoardSettings ConfigSettings { get; set; } = BoardSettings.Default;
         public string PortName => port.PortName;
         private readonly SerialPort port;
-        private PipeReader pipeReader;
-        public delegate bool TryReadLineDelegate(ref ReadOnlySequence<byte> buffer, out string line);
+        private PipeReader? pipeReader;
+        public delegate bool TryReadLineDelegate(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)]out string? line);
         private TryReadLineDelegate TryReadLine;
-        public delegate (bool finishedDetection, BoardInfo info) CustomProtocolDetectionDelegate(ReadOnlySequence<byte> buffer, string portName);
-        private static readonly List<CustomProtocolDetectionDelegate> customProtocolDetectors = new List<CustomProtocolDetectionDelegate>();
+        public delegate (bool finishedDetection, BoardInfo? info) CustomProtocolDetectionDelegate(ReadOnlySequence<byte> buffer, string portName);
+        private static readonly List<CustomProtocolDetectionDelegate> customProtocolDetectors = new();
 
         private MCUBoard(SerialPort port) 
         {
             this.port = port;
+            TryReadLine = TryReadAsciiLine; //this is the default which can be changed in ReadSerial based on the ThirdPartyProtocolDetection
         }
 
-        private async static Task<MCUBoard> Create(string name, int baudrate, bool skipBoardAutoDetection)
+        private async static Task<MCUBoard?> Create(string name, int baudrate, bool skipBoardAutoDetection)
         {
-            MCUBoard board = null;
+            MCUBoard? board = null;
             try
             {
                 var port = new SerialPort(name);
@@ -93,14 +95,8 @@ namespace CA_DataUploaderLib
                 port.Open();
                 board.pipeReader = PipeReader.Create(port.BaseStream);
                 Thread.Sleep(30); // it needs to await that the board registers that the COM port has been opened before sending commands (work arounds issue when first opening the connection and sending serial).
-
-                board.TryReadLine = board.TryReadAsciiLine; //this is the default which can be changed in ReadSerial based on the ThirdPartyProtocolDetection
                 board.productType = "NA";
-
-                if (skipBoardAutoDetection)
-                    board.InitialConnectionSucceeded = true;
-                else
-                    board.InitialConnectionSucceeded = await board.ReadSerialNumber();
+                board.InitialConnectionSucceeded = skipBoardAutoDetection || await board.ReadSerialNumber(board.pipeReader);
 
                 if (File.Exists("IO.conf"))
                 { // note that unlike the discovery at MCUBoard.OpenDeviceConnection that only considers the usb port, in here we can find the boards by the serial number too.
@@ -135,9 +131,9 @@ namespace CA_DataUploaderLib
             return board;
         }
 
-        private async Task<string> UpdateCalibration(BoardSettings configSettings)
+        private async Task<string?> UpdateCalibration(BoardSettings configSettings)
         {
-            string newCalibration = configSettings.Calibration;
+            string? newCalibration = configSettings.Calibration;
             if (newCalibration == default || Calibration == newCalibration)
                 return default; // ignore if there is no calibration in configuration or if the board already had the expected configuration
 
@@ -158,15 +154,16 @@ namespace CA_DataUploaderLib
                     pcbVersion.IsNullOrEmpty();  
         }
         
-        public async Task<string> SafeReadLine(CancellationToken token) => (await RunEnsuringConnectionIsOpen("ReadLine", ReadLine, token)) ?? string.Empty;
-        public Task SafeWriteLine(string msg, CancellationToken token) => RunEnsuringConnectionIsOpen("WriteLine", () => port.WriteLine(msg), token);
+        public async Task<string> SafeReadLine(CancellationToken token) => (await RunWaitingForAnyOngoingReconnect(ReadLine, token)) ?? string.Empty;
+        public Task SafeWriteLine(string msg, CancellationToken token) => RunWaitingForAnyOngoingReconnect(() => port.WriteLine(msg), token);
 
         public async Task SafeClose(CancellationToken token)
         {
             await _reconnectionLock.AcquireWriterLock(token);
             try
             {
-                await pipeReader.CompleteAsync();
+                if (pipeReader != null)
+                    await pipeReader.CompleteAsync();
                 if (port.IsOpen)
                     port.Close();                
             }
@@ -200,7 +197,8 @@ namespace CA_DataUploaderLib
             await _reconnectionLock.AcquireWriterLock(token);
             try
             {
-                await pipeReader.CompleteAsync();
+                if (pipeReader != null)
+                    await pipeReader.CompleteAsync();
                 if (port.IsOpen)
                 {
                     CALog.LogData(LogID.B, $"(Reopen) Closing port {PortName} {productType} {serialNumber}");
@@ -234,7 +232,7 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public async static Task<MCUBoard> OpenDeviceConnection(string name)
+        public async static Task<MCUBoard?> OpenDeviceConnection(string name)
         {
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
             var map = File.Exists("IO.conf") ? IOconfFile.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name) : null;
@@ -243,13 +241,15 @@ namespace CA_DataUploaderLib
             if (skipAutoDetection)
                 CALog.LogInfoAndConsoleLn(LogID.A, $"device detection disabled for board {map}");
             var mcu = await Create(name, initialBaudrate, skipAutoDetection);
-            if (!mcu.InitialConnectionSucceeded)
+            if (mcu == null || !mcu.InitialConnectionSucceeded)
                 mcu = await OpenWithAutoDetection(name, initialBaudrate);
+            if (mcu == null)
+                return null; //we normally only get here if the SerialPort(usbport) constructor failed, which might be due to a wrong port
             if (mcu.serialNumber.IsNullOrEmpty())
                 mcu.serialNumber = "unknown" + Interlocked.Increment(ref _detectedUnknownBoards);
             if (mcu.InitialConnectionSucceeded && map != null && map.BaudRate != 0 && mcu.port.BaudRate != map.BaudRate)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected baud rate for {map}. Board info {mcu}");
-            if (mcu.ConfigSettings.ExpectedHeaderLines > 8)
+            if (mcu.InitialConnectionSucceeded && mcu.ConfigSettings.ExpectedHeaderLines > 8)
                 await mcu.SkipExtraHeaders(mcu.ConfigSettings.ExpectedHeaderLines - 8);
             return mcu;
         }
@@ -268,7 +268,7 @@ namespace CA_DataUploaderLib
             return lines;
         }
 
-        private async static Task<MCUBoard> OpenWithAutoDetection(string name, int previouslyAttemptedBaudRate)
+        private async static Task<MCUBoard?> OpenWithAutoDetection(string name, int previouslyAttemptedBaudRate)
         { 
             var skipAutoDetection = false;
             if (previouslyAttemptedBaudRate == 115200)
@@ -276,13 +276,13 @@ namespace CA_DataUploaderLib
             if (previouslyAttemptedBaudRate == 9600)
                 return await Create(name, 115200, skipAutoDetection);
             var board = await Create(name, 115200, skipAutoDetection);
-            return board.InitialConnectionSucceeded ? board : await Create(name, 9600, skipAutoDetection);
+            return board != null && board.InitialConnectionSucceeded ? board : await Create(name, 9600, skipAutoDetection);
         }
 
         /// <returns><c>true</c> if we were able to read</returns>
-        private async Task<bool> ReadSerialNumber()
+        private async Task<bool> ReadSerialNumber(PipeReader pipeReader)
         {
-            var detectedInfo = await DetectThirdPartyProtocol();
+            var detectedInfo = await DetectThirdPartyProtocol(pipeReader);
             if (detectedInfo != default)
             {
                 serialNumber = detectedInfo.SerialNumber;
@@ -390,7 +390,7 @@ namespace CA_DataUploaderLib
         }
 
         ///<returns>true if it finished attempting to read the optional calibration, or false if more data is needed</returns>
-        private bool TryReadOptionalCalibration(ref ReadOnlySequence<byte> buffer, out string calibration)
+        private bool TryReadOptionalCalibration(ref ReadOnlySequence<byte> buffer, out string? calibration)
         {
             calibration = default;
             var localBuffer = buffer; // take a copy to avoid unnecesarily throwing away data coming after the header
@@ -405,13 +405,13 @@ namespace CA_DataUploaderLib
         }
 
         /// <summary>detects if we are talking with a supported third party device</summary>
-        private Task<BoardInfo> DetectThirdPartyProtocol() => 
+        private Task<BoardInfo?> DetectThirdPartyProtocol(PipeReader pipeReader) => 
             DetectThirdPartyProtocol(port.BaudRate, PortName, pipeReader);
 
         public static void AddCustomProtocol(CustomProtocolDetectionDelegate detector) => customProtocolDetectors.Add(detector ?? throw new ArgumentNullException(nameof(detector)));
 
         /// <summary>detects if we are talking with a supported third party device</summary>
-        public static async Task<BoardInfo> DetectThirdPartyProtocol(
+        public static async Task<BoardInfo?> DetectThirdPartyProtocol(
             int baudRate, string portName, PipeReader pipeReader)
         {
             if (baudRate != 9600) 
@@ -457,7 +457,7 @@ namespace CA_DataUploaderLib
         }
 
         private Task<string> ReadLine() => 
-            ReadLine(pipeReader, PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine);
+            ReadLine(pipeReader ?? throw new ObjectDisposedException("closed connection detected (null pipeReader)"), PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine);
         //exposing this one for testing purposes
         public static async Task<string> ReadLine(
             PipeReader pipeReader, string portName, int millisecondsTimeout, TryReadLineDelegate tryReadLine)
@@ -491,7 +491,7 @@ namespace CA_DataUploaderLib
                             //so the first ReadAsync in the next ReadLine call does not wait for more data but returns inmediately.
                             //not doing this would be a memory leak if we already had a full line in the buffer (as we keep waiting for an extra line and over time the buffer keeps accumulating extra lines).
                             examined = buffer.Start;
-                            return line; //we return a single line for now to keep a similar API before introducing the pipe reader, but would be fine to explore changing the API shape in the future
+                            return line ?? throw new InvalidOperationException("unexpected null line returned by TryReadLineDelegate (probably from a custom read implementation)"); //we return a single line for now to keep a similar API before introducing the pipe reader, but would be fine to explore changing the API shape in the future
                         }
 
                         if (res.IsCompleted)
@@ -513,8 +513,8 @@ namespace CA_DataUploaderLib
             throw new TimeoutException("timed out (idle)");
         }
 
-        private bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, out string line) => TryReadAsciiLine(ref buffer, out line, ConfigSettings.ValuesEndOfLineChar);
-        public static bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, out string line, char endOfLineChar) 
+        private bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line) => TryReadAsciiLine(ref buffer, out line, ConfigSettings.ValuesEndOfLineChar);
+        public static bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line, char endOfLineChar) 
         {
             // Look for a EOL in the buffer.
             SequencePosition? position = buffer.PositionOf((byte)endOfLineChar);
@@ -530,7 +530,7 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        private async Task<TResult> RunEnsuringConnectionIsOpen<TResult>(string actionName, Func<TResult> action, CancellationToken token)
+        private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<TResult> action, CancellationToken token)
         {
             await _reconnectionLock.AcquireReaderLock(token);
             try
@@ -543,7 +543,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private async Task<TResult> RunEnsuringConnectionIsOpen<TResult>(string actionName, Func<Task<TResult>> action, CancellationToken token)
+        private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<Task<TResult>> action, CancellationToken token)
         {
             await _reconnectionLock.AcquireReaderLock(token);
             try
@@ -556,8 +556,8 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private Task RunEnsuringConnectionIsOpen(string actionName, Action action, CancellationToken token) => 
-            RunEnsuringConnectionIsOpen(actionName, () => { action(); return true; }, token);
+        private Task RunWaitingForAnyOngoingReconnect(Action action, CancellationToken token) => 
+            RunWaitingForAnyOngoingReconnect(() => { action(); return true; }, token);
 
         public class BoardInfo
         {

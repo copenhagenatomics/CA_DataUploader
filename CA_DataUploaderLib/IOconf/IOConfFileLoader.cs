@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,7 +8,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public static class IOconfFileLoader
     {
-        private readonly static List<(string rowType, Func<string, int, IOconfRow> loader)> Loaders = new List<(string rowType, Func<string, int, IOconfRow> ctor)>
+        private readonly static List<(string rowType, Func<string, int, IOconfRow> loader)> Loaders = new()
         {
             ("LoopName", (r, l) => new IOconfLoopName(r, l)),
             ("Account", (r, l) => new IOconfAccount(r, l)),
@@ -16,14 +17,10 @@ namespace CA_DataUploaderLib.IOconf
             ("Math", (r, l) => new IOconfMath(r, l)),
             ("Alert", (r, l) => new IOconfAlert(r, l)),
             ("TypeK", (r, l) => new IOconfTypeK(r, l)),
-            ("AirFlow", (r, l) => new IOconfAirFlow(r, l)),
             ("Heater", (r, l) => new IOconfHeater(r, l)),
-            ("Light", (r, l) => new IOconfLight(r, l)),
             ("Oven", (r, l) => new IOconfOven(r, l)),
-            ("Geiger", (r, l) => new IOconfGeiger(r, l)),
             ("Filter", (r, l) => new IOconfFilter(r, l)),
             ("RPiTemp", (r, l) => new IOconfRPiTemp(r, l)),
-            ("VacuumPump", (r, l) => new IOconfVacuumPump(r, l)),
             ("GenericSensor", (r, l) => new IOconfGeneric(r, l)),
             ("SwitchboardSensor", (r, l) => new IOconfSwitchboardSensor(r, l)),
             ("Node", (r, l) => new IOconfNode(r, l)),
@@ -73,7 +70,7 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        private static Func<string, int, IOconfRow> GetLoader(ReadOnlySpan<char> rowType)
+        private static Func<string, int, IOconfRow>? GetLoader(ReadOnlySpan<char> rowType)
         {
             foreach (var loader in Loaders)
                 if (rowType.Equals(loader.rowType, StringComparison.InvariantCultureIgnoreCase))

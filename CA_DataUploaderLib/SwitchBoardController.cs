@@ -16,13 +16,13 @@ namespace CA_DataUploaderLib
 
         private SwitchBoardController(CommandHandler cmd) 
         {
-            var ports = IOconfFile.GetEntries<IOconfOut230Vac>().Where(p => p.IsSwitchboardControllerOutput).ToList();
+            var ports = IOconfFile.GetEntries<IOconfOut230Vac>().ToList();
             var boardsTemperatures = ports.GroupBy(p => p.BoxName).Select(g => g.First().GetBoardTemperatureInputConf());
             var sensorPortsInputs = IOconfFile.GetEntries<IOconfSwitchboardSensor>().SelectMany(i => i.GetExpandedConf());
             var inputs = ports.SelectMany(p => p.GetExpandedInputConf()).Concat(boardsTemperatures).Concat(sensorPortsInputs);
             var boardsLoops = new BaseSensorBox(cmd, "switchboards", inputs);
             //we ignore remote boards and boards missing during the start sequence (as we don't have auto reconnect logic yet for those). Note the BaseSensorBox already reports the missing local boards.
-            foreach (var board in ports.Where(p => p.Map.IsLocalBoard && p.Map.Board != null).GroupBy(v => v.Map.Board))
+            foreach (var board in ports.Where(p => p.Map.IsLocalBoard && p.Map.Board != null).GroupBy(v => v.Map.Board!))
                 RegisterBoardWriteActions(cmd, boardsLoops, board.Key, board.ToList());
         }
 

@@ -73,10 +73,7 @@ namespace CA_DataUploaderLib.IOconf
         public static IEnumerable<IOconfGeneric> GetGeneric()  => GetEntries<IOconfGeneric>();
         public static IEnumerable<IOconfTypeK> GetTypeK() => GetEntries<IOconfTypeK>();
         public static IOconfRPiTemp GetRPiTemp() => GetEntries<IOconfRPiTemp>().SingleOrDefault() ?? IOconfRPiTemp.Default;
-        public static IEnumerable<IOconfInput> GetGeiger()=> GetEntries<IOconfGeiger>();
-        public static IEnumerable<IOconfInput> GetAirFlow()=> GetEntries<IOconfAirFlow>();
         public static IEnumerable<IOconfHeater> GetHeater() => GetEntries<IOconfHeater>();
-        public static IEnumerable<IOconfLight> GetLight() => GetEntries<IOconfLight>();
         public static IEnumerable<IOconfOven> GetOven() => GetEntries<IOconfOven>();
         public static IEnumerable<IOconfAlert> GetAlerts()=> GetEntries<IOconfAlert>();
         public static IEnumerable<IOconfMath> GetMath() => GetEntries<IOconfMath>();
