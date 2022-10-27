@@ -134,6 +134,46 @@ namespace CA_DataUploaderLib
             else actions.Add((writeAction, exitAction));
         }
 
+        protected void RegisterBoardWriteActions(
+            MCUBoard board, IOconfOutput port, double defaultTarget, string targetFieldName, 
+            Func<int, double, string> getCommand, int repeatMilliseconds = 2000)
+        {
+            var lastAction = new LastAction(defaultTarget, repeatMilliseconds);
+            var fieldIndex = -1;
+            _cmd.FullVectorIndexesCreated += InitializeAction;
+            AddBuildInWriteAction(board, WriteAction, ExitAction);
+
+            void InitializeAction(object? sender, IReadOnlyDictionary<string, int> indexes) =>
+                fieldIndex = indexes.TryGetValue(targetFieldName, out var index) 
+                    ? index 
+                    : throw new InvalidOperationException($"missing target field: {targetFieldName}");
+            Task ExitAction(MCUBoard board, CancellationToken token) => Off(board, port, token);
+            Task WriteAction(DataVector? vector, MCUBoard board, CancellationToken token) => DoPortActions(vector, board, fieldIndex, lastAction, token);
+
+            async Task DoPortActions(DataVector? vector, MCUBoard board, int fieldIndex, LastAction lastAction, CancellationToken token)
+            {
+                if (vector == null)
+                {
+                    await board.SafeWriteLine(getCommand(port.PortNumber, defaultTarget), token);
+                    lastAction.TimedOutWaittingForDecision(defaultTarget);
+                    return;
+                }
+
+                var target = vector[fieldIndex];
+                if (lastAction.ChangedOrExpired(target, vector.Timestamp))
+                    return;
+
+                await board.SafeWriteLine(getCommand(port.PortNumber, target), token);
+                lastAction.ExecutedNewAction(target, vector.Timestamp);
+            }
+
+            async Task Off(MCUBoard board, IOconfOutput port, CancellationToken token)
+            {
+                await board.SafeWriteLine(getCommand(port.PortNumber, defaultTarget), token);
+                CALog.LogInfoAndConsoleLn(LogID.A, $"port has been set to default position ({defaultTarget:F2}): {port.Name}");
+            }
+        }
+
         protected bool ShowQueue(List<string> args)
         {
             var subsystem = args[0].ToLower();
