@@ -14,9 +14,9 @@ namespace CA_DataUploaderLib
 {
     public class RpiVersion
     {
-        private static OperatingSystem _OS = Environment.OSVersion;
+        private static readonly OperatingSystem _OS = Environment.OSVersion;
 
-        public static string GetWelcomeMessage(string purpose, string i2cConfig = null)
+        public static string GetWelcomeMessage(string purpose)
         {
             var sb = new StringBuilder();
             sb.AppendLine("This is Open Source code by Copenhagen Atomics");
@@ -26,7 +26,7 @@ namespace CA_DataUploaderLib
             {
                 sb.AppendLine("UTC time now: " + DateTime.UtcNow.ToString("ddd MMM dd. HH:mm:ss"));
                 sb.AppendLine(GetSoftware());
-                sb.AppendLine(GetHardware(i2cConfig));
+                sb.AppendLine(GetHardware());
                 sb.AppendLine();
             }
             sb.AppendLine("Press ESC to stop");
@@ -34,7 +34,7 @@ namespace CA_DataUploaderLib
             return sb.ToString();
         }
 
-        public static string GetHardware(string i2cConfig = null)
+        public static string GetHardware()
         {
             var sb = new StringBuilder();
             sb.AppendLine("Hardware:");
@@ -46,22 +46,18 @@ namespace CA_DataUploaderLib
             sb.AppendLine("WiFi     " + GetWiFi_SSID());
             sb.AppendLine();
 
-            if (i2cConfig != null)
-                sb.AppendLine(i2cConfig);
-
             return sb.ToString();
         }
 
         public static string GetSoftware()
         {
             var hostAssembly = Assembly.GetEntryAssembly();
-            var hostVersion = hostAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
+            var hostVersion = hostAssembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
             Assembly asm = typeof(RpiVersion).Assembly;
-            var copyright = asm.GetCustomAttribute<AssemblyCopyrightAttribute>().Copyright;
-            string version = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion;
-            string newLine = Environment.NewLine;
+            var copyright = asm.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright;
+            var version = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
             return 
-$@"{hostAssembly.GetName()}
+$@"{hostAssembly?.GetName()}
     FileVersion {hostVersion}
 {asm.GetName()}
     FileVersion {version}
@@ -93,13 +89,12 @@ $@"{hostAssembly.GetName()}
             // originate here:  http://elinux.org/RPi_HardwareHistory
 
             var assembly = Assembly.GetExecutingAssembly();
-            using (Stream stream = assembly.GetManifestResourceStream("CA_DataUploaderLib.RPi_versions.csv"))
-            using (StreamReader reader = new StreamReader(stream))
-            {
-                var lines = reader.ReadToEnd().SplitNewLine();
-                var header = lines.First().Split(';').Select(x => x.PadRight(15) + ": ").ToArray();
-                return lines.Skip(1).ToDictionary(x => GetKey(x), x => FormatString(header, x.Split(';')));
-            }
+            using Stream stream = assembly.GetManifestResourceStream("CA_DataUploaderLib.RPi_versions.csv") 
+                ?? throw new InvalidOperationException("failed to get rpi versions");
+            using var reader = new StreamReader(stream);
+            var lines = reader.ReadToEnd().SplitNewLine();
+            var header = lines.First().Split(';').Select(x => x.PadRight(15) + ": ").ToArray();
+            return lines.Skip(1).ToDictionary(x => GetKey(x), x => FormatString(header, x.Split(';')));
         }
 
         private static string FormatString(string[] header, string[] values)
@@ -171,22 +166,19 @@ $@"{hostAssembly.GetName()}
 
         private static void WriteResourceToFile(string resourceName, string fileName)
         {
-            using (var resource = Assembly.GetCallingAssembly().GetManifestResourceStream("CA_DataUploaderLib." + resourceName))
-            {
-                using (var file = new FileStream(fileName, FileMode.Create, FileAccess.Write))
-                {
-                    if (!File.Exists(fileName))
-                        resource.CopyTo(file);
-                }
-            }
+            using var resource = Assembly.GetCallingAssembly().GetManifestResourceStream("CA_DataUploaderLib." + resourceName)
+                ?? throw new InvalidOperationException("failed to get resource CA_DataUploaderLib." + resourceName);
+            using var file = new FileStream(fileName, FileMode.Create, FileAccess.Write);
+            if (!File.Exists(fileName))
+                resource.CopyTo(file);
         }
 
-        private static string GetCPU()
+        private static string? GetCPU()
         {
             if (_OS.Platform == PlatformID.Unix)
                 return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").SplitNewLine().First().Substring(18).Trim();
 
-            return System.Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE");
+            return Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE");
         }
 
         private static string GetKernelVersion()
@@ -200,7 +192,7 @@ $@"{hostAssembly.GetName()}
         private static int GetNumberOfCores()
         {
             if(_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").SplitNewLine().Count();
+                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").SplitNewLine().Count;
 
             return Environment.ProcessorCount;
         }

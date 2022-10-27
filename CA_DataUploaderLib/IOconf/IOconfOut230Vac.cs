@@ -26,9 +26,6 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfInput GetBoardTemperatureInputConf() => NewPortInput(Map.BoxName + "_temperature", 5);
         public static BoardSettings GetNewSwitchboardBoardSettings(string row) => 
             new() { Parser = new SwitchBoardResponseParser(!row.Contains("showConfirmations")), ValuesEndOfLineChar = '\r' };
-        private IOconfInput NewPortInput(string name, int portNumber) => new(Row, LineNumber, Type, false, false, null) 
-            { Name = name, BoxName = BoxName, Map = Map, PortNumber = portNumber };
-
         public class SwitchBoardResponseParser : BoardSettings.LineParser
         {
             // old response format "P1=0.06A P2=0.05A P3=0.05A P4=0.06A 0, 1, 0, 1, 25.87"

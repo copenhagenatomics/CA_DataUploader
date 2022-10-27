@@ -15,6 +15,7 @@
     <RepositoryType>git</RepositoryType>
     <LangVersion>10.0</LangVersion>
     <MinVerTagPrefix>plugins</MinVerTagPrefix>
+	<Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
     <None Include="MIT license.txt">

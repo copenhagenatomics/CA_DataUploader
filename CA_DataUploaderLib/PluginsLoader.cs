@@ -53,7 +53,8 @@ namespace CA_DataUploaderLib
             foreach (Type type in assembly.GetTypes())
             {
                 if (!typeof(T).IsAssignableFrom(type)) continue;
-                var result = (T) Activator.CreateInstance(type, args);
+                var result = (T) (Activator.CreateInstance(type, args) 
+                    ?? throw new InvalidOperationException($"Activator.CreateInstance returned null for {type.FullName}"));
                 yield return result;
             }
         }
@@ -65,15 +66,15 @@ namespace CA_DataUploaderLib
             public PluginLoadContext(string pluginFullPath) : base (true) => 
                 _resolver = new AssemblyDependencyResolver(pluginFullPath);
 
-            protected override Assembly Load(AssemblyName assemblyName)
+            protected override Assembly? Load(AssemblyName assemblyName)
             {
-                string assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
+                string? assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
                 return assemblyPath != null ? LoadFromAssemblyPath(assemblyPath) : null;
             }
 
             protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)
             {
-                string libraryPath = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
+                string? libraryPath = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
                 return libraryPath != null ? LoadUnmanagedDllFromPath(libraryPath) : IntPtr.Zero;
             }
         }

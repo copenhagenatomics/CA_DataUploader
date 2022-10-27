@@ -20,11 +20,11 @@ namespace CA_DataUploaderLib
         /// <remarks>some boards might be closed, specially if the system is stopping due to losing connection to one of the boards</remarks>
         public event EventHandler? Stopping;
         private readonly CommandHandler _cmd;
-        protected readonly List<SensorSample> _values;
-        protected readonly List<SensorSample> _localValues;
-        private readonly (IOconfMap map, SensorSample[] values, int boardStateIndexInFullVector)[] _boards = Array.Empty<(IOconfMap map, SensorSample[] values, int boardStateIndexInFullVector)>();
+        protected readonly List<SensorSample.InputBased> _values;
+        protected readonly List<SensorSample.InputBased> _localValues;
+        private readonly (IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] _boards = Array.Empty<(IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)>();
         protected readonly AllBoardsState _boardsState = new(Enumerable.Empty<IOconfMap>());
-        private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamplesLookup = new();
+        private readonly Dictionary<MCUBoard, SensorSample.InputBased[]> _boardSamplesLookup = new();
         private readonly string mainSubsystem;
         private readonly Dictionary<MCUBoard, List<(Func<DataVector?, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
         private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = new();
@@ -35,7 +35,7 @@ namespace CA_DataUploaderLib
             mainSubsystem = commandName.ToLower();
             Title = commandName;
             _cmd = cmd;
-            _values = values.Select(x => new SensorSample(x)).ToList();
+            _values = values.Select(x => new SensorSample.InputBased(x)).ToList();
             _localValues = _values.Where(x => x.Input.Map.IsLocalBoard).ToList();
             if (!_values.Any())
                 return;  // no data
@@ -98,10 +98,10 @@ namespace CA_DataUploaderLib
         }
 
         public Task Run(CancellationToken token) => RunBoardLoops(_boards, token);
-        private void SubscribeCommandsToSubsystems(CommandHandler cmd, string mainSubsystem, List<SensorSample> values)
+        private void SubscribeCommandsToSubsystems(CommandHandler cmd, string mainSubsystem, List<SensorSample.InputBased> values)
         {
             cmd.AddCommand(mainSubsystem, ShowQueue);
-            var subsystemOverrides = values.Select(v => v.Input.SubsystemOverride).Where(v => v != default).Distinct();
+            var subsystemOverrides = values.Select(v => v.Input.SubsystemOverride).OfType<string>().Distinct();
             foreach (var subsystem in subsystemOverrides)
             {
                 if (subsystem == mainSubsystem) continue;
@@ -119,11 +119,11 @@ namespace CA_DataUploaderLib
             var valuesByNode = nodes.Select(n => (n.Key, GetNodeDescItems(n))).ToList();
             return new SubsystemDescriptionItems(valuesByNode);
 
-            static List<VectorDescriptionItem> GetNodeDescItems(IEnumerable<SensorSample> values) =>
+            static List<VectorDescriptionItem> GetNodeDescItems(IEnumerable<SensorSample.InputBased> values) =>
                 values.Select(v => new VectorDescriptionItem("double", v.Input.Name, DataTypeEnum.Input))
                  .Concat(GetBoards(values).Select(b => new VectorDescriptionItem("double", b.BoxName + "_state", DataTypeEnum.State)))
                  .ToList();
-            static IEnumerable<IOconfMap> GetBoards(IEnumerable<SensorSample> n) =>
+            static IEnumerable<IOconfMap> GetBoards(IEnumerable<SensorSample.InputBased> n) =>
                 n.Where(v => !v.Input.Skip).GroupBy(v => v.Input.Map).Select(b => b.Key);
         }
 
@@ -148,7 +148,7 @@ namespace CA_DataUploaderLib
                 sb = new StringBuilder();
             foreach (var t in _values)
             {
-                string subsystemOverride = t.Input.SubsystemOverride;
+                string? subsystemOverride = t.Input.SubsystemOverride;
                 var matchesSubsystem = (isMainCommand && subsystemOverride == default) || subsystemOverride == subsystem;
                 if (matchesSubsystem)
                     sb.AppendLine($"{t.Input.Name,-22}={t.Value,9:N2}");
@@ -159,7 +159,7 @@ namespace CA_DataUploaderLib
         }
 
         private double GetAvgLoopTime() => _values.Average(x => x.ReadSensor_LoopTime);
-        private async Task RunBoardLoops((IOconfMap map, SensorSample[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
+        private async Task RunBoardLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             DateTime start = DateTime.Now;
             try
@@ -190,7 +190,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected virtual List<Task> StartLoops((IOconfMap map, SensorSample[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
+        protected virtual List<Task> StartLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             var missingBoards = boards.Where(h => h.map.Board == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
@@ -310,7 +310,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private async Task BoardReadLoop(MCUBoard board, string boxName, SensorSample[] targetSamples, CancellationToken token)
+        private async Task BoardReadLoop(MCUBoard board, string boxName, SensorSample.InputBased[] targetSamples, CancellationToken token)
         {
             while (!token.IsCancellationRequested)
             {
@@ -338,7 +338,7 @@ namespace CA_DataUploaderLib
         }
 
         ///<returns><c>false</c> if a board disconnect was detected</returns>
-        private async Task<bool> SafeReadSensors(MCUBoard board, string boxName, SensorSample[] targetSamples, CancellationToken token)
+        private async Task<bool> SafeReadSensors(MCUBoard board, string boxName, SensorSample.InputBased[] targetSamples, CancellationToken token)
         { //we use this to prevent read exceptions from interfering with failure checks and reconnects
             try
             {
@@ -361,7 +361,7 @@ namespace CA_DataUploaderLib
         }
 
         ///<returns><c>false</c> if a board disconnect was detected</returns>
-        private async Task<bool> ReadSensors(MCUBoard board, string boxName, SensorSample[] targetSamples, CancellationToken token)
+        private async Task<bool> ReadSensors(MCUBoard board, string boxName, SensorSample.InputBased[] targetSamples, CancellationToken token)
         {
             var timeSinceLastValidRead = Stopwatch.StartNew();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
@@ -461,7 +461,7 @@ namespace CA_DataUploaderLib
         protected virtual List<double>? TryParseAsDoubleList(MCUBoard board, string line) => 
             board.ConfigSettings.Parser.TryParseAsDoubleList(line);
 
-        private bool CheckFails(MCUBoard board, SensorSample[] values)
+        private bool CheckFails(MCUBoard board, SensorSample.InputBased[] values)
         {
             bool hasStaleValues = false;
             foreach (var item in values)
@@ -510,7 +510,7 @@ namespace CA_DataUploaderLib
             return false;
         }
 
-        public virtual void ProcessLine(IEnumerable<double> numbers, MCUBoard board, SensorSample[] targetSamples)
+        public virtual void ProcessLine(IEnumerable<double> numbers, MCUBoard board, SensorSample.InputBased[] targetSamples)
         {
             int i = 1;
             var timestamp = DateTime.UtcNow;
@@ -527,7 +527,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private void DetectAndWarnSensorDisconnects(MCUBoard board, SensorSample sensor)
+        private void DetectAndWarnSensorDisconnects(MCUBoard board, SensorSample.InputBased sensor)
         {
             if (!sensor.HasSpecialDisconnectValue())
             {//we reset the attempts when we get valid values, both to avoid recurring but temporary errors firing the warning + to re-enable the warning when the issue is fixed.
@@ -543,7 +543,7 @@ namespace CA_DataUploaderLib
         }
 
         public void ProcessLine(IEnumerable<double> numbers, MCUBoard board) => ProcessLine(numbers, board, GetSamples(board));
-        private SensorSample[] GetSamples(MCUBoard board)
+        private SensorSample.InputBased[] GetSamples(MCUBoard board)
         {
             if (_boardSamplesLookup.TryGetValue(board, out var samples))
                 return samples;

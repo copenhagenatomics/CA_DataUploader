@@ -9,9 +9,15 @@ namespace CA_DataUploaderLib
     {
         public string NodeName { get; init; }
         public List<BoardInfo> Boards { get; init; }
+
+        public SystemChangeNotificationData(string nodeName, List<BoardInfo> boards) 
+        { 
+            NodeName = nodeName; 
+            Boards = boards; 
+        }
         private static JsonSerializerOptions SerializerOptions { get; } = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         internal string ToJson() => JsonSerializer.Serialize(this, SerializerOptions);
-        internal static SystemChangeNotificationData ParseJson(string data) => JsonSerializer.Deserialize<SystemChangeNotificationData>(data, SerializerOptions);
+        internal static SystemChangeNotificationData? ParseJson(string data) => JsonSerializer.Deserialize<SystemChangeNotificationData>(data, SerializerOptions);
         /// <summary>
         /// Gets utf8 bytes of a json representation containing a top level array with only the properties expected by the remote boards serials endpoint
         /// </summary>
@@ -45,18 +51,20 @@ namespace CA_DataUploaderLib
 
         public class BoardInfo
         {
-            public string SerialNumber { get; init; }
-            public string ProductType { get; init; }
-            public string ProductSubType { get; init; }
-            public string McuFamily { get; init; }
-            public string SoftwareVersion { get; init; }
-            public string CompileDate { get; init; }
-            public string GitSha { get; init; }
-            public string PcbVersion { get; init; }
-            public string Calibration { get; init; }
-            public string MappedBoardName { get; init; }
+            public string? SerialNumber { get; init; }
+            public string? ProductType { get; init; }
+            public string? ProductSubType { get; init; }
+            public string? McuFamily { get; init; }
+            public string? SoftwareVersion { get; init; }
+            public string? CompileDate { get; init; }
+            public string? GitSha { get; init; }
+            public string? PcbVersion { get; init; }
+            public string? Calibration { get; init; }
+            public string? MappedBoardName { get; init; }
             public string Port { get; init; }
-            public string UpdatedCalibration { get; init; }
+            public string? UpdatedCalibration { get; init; }
+
+            public BoardInfo(string port) => Port = port;
         }
     }
 }

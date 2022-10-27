@@ -321,6 +321,8 @@ namespace CA_DataUploaderLib
             Task PostSystemChangeNotificationAsync(EventFiredArgs args)
             {
                 var data = SystemChangeNotificationData.ParseJson(args.Data);
+                if (data == null)
+                    throw new FormatException($"failed to parse SystemChangeNotificationData: {args.Data}");
                 return Task.WhenAll(
                     PostBoardsSerialInfo(data, args.TimeSpan),
                     Post(new EventFiredArgs(ToShortEventData(data), args.EventType, args.TimeSpan)));
@@ -428,7 +430,7 @@ namespace CA_DataUploaderLib
                     var signedValue = publicKey.Concat(signedVectorDescription).ToArray(); // Note that it will only work if converted to array and not IEnummerable
                     response = await client.PutAsJsonAsync(query, signedValue);
                     response.EnsureSuccessStatusCode();
-                    var result = await response.Content.ReadFromJsonAsync<string>();
+                    var result = await response.Content.ReadFromJsonAsync<string>() ?? throw new InvalidOperationException("unexpected null result when getting plotid");
                     return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
                 }
                 catch (Exception ex)
@@ -471,9 +473,9 @@ namespace CA_DataUploaderLib
 
             private static async Task<string> GetLoginToken(HttpClient client, ConnectionInfo accountInfo)
             {
-                string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}");
+                string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.Email}&password={accountInfo.Password}");
                 if (string.IsNullOrEmpty(token))
-                    token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.email}&password={accountInfo.password}&fullName={accountInfo.Fullname}"); // attempt to create account assuming it did not exist
+                    token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.Email}&password={accountInfo.Password}&fullName={accountInfo.Fullname}"); // attempt to create account assuming it did not exist
                 if (!string.IsNullOrEmpty(token))
                     return token;
 

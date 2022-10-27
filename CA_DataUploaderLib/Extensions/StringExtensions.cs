@@ -18,11 +18,7 @@ namespace CA_DataUploaderLib.Extensions
         /// <returns>
         ///   <c>true</c> if [is null or empty] [the specified s]; otherwise, <c>false</c>.
         /// </returns>
-        public static bool IsNullOrEmpty(this string s)
-        {
-            return string.IsNullOrEmpty(s);
-        }
-
+        public static bool IsNullOrEmpty(this string? s) => string.IsNullOrEmpty(s);
         public static string StringBefore(this string s, string match)
         {
             int pos = s.IndexOf(match);
