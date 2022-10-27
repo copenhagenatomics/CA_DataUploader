@@ -9,7 +9,7 @@ namespace CA_DataUploaderLib.IOconf
     /// </remarks>
     public class IOconfNode : IOconfRow
     {
-        private readonly IPEndPoint _endPoint;
+        private readonly IPEndPoint? _endPoint;
 
         private static readonly Lazy<IOconfNode> _singleNode = new(() => 
             new IOconfNode(IOconfFile.GetLoopName()) { IsCurrentSystem = true }
@@ -41,6 +41,6 @@ namespace CA_DataUploaderLib.IOconf
         public bool IsCurrentSystem { get; set; }
         /// <summary>position of the node in the config (starting at 0)</summary>
         public byte NodeIndex { get; }
-        public string Role { get; }
+        public string? Role { get; }
     }
 }

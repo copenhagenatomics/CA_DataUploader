@@ -50,14 +50,7 @@ namespace CA_DataUploaderLib.IOconf
             {
                 var loopConfig = GetLoopConfig();
                 var account = ((IOconfAccount)Table.Single(x => x.GetType() == typeof(IOconfAccount)));
-                return new ConnectionInfo
-                {
-                    LoopName = loopConfig.Name,
-                    Server = loopConfig.Server,
-                    Fullname = account.Name,
-                    email = account.Email,
-                    password = account.Password,
-                };
+                return new ConnectionInfo(loopConfig.Name, loopConfig.Server, account.Name, account.Email, account.Password);
             }
             catch (Exception ex)
             {

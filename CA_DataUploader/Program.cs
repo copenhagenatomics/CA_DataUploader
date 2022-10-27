@@ -30,7 +30,7 @@ namespace CA_DataUploader
                         return; // SerialNumberMapper already lists devices, no need for further output.
 
                     // close all ports which are not Hub10
-                    serial.McuBoards.Where(x => !x.productType.Contains("Temperature") &&!x.productType.Contains("Hub10STM")).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
+                    serial.McuBoards.Where(x => x.productType?.Contains("Temperature") != true && x.productType?.Contains("Hub10STM") != true).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
 
                     var email = IOconfSetup.UpdateIOconf(serial);
 
@@ -45,7 +45,7 @@ namespace CA_DataUploader
 
                     int i = 0;
                     var uploadThrottle = new TimeThrottle(100);
-                    DataVector dataVector = null;
+                    DataVector? dataVector = null;
                     while (cmd.IsRunning)
                     {
                         cmd.GetFullSystemVectorValues(ref dataVector, GetReceivedCommandsInThisCycle());
@@ -64,7 +64,7 @@ namespace CA_DataUploader
 
             Console.ReadKey();
 
-            void AddToReceivedCommandsQueue(object source, EventFiredArgs args)
+            void AddToReceivedCommandsQueue(object? source, EventFiredArgs args)
             {
                 lock (receivedCommandsInThisCycleQueue)
                 {

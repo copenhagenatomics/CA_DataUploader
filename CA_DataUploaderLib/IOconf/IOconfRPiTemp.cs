@@ -3,16 +3,15 @@ using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfRPiTemp : IOconfInput
+    public class IOconfRPiTemp : IOconfRow
     {
         public static IOconfRPiTemp Default { get; } = new IOconfRPiTemp("RPiTemp;RPiTemp", 0);
         public readonly bool Disabled;
-        public IOconfRPiTemp(string row, int lineNum) : base(row, lineNum, "RPiTemp", false, false, null)
+        public IOconfRPiTemp(string row, int lineNum) : base(row, lineNum, "RPiTemp")
         {
             Format = "RPiTemp;Name;[Disabled]";
             var list = ToList();
             Disabled = list.Count > 2 && list[2] == "Disabled";
-            Skip = true;
         }
 
         public IEnumerable<IOconfInput> GetDistributedExpandedInputConf()
@@ -23,8 +22,8 @@ namespace CA_DataUploaderLib.IOconf
             if (nodes.Count == 0)
             {
                 var map = new IOconfMap($"Map;RpiFakeBox;{Name}Box", LineNumber);
-                yield return new IOconfInput($"RPiTemp;{Name}Gpu", LineNumber, Type, false, false, BoardSettings.Default) { Map = map, Skip = true };
-                yield return new IOconfInput($"RPiTemp;{Name}Cpu", LineNumber, Type, false, false, BoardSettings.Default) { Map = map, Skip = true };
+                yield return NewPortInput($"{Name}Gpu", map, 1);
+                yield return NewPortInput($"{Name}Cpu", map, 2);
                 yield break;
             }
 
@@ -32,12 +31,12 @@ namespace CA_DataUploaderLib.IOconf
             {
                 //note there is no map entry for the IOconfRpiTemp as it not an external box, but at the moment we only expose the IOconfNode through it
                 var map = new IOconfMap($"Map;RpiFakeBox;{Name}_{node.Name}Box;{node.Name}", LineNumber);
-                yield return new IOconfInput($"RPiTemp;{Name}_{node.Name}Gpu", LineNumber, Type, false, false, BoardSettings.Default) { Map = map, Skip = true };
-                yield return new IOconfInput($"RPiTemp;{Name}_{node.Name}Cpu", LineNumber, Type, false, false, BoardSettings.Default) { Map = map, Skip = true };
+                yield return NewPortInput($"{Name}_{node.Name}Gpu", map, 1);
+                yield return NewPortInput($"{Name}_{node.Name}Cpu", map, 2);
             }
         }
-
-        public static bool IsLocalCpuSensor(IOconfInput input) => input.Map.IsLocalBoard && input.Name.EndsWith("Cpu");
-        public static bool IsLocalGpuSensor(IOconfInput input) => input.Map.IsLocalBoard && input.Name.EndsWith("Gpu");
+        private IOconfInput NewPortInput(string name, IOconfMap map, int portNumber) => new(Row, LineNumber, Type, map, portNumber) { Name = name, Skip = true };
+        public static bool IsLocalCpuSensor(IOconfInput input) => input.Map.IsLocalBoard == true && input.Name.EndsWith("Cpu");
+        public static bool IsLocalGpuSensor(IOconfInput input) => input.Map.IsLocalBoard == true && input.Name.EndsWith("Gpu");
     }
 }

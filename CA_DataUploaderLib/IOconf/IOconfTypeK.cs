@@ -5,7 +5,7 @@ namespace CA_DataUploaderLib.IOconf
     public class IOconfTypeK : IOconfInput
     {
         public bool AllJunction { get; }
-        public IOconfTypeK(string row, int lineNum) : base(row, lineNum, "TypeK", false, true, null)
+        public IOconfTypeK(string row, int lineNum) : base(row, lineNum, "TypeK", false, BoardSettings.Default)
         {
             Format = "TypeK;Name;BoxName;[port number];[skip/all]";
 

@@ -46,7 +46,7 @@ namespace CA.LoopControlPluginBase
         public void ValidateConfiguredFields(IEnumerable<string> allowedFields)
         {
             var allowed = new HashSet<string>(allowedFields);
-            List<string> unexpectedFields = null;
+            List<string>? unexpectedFields = null;
 
             foreach (var field in Fields)
                 if (!allowed.Contains(field))

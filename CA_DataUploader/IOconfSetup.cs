@@ -12,7 +12,7 @@ namespace CA_DataUploader
     {
         public static string UpdateIOconf(SerialNumberMapper serial)
         {
-            var mcuList = serial.McuBoards.Where(x => !x.serialNumber.StartsWith("unknown"));
+            var mcuList = serial.McuBoards.Where(x => x.serialNumber?.StartsWith("unknown") != true);
             if (!mcuList.Any())
                 throw new Exception($"Could not find any devices connected to USB.");
 
@@ -23,7 +23,7 @@ namespace CA_DataUploader
             if (lines.Any(x => x.StartsWith("LoopName")) && lines.Any(x => x.StartsWith("Account")) && lines.Any(x => x.StartsWith("Map")) && lines.Count(x => x.StartsWith("TypeK")) > 1)
             {
                 Console.WriteLine("Do you want to skip IO.conf setup? (yes, no)");
-                var answer = Console.ReadLine();
+                var answer = Console.ReadLine() ?? throw new NotSupportedException("failed to answer from console input");
                 if (answer.ToLower().StartsWith("y"))
                 {
                     if (lines.Any(x => x.StartsWith("Account")))
@@ -54,7 +54,7 @@ namespace CA_DataUploader
                 lines.Remove(lines.First(x => x.StartsWith("LoopName")));
 
             Console.Write("Please enter a name for the webchart (It must be a new name you have not used before): ");
-            var plotname = Console.ReadLine();
+            var plotname = Console.ReadLine() ?? throw new NotSupportedException("failed to answer from console input");
             if (plotname.Length > 50)
                 plotname = plotname.Substring(0, 50);
 
@@ -64,7 +64,7 @@ namespace CA_DataUploader
                 lines.Remove(lines.First(x => x.StartsWith("Account")));
 
             Console.Write("Please enter your full name: ");
-            var fullname = Console.ReadLine();
+            var fullname = Console.ReadLine() ?? throw new NotSupportedException("failed to answer from console input");
             if (fullname.Length > 100)
                 fullname = fullname.Substring(0, 100);
 
@@ -72,7 +72,7 @@ namespace CA_DataUploader
             Console.Write("Please enter your email address: ");
             do
             {
-                email = Console.ReadLine();
+                email = Console.ReadLine() ?? throw new NotSupportedException("failed to answer from console input");
             }
             while (!IsValidEmail(email));
 
@@ -80,7 +80,7 @@ namespace CA_DataUploader
             Console.Write("Please enter a password for the webchart: ");
             do
             {
-                pwd = Console.ReadLine();
+                pwd = Console.ReadLine() ?? throw new NotSupportedException("failed to answer from console input");
             }
             while (!IsValidPassword(pwd));
 

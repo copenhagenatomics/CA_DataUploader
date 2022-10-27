@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Pipelines;
 using System.Text;
@@ -88,7 +89,7 @@ namespace UnitTests
             return writer.FlushAsync();
         }
 
-        private static bool TryReadLine(ref ReadOnlySequence<byte> buffer, out string line) =>
+        private static bool TryReadLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line) =>
             MCUBoard.TryReadAsciiLine(ref buffer, out line, '\n');
     }
 }

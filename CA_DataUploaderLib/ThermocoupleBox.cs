@@ -11,15 +11,15 @@ namespace CA_DataUploaderLib
 {
     public class ThermocoupleBox : BaseSensorBox
     {
-        private readonly SensorSample _rpiGpuSample;
-        private readonly SensorSample _rpiCpuSample;
+        private readonly SensorSample? _rpiGpuSample;
+        private readonly SensorSample? _rpiCpuSample;
         public ThermocoupleBox(CommandHandler cmd) : base(cmd, "Temperatures", GetSensors()) 
         { // these are disabled / null when RpiTemp is disabled
             _rpiGpuSample = _values.FirstOrDefault(x => IOconfRPiTemp.IsLocalGpuSensor(x.Input));
             _rpiCpuSample = _values.FirstOrDefault(x => IOconfRPiTemp.IsLocalCpuSensor(x.Input));
         }
 
-        protected override List<Task> StartLoops((IOconfMap map, SensorSample[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
+        protected override List<Task> StartLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             var loops = base.StartLoops(boards, token);
             if (_rpiGpuSample != null && _rpiCpuSample != null && !OperatingSystem.IsWindows()) 

@@ -114,10 +114,10 @@ namespace CA_DataUploaderLib
                 return;
             }
 
-            var data = new SystemChangeNotificationData() { NodeName = GetCurrentNode().Name, Boards = _mapper.McuBoards.Select(ToBoardInfo).ToList() }.ToJson();
+            var data = new SystemChangeNotificationData(GetCurrentNode().Name, _mapper.McuBoards.Select(ToBoardInfo).ToList()).ToJson();
             FireCustomEvent(data, DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
 
-            static SystemChangeNotificationData.BoardInfo ToBoardInfo(MCUBoard board) => new()
+            static SystemChangeNotificationData.BoardInfo ToBoardInfo(MCUBoard board) => new(board.PortName)
             {
                 SerialNumber = board.serialNumber,
                 ProductType = board.productType,
@@ -129,7 +129,6 @@ namespace CA_DataUploaderLib
                 PcbVersion = board.pcbVersion,
                 Calibration = board.Calibration,
                 MappedBoardName = board.BoxName,
-                Port = board.PortName,
                 UpdatedCalibration = board.UpdatedCalibration
             };
         }
@@ -348,7 +347,7 @@ namespace CA_DataUploaderLib
 $@"{GetCurrentNode().Name}
 {RpiVersion.GetSoftware()}
 {RpiVersion.GetHardware()}
-{connInfo.LoopName} - {connInfo.email}
+{connInfo.LoopName} - {connInfo.Email}
 {(_mapper != null ? string.Join(Environment.NewLine, _mapper.McuBoards.Select(x => x.ToString())) : "")}");
             return true;
         }

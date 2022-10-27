@@ -1,5 +1,6 @@
 ﻿using CA.LoopControlPluginBase;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CA_DataUploaderLib
 {
@@ -16,6 +17,6 @@ namespace CA_DataUploaderLib
 
         public string Decision => decision;
         public IEnumerable<string> Fields => values.Keys;
-        public bool TryGet(string fieldName, out string val) => values.TryGetValue(fieldName, out val);
+        public bool TryGet(string fieldName, [NotNullWhen(true)] out string? val) => values.TryGetValue(fieldName, out val);
     }
 }
