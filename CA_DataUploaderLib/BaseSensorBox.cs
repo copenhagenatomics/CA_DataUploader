@@ -120,7 +120,7 @@ namespace CA_DataUploaderLib
             return new SubsystemDescriptionItems(valuesByNode);
 
             static List<VectorDescriptionItem> GetNodeDescItems(IEnumerable<SensorSample.InputBased> values) =>
-                values.Select(v => new VectorDescriptionItem("double", v.Input.Name, DataTypeEnum.Input))
+                values.Select(v => new VectorDescriptionItem("double", v.Input.Name, DataTypeEnum.Input) { Upload = v.Input.Upload })
                  .Concat(GetBoards(values).Select(b => new VectorDescriptionItem("double", b.BoxName + "_state", DataTypeEnum.State)))
                  .ToList();
             static IEnumerable<IOconfMap> GetBoards(IEnumerable<SensorSample.InputBased> n) =>

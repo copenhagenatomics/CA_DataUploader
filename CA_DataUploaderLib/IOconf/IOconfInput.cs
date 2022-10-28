@@ -37,6 +37,7 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfMap Map { get; }
         protected bool HasPort { get; }
         public string? SubsystemOverride { get; init; }
+        public bool Upload { get; init; } = true;
 
         private static (bool hasPort, bool skip, int port) GetPort(string row, string type, bool parsePortRequired, List<string> list)
         {

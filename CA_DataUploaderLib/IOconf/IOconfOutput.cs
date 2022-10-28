@@ -29,6 +29,6 @@ namespace CA_DataUploaderLib.IOconf
             return map;
         }
 
-        protected IOconfInput NewPortInput(string name, int portNumber) => new(Row, LineNumber, Type, Map, portNumber) { Name = name };
+        protected IOconfInput NewPortInput(string name, int portNumber, bool upload = true) => new(Row, LineNumber, Type, Map, portNumber) { Name = name, Upload = upload };
     }
 }
