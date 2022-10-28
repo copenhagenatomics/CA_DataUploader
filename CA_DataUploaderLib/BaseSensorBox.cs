@@ -160,7 +160,7 @@ namespace CA_DataUploaderLib
                 }
 
                 var target = vector[fieldIndex];
-                if (lastAction.ChangedOrExpired(target, vector.Timestamp))
+                if (!lastAction.ChangedOrExpired(target, vector.Timestamp))
                     return;
 
                 await board.SafeWriteLine(getCommand(port.PortNumber, target), token);
