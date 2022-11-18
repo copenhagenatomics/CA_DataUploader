@@ -26,8 +26,18 @@ namespace CA_DataUploaderLib
         }
 
         public static Task<SerialNumberMapper> SkipDetection() => Task.FromResult(new SerialNumberMapper(Enumerable.Empty<Board>()));
+        /// <summary>Registers custom board detection, typically a board that does not support a terminal like interface i.e. not tty on linux</summary>
         /// <remarks>
-        /// Custom detection is typically used for 
+        /// The custom detections must be registered before <see cref="DetectDevices"/> is called.
+        /// 
+        /// The subsystems that use this custom board detection must implement all communication with the relevant board,
+        /// so it is not possible to base the subsystem on or use BaseSensorBox with these custom boards. As such, 
+        /// the subsystem must also implement or register an <see cref="ISubsystemWithVectorData"/> to add any relevant board data to the vector.
+        /// 
+        /// In linux only boards listed under /dev/USB* are considered. It is possible to use udev rules that target the type of device and
+        /// add a specific suffix for easy detection, for example, /dev/USBAUDIO1-1.3.
+        /// 
+        /// An alternative for boards with a terminal like interface, supported by <see cref="BaseSensorBox"/>, is to use <see cref="MCUBoard.AddCustomProtocol(MCUBoard.CustomProtocolDetectionDelegate)"/>.
         /// </remarks>
         public static void RegisterCustomDetection(Func<string, Board?> detectionFunction) => CustomDetections.Add(detectionFunction);
         private static async Task<Board?> AttemptToOpenDeviceConnection(string name, CALogLevel logLevel)
