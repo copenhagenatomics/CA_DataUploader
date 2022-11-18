@@ -57,7 +57,7 @@ namespace CA_DataUploaderLib
             static void RegisterCustomBoardCommand(
                 IOconfMap map, CommandHandler? cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived, HashSet<string> localBoards)
             {
-                if (map.Board == null)
+                if (map.McuBoard == null)
                 {
                     CALog.LogData(LogID.A, $"missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
                     return;
@@ -65,7 +65,7 @@ namespace CA_DataUploaderLib
 
                 var channel = Channel.CreateUnbounded<string>();
                 var channelWriter = channel.Writer;
-                boardCustomCommandsReceived.Add(map.Board, channel.Reader);
+                boardCustomCommandsReceived.Add(map.McuBoard, channel.Reader);
                 cmd?.AddCommand("custom", CustomCommand);
 
                 bool CustomCommand(List<string> args)
@@ -90,7 +90,7 @@ namespace CA_DataUploaderLib
                 string name = map.BoxName + "_state";
                 if (!indexes.TryGetValue(name, out var index)) throw new ArgumentException($"failed to find box state in full vector: {name}");
                 _boards[i] = (map, values, index);
-                hasBoardWithBuildInActions |= map.Board != null && _buildInWriteActions.TryGetValue(map.Board, out var _);
+                hasBoardWithBuildInActions |= map.McuBoard != null && _buildInWriteActions.TryGetValue(map.McuBoard, out var _);
             }
 
             if (hasBoardWithBuildInActions)
@@ -113,9 +113,10 @@ namespace CA_DataUploaderLib
             .Select(s => s.Clone())
             .Concat(_boardsState.Select(b => new SensorSample(b.sensorName, (int)b.State)));
 
-        public virtual SubsystemDescriptionItems GetVectorDescriptionItems()
+        public virtual SubsystemDescriptionItems GetVectorDescriptionItems() => GetVectorDescriptionItems(_values);
+        public static SubsystemDescriptionItems GetVectorDescriptionItems(List<SensorSample.InputBased> values)
         {
-            var nodes = _values.GroupBy(v => v.Input.Map.DistributedNode);
+            var nodes = values.GroupBy(v => v.Input.Map.DistributedNode);
             var valuesByNode = nodes.Select(n => (n.Key, GetNodeDescItems(n))).ToList();
             return new SubsystemDescriptionItems(valuesByNode);
 
@@ -220,7 +221,7 @@ namespace CA_DataUploaderLib
                 try
                 {
                     using var closeTimeoutToken = new CancellationTokenSource(5000);
-                    map.Board?.SafeClose(closeTimeoutToken.Token);
+                    map.McuBoard?.SafeClose(closeTimeoutToken.Token);
                     _boardsState.SetDisconnectedState(map);
                 }
                 catch(Exception ex)
@@ -232,13 +233,13 @@ namespace CA_DataUploaderLib
 
         protected virtual List<Task> StartLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
-            var missingBoards = boards.Where(h => h.map.Board == null).Select(b => b.map.BoxName).Distinct().ToList();
+            var missingBoards = boards.Where(h => h.map.McuBoard == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} - missing boards detected {string.Join(",", missingBoards)}. Related sensors/actuators are disabled.");
 
             return boards
-                .Where(b => b.map.Board != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
-                .SelectMany(b => new []{ BoardReadLoop(b.map.Board!, b.map.BoxName, b.values, token), BoardWriteLoop(b.map.Board!, b.boardStateIndexInFullVector, token) })
+                .Where(b => b.map.McuBoard != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
+                .SelectMany(b => new []{ BoardReadLoop(b.map.McuBoard!, b.map.BoxName, b.values, token), BoardWriteLoop(b.map.McuBoard!, b.boardStateIndexInFullVector, token) })
                 .ToList();
         }
 
@@ -593,8 +594,8 @@ namespace CA_DataUploaderLib
 
         private void LogError(IOconfMap board, string message, Exception ex) 
         {
-            if (board.Board != null)
-                LogError(board.Board, message, ex);
+            if (board.McuBoard != null)
+                LogError(board.McuBoard, message, ex);
             else
                 CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.BoxName} (missing)", ex); 
         }
@@ -620,7 +621,7 @@ namespace CA_DataUploaderLib
                 {
                     _sensorNames[i] = _boardList[i].BoxName + "_state";
                     _boardsIndexes[_boardList[i].BoxName] = i;
-                    _states[i] = _boardList[i].Board?.InitialConnectionSucceeded == true ? ConnectionState.Connected : ConnectionState.Disconnected;
+                    _states[i] = _boardList[i].McuBoard?.InitialConnectionSucceeded == true ? ConnectionState.Connected : ConnectionState.Disconnected;
                 }
             }
 
