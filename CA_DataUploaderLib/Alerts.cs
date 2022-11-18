@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using CA_DataUploaderLib.IOconf;
 
@@ -45,33 +46,38 @@ namespace CA_DataUploaderLib
 
         private async void CheckAlertsOnReceivedVectors()
         {
-            await foreach (var vector in _cmd.ReceivedVectorsReader.ReadAllAsync(_cmd.StopToken))
+            try
             {
-                if (Disabled) continue;
-
-                var timestamp = vector.Timestamp;
-                foreach (var (alert, sensorIndex) in _alerts)
+                await foreach (var vector in _cmd.ReceivedVectorsReader.ReadAllAsync(_cmd.StopToken))
                 {
-                    if (!alert.CheckValue(vector[sensorIndex], timestamp)) 
-                        continue;
+                    if (Disabled) continue;
 
-                    _cmd.FireAlert(alert.Message, timestamp);
-                    if (alert.Command == default)
-                        continue;
-
-                    foreach (var commands in alert.Command.Split('|'))
+                    var timestamp = vector.Timestamp;
+                    foreach (var (alert, sensorIndex) in _alerts)
                     {
-                        try
+                        if (!alert.CheckValue(vector[sensorIndex], timestamp))
+                            continue;
+
+                        _cmd.FireAlert(alert.Message, timestamp);
+                        if (alert.Command == default)
+                            continue;
+
+                        foreach (var commands in alert.Command.Split('|'))
                         {
-                            _cmd.Execute(commands, true);
-                        }
-                        catch (Exception ex)
-                        {//note that a distributed host might postpone the execution of the command above, but it would then be responsible of logging information about any error.
-                            CALog.LogError(LogID.A, $"unexpected error running command for alert {alert.Name}", ex);
+                            try
+                            {
+                                _cmd.Execute(commands, true);
+                            }
+                            catch (Exception ex)
+                            {//note that a distributed host might postpone the execution of the command above, but it would then be responsible of logging information about any error.
+                                CALog.LogError(LogID.A, $"unexpected error running command for alert {alert.Name}", ex);
+                            }
                         }
                     }
                 }
-            }    
+            }
+            catch (ChannelClosedException) { }
+            catch (OperationCanceledException) { }
         }
 
         private static List<(IOconfAlert alert, int sensorIndex)> GetAlerts(VectorDescription vectorDesc, CommandHandler cmd)

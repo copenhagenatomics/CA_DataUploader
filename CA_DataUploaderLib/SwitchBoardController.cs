@@ -17,8 +17,8 @@ namespace CA_DataUploaderLib
             .Concat(IOconfFile.GetEntries<IOconfSwitchboardSensor>().SelectMany(i => i.GetExpandedConf())))
         {
             //we ignore remote boards and boards missing during the start sequence (as we don't have auto reconnect logic yet for those). Note the BaseSensorBox already reports the missing local boards.
-            foreach (var port in ports.Where(p => p.Map.IsLocalBoard && p.Map.Board != null))
-                RegisterBoardWriteActions(port.Map.Board!, port, 0, port.Name + "_onoff", GetCommand);
+            foreach (var port in ports.Where(p => p.Map.IsLocalBoard && p.Map.McuBoard != null))
+                RegisterBoardWriteActions(port.Map.McuBoard!, port, 0, port.Name + "_onoff", GetCommand);
 
             static string GetCommand(int portNumber, double target) => target == 1.0 ? $"p{portNumber} on 3" : $"p{portNumber} off";
         }

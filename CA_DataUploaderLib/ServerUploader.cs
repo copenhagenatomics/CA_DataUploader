@@ -27,7 +27,6 @@ namespace CA_DataUploaderLib
         private readonly Queue<EventFiredArgs> _eventsQueue = new();
         private readonly Dictionary<string, int> _duplicateEventsDetection = new();
         private readonly Queue<(DateTime expirationTime, string @event)> _duplicateEventsExpirationTimes = new();
-        private readonly List<DateTime> _badPackages = new();
         private DateTime _lastTimestamp;
         private readonly CancellationTokenSource _stopTokenSource;
         private readonly int _localVectorLength;
@@ -55,7 +54,7 @@ namespace CA_DataUploaderLib
                 _uploadVectorLength = uploadDescription.Length;
                 _plot = PlotConnection.Establish(loopName, _signing.GetPublicKey(), GetSignedVectorDescription(uploadDescription)).GetAwaiter().GetResult();
                 _stopTokenSource = cmd != null ? CancellationTokenSource.CreateLinkedTokenSource(cmd.StopToken) : new();
-                new Thread(() => LoopForever(_stopTokenSource.Token)).Start();
+                _ = Task.Run(() => LoopForever(_stopTokenSource.Token));
                 _cmd = cmd;
 
             }
@@ -108,6 +107,8 @@ namespace CA_DataUploaderLib
                 return;
             }
 
+            _executedActionChannel.Writer.TryWrite(UploadState.LocalClusterRunning);
+
             lock (_queue)
                 if (_queue.Count < 10000)  // if sending thread can't catch up, then drop packages.
                 {
@@ -132,93 +133,147 @@ namespace CA_DataUploaderLib
 
         public string GetPlotUrl() => "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plot.PlotName;
 
-        private void LoopForever(CancellationToken token)
-        {
-            _ = Task.Run(() => TrackUploadState(token), token);
-
-            var vectorUploadDelay = IOconfFile.GetVectorUploadDelay();
-            var throttle = new TimeThrottle(vectorUploadDelay);
-            var writer = _executedActionChannel.Writer;
-            while (!token.IsCancellationRequested)
-            {
-                throttle.Wait();
-                writer.TryWrite(UploadState.StartingUploadCycle);
-                SendQueuedData(false, writer);
-            }
-
-            CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued messages");
-            SendQueuedData(true, writer);
-
-            async void SendQueuedData(bool stopping, ChannelWriter<UploadState> writer)
-            {
-                try
-                {
-                    var list = DequeueAllEntries(_queue);
-                    if (list != null)
-                    {
-                        var task = PostVectorAsync(GetSignedVectors(list), list.First().Timestamp, writer);
-                        if (stopping) await task;
-                    }
-
-                    RemoveExpireduplicateEvents();
-                    var events = DequeueAllEntries(_eventsQueue);
-                    if (events != null)
-                    {
-                        foreach (var @event in events)
-                        {
-                            var task = PostEventAsync(@event);
-                            if (stopping) await task;
-                        }
-                    }
-
-                    if (stopping)
-                    {
-                        await PostEventAsync(new EventFiredArgs("uploader has stopped", EventType.Log, DateTime.UtcNow));
-                        writer.Complete();
-                    }
-
-                    PrintBadPackagesMessage(stopping);
-                }
-                catch (Exception ex)
-                {//we don't normally expect to reach here, as the post method above capture and log any exceptions
-                    CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message, ex);
-                }
-            }
-        }
-
-        private async Task TrackUploadState(CancellationToken token)
+        private async Task LoopForever(CancellationToken token)
         {
             try
             {
-                await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
-                var startingUploadCheckArgs = (Stopwatch.StartNew(), 2500);
-                var postingVectorCheckArgs = (Stopwatch.StartNew(), 2500);
-                var postedVectorCheckArgs = (Stopwatch.StartNew(), 2500);
-                await foreach (var state in _executedActionChannel.Reader.ReadAllAsync(token))
-                {
-                    DetectSlowActionOnNewAction(ref startingUploadCheckArgs, UploadState.StartingUploadCycle, state);
-                    DetectSlowActionOnNewAction(ref postingVectorCheckArgs, UploadState.PostingVector, state);
-                    DetectSlowActionOnNewAction(ref postedVectorCheckArgs, UploadState.PostedVector, state);
-                }
+                var stateTracker = WithExceptionLogging(TrackUploadState(token), "upload state tracker");
+                var vectorsSender = WithExceptionLogging(VectorsSender(token), "upload vector sender");
+                var eventsSender = WithExceptionLogging(EventsSender(token), "upload events sender");
+
+                await Task.WhenAll(stateTracker, vectorsSender, eventsSender);
             }
-            catch (OperationCanceledException ex) when (ex.CancellationToken == token) { }
             catch (Exception ex)
+            {//we don't normally expect to reach here, as the individual tasks above are expected to capture and logs any exceptions
+                CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message, ex);
+            }
+            finally
             {
-                OnError("Unexpected error tracking upload state", ex);
+                _executedActionChannel.Writer.Complete();
             }
 
-            static void DetectSlowActionOnNewAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction) stateCheckArgs, UploadState expectedState, UploadState state)
+            async Task VectorsSender(CancellationToken token)
             {
-                if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
+                var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(IOconfFile.GetVectorUploadDelay()));
+                var stateWriter = _executedActionChannel.Writer;
+                var badVectors = new List<DateTime>();
+
+                try
                 {
-                    OnError($"detected slow {expectedState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed}", null);
-                    stateCheckArgs.nextTargetToReportSlowAction *= 2;
+                    while (await throttle.WaitForNextTickAsync(token))
+                    {
+                        stateWriter.TryWrite(UploadState.UploadVectorsCycle);
+                        if (!await PostQueuedVectorAsync(stateWriter))
+                            badVectors.Add(DateTime.UtcNow);
+                    }
+                }
+                catch (OperationCanceledException) { }
+
+                CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued vectors");
+                if (!await PostQueuedVectorAsync(stateWriter))
+                    badVectors.Add(DateTime.UtcNow);
+                PrintBadPackagesMessage(badVectors, "Vector", true);
+            }
+
+            async Task EventsSender(CancellationToken token)
+            {
+                //note this uses this uses the vector upload delay for the frequency for no special reason, it was just an easy value to use for this
+                var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(IOconfFile.GetVectorUploadDelay()));
+                var stateWriter = _executedActionChannel.Writer;
+                var badEvents = new List<DateTime>();
+
+                try
+                {
+                    while (await throttle.WaitForNextTickAsync(token))
+                    {
+                        stateWriter.TryWrite(UploadState.UploadEventsCycle);
+                        await PostQueuedEventsAsync(stateWriter, badEvents);
+                    }
+                }
+                catch (OperationCanceledException) { }
+
+                await PostEventAsync(new EventFiredArgs("uploader is stopping", EventType.Log, DateTime.UtcNow));
+                CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued events");
+
+                await Task.Delay(200); //we give an extra 200ms to let any remaining shutdown events come in
+                await PostQueuedEventsAsync(stateWriter, badEvents);
+                PrintBadPackagesMessage(badEvents, "Events", true);
+            }
+
+            async Task TrackUploadState(CancellationToken token)
+            {
+                using var cts = new CancellationTokenSource();
+                _ = Task.Run(() => SignalCheckStateEvery200ms(_executedActionChannel.Writer, cts));
+                try
+                {
+                    await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
+                    var vectorsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadVectorsCycle);
+                    var eventsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadEventsCycle);
+                    var receivedVectorCheckArgs = (Stopwatch.StartNew(), 1000, UploadState.LocalClusterRunning);
+                    await foreach (var state in _executedActionChannel.Reader.ReadAllAsync(token))
+                    {
+                        switch (state)
+                        {//we only process together the group them by state
+                            case UploadState.UploadVectorsCycle or UploadState.PostingVector or UploadState.PostedVector:
+                                DetectSlowActionOnNewAction(ref vectorsCycleCheckArgs, state);
+                                break;
+                            case UploadState.LocalClusterRunning:
+                                DetectSlowActionOnNewAction(ref receivedVectorCheckArgs, state);
+                                break;
+                            case UploadState.UploadEventsCycle or UploadState.PostingEvent or UploadState.PostedEvent:
+                                DetectSlowActionOnNewAction(ref eventsCycleCheckArgs, state);
+                                break;
+                            default:
+                                DetectSlowAction(ref vectorsCycleCheckArgs);
+                                DetectSlowAction(ref receivedVectorCheckArgs);
+                                DetectSlowAction(ref eventsCycleCheckArgs);
+                                break;
+                        }
+                    }
+                }
+                finally
+                {
+                    cts.Cancel();
                 }
 
-                if (state != expectedState) return;
+                static void DetectSlowActionOnNewAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState) stateCheckArgs, UploadState newState)
+                {
+                    if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
+                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed} - new state {newState}", null);
 
-                stateCheckArgs.timeSinceLastAction.Restart();
-                stateCheckArgs.nextTargetToReportSlowAction = 2500;
+                    stateCheckArgs.nextTargetToReportSlowAction = 2500;
+                    stateCheckArgs.timeSinceLastAction.Restart();
+                    stateCheckArgs.lastState = newState;
+                }
+
+                static void DetectSlowAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState) stateCheckArgs)
+                {
+                    if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
+                    {
+                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed}", null);
+                        stateCheckArgs.nextTargetToReportSlowAction *= 2;
+                    }
+                }
+
+                static async Task SignalCheckStateEvery200ms(ChannelWriter<UploadState> writer, CancellationTokenSource cts)
+                {
+                    var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
+                    while (await timer.WaitForNextTickAsync(cts.Token))
+                        writer.TryWrite(UploadState.CheckState);
+                }
+            }
+
+            async Task WithExceptionLogging(Task task, string subsystem)
+            {
+                try
+                {
+                    await task;
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                { //normally the upload subsystems should handle errors so they can continue operating, so seeing this error means we missed handling some case
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"{subsystem} - unexpected error detected", ex);
+                }
             }
         }
 
@@ -278,25 +333,48 @@ namespace CA_DataUploaderLib
             Console.WriteLine(message);
         }
 
-        private async Task PostVectorAsync(byte[] buffer, DateTime timestamp, ChannelWriter<UploadState> writer)
+        private ValueTask<bool> PostQueuedVectorAsync(ChannelWriter<UploadState> stateWriter)
         {
-            try
+            var list = DequeueAllEntries(_queue);
+            if (list == null) return ValueTask.FromResult(true); //no vectors, return success
+
+            stateWriter.TryWrite(UploadState.PostingVector);
+            var buffer = GetSignedVectors(list);
+            var timestamp = list.First().Timestamp;
+            return new ValueTask<bool>(Post());
+
+            async Task<bool> Post()
             {
-                writer.TryWrite(UploadState.PostingVector);
-                await _plot.PostVectorAsync(buffer, timestamp);
-                writer.TryWrite(UploadState.PostedVector);
-            }
-            catch (Exception ex)
-            {
-                lock (_badPackages)
+                try
                 {
-                    _badPackages.Add(DateTime.UtcNow);
+                    await _plot.PostVectorAsync(buffer, timestamp);
+                    stateWriter.TryWrite(UploadState.PostedVector);
+                    return true;
                 }
-                OnError("failed posting vector", ex);
+                catch (Exception ex)
+                {
+                    OnError("failed posting vector", ex);
+                    return false;
+                }
             }
         }
 
-        private async Task PostEventAsync(EventFiredArgs args)
+        private async ValueTask PostQueuedEventsAsync(ChannelWriter<UploadState> stateWriter, List<DateTime> badEvents)
+        {
+            RemoveExpireduplicateEvents();
+            var events = DequeueAllEntries(_eventsQueue);
+            if (events == null) return;
+
+            foreach (var @event in events)
+            {
+                stateWriter.TryWrite(UploadState.PostingEvent);
+                if (!await PostEventAsync(@event))
+                    badEvents.Add(DateTime.UtcNow);
+                stateWriter.TryWrite(UploadState.PostedEvent);
+            }
+        }
+
+        private async Task<bool> PostEventAsync(EventFiredArgs args)
         {
             try
             {
@@ -304,15 +382,12 @@ namespace CA_DataUploaderLib
                     await PostSystemChangeNotificationAsync(args);//this special event turns into reported boards serial info + still an event with a shorter description
                 else
                     await Post(args);
+                return true;
             }
             catch (Exception ex)
             {
-                lock (_badPackages)
-                {
-                    _badPackages.Add(DateTime.UtcNow);
-                }
-
                 OnError($"failed posting event: {args.EventType} - {args.Data} - {args.TimeSpan}", ex);
+                return false;
             }
 
             Task Post(EventFiredArgs args) => _plot.PostEventAsync(GetSignedEvent(args));
@@ -345,25 +420,23 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private void PrintBadPackagesMessage(bool force)
+        private static void PrintBadPackagesMessage(List<DateTime> badPackages, string type, bool force)
         {
-            if (!_badPackages.Any())
+            if (!badPackages.Any())
                 return;
 
-            lock (_badPackages)
+            if (force || badPackages.First().AddHours(1) < DateTime.UtcNow)
             {
-                if (force || _badPackages.First().AddHours(1) < DateTime.UtcNow)
-                {
-                    var msg = GetBadPackagesErrorMessage(_badPackages);
-                    CALog.LogInfoAndConsoleLn(LogID.A, msg);
-                    _badPackages.Clear();
-                }
+                var msg = GetBadPackagesErrorMessage(type, badPackages);
+                CALog.LogInfoAndConsoleLn(LogID.A, msg);
+                badPackages.Clear();
             }
 
-            static string GetBadPackagesErrorMessage(List<DateTime> times)
+            static string GetBadPackagesErrorMessage(string type, List< DateTime> times)
             {
                 var sb = new StringBuilder();
-                sb.AppendLine("Vector upload errors within the last hour:");
+                sb.Append(type);
+                sb.AppendLine(" upload errors within the last hour:");
                 foreach (var minutes in times.GroupBy(x => x.ToString("MMM dd HH:mm")))
                     sb.AppendLine($"{minutes.Key} = {minutes.Count()}");
                 return sb.ToString();
@@ -523,9 +596,14 @@ namespace CA_DataUploaderLib
 
         private enum UploadState
         {
-            StartingUploadCycle,
+            UploadVectorsCycle,
+            PostedVector,
+            LocalClusterRunning,
+            PostedEvent,
+            UploadEventsCycle,
             PostingVector,
-            PostedVector
+            CheckState,
+            PostingEvent
         }
     }
 }

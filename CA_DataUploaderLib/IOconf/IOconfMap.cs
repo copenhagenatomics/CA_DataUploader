@@ -47,14 +47,17 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public event EventHandler<EventArgs>? OnBoardDetected;
-        public bool SetMCUboard(MCUBoard board)
+        public bool Setboard(Board board)
         {
             if (!IsLocalBoard)
                 return false; //when using a distributed deployment, the map entries are only valid in the specified node.
 
-            if ((board.serialNumber == SerialNumber && SerialNumber != null) || board.PortName == USBPort)
+            if ((board.SerialNumber == SerialNumber && SerialNumber != null) || board.PortName == USBPort)
             {
                 Board = board;
+                if (board is MCUBoard mcuBoard)
+                    McuBoard = mcuBoard;
+
                 OnBoardDetected?.Invoke(this, EventArgs.Empty);
                 return true;
             }
@@ -81,7 +84,8 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfNode DistributedNode { get; } = IOconfNode.SingleNode;
         public bool IsLocalBoard => DistributedNode.IsCurrentSystem;
         public bool CustomWritesEnabled { get; } = false;
-        public MCUBoard? Board;
+        public Board? Board { get; private set; }
+        public MCUBoard? McuBoard { get; private set; }
         private BoardSettings _boardSettings = BoardSettings.Default;
 
         public override string ToString() => $"{BoxName} - {USBPort ?? SerialNumber}";
