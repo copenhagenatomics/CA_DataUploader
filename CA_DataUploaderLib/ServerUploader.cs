@@ -195,15 +195,15 @@ namespace CA_DataUploaderLib
                 await PostEventAsync(new EventFiredArgs("uploader is stopping", EventType.Log, DateTime.UtcNow));
                 CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued events");
 
-                await Task.Delay(200); //we give an extra 200ms to let any remaining shutdown events come in
+                await Task.Delay(200, CancellationToken.None); //we give an extra 200ms to let any remaining shutdown events come in
                 await PostQueuedEventsAsync(stateWriter, badEvents);
                 PrintBadPackagesMessage(badEvents, "Events", true);
             }
 
             async Task TrackUploadState(CancellationToken token)
             {
-                using var cts = new CancellationTokenSource();
-                _ = Task.Run(() => SignalCheckStateEvery200ms(_executedActionChannel.Writer, cts));
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                _ = Task.Run(() => SignalCheckStateEvery200ms(_executedActionChannel.Writer, cts), token);
                 try
                 {
                     await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.

@@ -12,7 +12,7 @@ namespace CA_DataUploader
     {
         public static string UpdateIOconf(SerialNumberMapper serial)
         {
-            var mcuList = serial.McuBoards.Where(x => x.serialNumber?.StartsWith("unknown") != true);
+            var mcuList = serial.McuBoards.Where(x => x.SerialNumber?.StartsWith("unknown") != true);
             if (!mcuList.Any())
                 throw new Exception($"Could not find any devices connected to USB.");
 
@@ -47,7 +47,7 @@ namespace CA_DataUploader
             int i = 1;
             foreach (var mcu in mcuList)
             {
-                lines.Insert(4, $"Map;{mcu.serialNumber};ThermalBox{i++}");
+                lines.Insert(4, $"Map;{mcu.SerialNumber};ThermalBox{i++}");
             }
 
             if (lines.Any(x => x.StartsWith("LoopName")))
@@ -56,7 +56,7 @@ namespace CA_DataUploader
             Console.Write("Please enter a name for the webchart (It must be a new name you have not used before): ");
             var plotname = Console.ReadLine() ?? throw new NotSupportedException("failed to answer from console input");
             if (plotname.Length > 50)
-                plotname = plotname.Substring(0, 50);
+                plotname = plotname[..50];
 
             lines.Insert(0, $"LoopName;{plotname};Normal;https://www.theng.dk");
 
@@ -66,7 +66,7 @@ namespace CA_DataUploader
             Console.Write("Please enter your full name: ");
             var fullname = Console.ReadLine() ?? throw new NotSupportedException("failed to answer from console input");
             if (fullname.Length > 100)
-                fullname = fullname.Substring(0, 100);
+                fullname = fullname[..100];
 
             string email;
             Console.Write("Please enter your email address: ");
@@ -110,7 +110,7 @@ namespace CA_DataUploader
                     Console.WriteLine("email is too long, please try again: ");
                     return false;
                 }
-                MailAddress m = new MailAddress(email);
+                MailAddress m = new(email);
                 return true;
             }
             catch (FormatException)
@@ -135,13 +135,8 @@ namespace CA_DataUploader
         {
             IOconfFile.Reload();
             foreach (var board in serial.McuBoards)
-            {
-                foreach (var ioconfMap in IOconfFile.GetMap())
-                {
-                    if (ioconfMap.SetMCUboard(board))
-                        board.BoxName = ioconfMap.BoxName;
-                }
-            }
+            foreach (var ioconfMap in IOconfFile.GetMap())
+                board.TrySetMap(ioconfMap);
         }
     }
 }

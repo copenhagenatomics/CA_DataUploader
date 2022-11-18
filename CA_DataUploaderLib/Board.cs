@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib
         public string? Calibration { get; protected set; }
         public string? UpdatedCalibration { get; protected set; }
 
-        protected bool TrySetMap(IOconfMap map)
+        public bool TrySetMap(IOconfMap map)
         {
             var boardMatched = map.Setboard(this);
             if (boardMatched)
