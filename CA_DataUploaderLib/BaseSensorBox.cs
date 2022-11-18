@@ -60,10 +60,16 @@ namespace CA_DataUploaderLib
             static void RegisterCustomBoardCommand(
                 IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived, HashSet<string> localBoards)
             {
+                if (map.McuBoard == null)
+                {
+                    CALog.LogData(LogID.A, $"missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
+                    return;
+                }
+
                 var channel = Channel.CreateUnbounded<string>();
                 var channelWriter = channel.Writer;
-                boardCustomCommandsReceived.Add(map.Board, channel.Reader);
-                cmd.AddCommand("custom", CustomCommand);
+                boardCustomCommandsReceived.Add(map.McuBoard, channel.Reader);
+                cmd?.AddCommand("custom", CustomCommand);
 
                 bool CustomCommand(List<string> args)
                 {
@@ -163,7 +169,7 @@ namespace CA_DataUploaderLib
                 try
                 {
                     using var closeTimeoutToken = new CancellationTokenSource(5000);
-                    map.Board?.SafeClose(closeTimeoutToken.Token);
+                    map.McuBoard?.SafeClose(closeTimeoutToken.Token);
                     _boardsState.SetDisconnectedState(map);
                 }
                 catch(Exception ex)
@@ -175,13 +181,13 @@ namespace CA_DataUploaderLib
 
         protected virtual List<Task> StartLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
         {
-            var missingBoards = boards.Where(h => h.map.Board == null).Select(b => b.map.BoxName).Distinct().ToList();
+            var missingBoards = boards.Where(h => h.map.McuBoard == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} - missing boards detected {string.Join(",", missingBoards)}. Related sensors/actuators are disabled.");
 
             return boards
-                .Where(b => b.map.Board != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
-                .SelectMany(b => new []{ BoardReadLoop(b.map.Board, b.values, token), BoardWriteLoop(b.map.Board, token) })
+                .Where(b => b.map.McuBoard != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
+                .SelectMany(b => new []{ BoardReadLoop(b.map.McuBoard, b.values, token), BoardWriteLoop(b.map.McuBoard, token) })
                 .ToList();
         }
 
@@ -421,7 +427,7 @@ namespace CA_DataUploaderLib
             foreach (var item in values)
             {
                 var msSinceLastRead = DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds;
-                if (msSinceLastRead <= item.Input.Map.Board.ConfigSettings.MaxMillisecondsWithoutNewValues)
+                if (msSinceLastRead <= item.Input.Map.McuBoard.ConfigSettings.MaxMillisecondsWithoutNewValues)
                     continue;
                 hasStaleValues = true; 
                 LogInfo(board, $"stale sensor detected: {item.Input.Name}. {msSinceLastRead} milliseconds since last read");
@@ -513,8 +519,8 @@ namespace CA_DataUploaderLib
 
         private void LogError(IOconfMap board, string message, Exception ex) 
         {
-            if (board.Board != null)
-                LogError(board.Board, message, ex);
+            if (board.McuBoard != null)
+                LogError(board.McuBoard, message, ex);
             else
                 CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.BoxName} (missing)", ex); 
         }
@@ -547,7 +553,7 @@ namespace CA_DataUploaderLib
                 {
                     _sensorNames[i] = _boardList[i].BoxName + "_state";
                     _boardsIndexes[_boardList[i].BoxName] = i;
-                    _states[i] = _boardList[i].Board?.InitialConnectionSucceeded == true ? ConnectionState.Connected : ConnectionState.Disconnected;
+                    _states[i] = _boardList[i].McuBoard?.InitialConnectionSucceeded == true ? ConnectionState.Connected : ConnectionState.Disconnected;
                 }
             }
 
