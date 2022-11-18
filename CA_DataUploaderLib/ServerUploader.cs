@@ -107,7 +107,7 @@ namespace CA_DataUploaderLib
                 return;
             }
 
-            _executedActionChannel.Writer.TryWrite(UploadState.ReceivedVector);
+            _executedActionChannel.Writer.TryWrite(UploadState.LocalClusterRunning);
 
             lock (_queue)
                 if (_queue.Count < 10000)  // if sending thread can't catch up, then drop packages.
@@ -162,7 +162,7 @@ namespace CA_DataUploaderLib
                 {
                     while (await throttle.WaitForNextTickAsync(token))
                     {
-                        stateWriter.TryWrite(UploadState.StartUploadVectorsCycle);
+                        stateWriter.TryWrite(UploadState.UploadVectorsCycle);
                         if (!await PostQueuedVectorAsync(stateWriter))
                             badVectors.Add(DateTime.UtcNow);
                     }
@@ -186,7 +186,7 @@ namespace CA_DataUploaderLib
                 {
                     while (await throttle.WaitForNextTickAsync(token))
                     {
-                        stateWriter.TryWrite(UploadState.StartUploadEventsCycle);
+                        stateWriter.TryWrite(UploadState.UploadEventsCycle);
                         await PostQueuedEventsAsync(stateWriter, badEvents);
                     }
                 }
@@ -207,20 +207,20 @@ namespace CA_DataUploaderLib
                 try
                 {
                     await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
-                    var vectorsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.StartUploadVectorsCycle);
-                    var eventsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.StartUploadEventsCycle);
-                    var receivedVectorCheckArgs = (Stopwatch.StartNew(), 1000, UploadState.ReceivedVector);
+                    var vectorsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadVectorsCycle);
+                    var eventsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadEventsCycle);
+                    var receivedVectorCheckArgs = (Stopwatch.StartNew(), 1000, UploadState.LocalClusterRunning);
                     await foreach (var state in _executedActionChannel.Reader.ReadAllAsync(token))
                     {
                         switch (state)
                         {//we only process together the group them by state
-                            case UploadState.StartUploadVectorsCycle or UploadState.PostingVector or UploadState.PostedVector:
+                            case UploadState.UploadVectorsCycle or UploadState.PostingVector or UploadState.PostedVector:
                                 DetectSlowActionOnNewAction(ref vectorsCycleCheckArgs, state);
                                 break;
-                            case UploadState.ReceivedVector:
+                            case UploadState.LocalClusterRunning:
                                 DetectSlowActionOnNewAction(ref receivedVectorCheckArgs, state);
                                 break;
-                            case UploadState.StartUploadEventsCycle or UploadState.PostingEvent or UploadState.PostedEvent:
+                            case UploadState.UploadEventsCycle or UploadState.PostingEvent or UploadState.PostedEvent:
                                 DetectSlowActionOnNewAction(ref eventsCycleCheckArgs, state);
                                 break;
                             default:
@@ -596,11 +596,11 @@ namespace CA_DataUploaderLib
 
         private enum UploadState
         {
-            StartUploadVectorsCycle,
+            UploadVectorsCycle,
             PostedVector,
-            ReceivedVector,
+            LocalClusterRunning,
             PostedEvent,
-            StartUploadEventsCycle,
+            UploadEventsCycle,
             PostingVector,
             CheckState,
             PostingEvent
