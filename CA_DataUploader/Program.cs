@@ -26,7 +26,7 @@ namespace CA_DataUploader
                         return; // SerialNumberMapper already lists devices, no need for further output.
 
                     // close all ports which are not Hub10
-                    serial.McuBoards.Where(x => !x.productType.Contains("Temperature") &&!x.productType.Contains("Hub10STM")).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
+                    serial.McuBoards.OfType<MCUBoard>().Where(x => x.ProductType?.Contains("Temperature") != true && x.ProductType?.Contains("Hub10STM") != true).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
 
                     var email = IOconfSetup.UpdateIOconf(serial);
 

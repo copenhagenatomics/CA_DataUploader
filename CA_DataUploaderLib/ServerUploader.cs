@@ -101,9 +101,9 @@ namespace CA_DataUploaderLib
         {
             if (vector.Count() != _localVectorLength)
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_localVectorLength}");
-            if (vector.Timestamp <= _lastTimestamp)
+            if (vector.timestamp <= _lastTimestamp)
             {
-                CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.Timestamp}");
+                CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.timestamp}");
                 return;
             }
 
@@ -113,21 +113,21 @@ namespace CA_DataUploaderLib
                 if (_queue.Count < 10000)  // if sending thread can't catch up, then drop packages.
                 {
                     _queue.Enqueue(WithOnlyUploadFields(vector));
-                    _lastTimestamp = vector.Timestamp;
+                    _lastTimestamp = vector.timestamp;
                 }
 
             DataVector WithOnlyUploadFields(DataVector fullVector)
             {
-                var fullVectorData = fullVector.Data;
+                var fullVectorData = fullVector.vector;
                 var uploadData = new double[_uploadVectorLength];
                 int j = 0;
-                for (int i = 0; i < fullVector.Data.Length; i++)
+                for (int i = 0; i < fullVector.vector.Count; i++)
                 {
                     if (_fieldUploadMap[i])
                         uploadData[j++] = fullVectorData[i];
                 }
 
-                return new(uploadData, fullVector.Timestamp);
+                return new(new(uploadData), fullVector.timestamp);
             }
         }
 
@@ -195,15 +195,15 @@ namespace CA_DataUploaderLib
                 await PostEventAsync(new EventFiredArgs("uploader is stopping", EventType.Log, DateTime.UtcNow));
                 CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued events");
 
-                await Task.Delay(200); //we give an extra 200ms to let any remaining shutdown events come in
+                await Task.Delay(200, CancellationToken.None); //we give an extra 200ms to let any remaining shutdown events come in
                 await PostQueuedEventsAsync(stateWriter, badEvents);
                 PrintBadPackagesMessage(badEvents, "Events", true);
             }
 
             async Task TrackUploadState(CancellationToken token)
             {
-                using var cts = new CancellationTokenSource();
-                _ = Task.Run(() => SignalCheckStateEvery200ms(_executedActionChannel.Writer, cts));
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                _ = Task.Run(() => SignalCheckStateEvery200ms(_executedActionChannel.Writer, cts), token);
                 try
                 {
                     await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
@@ -314,7 +314,7 @@ namespace CA_DataUploaderLib
         private byte[] GetSignedVectors(List<DataVector> vectors)
         {
             byte[] listLen = BitConverter.GetBytes((ushort)vectors.Count);
-            var theData = vectors.SelectMany(a => a.Buffer).ToArray();
+            var theData = vectors.SelectMany(a => a.buffer).ToArray();
             return SignAndCompress(listLen.Concat(theData).ToArray());
         }
 
@@ -340,7 +340,7 @@ namespace CA_DataUploaderLib
 
             stateWriter.TryWrite(UploadState.PostingVector);
             var buffer = GetSignedVectors(list);
-            var timestamp = list.First().Timestamp;
+            var timestamp = list.First().timestamp;
             return new ValueTask<bool>(Post());
 
             async Task<bool> Post()
@@ -546,9 +546,9 @@ namespace CA_DataUploaderLib
 
             private static async Task<string> GetLoginToken(HttpClient client, ConnectionInfo accountInfo)
             {
-                string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.Email}&password={accountInfo.Password}");
+                string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}");
                 if (string.IsNullOrEmpty(token))
-                    token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.Email}&password={accountInfo.Password}&fullName={accountInfo.Fullname}"); // attempt to create account assuming it did not exist
+                    token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.email}&password={accountInfo.password}&fullName={accountInfo.Fullname}"); // attempt to create account assuming it did not exist
                 if (!string.IsNullOrEmpty(token))
                     return token;
 
