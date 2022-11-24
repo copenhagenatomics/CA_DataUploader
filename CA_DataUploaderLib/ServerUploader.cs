@@ -78,7 +78,7 @@ namespace CA_DataUploaderLib
 
                 _eventsQueue.Enqueue(e);
                 _duplicateEventsDetection[e.Data] = 1;
-                _duplicateEventsExpirationTimes.Enqueue((DateTime.UtcNow.AddMinutes(5), e.Data));
+                _duplicateEventsExpirationTimes.Enqueue((DateTime.UtcNow.AddMinutes(1), e.Data));
             }
         }
 
@@ -91,7 +91,7 @@ namespace CA_DataUploaderLib
                 {
                     e = _duplicateEventsExpirationTimes.Dequeue();
                     if (_duplicateEventsDetection.TryGetValue(e.@event, out var repeatCount) && repeatCount > 1)
-                        _eventsQueue.Enqueue(new EventFiredArgs($"Skipped {repeatCount} duplicate messages detected within 5 minute: {e.@event}", EventType.LogError, DateTime.UtcNow));
+                        _eventsQueue.Enqueue(new EventFiredArgs($"Skipped {repeatCount} duplicate messages detected within 1 minute: {e.@event}", EventType.LogError, DateTime.UtcNow));
                     _duplicateEventsDetection.Remove(e.@event);
                 }
             }
