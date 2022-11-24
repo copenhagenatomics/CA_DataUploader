@@ -86,16 +86,16 @@ namespace CA_DataUploaderLib
             var data = new SystemChangeNotificationData() { NodeName = GetCurrentNode().Name, Boards = _mapper.McuBoards.Select(ToBoardInfo).ToList() }.ToJson();
             FireCustomEvent(data, DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
 
-            static SystemChangeNotificationData.BoardInfo ToBoardInfo(MCUBoard board) => new()
+            static SystemChangeNotificationData.BoardInfo ToBoardInfo(Board board) => new()
             {
-                SerialNumber = board.serialNumber,
-                ProductType = board.productType,
-                ProductSubType = board.subProductType,
-                McuFamily = board.mcuFamily,
-                SoftwareVersion = board.softwareVersion,
-                CompileDate = board.softwareCompileDate,
+                SerialNumber = board.SerialNumber,
+                ProductType = board.ProductType,
+                ProductSubType = board.SubProductType,
+                McuFamily = board.McuFamily,
+                SoftwareVersion = board.SoftwareVersion,
+                CompileDate = board.SoftwareCompileDate,
                 GitSha = board.GitSha,
-                PcbVersion = board.pcbVersion,
+                PcbVersion = board.PcbVersion,
                 Calibration = board.Calibration,
                 MappedBoardName = board.BoxName,
                 Port = board.PortName,

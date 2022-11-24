@@ -1,4 +1,5 @@
-﻿using CA_DataUploaderLib.Extensions;
+﻿#nullable enable
+using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
@@ -6,7 +7,6 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -23,20 +23,23 @@ namespace CA_DataUploaderLib
     {
         private readonly PlotConnection _plot;
         private readonly Signing _signing;
-        private readonly Queue<DataVector> _queue = new Queue<DataVector>();
-        private readonly Queue<EventFiredArgs> _eventsQueue = new Queue<EventFiredArgs>();
-        private readonly List<DateTime> _badPackages = new List<DateTime>();
+        private readonly Queue<DataVector> _queue = new();
+        private readonly Queue<EventFiredArgs> _eventsQueue = new();
+        private readonly Dictionary<string, int> _duplicateEventsDetection = new();
+        private readonly Queue<(DateTime expirationTime, string @event)> _duplicateEventsExpirationTimes = new();
         private DateTime _lastTimestamp;
-        private bool _running;
-        private readonly VectorDescription _vectorDescription;
-        private readonly CommandHandler _cmd;
+        private readonly CancellationTokenSource _stopTokenSource;
+        private readonly int _localVectorLength;
+        private readonly int _uploadVectorLength;
+        private readonly bool[] _fieldUploadMap;
+        private readonly CommandHandler? _cmd;
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(10000);
 
         public ServerUploader(VectorDescription vectorDescription) : this(vectorDescription, null)
         {
         }
 
-        public ServerUploader(VectorDescription vectorDescription, CommandHandler cmd)
+        public ServerUploader(VectorDescription vectorDescription, CommandHandler? cmd)
         {
             try
             {
@@ -45,12 +48,14 @@ namespace CA_DataUploaderLib
                     throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", duplicates));
                 var loopName = IOconfFile.GetLoopName();
                 _signing = new Signing(loopName);
-                vectorDescription.IOconf = IOconfFile.GetRawFile();
-                _vectorDescription = vectorDescription;
-                _plot = PlotConnection.Establish(loopName, _signing.GetPublicKey(), GetSignedVectorDescription(vectorDescription)).GetAwaiter().GetResult();
-                new Thread(() => this.LoopForever()).Start();
+                _localVectorLength = vectorDescription.Length;
+                _fieldUploadMap = vectorDescription._items.Select(v => v.Upload).ToArray();
+                var uploadDescription = new VectorDescription(vectorDescription._items.Where(v => v.Upload).ToList(), vectorDescription.Hardware, vectorDescription.Software) { IOconf = IOconfFile.GetRawFile() };
+                _uploadVectorLength = uploadDescription.Length;
+                _plot = PlotConnection.Establish(loopName, _signing.GetPublicKey(), GetSignedVectorDescription(uploadDescription)).GetAwaiter().GetResult();
+                _stopTokenSource = cmd != null ? CancellationTokenSource.CreateLinkedTokenSource(cmd.StopToken) : new();
+                _ = Task.Run(() => LoopForever(_stopTokenSource.Token));
                 _cmd = cmd;
-                cmd?.AddCommand("escape", Stop);
 
             }
             catch (Exception ex)
@@ -60,131 +65,225 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public void SendEvent(object sender, EventFiredArgs e)
+        public void SendEvent(object? sender, EventFiredArgs e)
         {
             lock (_eventsQueue)
-                if (_eventsQueue.Count < 10000)  // if sending thread can't catch up, then drop packages.
-                    _eventsQueue.Enqueue(e);
+            {
+                if (_eventsQueue.Count >= 10000) return;  // if sending thread can't catch up, then drop packages.
+                if (_duplicateEventsDetection.TryGetValue(e.Data, out var repeatCount))
+                {
+                    _duplicateEventsDetection[e.Data] = repeatCount + 1;
+                    return;
+                }
+
+                _eventsQueue.Enqueue(e);
+                _duplicateEventsDetection[e.Data] = 1;
+                _duplicateEventsExpirationTimes.Enqueue((DateTime.UtcNow.AddMinutes(1), e.Data));
+            }
+        }
+
+        void RemoveExpireduplicateEvents()
+        {
+            lock (_eventsQueue)
+            {
+                var now = DateTime.UtcNow;
+                while (_duplicateEventsExpirationTimes.TryPeek(out var e) && now > e.expirationTime)
+                {
+                    e = _duplicateEventsExpirationTimes.Dequeue();
+                    if (_duplicateEventsDetection.TryGetValue(e.@event, out var repeatCount) && repeatCount > 1)
+                        _eventsQueue.Enqueue(new EventFiredArgs($"Skipped {repeatCount} duplicate messages detected within 1 minute: {e.@event}", EventType.LogError, DateTime.UtcNow));
+                    _duplicateEventsDetection.Remove(e.@event);
+                }
+            }
         }
 
         public void SendVector(DataVector vector)
         {
-            if (vector.Count() != _vectorDescription.Length)
-                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_vectorDescription.Length}");
+            if (vector.Count() != _localVectorLength)
+                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_localVectorLength}");
             if (vector.timestamp <= _lastTimestamp)
             {
                 CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.timestamp}");
                 return;
             }
 
+            _executedActionChannel.Writer.TryWrite(UploadState.LocalClusterRunning);
+
             lock (_queue)
                 if (_queue.Count < 10000)  // if sending thread can't catch up, then drop packages.
                 {
-                    _queue.Enqueue(vector);
+                    _queue.Enqueue(WithOnlyUploadFields(vector));
                     _lastTimestamp = vector.timestamp;
                 }
+
+            DataVector WithOnlyUploadFields(DataVector fullVector)
+            {
+                var fullVectorData = fullVector.vector;
+                var uploadData = new double[_uploadVectorLength];
+                int j = 0;
+                for (int i = 0; i < fullVector.vector.Count; i++)
+                {
+                    if (_fieldUploadMap[i])
+                        uploadData[j++] = fullVectorData[i];
+                }
+
+                return new(new(uploadData), fullVector.timestamp);
+            }
         }
 
         public string GetPlotUrl() => "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plot.PlotName;
 
-        private void LoopForever()
+        private async Task LoopForever(CancellationToken token)
         {
-            _running = true;
-            _ = Task.Run(TrackUploadState);
-
-            var vectorUploadDelay = IOconfFile.GetVectorUploadDelay();
-            var throttle = new TimeThrottle(vectorUploadDelay);
-            var writer = _executedActionChannel.Writer;
-            while (_running)
+            try
             {
-                throttle.Wait();
-                writer.TryWrite(UploadState.StartingUploadCycle);
-                SendQueuedData(false, writer);
+                var stateTracker = WithExceptionLogging(TrackUploadState(token), "upload state tracker");
+                var vectorsSender = WithExceptionLogging(VectorsSender(token), "upload vector sender");
+                var eventsSender = WithExceptionLogging(EventsSender(token), "upload events sender");
+
+                await Task.WhenAll(stateTracker, vectorsSender, eventsSender);
+            }
+            catch (Exception ex)
+            {//we don't normally expect to reach here, as the individual tasks above are expected to capture and logs any exceptions
+                CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message, ex);
+            }
+            finally
+            {
+                _executedActionChannel.Writer.Complete();
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued messages");
-            SendQueuedData(true, writer);
+            async Task VectorsSender(CancellationToken token)
+            {
+                var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(IOconfFile.GetVectorUploadDelay()));
+                var stateWriter = _executedActionChannel.Writer;
+                var badVectors = new List<DateTime>();
 
-            async void SendQueuedData(bool stopping, ChannelWriter<UploadState> writer)
+                try
+                {
+                    while (await throttle.WaitForNextTickAsync(token))
+                    {
+                        stateWriter.TryWrite(UploadState.UploadVectorsCycle);
+                        if (!await PostQueuedVectorAsync(stateWriter))
+                            badVectors.Add(DateTime.UtcNow);
+                    }
+                }
+                catch (OperationCanceledException) { }
+
+                CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued vectors");
+                if (!await PostQueuedVectorAsync(stateWriter))
+                    badVectors.Add(DateTime.UtcNow);
+                PrintBadPackagesMessage(badVectors, "Vector", true);
+            }
+
+            async Task EventsSender(CancellationToken token)
+            {
+                //note this uses this uses the vector upload delay for the frequency for no special reason, it was just an easy value to use for this
+                var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(IOconfFile.GetVectorUploadDelay()));
+                var stateWriter = _executedActionChannel.Writer;
+                var badEvents = new List<DateTime>();
+
+                try
+                {
+                    while (await throttle.WaitForNextTickAsync(token))
+                    {
+                        stateWriter.TryWrite(UploadState.UploadEventsCycle);
+                        await PostQueuedEventsAsync(stateWriter, badEvents);
+                    }
+                }
+                catch (OperationCanceledException) { }
+
+                await PostEventAsync(new EventFiredArgs("uploader is stopping", EventType.Log, DateTime.UtcNow));
+                CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued events");
+
+                await Task.Delay(200, CancellationToken.None); //we give an extra 200ms to let any remaining shutdown events come in
+                await PostQueuedEventsAsync(stateWriter, badEvents);
+                PrintBadPackagesMessage(badEvents, "Events", true);
+            }
+
+            async Task TrackUploadState(CancellationToken token)
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                _ = Task.Run(() => SignalCheckStateEvery200ms(_executedActionChannel.Writer, cts), token);
+                try
+                {
+                    await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
+                    var vectorsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadVectorsCycle);
+                    var eventsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadEventsCycle);
+                    var receivedVectorCheckArgs = (Stopwatch.StartNew(), 1000, UploadState.LocalClusterRunning);
+                    await foreach (var state in _executedActionChannel.Reader.ReadAllAsync(token))
+                    {
+                        switch (state)
+                        {//we only process together the group them by state
+                            case UploadState.UploadVectorsCycle or UploadState.PostingVector or UploadState.PostedVector:
+                                DetectSlowActionOnNewAction(ref vectorsCycleCheckArgs, state);
+                                break;
+                            case UploadState.LocalClusterRunning:
+                                DetectSlowActionOnNewAction(ref receivedVectorCheckArgs, state);
+                                break;
+                            case UploadState.UploadEventsCycle or UploadState.PostingEvent or UploadState.PostedEvent:
+                                DetectSlowActionOnNewAction(ref eventsCycleCheckArgs, state);
+                                break;
+                            default:
+                                DetectSlowAction(ref vectorsCycleCheckArgs);
+                                DetectSlowAction(ref receivedVectorCheckArgs);
+                                DetectSlowAction(ref eventsCycleCheckArgs);
+                                break;
+                        }
+                    }
+                }
+                finally
+                {
+                    cts.Cancel();
+                }
+
+                static void DetectSlowActionOnNewAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState) stateCheckArgs, UploadState newState)
+                {
+                    if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
+                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed} - new state {newState}", null);
+
+                    stateCheckArgs.nextTargetToReportSlowAction = 2500;
+                    stateCheckArgs.timeSinceLastAction.Restart();
+                    stateCheckArgs.lastState = newState;
+                }
+
+                static void DetectSlowAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState) stateCheckArgs)
+                {
+                    if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
+                    {
+                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed}", null);
+                        stateCheckArgs.nextTargetToReportSlowAction *= 2;
+                    }
+                }
+
+                static async Task SignalCheckStateEvery200ms(ChannelWriter<UploadState> writer, CancellationTokenSource cts)
+                {
+                    var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
+                    while (await timer.WaitForNextTickAsync(cts.Token))
+                        writer.TryWrite(UploadState.CheckState);
+                }
+            }
+
+            async Task WithExceptionLogging(Task task, string subsystem)
             {
                 try
                 {
-                    var list = DequeueAllEntries(_queue);
-                    if (list != null)
-                    {
-                        var task = PostVectorAsync(GetSignedVectors(list), list.First().timestamp, writer);
-                        if (stopping) await task;
-                    }
-
-                    var events = DequeueAllEntries(_eventsQueue);
-                    if (events != null)
-                    {
-                        foreach (var @event in events)
-                        {
-                            var task = PostEventAsync(@event);
-                            if (stopping) await task;
-                        }
-                    }
-
-                    if (stopping)
-                    {
-                        await PostEventAsync(new EventFiredArgs("uploader has stopped", EventType.Log, DateTime.UtcNow));
-                        writer.Complete();
-                    }
-
-                    PrintBadPackagesMessage(stopping);
+                    await task;
                 }
+                catch (OperationCanceledException) { }
                 catch (Exception ex)
-                {//we don't normally expect to reach here, as the post method above capture and log any exceptions
-                    CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message, ex);
+                { //normally the upload subsystems should handle errors so they can continue operating, so seeing this error means we missed handling some case
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"{subsystem} - unexpected error detected", ex);
                 }
             }
         }
 
-        private async Task TrackUploadState()
+        static List<T>? DequeueAllEntries<T>(Queue<T> queue)
         {
-            var token = _cmd.StopToken;
-            try
-            {
-                await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
-                var startingUploadCheckArgs = (Stopwatch.StartNew(), 2500);
-                var postingVectorCheckArgs = (Stopwatch.StartNew(), 2500);
-                var postedVectorCheckArgs = (Stopwatch.StartNew(), 2500);
-                await foreach (var state in _executedActionChannel.Reader.ReadAllAsync(token))
-                {
-                    DetectSlowActionOnNewAction(ref startingUploadCheckArgs, UploadState.StartingUploadCycle, state);
-                    DetectSlowActionOnNewAction(ref postingVectorCheckArgs, UploadState.PostingVector, state);
-                    DetectSlowActionOnNewAction(ref postedVectorCheckArgs, UploadState.PostedVector, state);
-                }
-            }
-            catch (OperationCanceledException ex) when (ex.CancellationToken == token) { }
-            catch (Exception ex)
-            {
-                OnError("Unexpected error tracking upload state", ex);
-            }
-
-            static void DetectSlowActionOnNewAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction) stateCheckArgs, UploadState expectedState, UploadState state)
-            {
-                if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
-                {
-                    OnError($"detected slow {expectedState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed}", null);
-                    stateCheckArgs.nextTargetToReportSlowAction *= 2;
-                }
-
-                if (state != expectedState) return;
-
-                stateCheckArgs.timeSinceLastAction.Restart();
-                stateCheckArgs.nextTargetToReportSlowAction = 2500;
-            }
-        }
-
-        List<T> DequeueAllEntries<T>(Queue<T> queue)
-        {
-            List<T> list = null; // delayed initialization to avoid creating lists when there is no data.
+            List<T>? list = null; // delayed initialization to avoid creating lists when there is no data.
             lock (queue)
                 while (queue.Any())  // dequeue all. 
                 {
-                    list = list ?? new List<T>(); // ensure initialized
+                    list ??= new List<T>(); // ensure initialized
                     list.Add(queue.Dequeue());
                 }
 
@@ -194,15 +293,13 @@ namespace CA_DataUploaderLib
         /// <returns>a signature of the original data followed by the data compressed with gzip.</returns>
         private byte[] SignAndCompress(byte[] buffer)
         {
-            using (var memory = new MemoryStream())
+            using var memory = new MemoryStream();
+            using (var gzip = new GZipStream(memory, CompressionMode.Compress))
             {
-                using (var gzip = new GZipStream(memory, CompressionMode.Compress))
-                {
-                    gzip.Write(buffer, 0, buffer.Length);
-                }
-
-                return _signing.GetSignature(buffer).Concat(memory.ToArray()).ToArray();
+                gzip.Write(buffer, 0, buffer.Length);
             }
+
+            return _signing.GetSignature(buffer).Concat(memory.ToArray()).ToArray();
         }
 
         private byte[] GetSignedVectorDescription(VectorDescription vectorDescription)
@@ -216,7 +313,7 @@ namespace CA_DataUploaderLib
 
         private byte[] GetSignedVectors(List<DataVector> vectors)
         {
-            byte[] listLen = BitConverter.GetBytes((ushort)vectors.Count());
+            byte[] listLen = BitConverter.GetBytes((ushort)vectors.Count);
             var theData = vectors.SelectMany(a => a.buffer).ToArray();
             return SignAndCompress(listLen.Concat(theData).ToArray());
         }
@@ -227,34 +324,57 @@ namespace CA_DataUploaderLib
             return _signing.GetSignature(bytes).Concat(bytes).ToArray();
         }
 
-        private static void OnError(string message, Exception ex)
+        private static void OnError(string message, Exception? ex)
         {
             if (ex != null)
                 CALog.LogError(LogID.A, message, ex); //note we don't use LogErrorAndConsoleLn variation, as CALog.LoggerForUserOutput may be set to generate events that are only visible on the event log.
             else
-                CALog.LogData(LogID.A, $"{DateTime.Now:MM.dd HH:mm:ss} - {message}");
+                CALog.LogData(LogID.A, message);
             Console.WriteLine(message);
         }
 
-        private async Task PostVectorAsync(byte[] buffer, DateTime timestamp, ChannelWriter<UploadState> writer)
+        private ValueTask<bool> PostQueuedVectorAsync(ChannelWriter<UploadState> stateWriter)
         {
-            try
+            var list = DequeueAllEntries(_queue);
+            if (list == null) return ValueTask.FromResult(true); //no vectors, return success
+
+            stateWriter.TryWrite(UploadState.PostingVector);
+            var buffer = GetSignedVectors(list);
+            var timestamp = list.First().timestamp;
+            return new ValueTask<bool>(Post());
+
+            async Task<bool> Post()
             {
-                writer.TryWrite(UploadState.PostingVector);
-                await _plot.PostVectorAsync(buffer, timestamp);
-                writer.TryWrite(UploadState.PostedVector);
-            }
-            catch (Exception ex)
-            {
-                lock (_badPackages)
+                try
                 {
-                    _badPackages.Add(DateTime.UtcNow);
+                    await _plot.PostVectorAsync(buffer, timestamp);
+                    stateWriter.TryWrite(UploadState.PostedVector);
+                    return true;
                 }
-                OnError("failed posting vector", ex);
+                catch (Exception ex)
+                {
+                    OnError("failed posting vector", ex);
+                    return false;
+                }
             }
         }
 
-        private async Task PostEventAsync(EventFiredArgs args)
+        private async ValueTask PostQueuedEventsAsync(ChannelWriter<UploadState> stateWriter, List<DateTime> badEvents)
+        {
+            RemoveExpireduplicateEvents();
+            var events = DequeueAllEntries(_eventsQueue);
+            if (events == null) return;
+
+            foreach (var @event in events)
+            {
+                stateWriter.TryWrite(UploadState.PostingEvent);
+                if (!await PostEventAsync(@event))
+                    badEvents.Add(DateTime.UtcNow);
+                stateWriter.TryWrite(UploadState.PostedEvent);
+            }
+        }
+
+        private async Task<bool> PostEventAsync(EventFiredArgs args)
         {
             try
             {
@@ -262,15 +382,12 @@ namespace CA_DataUploaderLib
                     await PostSystemChangeNotificationAsync(args);//this special event turns into reported boards serial info + still an event with a shorter description
                 else
                     await Post(args);
+                return true;
             }
             catch (Exception ex)
             {
-                lock (_badPackages)
-                {
-                    _badPackages.Add(DateTime.UtcNow);
-                }
-
                 OnError($"failed posting event: {args.EventType} - {args.Data} - {args.TimeSpan}", ex);
+                return false;
             }
 
             Task Post(EventFiredArgs args) => _plot.PostEventAsync(GetSignedEvent(args));
@@ -279,6 +396,8 @@ namespace CA_DataUploaderLib
             Task PostSystemChangeNotificationAsync(EventFiredArgs args)
             {
                 var data = SystemChangeNotificationData.ParseJson(args.Data);
+                if (data == null)
+                    throw new FormatException($"failed to parse SystemChangeNotificationData: {args.Data}");
                 return Task.WhenAll(
                     PostBoardsSerialInfo(data, args.TimeSpan),
                     Post(new EventFiredArgs(ToShortEventData(data), args.EventType, args.TimeSpan)));
@@ -301,40 +420,32 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private void PrintBadPackagesMessage(bool force)
+        private static void PrintBadPackagesMessage(List<DateTime> badPackages, string type, bool force)
         {
-            if (!_badPackages.Any())
+            if (!badPackages.Any())
                 return;
 
-            lock (_badPackages)
+            if (force || badPackages.First().AddHours(1) < DateTime.UtcNow)
             {
-                if (force || _badPackages.First().AddHours(1) < DateTime.UtcNow)
-                {
-                    var msg = GetBadPackagesErrorMessage(_badPackages);
-                    CALog.LogInfoAndConsoleLn(LogID.A, msg);
-                    _badPackages.Clear();
-                }
+                var msg = GetBadPackagesErrorMessage(type, badPackages);
+                CALog.LogInfoAndConsoleLn(LogID.A, msg);
+                badPackages.Clear();
             }
 
-            static string GetBadPackagesErrorMessage(List<DateTime> times)
+            static string GetBadPackagesErrorMessage(string type, List< DateTime> times)
             {
                 var sb = new StringBuilder();
-                sb.AppendLine("Vector upload errors within the last hour:");
+                sb.Append(type);
+                sb.AppendLine(" upload errors within the last hour:");
                 foreach (var minutes in times.GroupBy(x => x.ToString("MMM dd HH:mm")))
                     sb.AppendLine($"{minutes.Key} = {minutes.Count()}");
                 return sb.ToString();
             }
         }
 
-        private bool Stop(List<string> args)
-        {
-            _running = false;
-            return true;
-        }
-
         public void Dispose()
         { // class is sealed so don't need full blown IDisposable pattern.
-            _running = false;
+            _stopTokenSource.Cancel();
         }
 
         private class PlotConnection
@@ -385,14 +496,14 @@ namespace CA_DataUploaderLib
             private static async Task<(int plotId, string plotName)> GetPlotIDAsync(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription)
             {
                 //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-                HttpResponseMessage response = null;
+                HttpResponseMessage? response = null;
                 try
                 {
                     string query = $"/api/v1/Plotdata/GetPlotnameId?loopname={loopName}&ticks={DateTime.UtcNow.Ticks}&logintoken={loginToken}";
                     var signedValue = publicKey.Concat(signedVectorDescription).ToArray(); // Note that it will only work if converted to array and not IEnummerable
                     response = await client.PutAsJsonAsync(query, signedValue);
                     response.EnsureSuccessStatusCode();
-                    var result = await response.Content.ReadFromJsonAsync<string>();
+                    var result = await response.Content.ReadFromJsonAsync<string>() ?? throw new InvalidOperationException("unexpected null result when getting plotid");
                     return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
                 }
                 catch (Exception ex)
@@ -412,7 +523,6 @@ namespace CA_DataUploaderLib
 
             private static async Task<string> GetLoginTokenWithRetries(HttpClient client, ConnectionInfo info)
             {
-                var accountInfo = new Dictionary<string, string> { { "email", info.email }, { "password", info.password }, { "fullname", info.Fullname } };
                 int failureCount = 0;
                 while (true)
                 {
@@ -436,7 +546,7 @@ namespace CA_DataUploaderLib
 
             private static async Task<string> GetLoginToken(HttpClient client, ConnectionInfo accountInfo)
             {
-                string token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}");
+                string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}");
                 if (string.IsNullOrEmpty(token))
                     token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.email}&password={accountInfo.password}&fullName={accountInfo.Fullname}"); // attempt to create account assuming it did not exist
                 if (!string.IsNullOrEmpty(token))
@@ -445,15 +555,11 @@ namespace CA_DataUploaderLib
                 throw new Exception("Unable to login or create token");
             }
 
-            private static async Task<string> Post(HttpClient client, string requestUri)
+            private static async Task<string?> Post(HttpClient client, string requestUri)
             {
-                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                 var response = await client.PostAsync(requestUri, null);
                 if (response.StatusCode == System.Net.HttpStatusCode.OK && response.Content != null)
-                {
-                    return (await response.Content.ReadAsStringAsync())?.Replace("\"","");
-
-                }
+                    return (await response.Content.ReadAsStringAsync()).Replace("\"","");
                 else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                     return null;
 
@@ -472,7 +578,7 @@ namespace CA_DataUploaderLib
 
         private class Signing
         {
-            private RSACryptoServiceProvider _rsaWriter = new RSACryptoServiceProvider(1024);
+            private readonly RSACryptoServiceProvider _rsaWriter = new(1024);
 
             public Signing(string loopName)
             {
@@ -490,9 +596,14 @@ namespace CA_DataUploaderLib
 
         private enum UploadState
         {
-            StartingUploadCycle,
+            UploadVectorsCycle,
+            PostedVector,
+            LocalClusterRunning,
+            PostedEvent,
+            UploadEventsCycle,
             PostingVector,
-            PostedVector
+            CheckState,
+            PostingEvent
         }
     }
 }

@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib
             var inputs = ports.SelectMany(p => p.GetExpandedInputConf()).Concat(boardsTemperatures).Concat(sensorPortsInputs);
             _boardsLoops = new BaseSensorBox(cmd, "switchboards", string.Empty, "show switchboards inputs", inputs);
             //we ignore remote boards and boards missing during the start sequence (as we don't have auto reconnect logic yet for those). Note the BaseSensorBox already reports the missing local boards.
-            foreach (var board in ports.Where(p => p.Map.IsLocalBoard && p.Map.Board != null).GroupBy(v => v.Map.Board))
+            foreach (var board in ports.Where(p => p.Map.IsLocalBoard && p.Map.McuBoard != null).GroupBy(v => v.Map.McuBoard))
                 RegisterBoardWriteActions(_boardsLoops, board.Key, board.ToList());
         }
 

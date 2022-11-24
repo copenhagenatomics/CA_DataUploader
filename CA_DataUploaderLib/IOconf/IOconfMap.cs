@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
@@ -30,7 +31,7 @@ namespace CA_DataUploaderLib.IOconf
             if (list.Count <= 3)
                 return;
 
-            string distributedNodeName = list.Count == 5 ? list[3] : default;
+            var distributedNodeName = list.Count == 5 ? list[3] : default;
             var baudrate = 0;
             if (list.Count >= 5 && !int.TryParse(list[4], out baudrate))
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Failed to parse the baud rate for the board: {BoxName}. Attempting with defaults.");
@@ -45,15 +46,18 @@ namespace CA_DataUploaderLib.IOconf
                 : !IOconfFile.GetEntries<IOconfNode>().Any() ? DistributedNode : throw new Exception($"The node name is not optional for distributed deployments: {row}. Format: {Format}");
         }
 
-        public event EventHandler<EventArgs> OnBoardDetected;
-        public bool SetMCUboard(MCUBoard board)
+        public event EventHandler<EventArgs>? OnBoardDetected;
+        public bool Setboard(Board board)
         {
             if (!IsLocalBoard)
                 return false; //when using a distributed deployment, the map entries are only valid in the specified node.
 
-            if ((board.serialNumber == SerialNumber && SerialNumber != null) || board.PortName == USBPort)
+            if ((board.SerialNumber == SerialNumber && SerialNumber != null) || board.PortName == USBPort)
             {
                 Board = board;
+                if (board is MCUBoard mcuBoard)
+                    McuBoard = mcuBoard;
+
                 OnBoardDetected?.Invoke(this, EventArgs.Empty);
                 return true;
             }
@@ -61,8 +65,8 @@ namespace CA_DataUploaderLib.IOconf
             return false;
         }
 
-        public string USBPort { get; }
-        private string SerialNumber { get; }
+        public string? USBPort { get; }
+        private string? SerialNumber { get; }
         public string BoxName { get; }
         public BoardSettings BoardSettings
         {
@@ -80,7 +84,8 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfNode DistributedNode { get; } = IOconfNode.SingleNode;
         public bool IsLocalBoard => DistributedNode.IsCurrentSystem;
         public bool CustomWritesEnabled { get; } = false;
-        public MCUBoard Board;
+        public Board? Board { get; private set; }
+        public MCUBoard? McuBoard { get; private set; }
         private BoardSettings _boardSettings = BoardSettings.Default;
 
         public override string ToString() => $"{BoxName} - {USBPort ?? SerialNumber}";
