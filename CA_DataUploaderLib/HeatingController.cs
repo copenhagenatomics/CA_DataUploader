@@ -18,10 +18,10 @@ namespace CA_DataUploaderLib
                 return;
 
             var ovens = IOconfFile.GetOven().ToList();
-            var allAreasWithArgIndex = IOconfFile.GetOven().Select(x => x.OvenArea).Distinct().OrderBy(x => x).Select((a,i) => (a, i)).ToDictionary(v => v.a, v => v.i);
+            var allAreas = IOconfFile.GetOven().Select(x => x.OvenArea).Distinct();
 
             //notice that the decisions states and outputs are handled by the registered decisions, while the switchboard inputs and actuations are handled by the switchboard controller
-            cmd.AddDecisions(allAreasWithArgIndex.Select(a => new OvenAreaDecision(new($"ovenarea{a.Key}", a.Value, allAreasWithArgIndex.Count))).ToList());
+            cmd.AddDecisions(allAreas.Select(a => new OvenAreaDecision(new($"ovenarea{a}", a))).ToList());
             cmd.AddDecisions(heatersConfigs.Select(h => new HeaterDecision(h, ovens.SingleOrDefault(x => x.HeatingElement.Name == h.Name))).ToList());
             SwitchBoardController.Initialize(cmd);
         }
@@ -52,7 +52,7 @@ namespace CA_DataUploaderLib
 
                 foreach (var @event in events)
                 {
-                    if (_eventsMap.TryGetValue(@event.StartsWith("oven", StringComparison.OrdinalIgnoreCase) ? "oven" : @event, out var e))
+                    if (_eventsMap.TryGetValue(@event.StartsWith("oven", StringComparison.OrdinalIgnoreCase) ? "oven" : @event, out var e)) //note the oven prefix also reacts to ovenarea commands
                         model.MakeDecision(e);
                 }
 
@@ -272,8 +272,8 @@ namespace CA_DataUploaderLib
         public class OvenAreaDecision : LoopControlDecision
         {
             public enum States { initial, Off, Running }
-            public enum Events { none, vector, oven, emergencyshutdown };
-            private readonly (string prefix, Func<string, (Events e, double data)> func)[] _eventsMap;
+            public enum Events { none, vector, oven, ovenarea, emergencyshutdown };
+            private readonly (string prefix, Events e, bool targetRequired)[] _eventsMap;
             private readonly Config _config;
 
             private Indexes? _indexes;
@@ -283,9 +283,12 @@ namespace CA_DataUploaderLib
             public OvenAreaDecision(Config config)
             {
                 _config = config;
-                _eventsMap = new (string prefix, Func<string, (Events e, double data)> func)[] {
-                (prefix: "oven", e => (Events.oven, config.ParseTemperatureForArea(e.AsSpan()[4..]))),
-                (prefix: "emergencyshutdown", e => (Events.emergencyshutdown, 0d))};
+                _eventsMap = new (string prefix, Events e, bool targetRequired)[] {
+                    (prefix: "oven", Events.oven, true),
+                    (prefix: $"ovenarea {config.Area}", Events.ovenarea, true),
+                    (prefix: $"ovenarea all", Events.ovenarea, true),
+                    (prefix: "emergencyshutdown", Events.emergencyshutdown, false)};
+
             }
 
             public override void Initialize(CA.LoopControlPluginBase.VectorDescription desc) => _indexes = new(desc, _config);
@@ -295,10 +298,13 @@ namespace CA_DataUploaderLib
                 var model = new Model(vector, _indexes);
 
                 foreach (var e in events)
-                foreach (var (prefix, func) in _eventsMap)
+                foreach (var (prefix, typedEvent, targetRequired) in _eventsMap)
                 {
-                    if (!e.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
-                    var (typedEvent, data) = func(e);
+                    if (!e.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) 
+                        continue;
+                    var valueSpan = e.AsSpan()[prefix.Length..].Trim();
+                    if (!valueSpan.TryToDouble(out var data) && targetRequired)
+                        continue; //CommandHandler.AddDecisions already causes the command to be reported as rejected on failures to parse, so here we just skip the command.
                     model.MakeDecision(typedEvent, data);
                 }
 
@@ -307,45 +313,14 @@ namespace CA_DataUploaderLib
 
             public class Config
             {
-                public Config(string name, int areaIndex, int areasCount)
+                public Config(string name, int area)
                 {
                     Name = name;
-                    AreaIndex = areaIndex;
-                    AreasCount = areasCount;
+                    Area = area;
                 }
 
-                public int AreaIndex { get; init; }
-                public int AreasCount { get; init; }
+                public int Area { get; init; }
                 public string Name { get; }
-
-                internal double ParseTemperatureForArea(ReadOnlySpan<char> temps)
-                {
-                    var lastWasSpace = true;
-                    int totalWords = 0, matchIndex = -1;
-                    for (int i = 0; i < temps.Length; i++)
-                    {
-                        if (temps[i] == ' ')
-                            lastWasSpace = true;
-                        else if (lastWasSpace)
-                        {
-                            lastWasSpace = false;
-                            totalWords++;
-                            if (totalWords - 1 == AreaIndex)
-                                matchIndex = i;
-                        }
-                    }
-
-                    if (totalWords == 0) return 0;
-                    if (totalWords == 1) return int.TryParse(temps.Trim(), out var globaltarget) ? globaltarget : 0;
-                    if (totalWords != AreasCount) return 0;
-                    if (matchIndex == -1) return 0;
-                    var match = temps[matchIndex..];
-                    var matchEndIndex = match.IndexOf(' ');
-                    if (matchEndIndex != -1)
-                        match = match[..matchEndIndex];
-
-                    return int.TryParse(match, out var areaTemperature) ? areaTemperature : 0;
-                }
             }
 
 #pragma warning disable IDE1006 // Naming Styles - decisions are coded using a similar approach to decisions plugins, which avoid casing rules in properties to more have naming more similar to the original fields
@@ -388,7 +363,7 @@ namespace CA_DataUploaderLib
                     {
                         switch ((State, e))
                         {
-                            case (States.Off or States.Running, Events.oven):
+                            case (States.Off or States.Running, Events.oven or Events.ovenarea):
                                 target = data;
                                 break;
                             default: //any state without event actions goes here

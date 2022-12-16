@@ -66,15 +66,12 @@ namespace CA_DataUploaderLib
                 var channel = Channel.CreateUnbounded<string>();
                 var channelWriter = channel.Writer;
                 boardCustomCommandsReceived.Add(map.McuBoard, channel.Reader);
-                cmd?.AddCommand("custom", CustomCommand);
+                cmd?.AddCommand("custom", CustomCommand); //note that the custom is a special command that the host needs to run only in the node that has the board.
 
                 bool CustomCommand(List<string> args)
                 {
                     if (args.Count < 3) return false;
-                    if (args[1] != map.BoxName)
-                        //note we only reject the command if the board name is invalid,
-                        //which not only avoids bad command being reported but prevents further command execution from being aborted in the default command runner
-                        return localBoards.Contains(args[1]); 
+                    if (args[1] != map.BoxName) return false; 
                     channelWriter.TryWrite(string.Join(' ', args.Skip(2)));
                     return true;
                 }

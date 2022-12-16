@@ -37,15 +37,18 @@ namespace UnitTests
         }
         private void NewHeaterDecisionConfig(HeatingController.HeaterDecision.Config config)
         {
-            decisions[1] = new HeatingController.HeaterDecision(config);
-            decisions[1].Initialize(desc);
+            var index = decisions.FindIndex(d => d.Name == config.Name);
+            if (index == -1) throw new ArgumentException("failed to find decision to replace");
+            decisions[index] = new HeatingController.HeaterDecision(config);
+            decisions[index].Initialize(desc);
         }
 
         [TestInitialize]
         public void Setup()
         {
             decisions = new List<LoopControlDecision>() {
-                new HeatingController.OvenAreaDecision(new($"ovenarea0", 0, areasCount: 2)),
+                new HeatingController.OvenAreaDecision(new($"ovenarea0", 0)),
+                new HeatingController.OvenAreaDecision(new($"ovenarea1", 1)),
                 new HeatingController.HeaterDecision(NewConfig.Build())};
             var samples = NewVectorSamples
                 .Select(kvp => (field: kvp.Key, value: kvp.Value))
@@ -65,6 +68,34 @@ namespace UnitTests
             MakeDecisions("oven 54");
             Assert.AreEqual(1.0, Field("heater_onoff"));
             Assert.AreEqual(vector.Timestamp.AddSeconds(2), Field("heater_controlperiodtimeoff").ToVectorDate());
+        }
+
+        [TestMethod]
+        public void WhenHeaterIsOffCanTurnOnWithOvenAreaAll()
+        {
+            MakeDecisions("ovenarea all 54");
+            Assert.AreEqual(1.0, Field("heater_onoff"));
+        }
+
+        [TestMethod]
+        public void WhenHeaterIsOffCanTurnOnWithOvenArea()
+        {
+            MakeDecisions("ovenarea 0 54");
+            Assert.AreEqual(1.0, Field("heater_onoff"));
+        }
+
+        [TestMethod]
+        public void WhenHeaterIsOffIgnoresUnrelatedArea()
+        {
+            MakeDecisions("ovenarea 1 54");
+            Assert.AreEqual(0.0, Field("heater_onoff"));
+        }
+
+        [TestMethod]
+        public void WhenHeaterIsOffIgnoresOvenWithMultipleAreas() //this is ignored, as it will be rejected by CommandHandler.AddDecisions
+        {
+            MakeDecisions("oven 54 42");
+            Assert.AreEqual(0.0, Field("heater_onoff"));
         }
 
         [TestMethod]
