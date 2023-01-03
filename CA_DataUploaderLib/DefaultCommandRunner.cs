@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib
 
         public bool Run(string cmdString, bool isUserCommand)
         {
-            var cmd = cmdString.Trim().Split(' ').Select(x => x.Trim()).ToList();
+            var cmd = cmdString.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
 
             if (!cmd.Any())
                 return false;
@@ -44,37 +44,32 @@ namespace CA_DataUploaderLib
             var res = RunCommandFunctions(cmdString, cmd, commandFunctions);
             if (commandName == "help")
                 CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");  // end help menu divider
-            else if (res == false)
+            else if (!res)
                 CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command");
-            else if (res == true)
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
             else
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command / accepted by some subsystems");
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
 
-            return res ?? true; //note we also return true when res is null, which means some executions succeeded and one failed
+            return res;
         }
 
-        /// <returns><c>true</c> if all functions executed the command, <c>false</c> if all functions rejected the command, <c>null</c> for a mix of executed/rejected</returns>
-        /// <remarks>
-        /// If a command is rejected, we do not run the rest of the commands. This runs on the order the commands were registered.
-        /// </remarks>
-        private static bool? RunCommandFunctions(string cmdString, List<string> cmd, List<Func<List<string>, bool>> commandFunctions)
+        /// <returns><c>true</c> if at least one function accepted the command, otherwise <c>false</c></returns>
+        /// <remarks>If a command returns false or throws an ArgumentException we still run the other commands.</remarks>
+        private static bool RunCommandFunctions(string cmdString, List<string> cmd, List<Func<List<string>, bool>> commandFunctions)
         {
+            bool accepted = false;
             for (int i = 0; i < commandFunctions.Count; i++)
             {
                 try
                 {
-                    if (!commandFunctions[i](cmd))
-                        return i == 0 ? false : null;
+                    accepted |= commandFunctions[i](cmd);
                 }
                 catch (ArgumentException ex)
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"Command: {cmdString} - invalid arguments", ex);
-                    return i == 0 ? false : null;
                 }
             }
 
-            return true;
+            return accepted;
         }
     }
 }

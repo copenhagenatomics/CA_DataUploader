@@ -19,7 +19,6 @@ namespace CA_DataUploaderLib
         /// <summary>runs when the subsystem is about to stop running, but before all boards are closed</summary>
         /// <remarks>some boards might be closed, specially if the system is stopping due to losing connection to one of the boards</remarks>
         public event EventHandler Stopping;
-        private readonly CommandHandler _cmd;
         protected readonly List<SensorSample> _values;
         protected readonly List<SensorSample> _localValues;
         private readonly (IOconfMap map, SensorSample[] values)[] _boards;
@@ -35,7 +34,6 @@ namespace CA_DataUploaderLib
             CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values)
         { 
             Title = commandName;
-            _cmd = cmd;
             _cmdAdvanced = new PluginsCommandHandler(cmd);
             _values = values.Select(x => new SensorSample(x)).ToList();
             _localValues = _values.Where(x => x.Input.Map.IsLocalBoard).ToList();
@@ -53,12 +51,10 @@ namespace CA_DataUploaderLib
             var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray())).ToArray();
             _boards = allBoards.Where(b => b.map.IsLocalBoard).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
-            var localBoardNames = _boards.Select(b => b.map.Name).ToHashSet();
             foreach (var board in _boards.Where(b => b.map.CustomWritesEnabled))
-                RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived, localBoardNames);
+                RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived);
 
-            static void RegisterCustomBoardCommand(
-                IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived, HashSet<string> localBoards)
+            static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived)
             {
                 if (map.McuBoard == null)
                 {
@@ -69,15 +65,12 @@ namespace CA_DataUploaderLib
                 var channel = Channel.CreateUnbounded<string>();
                 var channelWriter = channel.Writer;
                 boardCustomCommandsReceived.Add(map.McuBoard, channel.Reader);
-                cmd?.AddCommand("custom", CustomCommand);
+                cmd?.AddCommand("custom", CustomCommand); //note that the custom is a special command that the host needs to run only in the node that has the board.
 
                 bool CustomCommand(List<string> args)
                 {
                     if (args.Count < 3) return false;
-                    if (args[1] != map.BoxName)
-                        //note we only reject the command if the board name is invalid,
-                        //which not only avoids bad command being reported but prevents further command execution from being aborted in the default command runner
-                        return localBoards.Contains(args[1]); 
+                    if (args[1] != map.BoxName) return false;
                     channelWriter.TryWrite(string.Join(' ', args.Skip(2)));
                     return true;
                 }
