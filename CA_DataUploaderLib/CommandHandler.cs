@@ -30,10 +30,21 @@ namespace CA_DataUploaderLib
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
         private readonly CancellationTokenSource _exitCts = new();
         private readonly TaskCompletionSource _runningTaskTcs = new();
-        private readonly Channel<DataVector> _receivedVectorsChannel = Channel.CreateUnbounded<DataVector>();
-        private readonly ChannelWriter<DataVector> _receivedVectorsWriter;
+        private readonly List<ChannelWriter<DataVector>> _receivedVectorsWriters = new();
 
-        public ChannelReader<DataVector> ReceivedVectorsReader => _receivedVectorsChannel.Reader;
+        /// <remarks>
+        /// This method is not thread safe, so in general call it from the main thread/async flow before the program cycles are started.
+        /// The only additional cycle that is allowed to call it is the decision cycle *before* the first decision.
+        /// 
+        /// For subsystems, this is usually the constructor of the subsystem or on a handler of <see cref="FullVectorIndexesCreated"/>.
+        /// </remarks>
+        public ChannelReader<DataVector> GetReceivedVectorsReader()
+        {
+            var channel = Channel.CreateUnbounded<DataVector>();
+            _receivedVectorsWriters.Add(channel.Writer);
+            return channel.Reader;
+        }
+
         public event EventHandler<EventFiredArgs>? EventFired;
         public event EventHandler<IReadOnlyDictionary<string, int>>? FullVectorIndexesCreated;
         public bool IsRunning => !_exitCts.IsCancellationRequested;
@@ -42,11 +53,11 @@ namespace CA_DataUploaderLib
 
         public CommandHandler(SerialNumberMapper? mapper = null, ICommandRunner? runner = null)
         {
-            _receivedVectorsWriter = _receivedVectorsChannel.Writer;
             _exitCts.Token.Register(() =>
             {
                 _runningTaskTcs.TrySetCanceled();
-                _receivedVectorsWriter.TryComplete();
+                foreach (var writer in _receivedVectorsWriters)                
+                    writer.TryComplete();
             });
             _commandRunner = runner ?? new DefaultCommandRunner();
             _mapper = mapper;
@@ -220,10 +231,13 @@ namespace CA_DataUploaderLib
 
         public void OnNewVectorReceived(DataVector args)
         {
-            if (!_receivedVectorsWriter.TryWrite(args) && IsRunning)
-                //at the time of writing the channel was unbounded, so it is not supposed to fail to add vectors to the channel
-                //note one case TryWrite may return false is when the channel is flagged as completed when we are stopping, thus the check for IsRunning above
-                throw new InvalidOperationException("unexpected failure to write to the received vectors channel"); 
+            foreach (var writer in _receivedVectorsWriters)
+            {
+                if (!writer.TryWrite(args) && IsRunning)
+                    //at the time of writing the channel was unbounded, so it is not supposed to fail to add vectors to the channel
+                    //note one case TryWrite may return false is when the channel is flagged as completed when we are stopping, thus the check for IsRunning above
+                    throw new InvalidOperationException("unexpected failure to write to the received vectors channel");
+            }
         }
 
         public void FireAlert(string msg, DateTime timespan)
