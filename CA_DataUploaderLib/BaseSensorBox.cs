@@ -91,7 +91,7 @@ namespace CA_DataUploaderLib
             }
 
             if (hasBoardWithBuildInActions)
-                _receivedVectors = _cmd.ReceivedVectorsReader;
+                _receivedVectors = _cmd.GetReceivedVectorsReader();
         }
 
         public Task Run(CancellationToken token) => RunBoardLoops(_boards, token);

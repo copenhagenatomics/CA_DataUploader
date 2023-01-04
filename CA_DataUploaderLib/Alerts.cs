@@ -41,14 +41,15 @@ namespace CA_DataUploaderLib
         {
             _cmd = cmd;
             _alerts = GetAlerts(vectorDescription, cmd).ToArray();
-            _ = Task.Run(CheckAlertsOnReceivedVectors);
+            var reader = _cmd.GetReceivedVectorsReader();
+            _ = Task.Run(() => CheckAlertsOnReceivedVectors(reader));
         }
 
-        private async void CheckAlertsOnReceivedVectors()
+        private async void CheckAlertsOnReceivedVectors(ChannelReader<DataVector> reader)
         {
             try
             {
-                await foreach (var vector in _cmd.ReceivedVectorsReader.ReadAllAsync(_cmd.StopToken))
+                await foreach (var vector in reader.ReadAllAsync(_cmd.StopToken))
                 {
                     if (Disabled) continue;
 
