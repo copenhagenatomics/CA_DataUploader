@@ -15,6 +15,8 @@ namespace UnitTests
         private CA.LoopControlPluginBase.VectorDescription desc = new(Array.Empty<string>());
         private CA_DataUploaderLib.DataVector vector = new(Array.Empty<double>(), default);
         private List<LoopControlDecision> decisions = new();
+        private ILookup<string, (string command, Func<List<string>, bool> commandValidationFunction)>? decisionCommandValidations;
+
         private static HeaterDecisionConfigBuilder NewConfig => new();
         private static Dictionary<string, double> NewVectorSamples => new()
         {
@@ -31,9 +33,17 @@ namespace UnitTests
         private void MakeDecisions(string @event, DateTime? time = null) => MakeDecisions(new List<string>() { @event }, time);
         private void MakeDecisions(List<string>? events = null, DateTime? time = null)
         {
+            events ??= new List<string>();
+            foreach (var e in events)
+            {
+                var splitCommand = e.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                if (!decisionCommandValidations![splitCommand.First()].Any(validation => validation.commandValidationFunction(splitCommand)))
+                    throw new ArgumentException($"rejected command/event: {e}");
+            }
+
             var v = new CA.LoopControlPluginBase.DataVector(time ?? vector.Timestamp, vector.Data);
             foreach (var decision in decisions)
-                decision.MakeDecision(v, events ?? new List<string>());
+                decision.MakeDecision(v, events);
         }
         private void NewHeaterDecisionConfig(HeatingController.HeaterDecision.Config config)
         {
@@ -41,7 +51,11 @@ namespace UnitTests
             if (index == -1) throw new ArgumentException("failed to find decision to replace");
             decisions[index] = new HeatingController.HeaterDecision(config);
             decisions[index].Initialize(desc);
+            decisionCommandValidations = GetCommandValidations(decisions);
         }
+
+        private static ILookup<string, (string command, Func<List<string>, bool> commandValidationFunction)> GetCommandValidations(List<LoopControlDecision> decisions) => 
+            decisions.SelectMany(DecisionExtensions.GetValidationCommands).ToLookup(validationCommand => validationCommand.command, StringComparer.OrdinalIgnoreCase);
 
         [TestInitialize]
         public void Setup()
@@ -50,6 +64,7 @@ namespace UnitTests
                 new HeatingController.OvenAreaDecision(new($"ovenarea0", 0)),
                 new HeatingController.OvenAreaDecision(new($"ovenarea1", 1)),
                 new HeatingController.HeaterDecision(NewConfig.Build())};
+            decisionCommandValidations = GetCommandValidations(decisions);
             var samples = NewVectorSamples
                 .Select(kvp => (field: kvp.Key, value: kvp.Value))
                 .Concat(decisions.SelectMany(d => d.PluginFields.Select(f => (field: f.Name, value: 0d))))
@@ -64,7 +79,7 @@ namespace UnitTests
 
         [TestMethod]
         public void WhenHeaterIsOffCanTurnOn()
-        {  
+        {
             MakeDecisions("oven 54");
             Assert.AreEqual(1.0, Field("heater_onoff"));
             Assert.AreEqual(vector.Timestamp.AddSeconds(2), Field("heater_controlperiodtimeoff").ToVectorDate());
@@ -92,11 +107,7 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void WhenHeaterIsOffIgnoresOvenWithMultipleAreas() //this is ignored, as it will be rejected by CommandHandler.AddDecisions
-        {
-            MakeDecisions("oven 54 42");
-            Assert.AreEqual(0.0, Field("heater_onoff"));
-        }
+        public void OvenWithMultipleAreasIsRejected() => Assert.ThrowsException<ArgumentException>(() => MakeDecisions("oven 54 42"));
 
         [TestMethod]
         public void WhenHeaterIsOverHalfDegreeAboveTempKeepsOff()
@@ -214,7 +225,7 @@ namespace UnitTests
 
         [TestMethod]
         //Important: at the time of writing, even though the oven target can be changed by other plugins, only the oven command currently applies it within the same control period
-        public void StateReflectLatestChangesDoneWithTheOvenCommand() 
+        public void StateReflectLatestChangesDoneWithTheOvenCommand()
         {
             MakeDecisions("oven 200");
             Assert.AreEqual(200, Field("ovenarea0_target"));
@@ -276,7 +287,7 @@ namespace UnitTests
             private bool _ovenDisabled = false;
 
             public HeaterDecisionConfigBuilder WithProportionalGain(double value)
-            { 
+            {
                 _proportionalGain = value;
                 return this;
             }
