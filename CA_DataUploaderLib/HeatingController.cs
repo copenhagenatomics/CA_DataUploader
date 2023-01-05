@@ -279,7 +279,7 @@ namespace CA_DataUploaderLib
             private Indexes? _indexes;
             public override string Name => _config.Name;
             public override PluginField[] PluginFields => new PluginField[] { $"{Name}_state", $"{Name}_target" };
-            public override string[] HandledEvents => new[] { "oven", "emergencyshutdown" };
+            public override string[] HandledEvents => new[] { "oven", "ovenarea", "emergencyshutdown" };
             public OvenAreaDecision(Config config)
             {
                 _config = config;
