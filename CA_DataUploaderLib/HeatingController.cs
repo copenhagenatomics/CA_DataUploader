@@ -279,7 +279,7 @@ namespace CA_DataUploaderLib
             private Indexes? _indexes;
             public override string Name => _config.Name;
             public override PluginField[] PluginFields => new PluginField[] { $"{Name}_state", $"{Name}_target" };
-            public override string[] HandledEvents => new[] { "oven", "ovenarea", "emergencyshutdown" };
+            public override string[] HandledEvents { get; }
             public OvenAreaDecision(Config config)
             {
                 _config = config;
@@ -288,7 +288,7 @@ namespace CA_DataUploaderLib
                     (prefix: $"ovenarea {config.Area}", Events.ovenarea, true),
                     (prefix: $"ovenarea all", Events.ovenarea, true),
                     (prefix: "emergencyshutdown", Events.emergencyshutdown, false)};
-
+                HandledEvents = new[] { "oven", $"ovenarea {config.Area}", "ovenarea all", "emergencyshutdown" };
             }
 
             public override void Initialize(CA.LoopControlPluginBase.VectorDescription desc) => _indexes = new(desc, _config);
