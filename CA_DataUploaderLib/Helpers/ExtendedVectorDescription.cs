@@ -15,6 +15,7 @@ namespace CA_DataUploaderLib.Helpers
         private readonly MathVectorExpansion _mathVectorExpansion;
         private readonly int _outputCount;
         public VectorDescription VectorDescription { get; }
+        public int InputsAndFiltersCount { get; }
         /// <summary>
         /// list of inputs descriptions per node in the same order that <see cref="CommandHandler.GetNodeInputs"/> uses.
         /// </summary>
@@ -31,6 +32,7 @@ namespace CA_DataUploaderLib.Helpers
             _values = GetFilters(allItems);
             allItems.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Output.Name, DataTypeEnum.Input)));
             RemoveHiddenSources(allItems, i => i.Descriptor);
+            InputsAndFiltersCount = allItems.Count;
             _mathVectorExpansion = new MathVectorExpansion();
             allItems.AddRange(_mathVectorExpansion.GetVectorDescriptionEntries());
             allItems.AddRange(outputs);
@@ -64,11 +66,13 @@ namespace CA_DataUploaderLib.Helpers
             }
         }
 
-        /// <remarks>the input vector is expected to contains all input + state initially sent in the vector description passed to the constructor.</remarks>
-        public void Apply(List<SensorSample> inputs, DataVector vector)
+        /// <summary>applies math to the vector, assuming the inputs and filters were already applied using <see cref="ApplyInputsAndFilters(List{SensorSample}, DataVector)"/></summary>
+        public void ApplyMath(DataVector vector) => _mathVectorExpansion.Apply(vector.Data);
+        /// <summary>applies the inputs to the vector, transforming them first with the configured filters</summary>
+        public void ApplyInputsAndFilters(List<SensorSample> inputs, DataVector vector)
         {
-            //removing all this manipulation below that requires some allocations is tricky,
-            //but a part of it might be moving to a decisions like approach where the subsystems precalculate the field indexes + maybe we keep an original and an extended version and use some field indexes mapping to move data around
+            //removing allocations here is tricky, but we should consider keeping the original inputs in the full vector and when hiding sources we set those inputs as not uploadable.
+            //note that it also helps cross checking full vectors, if one also has: the previous vector, the state of filters (they have a queue of values within filter length), events in the cycle.
             foreach (var filter in _values)
             {
                 filter.Input(inputs);
@@ -82,8 +86,6 @@ namespace CA_DataUploaderLib.Helpers
             var data = vector.Data;
             for (int i = 0; i < inputs.Count; i++)
                 data[i] = inputs[i].Value;
-
-            _mathVectorExpansion.Apply(data);
         }
     }
 }

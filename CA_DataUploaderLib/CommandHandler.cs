@@ -100,7 +100,23 @@ namespace CA_DataUploaderLib
         {
             var extendedDesc = _fullsystemFilterAndMath.Value;
             DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, vectorTime);
-            extendedDesc.Apply(inputs, vector);
+            extendedDesc.ApplyInputsAndFilters(inputs, vector);
+            MakeDecisionsAfterInputsAndFilters(vector, events, extendedDesc);
+        }
+
+        public void MakeDecisionUsingInputsAndFiltersFromNewVector(DataVector newVector, DataVector vector, List<string> events)
+        {
+            var extendedDesc = _fullsystemFilterAndMath.Value;
+            DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, newVector.Timestamp);
+            var data = vector.Data;
+            for (int i = 0; i < extendedDesc.InputsAndFiltersCount; i++)
+                data[i] = newVector[i];
+            MakeDecisionsAfterInputsAndFilters(vector, events, extendedDesc);
+        }
+
+        private void MakeDecisionsAfterInputsAndFilters(DataVector vector, List<string> events, ExtendedVectorDescription extendedDesc)
+        {
+            extendedDesc.ApplyMath(vector);
             var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.Timestamp, vector.Data);
             foreach (var decision in _decisions)
                 decision.MakeDecision(decisionsVector, events);
