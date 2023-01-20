@@ -50,12 +50,10 @@ namespace CA_DataUploaderLib
             var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray(), boardStateIndexInFullVector: -1)).ToArray();
             _boards = allBoards.Where(b => b.map.IsLocalBoard).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
-            var localBoardNames = _boards.Select(b => b.map.Name).ToHashSet();
             foreach (var board in _boards.Where(b => b.map.CustomWritesEnabled))
-                RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived, localBoardNames);
+                RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived);
 
-            static void RegisterCustomBoardCommand(
-                IOconfMap map, CommandHandler? cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived, HashSet<string> localBoards)
+            static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler? cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived)
             {
                 if (map.McuBoard == null)
                 {
