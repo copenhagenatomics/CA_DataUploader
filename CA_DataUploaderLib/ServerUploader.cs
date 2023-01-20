@@ -72,13 +72,13 @@ namespace CA_DataUploaderLib
                 if (_eventsQueue.Count >= 10000) return;  // if sending thread can't catch up, then drop packages.
                 var duplicate = _duplicateEventsDetection.TryGetValue(e.Data, out var oldRepeatCount);
                 if (duplicate)
-                    _duplicateEventsDetection[e.Data] = oldRepeatCount + 1;
+                    _duplicateEventsDetection[e.Data] = duplicate ? oldRepeatCount + 1 : 1;
                 if (duplicate && oldRepeatCount >= 2) 
                     return;
 
                 _eventsQueue.Enqueue(e);
-                _duplicateEventsDetection[e.Data] = 1;
-                _duplicateEventsExpirationTimes.Enqueue((DateTime.UtcNow.AddMinutes(1), e.Data));
+                if (!duplicate)
+                    _duplicateEventsExpirationTimes.Enqueue((DateTime.UtcNow.AddMinutes(1), e.Data));
             }
         }
 
