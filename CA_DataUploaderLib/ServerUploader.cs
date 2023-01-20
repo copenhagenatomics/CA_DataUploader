@@ -70,11 +70,11 @@ namespace CA_DataUploaderLib
             lock (_eventsQueue)
             {
                 if (_eventsQueue.Count >= 10000) return;  // if sending thread can't catch up, then drop packages.
-                if (_duplicateEventsDetection.TryGetValue(e.Data, out var repeatCount))
-                {
-                    _duplicateEventsDetection[e.Data] = repeatCount + 1;
+                var duplicate = _duplicateEventsDetection.TryGetValue(e.Data, out var oldRepeatCount);
+                if (duplicate)
+                    _duplicateEventsDetection[e.Data] = oldRepeatCount + 1;
+                if (duplicate && oldRepeatCount >= 2) 
                     return;
-                }
 
                 _eventsQueue.Enqueue(e);
                 _duplicateEventsDetection[e.Data] = 1;
@@ -90,8 +90,8 @@ namespace CA_DataUploaderLib
                 while (_duplicateEventsExpirationTimes.TryPeek(out var e) && now > e.expirationTime)
                 {
                     e = _duplicateEventsExpirationTimes.Dequeue();
-                    if (_duplicateEventsDetection.TryGetValue(e.@event, out var repeatCount) && repeatCount > 1)
-                        _eventsQueue.Enqueue(new EventFiredArgs($"Skipped {repeatCount} duplicate messages detected within 1 minute: {e.@event}", EventType.LogError, DateTime.UtcNow));
+                    if (_duplicateEventsDetection.TryGetValue(e.@event, out var repeatCount) && repeatCount > 2)
+                        _eventsQueue.Enqueue(new EventFiredArgs($"Skipped {repeatCount - 2} duplicate messages detected within the last minute: {e.@event}", EventType.LogError, DateTime.UtcNow));
                     _duplicateEventsDetection.Remove(e.@event);
                 }
             }
