@@ -21,6 +21,7 @@ namespace CA_DataUploaderLib
 {
     public sealed class ServerUploader : IDisposable
     {
+        private const int maxDuplicateMessagesPerMinuteRate = 3;
         private readonly PlotConnection _plot;
         private readonly Signing _signing;
         private readonly Queue<DataVector> _queue = new();
@@ -72,7 +73,7 @@ namespace CA_DataUploaderLib
                 if (_eventsQueue.Count >= 10000) return;  // if sending thread can't catch up, then drop packages.
                 var duplicate = _duplicateEventsDetection.TryGetValue(e.Data, out var oldRepeatCount);
                 _duplicateEventsDetection[e.Data] = duplicate ? oldRepeatCount + 1 : 1;
-                if (duplicate && oldRepeatCount >= 2) 
+                if (duplicate && oldRepeatCount >= maxDuplicateMessagesPerMinuteRate) 
                     return;
 
                 _eventsQueue.Enqueue(e);
@@ -89,8 +90,8 @@ namespace CA_DataUploaderLib
                 while (_duplicateEventsExpirationTimes.TryPeek(out var e) && now > e.expirationTime)
                 {
                     e = _duplicateEventsExpirationTimes.Dequeue();
-                    if (_duplicateEventsDetection.TryGetValue(e.@event, out var repeatCount) && repeatCount > 2)
-                        _eventsQueue.Enqueue(new EventFiredArgs($"Skipped {repeatCount - 2} duplicate messages detected within the last minute: {e.@event}", EventType.LogError, DateTime.UtcNow));
+                    if (_duplicateEventsDetection.TryGetValue(e.@event, out var repeatCount) && repeatCount > maxDuplicateMessagesPerMinuteRate)
+                        _eventsQueue.Enqueue(new EventFiredArgs($"Skipped {repeatCount - maxDuplicateMessagesPerMinuteRate} duplicate messages detected within the last minute: {e.@event}", EventType.LogError, DateTime.UtcNow));
                     _duplicateEventsDetection.Remove(e.@event);
                 }
             }
