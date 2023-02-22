@@ -36,7 +36,8 @@ namespace CA_DataUploaderLib.IOconf
             else if (!Skip && (PortNumber < 1 || PortNumber > 34)) 
                 throw new Exception($"{type}: invalid port number: {row}");
 
-            UpdatePortCalibration(Map.BoardSettings, delta, coldJunctionDelta, PortNumber);
+            if (PortNumber < 11) //only ports 1 to 10 are for thermocouples
+                UpdatePortCalibration(Map.BoardSettings, delta, coldJunctionDelta, PortNumber);
         }
 
         private static void UpdatePortCalibration(BoardSettings settings, string delta, string coldJunctionDelta, int portNumber)
