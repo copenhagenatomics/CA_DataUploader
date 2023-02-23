@@ -19,7 +19,6 @@ namespace CA_DataUploaderLib.IOconf
         public LineParser Parser { get; set; } = LineParser.Default;
         public char ValuesEndOfLineChar { get; set; } = '\n';
         public string? Calibration { get; set; }
-        public bool SkipCalibrationWhenHeaderIsMissing { get; set; } = false;
 
         ///<remarks>index is 0 based</remarks>
         public void SetCalibrationAtIndex(string defaultCalibration, char value, int index)
