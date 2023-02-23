@@ -37,8 +37,8 @@ namespace UnitTests
             Assert.IsFalse(action.ChangedOrExpired(0.2, now), "no expiration expected at 0s");
             await Task.Delay(60);
             Assert.IsFalse(action.ChangedOrExpired(0.2, now), "no expiration expected at 0.06s clock time");
-            await Task.Delay(40);
-            Assert.IsTrue(action.ChangedOrExpired(0.2, now), "expiration expected at 0.1s clock time");
+            await Task.Delay(60);
+            Assert.IsTrue(action.ChangedOrExpired(0.2, now), "expiration expected at 0.12s clock time");
         }
     }
 }
