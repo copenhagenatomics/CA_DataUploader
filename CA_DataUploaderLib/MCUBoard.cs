@@ -147,18 +147,11 @@ namespace CA_DataUploaderLib
 
         public async Task SafeClose(CancellationToken token)
         {
-            await _reconnectionLock.AcquireWriterLock(token);
-            try
-            {
-                if (pipeReader != null)
-                    await pipeReader.CompleteAsync();
-                if (port.IsOpen)
-                    port.Close();                
-            }
-            finally
-            {
-                _reconnectionLock.ReleaseWriterLock();
-            }
+            using var _ = await _reconnectionLock.AcquireWriterLock(token);
+            if (pipeReader != null)
+                await pipeReader.CompleteAsync();
+            if (port.IsOpen)
+                port.Close();                
         }
 
         public string ToDebugString(string seperator) => 
@@ -182,9 +175,9 @@ namespace CA_DataUploaderLib
         {
             var lines = new List<string>();
             var bytesToRead500ms = 0;
-            await _reconnectionLock.AcquireWriterLock(token);
             try
             {
+                using var _ = await _reconnectionLock.AcquireWriterLock(token);
                 if (pipeReader != null)
                     await pipeReader.CompleteAsync();
                 if (port.IsOpen)
@@ -210,10 +203,6 @@ namespace CA_DataUploaderLib
                     $"Failure reopening port {PortName} {ProductType} {SerialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
                     ex);
                 return false;
-            }
-            finally
-            {
-                _reconnectionLock.ReleaseWriterLock();
             }
 
             CALog.LogData(LogID.B, $"Reopened port {PortName} {ProductType} {SerialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§", lines)}'");
@@ -530,28 +519,14 @@ namespace CA_DataUploaderLib
 
         private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<TResult> action, CancellationToken token)
         {
-            await _reconnectionLock.AcquireReaderLock(token);
-            try
-            {
-                return action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.                
-            }
-            finally
-            {
-                _reconnectionLock.ReleaseReaderLock();
-            }
+            using var _ = await _reconnectionLock.AcquireReaderLock(token);
+            return action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.
         }
 
         private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<Task<TResult>> action, CancellationToken token)
         {
-            await _reconnectionLock.AcquireReaderLock(token);
-            try
-            {
-                return await action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.                
-            }
-            finally
-            {
-                _reconnectionLock.ReleaseReaderLock();
-            }
+            using var _ = await _reconnectionLock.AcquireReaderLock(token);
+            return await action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.
         }
 
         private Task RunWaitingForAnyOngoingReconnect(Action action, CancellationToken token) => 
