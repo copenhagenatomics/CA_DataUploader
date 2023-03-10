@@ -33,7 +33,6 @@ namespace CA_DataUploaderLib
         private readonly int _localVectorLength;
         private readonly int _uploadVectorLength;
         private readonly bool[] _fieldUploadMap;
-        private readonly CommandHandler? _cmd;
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(10000);
 
         public ServerUploader(VectorDescription vectorDescription) : this(vectorDescription, null)
@@ -56,7 +55,6 @@ namespace CA_DataUploaderLib
                 _plot = PlotConnection.Establish(loopName, _signing.GetPublicKey(), GetSignedVectorDescription(uploadDescription)).GetAwaiter().GetResult();
                 _stopTokenSource = cmd != null ? CancellationTokenSource.CreateLinkedTokenSource(cmd.StopToken) : new();
                 _ = Task.Run(() => LoopForever(_stopTokenSource.Token));
-                _cmd = cmd;
 
             }
             catch (Exception ex)
@@ -130,7 +128,8 @@ namespace CA_DataUploaderLib
                 return new(new(uploadData), fullVector.timestamp);
             }
         }
-
+        public int GetPlotId() => _plot.PlotId;
+        public Task<HttpResponseMessage> DirectPost(string requestUri, byte[] bytes) => _plot.PostAsync(requestUri, _signing.GetSignature(bytes).Concat(bytes).ToArray());
         public string GetPlotUrl() => "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plot.PlotName;
 
         private async Task LoopForever(CancellationToken token)
@@ -324,7 +323,7 @@ namespace CA_DataUploaderLib
             return _signing.GetSignature(bytes).Concat(bytes).ToArray();
         }
 
-        private static void OnError(string message, Exception? ex)
+        private static void OnError(string message, Exception? ex = null)
         {
             if (ex != null)
                 CALog.LogError(LogID.A, message, ex); //note we don't use LogErrorAndConsoleLn variation, as CALog.LoggerForUserOutput may be set to generate events that are only visible on the event log.
@@ -347,9 +346,10 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    await _plot.PostVectorAsync(buffer, timestamp);
+                    using var response = await _plot.PostVectorAsync(buffer, timestamp);
+                    var success = CheckAndLogFailures(response, "failed posting vector");
                     stateWriter.TryWrite(UploadState.PostedVector);
-                    return true;
+                    return success;
                 }
                 catch (Exception ex)
                 {
@@ -379,10 +379,9 @@ namespace CA_DataUploaderLib
             try
             {
                 if (args.EventType == (byte)EventType.SystemChangeNotification)
-                    await PostSystemChangeNotificationAsync(args);//this special event turns into reported boards serial info + still an event with a shorter description
+                    return await PostSystemChangeNotificationAsync(args);//this special event turns into reported boards serial info + still an event with a shorter description
                 else
-                    await Post(args);
-                return true;
+                    return await Post(args);
             }
             catch (Exception ex)
             {
@@ -390,17 +389,21 @@ namespace CA_DataUploaderLib
                 return false;
             }
 
-            Task Post(EventFiredArgs args) => _plot.PostEventAsync(GetSignedEvent(args));
-            Task PostBoardsSerialInfo(SystemChangeNotificationData data, DateTime timeSpan) =>
-                _plot.PostBoardsSerialInfo(SignAndCompress(data.ToBoardsSerialInfoJsonUtf8Bytes(timeSpan)));
-            Task PostSystemChangeNotificationAsync(EventFiredArgs args)
+            Task<bool> Post(EventFiredArgs args) => CheckAndLogEvent(_plot.PostEventAsync(GetSignedEvent(args)), "event");
+            Task<bool> PostBoards(byte[] message) => CheckAndLogEvent(_plot.PostBoardsAsync(SignAndCompress(message)), "board");
+            async Task<bool> PostSystemChangeNotificationAsync(EventFiredArgs args)
             {
-                var data = SystemChangeNotificationData.ParseJson(args.Data);
-                if (data == null)
+                var data = SystemChangeNotificationData.ParseJson(args.Data) ?? 
                     throw new FormatException($"failed to parse SystemChangeNotificationData: {args.Data}");
-                return Task.WhenAll(
-                    PostBoardsSerialInfo(data, args.TimeSpan),
+                var results = await Task.WhenAll(
+                    PostBoards(data.ToBoardsSerialInfoJsonUtf8Bytes(args.TimeSpan)),
                     Post(new EventFiredArgs(ToShortEventData(data), args.EventType, args.TimeSpan)));
+                return Array.TrueForAll(results, r => r);
+            }
+            async Task<bool> CheckAndLogEvent(Task<HttpResponseMessage> responseTask, string type)
+            {
+                using var response = await responseTask;
+                return CheckAndLogFailures(response, (type, args), a => $"failed posting ({a.type}): {a.args.EventType} - {a.args.Data} - {a.args.TimeSpan}");
             }
             static string ToShortEventData(SystemChangeNotificationData data)
             {
@@ -442,6 +445,15 @@ namespace CA_DataUploaderLib
                 return sb.ToString();
             }
         }
+        private static bool CheckAndLogFailures(HttpResponseMessage response, string message) => CheckAndLogFailures(response, message, m => m);
+        private static bool CheckAndLogFailures<T>(HttpResponseMessage response, T messageArgs, Func<T, string> getMessage)
+        {
+            var success = response.IsSuccessStatusCode;
+            if (!success)
+                OnError($"{getMessage(messageArgs)}. Response: {Environment.NewLine}{response}");
+
+            return success;
+        }
 
         public void Dispose()
         { // class is sealed so don't need full blown IDisposable pattern.
@@ -451,39 +463,19 @@ namespace CA_DataUploaderLib
         private class PlotConnection
         {
             readonly HttpClient _client;
-            readonly int _plotID;
             private PlotConnection(HttpClient client, int plotID, string plotname)
             {
                 _client = client;
-                _plotID = plotID;
+                PlotId = plotID;
                 PlotName = plotname;
             }
 
-            public string PlotName { get; private set; }
-            public async Task PostVectorAsync(byte[] buffer, DateTime timestamp)
-            {
-                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-                string query = $"/api/v2/Timeserie/UploadVectorRetroAsync?plotNameId={_plotID}&ticks={timestamp.Ticks}";
-                var response = await _client.PutAsJsonAsync(query, buffer);
-                response.EnsureSuccessStatusCode();
-            }
-
-            public async Task PostEventAsync(byte[] signedMessage)
-            {
-                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-                string query = $"/api/v2/Event?plotNameId={_plotID}";
-                var response = await _client.PutAsJsonAsync(query, signedMessage);
-                response.EnsureSuccessStatusCode();
-            }
-
-            public async Task PostBoardsSerialInfo(byte[] signedMessage)
-            {
-                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-                string query = $"/api/v1/McuSerialnumber?plotNameId={_plotID}";
-                var response = await _client.PutAsJsonAsync(query, signedMessage);
-                response.EnsureSuccessStatusCode();
-            }
-
+            public string PlotName { get; set; }
+            public int PlotId { get; }
+            public Task<HttpResponseMessage> PostVectorAsync(byte[] buffer, DateTime timestamp) => _client.PutAsJsonAsync($"/api/v2/Timeserie/UploadVectorRetroAsync?plotNameId={PlotId}&ticks={timestamp.Ticks}", buffer);
+            public Task<HttpResponseMessage> PostEventAsync(byte[] signedMessage) => _client.PutAsJsonAsync($"/api/v2/Event?plotNameId={PlotId}", signedMessage);
+            public Task<HttpResponseMessage> PostBoardsAsync(byte[] signedMessage) => _client.PutAsJsonAsync($"/api/v1/McuSerialnumber?plotNameId={PlotId}", signedMessage);
+            public Task<HttpResponseMessage> PostAsync(string requestUri, byte[] message) => _client.PutAsJsonAsync(requestUri, message);
             public static async Task<PlotConnection> Establish(string loopName, byte[] publicKey, byte[] signedVectorDescription)
             {
                 var connectionInfo = IOconfFile.GetConnectionInfo();
