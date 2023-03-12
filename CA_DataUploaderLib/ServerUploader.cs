@@ -108,7 +108,7 @@ namespace CA_DataUploaderLib
                 return;
             }
 
-            _executedActionChannel.Writer.TryWrite(UploadState.LocalClusterRunning);
+            _executedActionChannel.Writer.TryWrite(UploadState.LocalCluster);
 
             //first queue all events
             //note slightly changing the event time below is a workaround to ensure they come in order in the event log
@@ -176,7 +176,7 @@ namespace CA_DataUploaderLib
                 {
                     while (await throttle.WaitForNextTickAsync(token))
                     {
-                        stateWriter.TryWrite(UploadState.UploadVectorsCycle);
+                        stateWriter.TryWrite(UploadState.VectorUploader);
                         if (!await PostQueuedVectorAsync(stateWriter))
                             badVectors.Add(DateTime.UtcNow);
                     }
@@ -200,7 +200,7 @@ namespace CA_DataUploaderLib
                 {
                     while (await throttle.WaitForNextTickAsync(token))
                     {
-                        stateWriter.TryWrite(UploadState.UploadEventsCycle);
+                        stateWriter.TryWrite(UploadState.EventUploader);
                         await PostQueuedEventsAsync(stateWriter, badEvents);
                     }
                 }
@@ -220,22 +220,22 @@ namespace CA_DataUploaderLib
                 _ = Task.Run(() => SignalCheckStateEvery200ms(_executedActionChannel.Writer, cts), token);
                 try
                 {
-                    //TODO: LocalClusterRunning must also report an event to the server!
+                    //note failures to upload events are not reported to the event log, as that event would often fail as well
                     await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
-                    var vectorsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadVectorsCycle);
-                    var eventsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadEventsCycle);
-                    var receivedVectorCheckArgs = (Stopwatch.StartNew(), 1000, UploadState.LocalClusterRunning);
+                    var vectorsCycleCheckArgs = (Stopwatch.StartNew(), 5000, UploadState.VectorUploader, addToEventLog: true);
+                    var eventsCycleCheckArgs = (Stopwatch.StartNew(), 5000, UploadState.EventUploader, addToEventLog: false);
+                    var receivedVectorCheckArgs = (Stopwatch.StartNew(), 1000, UploadState.LocalCluster, addToEventLog: true);
                     await foreach (var state in _executedActionChannel.Reader.ReadAllAsync(token))
                     {
                         switch (state)
                         {//we only process together the group them by state
-                            case UploadState.UploadVectorsCycle or UploadState.PostingVector or UploadState.PostedVector:
+                            case UploadState.VectorUploader or UploadState.VectorUpload or UploadState.UploadedVector:
                                 DetectSlowActionOnNewAction(ref vectorsCycleCheckArgs, state);
                                 break;
-                            case UploadState.LocalClusterRunning:
+                            case UploadState.LocalCluster:
                                 DetectSlowActionOnNewAction(ref receivedVectorCheckArgs, state);
                                 break;
-                            case UploadState.UploadEventsCycle or UploadState.PostingEvent or UploadState.PostedEvent:
+                            case UploadState.EventUploader or UploadState.EventUpload or UploadState.UploadedEvent:
                                 DetectSlowActionOnNewAction(ref eventsCycleCheckArgs, state);
                                 break;
                             default:
@@ -251,21 +251,21 @@ namespace CA_DataUploaderLib
                     cts.Cancel();
                 }
 
-                static void DetectSlowActionOnNewAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState) stateCheckArgs, UploadState newState)
+                void DetectSlowActionOnNewAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState, bool addToEventLog) stateCheckArgs, UploadState newState)
                 {
                     if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
-                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed} - new state {newState}", null);
+                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed} - new state {newState}", stateCheckArgs.addToEventLog, null);
 
                     stateCheckArgs.nextTargetToReportSlowAction = 2500;
                     stateCheckArgs.timeSinceLastAction.Restart();
                     stateCheckArgs.lastState = newState;
                 }
 
-                static void DetectSlowAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState) stateCheckArgs)
+                void DetectSlowAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState, bool addToEventLog) stateCheckArgs)
                 {
                     if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
                     {
-                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed}", null);
+                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed}", stateCheckArgs.addToEventLog, null);
                         stateCheckArgs.nextTargetToReportSlowAction *= 2;
                     }
                 }
@@ -339,6 +339,19 @@ namespace CA_DataUploaderLib
             return SignInfo.GetSignature(bytes).Concat(bytes).ToArray();
         }
 
+        private void OnError(string message, bool addToEventLog, Exception? ex = null)
+        {
+            if (!addToEventLog)
+            {
+                OnError(message, ex);
+                return;
+            }
+
+            Console.WriteLine(message);
+            message = ex != null ? $"{message}{Environment.NewLine}{ex}" : message;
+            SendEvent(this, new(message, EventType.LogError, DateTime.UtcNow));
+            return;
+        }
         private static void OnError(string message, Exception? ex = null)
         {
             if (ex != null)
@@ -353,7 +366,7 @@ namespace CA_DataUploaderLib
             var list = DequeueAllEntries(_queue);
             if (list == null) return ValueTask.FromResult(true); //no vectors, return success
 
-            stateWriter.TryWrite(UploadState.PostingVector);
+            stateWriter.TryWrite(UploadState.VectorUpload);
             var buffer = GetSignedVectors(list);
             var timestamp = list.First().timestamp;
             return new ValueTask<bool>(Post());
@@ -364,7 +377,7 @@ namespace CA_DataUploaderLib
                 {
                     using var response = await Plot.PostVectorAsync(buffer, timestamp);
                     var success = CheckAndLogFailures(response, "failed posting vector");
-                    stateWriter.TryWrite(UploadState.PostedVector);
+                    stateWriter.TryWrite(UploadState.UploadedVector);
                     return success;
                 }
                 catch (Exception ex)
@@ -383,10 +396,10 @@ namespace CA_DataUploaderLib
 
             foreach (var @event in events)
             {
-                stateWriter.TryWrite(UploadState.PostingEvent);
+                stateWriter.TryWrite(UploadState.EventUpload);
                 if (!await PostEventAsync(@event))
                     badEvents.Add(DateTime.UtcNow);
-                stateWriter.TryWrite(UploadState.PostedEvent);
+                stateWriter.TryWrite(UploadState.UploadedEvent);
             }
         }
 
@@ -599,14 +612,14 @@ namespace CA_DataUploaderLib
 
         private enum UploadState
         {
-            UploadVectorsCycle,
-            PostedVector,
-            LocalClusterRunning,
-            PostedEvent,
-            UploadEventsCycle,
-            PostingVector,
+            VectorUploader,
+            UploadedVector,
+            LocalCluster,
+            UploadedEvent,
+            EventUploader,
+            VectorUpload,
             CheckState,
-            PostingEvent
+            EventUpload
         }
     }
 }
