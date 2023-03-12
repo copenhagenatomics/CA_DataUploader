@@ -33,8 +33,6 @@ namespace CA_DataUploader
                     using var cmd = new CommandHandler(serial);
                     var cloud = new ServerUploader(cmd);
                     using var usb = new ThermocoupleBox(cmd);
-                    cmd.EventFired += cloud.SendEvent;
-                    CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
                     cmd.Execute("help");
                     _ = Task.Run(() => cmd.RunSubsystems());
 
@@ -43,7 +41,7 @@ namespace CA_DataUploader
                     while (cmd.IsRunning)
                     {
                         cmd.RunNextSingleNodeVector();
-                        Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
+                        Console.Write($"\r data points recorded: {i++}"); // we don't want this in the log file. 
                         uploadThrottle.Wait();
                         if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
                     }

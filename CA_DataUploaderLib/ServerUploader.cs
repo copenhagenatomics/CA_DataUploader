@@ -46,12 +46,15 @@ namespace CA_DataUploaderLib
         {
             _cmd = cmd;
             _loopname = IOconfFile.GetLoopName();
-            IsEnabled = IOconfNode.IsCurrentSystemAnUploader(IOconfFile.GetEntries<IOconfNode>().ToList());
+            var nodes = IOconfFile.GetEntries<IOconfNode>().ToList();
+            IsEnabled = IOconfNode.IsCurrentSystemAnUploader(nodes);
             if (!IsEnabled) 
                 return;
             _signInfo = new Signing(_loopname);
             cmd.FullVectorDescriptionCreated += DescriptionCreated;
             cmd.NewVectorReceived += (s,e) => SendVector(e.Vector);
+            if (nodes.Count == 0) //in 3.x, single node systems do not include events in NewVectorReceived
+                cmd.EventFired += SendEvent;
             cmd.AddSubsystem(this);
 
             void DescriptionCreated(object? sender, VectorDescription desc)
