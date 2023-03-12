@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 using System;
@@ -19,50 +20,51 @@ using System.Xml.Serialization;
 
 namespace CA_DataUploaderLib
 {
-    public sealed class ServerUploader : IDisposable
+    public sealed class ServerUploader : ISubsystemWithVectorData
     {
         private const int maxDuplicateMessagesPerMinuteRate = 3;
-        private readonly PlotConnection _plot;
-        private readonly Signing _signing;
+        private readonly string _loopname;
+        private PlotConnection? _plot;
+        private PlotConnection Plot => _plot ?? throw new InvalidOperationException("usage of plot connection before vector description initialization");
+        private readonly Signing? _signInfo;
+        private Signing SignInfo => _signInfo ?? throw new NotSupportedException("signing is only supported in the uploader");
         private readonly Queue<DataVector> _queue = new();
         private readonly Queue<EventFiredArgs> _eventsQueue = new();
         private readonly Dictionary<string, int> _duplicateEventsDetection = new();
         private readonly Queue<(DateTime expirationTime, string @event)> _duplicateEventsExpirationTimes = new();
         private DateTime _lastTimestamp;
-        private readonly CancellationTokenSource _stopTokenSource;
-        private readonly int _localVectorLength;
-        private readonly int _uploadVectorLength;
-        private readonly bool[] _fieldUploadMap;
+        private (bool[] uploadMap, VectorDescription uploadDesc)? _desc;
+        private (bool[] uploadMap, VectorDescription uploadDesc) Desc => _desc ?? throw new InvalidOperationException("usage of desc before vector description initialization");
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(10000);
+        private readonly CommandHandler _cmd;
+        private readonly IReadOnlyList<(byte nodeid, byte eventType, string data)> _emptyEvents= new List<(byte nodeid, byte eventType, string data)>();
 
-        public ServerUploader(VectorDescription vectorDescription) : this(vectorDescription, null)
+        public string Title => nameof(ServerUploader);
+        public bool IsEnabled { get; }
+
+        public ServerUploader(CommandHandler cmd)
         {
-        }
+            _cmd = cmd;
+            _loopname = IOconfFile.GetLoopName();
+            IsEnabled = IOconfNode.IsCurrentSystemAnUploader(IOconfFile.GetEntries<IOconfNode>().ToList());
+            if (!IsEnabled) 
+                return;
+            _signInfo = new Signing(_loopname);
+            cmd.FullVectorDescriptionCreated += DescriptionCreated;
+            cmd.NewVectorAndEventsReceived += (s,e) => SendVector(e);
+            cmd.AddSubsystem(this);
 
-        public ServerUploader(VectorDescription vectorDescription, CommandHandler? cmd)
-        {
-            try
+            void DescriptionCreated(object? sender, VectorDescription desc)
             {
-                var duplicates = vectorDescription._items.GroupBy(x => x.Descriptor).Where(x => x.Count() > 1).Select(x => x.Key);
-                if (duplicates.Any())
-                    throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", duplicates));
-                var loopName = IOconfFile.GetLoopName();
-                _signing = new Signing(loopName);
-                _localVectorLength = vectorDescription.Length;
-                _fieldUploadMap = vectorDescription._items.Select(v => v.Upload).ToArray();
-                var uploadDescription = new VectorDescription(vectorDescription._items.Where(v => v.Upload).ToList(), vectorDescription.Hardware, vectorDescription.Software) { IOconf = IOconfFile.GetRawFile() };
-                _uploadVectorLength = uploadDescription.Length;
-                _plot = PlotConnection.Establish(loopName, _signing.GetPublicKey(), GetSignedVectorDescription(uploadDescription)).GetAwaiter().GetResult();
-                _stopTokenSource = cmd != null ? CancellationTokenSource.CreateLinkedTokenSource(cmd.StopToken) : new();
-                _ = Task.Run(() => LoopForever(_stopTokenSource.Token));
-
-            }
-            catch (Exception ex)
-            {
-                OnError("failed initializing uploader", ex);
-                throw;
+                var fieldUploadMap = desc._items.Select(v => v.Upload).ToArray();
+                var uploadDescription = new VectorDescription(desc._items.Where(v => v.Upload).ToList(), desc.Hardware, desc.Software) { IOconf = IOconfFile.GetRawFile() };
+                _desc = (fieldUploadMap, uploadDescription);
             }
         }
+
+        public SubsystemDescriptionItems GetVectorDescriptionItems() => new(new(), new());
+        public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
+        public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs) => Enumerable.Empty<SensorSample>();
 
         public void SendEvent(object? sender, EventFiredArgs e)
         {
@@ -97,8 +99,9 @@ namespace CA_DataUploaderLib
 
         public void SendVector(DataVector vector)
         {
-            if (vector.Count() != _localVectorLength)
-                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_localVectorLength}");
+            var (uploadMap, uploadDesc) = Desc;
+            if (vector.Count != uploadMap.Length)
+                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {uploadMap.Length}");
             if (vector.timestamp <= _lastTimestamp)
             {
                 CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.timestamp}");
@@ -107,6 +110,14 @@ namespace CA_DataUploaderLib
 
             _executedActionChannel.Writer.TryWrite(UploadState.LocalClusterRunning);
 
+            //first queue all events
+            //note slightly changing the event time below is a workaround to ensure they come in order in the event log
+            int @eventIndex = 0;
+            var time = vector.timestamp;
+            foreach (var (nodeid, eventType, data) in vector.Events ?? _emptyEvents)
+                SendEvent(this, new EventFiredArgs(data, eventType, time.AddTicks(eventIndex++)));
+
+            //now queue vectors
             lock (_queue)
                 if (_queue.Count < 10000)  // if sending thread can't catch up, then drop packages.
                 {
@@ -117,25 +128,30 @@ namespace CA_DataUploaderLib
             DataVector WithOnlyUploadFields(DataVector fullVector)
             {
                 var fullVectorData = fullVector.vector;
-                var uploadData = new double[_uploadVectorLength];
+                var uploadData = new double[uploadDesc.Length];
                 int j = 0;
                 for (int i = 0; i < fullVector.vector.Count; i++)
                 {
-                    if (_fieldUploadMap[i])
+                    if (uploadMap[i])
                         uploadData[j++] = fullVectorData[i];
                 }
 
-                return new(new(uploadData), fullVector.timestamp);
+                return new(new(uploadData), fullVector.timestamp, _emptyEvents); //emptyEvents as we already queued them
             }
         }
-        public int GetPlotId() => _plot.PlotId;
-        public Task<HttpResponseMessage> DirectPost(string requestUri, byte[] bytes) => _plot.PostAsync(requestUri, _signing.GetSignature(bytes).Concat(bytes).ToArray());
-        public string GetPlotUrl() => "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plot.PlotName;
+        public int GetPlotId() => Plot.PlotId;
+        public Task<HttpResponseMessage> DirectPost(string requestUri, byte[] bytes) => Plot.PostAsync(requestUri, SignInfo.GetSignature(bytes).Concat(bytes).ToArray());
+        public string GetPlotUrl() => "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + Plot.PlotName;
 
-        private async Task LoopForever(CancellationToken token)
+        public async Task Run(CancellationToken externalToken)
         {
             try
             {
+                var (_, uploadDesc) = Desc;
+                _plot = await PlotConnection.Establish(_loopname, SignInfo.GetPublicKey(), GetSignedVectorDescription(uploadDesc));
+
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken, _cmd.StopToken);
+                var token = cts.Token;
                 var stateTracker = WithExceptionLogging(TrackUploadState(token), "upload state tracker");
                 var vectorsSender = WithExceptionLogging(VectorsSender(token), "upload vector sender");
                 var eventsSender = WithExceptionLogging(EventsSender(token), "upload events sender");
@@ -205,6 +221,7 @@ namespace CA_DataUploaderLib
                 _ = Task.Run(() => SignalCheckStateEvery200ms(_executedActionChannel.Writer, cts), token);
                 try
                 {
+                    //TODO: LocalClusterRunning must also report an event to the server!
                     await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
                     var vectorsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadVectorsCycle);
                     var eventsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadEventsCycle);
@@ -298,7 +315,7 @@ namespace CA_DataUploaderLib
                 gzip.Write(buffer, 0, buffer.Length);
             }
 
-            return _signing.GetSignature(buffer).Concat(memory.ToArray()).ToArray();
+            return SignInfo.GetSignature(buffer).Concat(memory.ToArray()).ToArray();
         }
 
         private byte[] GetSignedVectorDescription(VectorDescription vectorDescription)
@@ -320,7 +337,7 @@ namespace CA_DataUploaderLib
         private byte[] GetSignedEvent(EventFiredArgs @event)
         { //this can be made more efficient to avoid extra allocations and/or use a memory pool, but these are for low frequency events so postponing looking at that.
             var bytes = @event.ToByteArray();
-            return _signing.GetSignature(bytes).Concat(bytes).ToArray();
+            return SignInfo.GetSignature(bytes).Concat(bytes).ToArray();
         }
 
         private static void OnError(string message, Exception? ex = null)
@@ -346,7 +363,7 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    using var response = await _plot.PostVectorAsync(buffer, timestamp);
+                    using var response = await Plot.PostVectorAsync(buffer, timestamp);
                     var success = CheckAndLogFailures(response, "failed posting vector");
                     stateWriter.TryWrite(UploadState.PostedVector);
                     return success;
@@ -389,8 +406,8 @@ namespace CA_DataUploaderLib
                 return false;
             }
 
-            Task<bool> Post(EventFiredArgs args) => CheckAndLogEvent(_plot.PostEventAsync(GetSignedEvent(args)), "event");
-            Task<bool> PostBoards(byte[] message) => CheckAndLogEvent(_plot.PostBoardsAsync(SignAndCompress(message)), "board");
+            Task<bool> Post(EventFiredArgs args) => CheckAndLogEvent(Plot.PostEventAsync(GetSignedEvent(args)), "event");
+            Task<bool> PostBoards(byte[] message) => CheckAndLogEvent(Plot.PostBoardsAsync(SignAndCompress(message)), "board");
             async Task<bool> PostSystemChangeNotificationAsync(EventFiredArgs args)
             {
                 var data = SystemChangeNotificationData.ParseJson(args.Data) ?? 
@@ -453,11 +470,6 @@ namespace CA_DataUploaderLib
                 OnError($"{getMessage(messageArgs)}. Response: {Environment.NewLine}{response}");
 
             return success;
-        }
-
-        public void Dispose()
-        { // class is sealed so don't need full blown IDisposable pattern.
-            _stopTokenSource.Cancel();
         }
 
         private class PlotConnection

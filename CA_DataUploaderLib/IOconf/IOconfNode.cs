@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 
 namespace CA_DataUploaderLib.IOconf
@@ -12,7 +14,7 @@ namespace CA_DataUploaderLib.IOconf
         private readonly IPEndPoint _endPoint;
 
         private static readonly Lazy<IOconfNode> _singleNode = new(() => 
-            new IOconfNode(IOconfFile.GetLoopName()) { IsCurrentSystem = true }
+            new IOconfNode(IOconfFile.GetLoopName()) { IsCurrentSystem = true, IsUploader = true }
         );
         private static byte _nodeInstances;
 
@@ -29,6 +31,7 @@ namespace CA_DataUploaderLib.IOconf
             NodeIndex = _nodeInstances++;
             if (list.Count > 3)
                 Role = list[3];
+            IsUploader = Role == "uploader";
         }
 
         private IOconfNode(string name) : base($"Node;{name}", 0, "Node") { }
@@ -42,5 +45,8 @@ namespace CA_DataUploaderLib.IOconf
         /// <summary>position of the node in the config (starting at 0)</summary>
         public byte NodeIndex { get; }
         public string Role { get; }
+        public bool IsUploader { get; private init; }
+        public static bool IsCurrentSystemAnUploader(IReadOnlyCollection<IOconfNode> allNodes) => 
+            allNodes.SingleOrDefault(n => n.IsCurrentSystem)?.IsUploader ?? allNodes.Count == 0;
     }
 }

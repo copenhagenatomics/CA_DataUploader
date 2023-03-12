@@ -31,8 +31,8 @@ namespace CA_DataUploader
                     var email = IOconfSetup.UpdateIOconf(serial);
 
                     using var cmd = new CommandHandler(serial);
+                    var cloud = new ServerUploader(cmd);
                     using var usb = new ThermocoupleBox(cmd);
-                    using var cloud = new ServerUploader(cmd.GetFullSystemVectorDescription(), cmd);
                     cmd.EventFired += cloud.SendEvent;
                     CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
                     cmd.Execute("help");
@@ -42,8 +42,7 @@ namespace CA_DataUploader
                     var uploadThrottle = new TimeThrottle(100);
                     while (cmd.IsRunning)
                     {
-                        var dataVector = cmd.GetFullSystemVectorValues();
-                        cloud.SendVector(dataVector);
+                        cmd.RunNextSingleNodeVector();
                         Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
                         uploadThrottle.Wait();
                         if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
