@@ -1,6 +1,5 @@
 ﻿#nullable enable
 using System;
-using System.Linq;
 using System.Collections.Generic;
 
 namespace CA_DataUploaderLib
@@ -10,7 +9,7 @@ namespace CA_DataUploaderLib
         public readonly DateTime timestamp;
         public readonly List<double> vector;
 
-        public DataVector(List<double> input, DateTime time, IReadOnlyList<(byte nodeid, byte eventType, string data)>? events)
+        public DataVector(List<double> input, DateTime time, IReadOnlyList<EventFiredArgs>? events)
         {
             vector = input; timestamp = time;
             Events = events;
@@ -27,7 +26,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public IReadOnlyList<(byte nodeid, byte eventType, string data)>? Events { get; }
+        public IReadOnlyList<EventFiredArgs>? Events { get; }
         public int Count => vector.Count;
     }
 }

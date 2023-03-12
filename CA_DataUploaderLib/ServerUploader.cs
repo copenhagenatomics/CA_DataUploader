@@ -37,7 +37,7 @@ namespace CA_DataUploaderLib
         private (bool[] uploadMap, VectorDescription uploadDesc) Desc => _desc ?? throw new InvalidOperationException("usage of desc before vector description initialization");
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(10000);
         private readonly CommandHandler _cmd;
-        private readonly IReadOnlyList<(byte nodeid, byte eventType, string data)> _emptyEvents= new List<(byte nodeid, byte eventType, string data)>();
+        private readonly IReadOnlyList<EventFiredArgs> _emptyEvents= new List<EventFiredArgs>();
 
         public string Title => nameof(ServerUploader);
         public bool IsEnabled { get; }
@@ -51,7 +51,7 @@ namespace CA_DataUploaderLib
                 return;
             _signInfo = new Signing(_loopname);
             cmd.FullVectorDescriptionCreated += DescriptionCreated;
-            cmd.NewVectorAndEventsReceived += (s,e) => SendVector(e);
+            cmd.NewVectorReceived += (s,e) => SendVector(e.Vector);
             cmd.AddSubsystem(this);
 
             void DescriptionCreated(object? sender, VectorDescription desc)
@@ -97,7 +97,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public void SendVector(DataVector vector)
+        private void SendVector(DataVector vector)
         {
             var (uploadMap, uploadDesc) = Desc;
             if (vector.Count != uploadMap.Length)
@@ -113,9 +113,8 @@ namespace CA_DataUploaderLib
             //first queue all events
             //note slightly changing the event time below is a workaround to ensure they come in order in the event log
             int @eventIndex = 0;
-            var time = vector.timestamp;
-            foreach (var (nodeid, eventType, data) in vector.Events ?? _emptyEvents)
-                SendEvent(this, new EventFiredArgs(data, eventType, time.AddTicks(eventIndex++)));
+            foreach (var e in vector.Events ?? _emptyEvents)
+                SendEvent(this, new EventFiredArgs(e.Data, e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
 
             //now queue vectors
             lock (_queue)

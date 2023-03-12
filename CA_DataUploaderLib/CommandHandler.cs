@@ -28,8 +28,7 @@ namespace CA_DataUploaderLib
         private readonly TaskCompletionSource _runningTaskTcs = new();
 
         public event EventHandler<VectorDescription>? FullVectorDescriptionCreated;
-        public event EventHandler<NewVectorReceivedArgs>? NewVectorReceived;//TODO: can we do the below from the CommandHandler plugins abstraction instead?
-        public event EventHandler<DataVector>? NewVectorAndEventsReceived;//separate one only to avoid breaking old plugins
+        public event EventHandler<NewVectorWithEventsReceivedArgs>? NewVectorReceived;
         public event EventHandler<EventFiredArgs>? EventFired;
         public bool IsRunning => !_exitCts.IsCancellationRequested;
         public CancellationToken StopToken => _exitCts.Token;
@@ -140,12 +139,11 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public DataVector OnNewVectorReceived(IReadOnlyList<SensorSample> vector, DateTime vectorTime, List<(byte nodeid, byte eventType, string data)>? events)
-        {//TODO: should we just hide the special events structure and be receiving the events in their form to be raised!
-            var dataVector = new DataVector(vector.Select(v => v.Value).ToList(), vectorTime, events);
-            NewVectorReceived?.Invoke(this, new(vector.WithVectorTime(vectorTime).ToDictionary(v => v.Name, v => v.Value)));
-            NewVectorAndEventsReceived?.Invoke(this,dataVector);
-            return dataVector;
+        public DataVector OnNewVectorReceived(IReadOnlyList<SensorSample> vector, DateTime vectorTime, List<EventFiredArgs>? events)
+        {
+            var eventArgs = NewVectorWithEventsReceivedArgs.From(vector, vectorTime, events);
+            NewVectorReceived?.Invoke(this, eventArgs);
+            return eventArgs.Vector;
         }
 
         public void FireAlert(string msg, DateTime timespan)
