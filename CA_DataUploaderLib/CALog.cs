@@ -189,7 +189,16 @@ namespace CA_DataUploaderLib
                             enabled = false;
                         disabledCallback();
                     });
-                    cmd.EventFired += (object sender, EventFiredArgs e) =>
+                    cmd.EventFired += OnUserCommandEnableOutput;
+                    cmd.StopToken.Register(() =>
+                    {//since we are not be able to deliver events after stopping, keep console output enabled
+                        cmd.EventFired -= OnUserCommandEnableOutput;
+                        timer.Change(Timeout.Infinite, Timeout.Infinite);//disable the timer
+                        lock (lockObj)
+                            enabled = true;
+                    });
+
+                    void OnUserCommandEnableOutput(object sender, EventFiredArgs e)
                     {
                         if (e.EventType != (byte)EventType.Command) return; //ignore commands
 
@@ -202,7 +211,7 @@ namespace CA_DataUploaderLib
                         }
                         if (justEnabled)
                             enabledCallback();
-                    };
+                    }
                 }
             }
         }
