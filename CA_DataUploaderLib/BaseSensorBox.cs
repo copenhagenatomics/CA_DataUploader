@@ -67,7 +67,7 @@ namespace CA_DataUploaderLib
                     CALog.LogData(LogID.A, $"missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
                     cmd.AddMultinodeCommand(
                         "custom", a => a.Count >= 3 && a[1] == map.BoxName, 
-                        _ => { CALog.LogData(LogID.A, $"custom command failed due to missing board: {map.BoxName}") });
+                        _ => { CALog.LogData(LogID.A, $"custom command failed due to missing board: {map.BoxName}"); });
                     return;
                 }
 

@@ -38,6 +38,7 @@ namespace CA_DataUploaderLib
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(10000);
         private readonly CommandHandler _cmd;
         private readonly IReadOnlyList<EventFiredArgs> _emptyEvents= new List<EventFiredArgs>();
+        private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new();
 
         public string Title => nameof(ServerUploader);
         public bool IsEnabled { get; }
@@ -141,28 +142,58 @@ namespace CA_DataUploaderLib
                 return new(new(uploadData), fullVector.timestamp, _emptyEvents); //emptyEvents as we already queued them
             }
         }
-        public int GetPlotId() => Plot.PlotId;
-        public Task<HttpResponseMessage> DirectPost(string requestUri, byte[] bytes) => Plot.PostAsync(requestUri, SignInfo.GetSignature(bytes).Concat(bytes).ToArray());
-        public string GetPlotUrl() => "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + Plot.PlotName;
+
+        /// <remarks>
+        /// This method waits until a connection has been established and if there is a connection failure it throws <see cref="InvalidOperationException"/>.
+        /// </remarks>
+        public async Task<int> GetPlotId(CancellationToken token)
+        {
+            if (!IsEnabled) throw new NotSupportedException("GetPlotId is only supported in uploader nodes");
+            var plot = await GetPlot(token);
+            return plot.PlotId;
+        }
+        private async Task<PlotConnection> GetPlot(CancellationToken token)
+        {
+            if (!IsEnabled) throw new NotSupportedException("the uploader is not enabled in this node");
+            var task = _connectionEstablishedSource.Task;
+            var cancellationSource = new TaskCompletionSource();
+            using var cancellationRegistration = token.Register(() => cancellationSource.TrySetCanceled(token));
+            await Task.WhenAny(task, cancellationSource.Task);
+            token.ThrowIfCancellationRequested();
+            return await task;
+        }
+
+        public async Task<HttpResponseMessage> DirectPost(string requestUri, byte[] bytes, CancellationToken token)
+        {
+            var plot = await GetPlot(token);
+            return await plot.PostAsync(requestUri, SignInfo.GetSignature(bytes).Concat(bytes).ToArray(), token);
+        }
+
+        public async Task<string> GetPlotUrl(CancellationToken token)
+        {
+            var plot = await GetPlot(token);
+            return "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + plot.PlotName;
+        }
 
         public async Task Run(CancellationToken externalToken)
         {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken, _cmd.StopToken);
             try
             {
-                var (_, uploadDesc) = Desc;
-                _plot = await PlotConnection.Establish(_loopname, SignInfo.GetPublicKey(), GetSignedVectorDescription(uploadDesc));
-
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken, _cmd.StopToken);
                 var token = cts.Token;
+                var (_, uploadDesc) = Desc;
+                _plot = await PlotConnection.Establish(_loopname, SignInfo.GetPublicKey(), GetSignedVectorDescription(uploadDesc), _connectionEstablishedSource, token);
+
                 var stateTracker = WithExceptionLogging(TrackUploadState(token), "upload state tracker");
                 var vectorsSender = WithExceptionLogging(VectorsSender(token), "upload vector sender");
                 var eventsSender = WithExceptionLogging(EventsSender(token), "upload events sender");
 
                 await Task.WhenAll(stateTracker, vectorsSender, eventsSender);
             }
+            catch (OperationCanceledException) when (cts.Token.IsCancellationRequested) { }
             catch (Exception ex)
-            {//we don't normally expect to reach here, as the individual tasks above are expected to capture and logs any exceptions
-                CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message, ex);
+            {//this will usually be a hard error to establish a plot connection 
+                OnError("ServerUploader.LoopForever() exception: " + ex.Message, ex);
             }
             finally
             {
@@ -502,27 +533,42 @@ namespace CA_DataUploaderLib
             public Task<HttpResponseMessage> PostVectorAsync(byte[] buffer, DateTime timestamp) => _client.PutAsJsonAsync($"/api/v2/Timeserie/UploadVectorRetroAsync?plotNameId={PlotId}&ticks={timestamp.Ticks}", buffer);
             public Task<HttpResponseMessage> PostEventAsync(byte[] signedMessage) => _client.PutAsJsonAsync($"/api/v2/Event?plotNameId={PlotId}", signedMessage);
             public Task<HttpResponseMessage> PostBoardsAsync(byte[] signedMessage) => _client.PutAsJsonAsync($"/api/v1/McuSerialnumber?plotNameId={PlotId}", signedMessage);
-            public Task<HttpResponseMessage> PostAsync(string requestUri, byte[] message) => _client.PutAsJsonAsync(requestUri, message);
-            public static async Task<PlotConnection> Establish(string loopName, byte[] publicKey, byte[] signedVectorDescription)
+            public Task<HttpResponseMessage> PostAsync(string requestUri, byte[] message, CancellationToken token = default) 
+                => _client.PutAsJsonAsync(requestUri, message, token);
+            public static async Task<PlotConnection> Establish(string loopName, byte[] publicKey, byte[] signedVectorDescription, TaskCompletionSource<PlotConnection> connectionEstablishedSource, CancellationToken cancellationToken)
             {
-                var connectionInfo = IOconfFile.GetConnectionInfo();
-                var client = NewClient(connectionInfo.Server);
-                var token = await GetLoginTokenWithRetries(client, connectionInfo); // retries here are important as its the first connection so running after a restart can run into the connection not being initialized
-                var (plotId, plotName) = await GetPlotIDAsync(loopName, client, token, publicKey, signedVectorDescription);
-                return new PlotConnection(client, plotId, plotName);
+                try
+                {
+                    var connectionInfo = IOconfFile.GetConnectionInfo();
+                    var client = NewClient(connectionInfo.Server);
+                    var token = await GetLoginTokenWithRetries(client, connectionInfo, cancellationToken); // retries here are important as its the first connection so running after a restart can run into the connection not being initialized
+                    var (plotId, plotName) = await GetPlotIDAsync(loopName, client, token, publicKey, signedVectorDescription, cancellationToken);
+                    var connection = new PlotConnection(client, plotId, plotName);
+                    connectionEstablishedSource.TrySetResult(connection);
+                    return connection;
+                }
+                catch (OperationCanceledException ex)
+                {
+                    connectionEstablishedSource.TrySetCanceled(ex.CancellationToken);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    connectionEstablishedSource.TrySetException(ex);
+                    throw;
+                }
             }
 
-            private static async Task<(int plotId, string plotName)> GetPlotIDAsync(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription)
+            private static async Task<(int plotId, string plotName)> GetPlotIDAsync(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription, CancellationToken cancellationToken)
             {
-                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                 HttpResponseMessage? response = null;
                 try
                 {
                     string query = $"/api/v1/Plotdata/GetPlotnameId?loopname={loopName}&ticks={DateTime.UtcNow.Ticks}&logintoken={loginToken}";
                     var signedValue = publicKey.Concat(signedVectorDescription).ToArray(); // Note that it will only work if converted to array and not IEnummerable
-                    response = await client.PutAsJsonAsync(query, signedValue);
+                    response = await client.PutAsJsonAsync(query, signedValue, cancellationToken);
                     response.EnsureSuccessStatusCode();
-                    var result = await response.Content.ReadFromJsonAsync<string>() ?? throw new InvalidOperationException("unexpected null result when getting plotid");
+                    var result = await response.Content.ReadFromJsonAsync<string>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("unexpected null result when getting plotid");
                     return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
                 }
                 catch (Exception ex)
@@ -530,55 +576,51 @@ namespace CA_DataUploaderLib
                     if (ex.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'" || ex.InnerException?.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'")
                         throw new HttpRequestException("Check your internet connection", ex);
 
-                    var contentTask = response?.Content?.ReadAsStringAsync();
+                    var contentTask = response?.Content?.ReadAsStringAsync(cancellationToken);
                     var error = contentTask != null ? await contentTask : null;
                     if (!string.IsNullOrEmpty(error))
                         throw new Exception(error);
 
-                    OnError("failed getting plot id", ex);
                     throw;
                 }
             }
 
-            private static async Task<string> GetLoginTokenWithRetries(HttpClient client, ConnectionInfo info)
+            private static async Task<string> GetLoginTokenWithRetries(HttpClient client, ConnectionInfo info, CancellationToken cancellationToken)
             {
                 int failureCount = 0;
                 while (true)
                 {
                     try
                     {
-                        var token = await GetLoginToken(client, info);
+                        var token = await GetLoginToken(client, info, cancellationToken);
                         if (failureCount > 0)
                             CALog.LogInfoAndConsoleLn(LogID.A, $"Reconnected after {failureCount} failed attempts.");
                         return token;
                     }
                     catch (HttpRequestException ex)
                     {
-                        if (failureCount++ > 10)
-                            throw;
-
                         OnError("Failed to connect while starting, attempting to reconnect in 5 seconds.", ex);
-                        await Task.Delay(5000);
+                        await Task.Delay(5000, cancellationToken);
                     }
                 }
             }
 
-            private static async Task<string> GetLoginToken(HttpClient client, ConnectionInfo accountInfo)
+            private static async Task<string> GetLoginToken(HttpClient client, ConnectionInfo accountInfo, CancellationToken cancellationToken)
             {
-                string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}");
+                string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}", cancellationToken);
                 if (string.IsNullOrEmpty(token))
-                    token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.email}&password={accountInfo.password}&fullName={accountInfo.Fullname}"); // attempt to create account assuming it did not exist
+                    token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.email}&password={accountInfo.password}&fullName={accountInfo.Fullname}", cancellationToken); // attempt to create account assuming it did not exist
                 if (!string.IsNullOrEmpty(token))
                     return token;
 
                 throw new Exception("Unable to login or create token");
             }
 
-            private static async Task<string?> Post(HttpClient client, string requestUri)
+            private static async Task<string?> Post(HttpClient client, string requestUri, CancellationToken cancellationToken)
             {
-                var response = await client.PostAsync(requestUri, null);
+                var response = await client.PostAsync(requestUri, null, cancellationToken);
                 if (response.StatusCode == System.Net.HttpStatusCode.OK && response.Content != null)
-                    return (await response.Content.ReadAsStringAsync()).Replace("\"","");
+                    return (await response.Content.ReadAsStringAsync(cancellationToken)).Replace("\"","");
                 else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                     return null;
 

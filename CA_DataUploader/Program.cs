@@ -43,7 +43,7 @@ namespace CA_DataUploader
                         cmd.RunNextSingleNodeVector();
                         Console.Write($"\r data points recorded: {i++}"); // we don't want this in the log file. 
                         uploadThrottle.Wait();
-                        if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
+                        if (i == 20) _ = Task.Run(async () => DULutil.OpenUrl(await cloud.GetPlotUrl(cmd.StopToken)));
                     }
                 }
                 CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
