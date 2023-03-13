@@ -9,7 +9,7 @@ namespace CA_DataUploaderLib
         public readonly DateTime timestamp;
         public readonly List<double> vector;
 
-        public DataVector(List<double> input, DateTime time, IReadOnlyList<EventFiredArgs>? events)
+        public DataVector(List<double> input, DateTime time, IReadOnlyList<EventFiredArgs> events)
         {
             vector = input; timestamp = time;
             Events = events;
@@ -26,7 +26,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public IReadOnlyList<EventFiredArgs>? Events { get; }
+        public IReadOnlyList<EventFiredArgs> Events { get; }
         public int Count => vector.Count;
     }
 }

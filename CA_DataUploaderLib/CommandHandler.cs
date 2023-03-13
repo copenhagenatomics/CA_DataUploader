@@ -26,6 +26,7 @@ namespace CA_DataUploaderLib
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
         private readonly CancellationTokenSource _exitCts = new();
         private readonly TaskCompletionSource _runningTaskTcs = new();
+        private readonly bool _isMultipi;
 
         public event EventHandler<VectorDescription>? FullVectorDescriptionCreated;
         public event EventHandler<NewVectorWithEventsReceivedArgs>? NewVectorReceived;
@@ -43,10 +44,49 @@ namespace CA_DataUploaderLib
             new Thread(() => this.LoopForever()).Start();
             AddCommand("escape", Stop);
             AddCommand("help", HelpMenu);
-            AddCommand("up", Uptime);
-            AddCommand("version", GetVersion);
+
+            _isMultipi = IOconfFile.GetEntries<IOconfNode>().Any();
+            //we run the command in all nodes
+            AddMultinodeCommand("up", _ => true, Uptime);
+            AddMultinodeCommand("version", _ => true, GetVersion);
         }
 
+        /// <param name="inputValidation">a validation function that returns the same value regardless of the node in which it runs</param>
+        /// <param name="action">an action that can run in all nodes</param>
+        public void AddMultinodeCommand(string command, Func<List<string>, bool> inputValidation, Action<List<string>> action)
+        {
+            if (!_isMultipi)
+            {
+                AddCommand(command, a => 
+                {
+                    if (!inputValidation(a)) return false;
+                    action(a);
+                    return true;
+                });
+                return;
+            }
+
+            AddCommand(command, inputValidation);
+            NewVectorReceived += (s, v) =>
+            {
+                foreach (var e in v.Vector.Events)
+                {
+                    if (e.EventType != (byte)EventType.Command || !e.Data.StartsWith(command)) continue;
+                    var cmd = _commandRunner.ParseCommand(e.Data);
+                    if (cmd.Count <= 0 || cmd[0] != command || !inputValidation(cmd))
+                        continue;
+
+                    try
+                    {
+                        action(cmd);
+                    }
+                    catch (Exception ex)
+                    {
+                        CALog.LogErrorAndConsoleLn(LogID.A, $"error running command: {e.Data}", ex);
+                    }
+                }
+            };
+        }
         /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>
         public Action AddCommand(string name, Func<List<string>, bool> func) => _commandRunner.AddCommand(name, func);
         public void Execute(string command, bool isUserCommand = false) => HandleCommand(command, isUserCommand);
@@ -57,7 +97,7 @@ namespace CA_DataUploaderLib
         public DataVector RunNextSingleNodeVector() 
         {
             var (samples, vectorTime) = MakeDecision(GetNodeInputs().ToList(), DateTime.UtcNow);
-            return OnNewVectorReceived(samples.ToList(), vectorTime, null); //on 3.x single host events must be sent by the host to the uploader
+            return OnNewVectorReceived(samples.ToList(), vectorTime, Array.Empty<EventFiredArgs>()); //on 3.x single host events must be sent by the host to the uploader
         }
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
         public (IEnumerable<SensorSample>, DateTime vectorTime) MakeDecision(List<SensorSample> inputs, DateTime vectorTime)
@@ -139,7 +179,7 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public DataVector OnNewVectorReceived(IReadOnlyList<SensorSample> vector, DateTime vectorTime, List<EventFiredArgs>? events)
+        public DataVector OnNewVectorReceived(IReadOnlyList<SensorSample> vector, DateTime vectorTime, IReadOnlyList<EventFiredArgs> events)
         {
             var eventArgs = NewVectorWithEventsReceivedArgs.From(vector, vectorTime, events);
             NewVectorReceived?.Invoke(this, eventArgs);
@@ -277,13 +317,10 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public bool Uptime(List<string> args)
-        {
+        public void Uptime(List<string> _) => 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{GetCurrentNode().Name} - {DateTime.Now.Subtract(_start).Humanize(5)}");
-            return true;
-        }
 
-        public bool GetVersion(List<string> args)
+        public void GetVersion(List<string> _)
         {
             var connInfo = IOconfFile.GetConnectionInfo();
             CALog.LogInfoAndConsoleLn(LogID.A, 
@@ -292,7 +329,6 @@ $@"{GetCurrentNode().Name}
 {RpiVersion.GetHardware()}
 {connInfo.LoopName} - {connInfo.email}
 {string.Join(Environment.NewLine, Mapper.McuBoards.Select(x => x.ToString()))}");
-            return true;
         }
 
         public void Dispose()

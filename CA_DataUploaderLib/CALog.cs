@@ -2,9 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 namespace CA_DataUploaderLib
-{ 
+{
     public enum LogID
     {
         A, B, C, D, E, F, G, H
@@ -133,16 +134,77 @@ namespace CA_DataUploaderLib
         public class EventsLogger : ISimpleLogger
         {
             private readonly CommandHandler handler;
+            private readonly bool useLocalEventsForOutput;
 
-            public EventsLogger(CommandHandler handler) 
+            public EventsLogger(CommandHandler handler, bool useLocalEventsForOutput = false) 
             {
                 this.handler = handler;
+                this.useLocalEventsForOutput = useLocalEventsForOutput;
+                EnableTempClusterOutputOnLocalActions(handler);
             }
             public void LogData(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log);
             public void LogError(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.LogError);
             public void LogError(Exception ex) => handler.FireCustomEvent(ex.ToString(), DateTime.UtcNow, (byte)EventType.LogError);
             public void LogInfo(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log);
 
+            /// <summary>prints remoteEvents to the console for 5 seconds when detecting local user commands<summary>
+            void EnableTempClusterOutputOnLocalActions(CommandHandler cmd)
+            {
+                var logger = new ConsoleLogger();
+                Action subscribeAction = useLocalEventsForOutput 
+                    ? () => cmd.EventFired += OnLocalEventFired 
+                    : () => cmd.NewVectorReceived += OnVectorReceivedFired;
+                Action unsubscribeAction = useLocalEventsForOutput
+                    ? () => cmd.EventFired -= OnLocalEventFired
+                    : () => cmd.NewVectorReceived -= OnVectorReceivedFired;
+                EnableOnLocalUserCommands(
+                    TimeSpan.FromSeconds(5),
+                    () => { Console.WriteLine("enabling local output for 5 seconds"); subscribeAction(); },
+                    () => { Console.WriteLine("disabled local output, check the event log in plots for further command(s) output"); unsubscribeAction(); });
+
+                void OnLocalEventFired(object _, EventFiredArgs e) => WriteLogEventTo(e.EventType, e.Data);
+                void OnVectorReceivedFired(object _, NewVectorWithEventsReceivedArgs args)
+                {
+                    var vector = args.Vector;
+                    if (vector.Events == null) return;
+                    foreach (var e in vector.Events)
+                        WriteLogEventTo(e.EventType, e.Data);
+                }
+
+                void WriteLogEventTo(byte type, string data)
+                {
+                    if (type == (byte)EventType.LogError)
+                        logger.LogError(data);
+                    else if (type == (byte)EventType.Log)
+                        logger.LogInfo(data);
+                }
+
+                void EnableOnLocalUserCommands(TimeSpan duration, Action enabledCallback, Action disabledCallback)
+                {
+                    var enabled = false;
+                    var lockObj = new object();
+                    var timer = new Timer(_ =>
+                    {
+                        lock (lockObj)
+                            enabled = false;
+                        disabledCallback();
+                    });
+                    cmd.EventFired += (object sender, EventFiredArgs e) =>
+                    {
+                        if (e.EventType != (byte)EventType.Command) return; //ignore commands
+
+                        timer.Change(duration, Timeout.InfiniteTimeSpan); //triggers after duration (ignores a previous trigger if pending)
+                        bool justEnabled;
+                        lock (lockObj)
+                        {
+                            if (justEnabled = !enabled)
+                                enabled = true;
+                        }
+                        if (justEnabled)
+                            enabledCallback();
+                    };
+                }
+            }
         }
     }
 }

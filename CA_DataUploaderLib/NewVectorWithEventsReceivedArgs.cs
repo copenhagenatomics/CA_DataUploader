@@ -12,7 +12,7 @@ namespace CA_DataUploaderLib
             => Vector = dataVector;
 
         public DataVector Vector { get; }
-        public static NewVectorWithEventsReceivedArgs From(IReadOnlyList<SensorSample> vector, DateTime vectorTime, List<EventFiredArgs>? events) => 
+        public static NewVectorWithEventsReceivedArgs From(IReadOnlyList<SensorSample> vector, DateTime vectorTime, IReadOnlyList<EventFiredArgs> events) => 
             new(
                 vector.WithVectorTime(vectorTime).ToDictionary(v => v.Name, v => v.Value), 
                 new(vector.Select(v => v.Value).ToList(), vectorTime, events));
