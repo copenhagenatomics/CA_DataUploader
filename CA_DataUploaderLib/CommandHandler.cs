@@ -31,6 +31,7 @@ namespace CA_DataUploaderLib
         public event EventHandler<VectorDescription>? FullVectorDescriptionCreated;
         public event EventHandler<NewVectorWithEventsReceivedArgs>? NewVectorReceived;
         public event EventHandler<EventFiredArgs>? EventFired;
+        public event EventHandler<EventFiredArgs>? UserCommandReceived;
         public bool IsRunning => !_exitCts.IsCancellationRequested;
         public CancellationToken StopToken => _exitCts.Token;
         public Task RunningTask => _runningTaskTcs.Task;
@@ -224,6 +225,8 @@ namespace CA_DataUploaderLib
         private void HandleCommand(string cmdString, bool isUserCommand)
         {
             cmdString = cmdString.Trim();
+            if (isUserCommand)
+                UserCommandReceived?.Invoke(this, new(cmdString, EventType.Command, DateTime.UtcNow));
             if (_commandRunner.Run(cmdString, isUserCommand) && isUserCommand)
                 OnUserCommandAccepted(cmdString);
         }

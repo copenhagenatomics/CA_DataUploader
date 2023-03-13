@@ -166,7 +166,7 @@ $@"{hostAssembly.GetName()}
                 // return ExecuteShellCommand("df.bat").Trim();  Does not work -> need debugging. 
             }
 
-            return "unknown";
+            return string.Empty;
         }
 
         private static void WriteResourceToFile(string resourceName, string fileName)
