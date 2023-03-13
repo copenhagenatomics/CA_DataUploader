@@ -168,6 +168,11 @@ namespace CA_DataUploaderLib
             var plot = await GetPlot(token);
             return await plot.PostAsync(requestUri, SignInfo.GetSignature(bytes).Concat(bytes).ToArray(), token);
         }
+        public async Task<HttpResponseMessage> DirectPut(string requestUri, byte[] bytes, CancellationToken token)
+        {
+            var plot = await GetPlot(token);
+            return await plot.PutAsync(requestUri, SignInfo.GetSignature(bytes).Concat(bytes).ToArray(), token);
+        }
 
         public async Task<string> GetPlotUrl(CancellationToken token)
         {
@@ -530,10 +535,12 @@ namespace CA_DataUploaderLib
 
             public string PlotName { get; set; }
             public int PlotId { get; }
-            public Task<HttpResponseMessage> PostVectorAsync(byte[] buffer, DateTime timestamp) => _client.PutAsJsonAsync($"/api/v2/Timeserie/UploadVectorRetroAsync?plotNameId={PlotId}&ticks={timestamp.Ticks}", buffer);
-            public Task<HttpResponseMessage> PostEventAsync(byte[] signedMessage) => _client.PutAsJsonAsync($"/api/v2/Event?plotNameId={PlotId}", signedMessage);
-            public Task<HttpResponseMessage> PostBoardsAsync(byte[] signedMessage) => _client.PutAsJsonAsync($"/api/v1/McuSerialnumber?plotNameId={PlotId}", signedMessage);
+            public Task<HttpResponseMessage> PostVectorAsync(byte[] buffer, DateTime timestamp) => PutAsync($"/api/v2/Timeserie/UploadVectorRetroAsync?plotNameId={PlotId}&ticks={timestamp.Ticks}", buffer);
+            public Task<HttpResponseMessage> PostEventAsync(byte[] signedMessage) => PutAsync($"/api/v2/Event?plotNameId={PlotId}", signedMessage);
+            public Task<HttpResponseMessage> PostBoardsAsync(byte[] signedMessage) => PutAsync($"/api/v1/McuSerialnumber?plotNameId={PlotId}", signedMessage);
             public Task<HttpResponseMessage> PostAsync(string requestUri, byte[] message, CancellationToken token = default) 
+                => _client.PostAsJsonAsync(requestUri, message, token);
+            internal Task<HttpResponseMessage> PutAsync(string requestUri, byte[] message, CancellationToken token = default)
                 => _client.PutAsJsonAsync(requestUri, message, token);
             public static async Task<PlotConnection> Establish(string loopName, byte[] publicKey, byte[] signedVectorDescription, TaskCompletionSource<PlotConnection> connectionEstablishedSource, CancellationToken cancellationToken)
             {
