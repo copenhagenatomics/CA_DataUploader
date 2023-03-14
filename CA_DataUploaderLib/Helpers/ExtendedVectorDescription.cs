@@ -21,10 +21,7 @@ namespace CA_DataUploaderLib.Helpers
         /// </summary>
         public IReadOnlyList<(IOconfNode, IReadOnlyList<VectorDescriptionItem>)> InputsPerNode { get; set; }
 
-        public ExtendedVectorDescription(
-            List<(IOconfNode, IReadOnlyList<VectorDescriptionItem> values)> inputsPerNode,
-            List<VectorDescriptionItem> outputs,
-            string hardware, string software)
+        public ExtendedVectorDescription(List<(IOconfNode, IReadOnlyList<VectorDescriptionItem> values)> inputsPerNode, List<VectorDescriptionItem> outputs)
         {
             _logLevel = IOconfFile.GetOutputLevel();
             InputsPerNode = inputsPerNode;
@@ -38,7 +35,10 @@ namespace CA_DataUploaderLib.Helpers
             allItems.AddRange(outputs);
             _outputCount = outputs.Count;
             _mathVectorExpansion.Initialize(allItems.Select(i => i.Descriptor));
-            VectorDescription = new VectorDescription(allItems, hardware, software);
+            var duplicates = allItems.GroupBy(x => x.Descriptor).Where(x => x.Count() > 1).Select(x => x.Key);
+            if (duplicates.Any())
+                throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", duplicates));
+            VectorDescription = new VectorDescription(allItems, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
         }
 
         public int GetIndex(VectorDescriptionItem item) { return VectorDescription._items.IndexOf(item); }

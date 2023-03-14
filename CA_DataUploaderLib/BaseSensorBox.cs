@@ -48,31 +48,36 @@ namespace CA_DataUploaderLib
             }
 
             var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray(), boardStateIndexInFullVector: -1)).ToArray();
+            foreach (var board in allBoards.Where(b => b.map.CustomWritesEnabled))
+                RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived);
             _boards = allBoards.Where(b => b.map.IsLocalBoard).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
-            foreach (var board in _boards.Where(b => b.map.CustomWritesEnabled))
-                RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived);
 
             static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler? cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived)
             {
-                if (map.McuBoard == null)
-                {
-                    CALog.LogData(LogID.A, $"missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
+                if (!map.IsLocalBoard)
+                {//if the board is not local we register the command validation with an empty action
+                    cmd.AddMultinodeCommand("custom", a => a.Count >= 3 && a[1] == map.BoxName, _ => { });
                     return;
                 }
 
+                if (map.McuBoard == null)
+                {
+                    CALog.LogData(LogID.A, $"missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
+                    cmd.AddMultinodeCommand(
+                        "custom", a => a.Count >= 3 && a[1] == map.BoxName, 
+                        _ => { CALog.LogData(LogID.A, $"custom command failed due to missing board: {map.BoxName}"); });
+                    return;
+                }
+
+                //for local boards we instead register a multinode that sends the command to a local channel the write loop uses
                 var channel = Channel.CreateUnbounded<string>();
                 var channelWriter = channel.Writer;
                 boardCustomCommandsReceived.Add(map.McuBoard, channel.Reader);
-                cmd?.AddCommand("custom", CustomCommand); //note that the custom is a special command that the host needs to run only in the node that has the board.
-
-                bool CustomCommand(List<string> args)
-                {
-                    if (args.Count < 3) return false;
-                    if (args[1] != map.BoxName) return false; 
-                    channelWriter.TryWrite(string.Join(' ', args.Skip(2)));
-                    return true;
-                }
+                cmd.AddMultinodeCommand(
+                    "custom", 
+                    a => a.Count >= 3 && a[1] == map.BoxName, 
+                    a => channelWriter.TryWrite(string.Join(' ', a.Skip(2))));
             }
         }
 
@@ -95,12 +100,12 @@ namespace CA_DataUploaderLib
         public Task Run(CancellationToken token) => RunBoardLoops(_boards, token);
         private void SubscribeCommandsToSubsystems(CommandHandler cmd, string mainSubsystem, List<SensorSample.InputBased> values)
         {
-            cmd.AddCommand(mainSubsystem, ShowQueue);
-            var subsystemOverrides = values.Select(v => v.Input.SubsystemOverride).OfType<string>().Distinct();
+            cmd.AddMultinodeCommand(mainSubsystem, _ => true, ShowQueue);
+            var subsystemOverrides = values.Select(v => v.Input.SubsystemOverride).Where(v => v != default).Distinct();
             foreach (var subsystem in subsystemOverrides)
             {
                 if (subsystem == mainSubsystem) continue;
-                cmd.AddCommand(subsystem, ShowQueue);
+                cmd.AddMultinodeCommand(subsystem, _ => true, ShowQueue);
             }
         }
 
@@ -170,7 +175,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected bool ShowQueue(List<string> args)
+        private void ShowQueue(List<string> args)
         {
             var subsystem = args[0].ToLower();
             var isMainCommand = subsystem == mainSubsystem;
@@ -191,7 +196,6 @@ namespace CA_DataUploaderLib
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, sb.ToString());
-            return true;
         }
 
         private double GetAvgLoopTime() => _values.Average(x => x.ReadSensor_LoopTime);

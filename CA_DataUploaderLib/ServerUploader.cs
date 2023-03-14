@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 using System;
@@ -19,50 +20,55 @@ using System.Xml.Serialization;
 
 namespace CA_DataUploaderLib
 {
-    public sealed class ServerUploader : IDisposable
+    public sealed class ServerUploader : ISubsystemWithVectorData
     {
         private const int maxDuplicateMessagesPerMinuteRate = 3;
-        private readonly PlotConnection _plot;
-        private readonly Signing _signing;
+        private readonly string _loopname;
+        private PlotConnection? _plot;
+        private PlotConnection Plot => _plot ?? throw new InvalidOperationException("usage of plot connection before vector description initialization");
+        private readonly Signing? _signInfo;
+        private Signing SignInfo => _signInfo ?? throw new NotSupportedException("signing is only supported in the uploader");
         private readonly Queue<DataVector> _queue = new();
         private readonly Queue<EventFiredArgs> _eventsQueue = new();
         private readonly Dictionary<string, int> _duplicateEventsDetection = new();
         private readonly Queue<(DateTime expirationTime, string @event)> _duplicateEventsExpirationTimes = new();
         private DateTime _lastTimestamp;
-        private readonly CancellationTokenSource _stopTokenSource;
-        private readonly int _localVectorLength;
-        private readonly int _uploadVectorLength;
-        private readonly bool[] _fieldUploadMap;
+        private (bool[] uploadMap, VectorDescription uploadDesc)? _desc;
+        private (bool[] uploadMap, VectorDescription uploadDesc) Desc => _desc ?? throw new InvalidOperationException("usage of desc before vector description initialization");
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(10000);
+        private readonly CommandHandler _cmd;
+        private readonly IReadOnlyList<EventFiredArgs> _emptyEvents= new List<EventFiredArgs>();
+        private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new();
 
-        public ServerUploader(VectorDescription vectorDescription) : this(vectorDescription, null)
+        public string Title => nameof(ServerUploader);
+        public bool IsEnabled { get; }
+
+        public ServerUploader(CommandHandler cmd)
         {
+            _cmd = cmd;
+            _loopname = IOconfFile.GetLoopName();
+            var nodes = IOconfFile.GetEntries<IOconfNode>().ToList();
+            IsEnabled = IOconfNode.IsCurrentSystemAnUploader(nodes);
+            if (!IsEnabled) 
+                return;
+            _signInfo = new Signing(_loopname);
+            cmd.FullVectorDescriptionCreated += DescriptionCreated;
+            cmd.NewVectorReceived += (s,e) => SendVector(e.Vector);
+            if (nodes.Count == 0) //in 3.x, single node systems do not include events in NewVectorReceived
+                cmd.EventFired += SendEvent;//TODO: we are in 4.x now
+            cmd.AddSubsystem(this);
+
+            void DescriptionCreated(object? sender, VectorDescription desc)
+            {
+                var fieldUploadMap = desc._items.Select(v => v.Upload).ToArray();
+                var uploadDescription = new VectorDescription(desc._items.Where(v => v.Upload).ToList(), desc.Hardware, desc.Software) { IOconf = IOconfFile.GetRawFile() };
+                _desc = (fieldUploadMap, uploadDescription);
+            }
         }
 
-        public ServerUploader(VectorDescription vectorDescription, CommandHandler? cmd)
-        {
-            try
-            {
-                var duplicates = vectorDescription._items.GroupBy(x => x.Descriptor).Where(x => x.Count() > 1).Select(x => x.Key);
-                if (duplicates.Any())
-                    throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", duplicates));
-                var loopName = IOconfFile.GetLoopName();
-                _signing = new Signing(loopName);
-                _localVectorLength = vectorDescription.Length;
-                _fieldUploadMap = vectorDescription._items.Select(v => v.Upload).ToArray();
-                var uploadDescription = new VectorDescription(vectorDescription._items.Where(v => v.Upload).ToList(), vectorDescription.Hardware, vectorDescription.Software) { IOconf = IOconfFile.GetRawFile() };
-                _uploadVectorLength = uploadDescription.Length;
-                _plot = PlotConnection.Establish(loopName, _signing.GetPublicKey(), GetSignedVectorDescription(uploadDescription)).GetAwaiter().GetResult();
-                _stopTokenSource = cmd != null ? CancellationTokenSource.CreateLinkedTokenSource(cmd.StopToken) : new();
-                _ = Task.Run(() => LoopForever(_stopTokenSource.Token));
-
-            }
-            catch (Exception ex)
-            {
-                OnError("failed initializing uploader", ex);
-                throw;
-            }
-        }
+        public SubsystemDescriptionItems GetVectorDescriptionItems() => new(new(), new());
+        public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
+        public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs) => Enumerable.Empty<SensorSample>();
 
         public void SendEvent(object? sender, EventFiredArgs e)
         {
@@ -95,18 +101,26 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public void SendVector(DataVector vector)
+        private void SendVector(DataVector vector)
         {
-            if (vector.Count() != _localVectorLength)
-                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {_localVectorLength}");
+            var (uploadMap, uploadDesc) = Desc;
+            if (vector.Count != uploadMap.Length)
+                throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {uploadMap.Length}");
             if (vector.Timestamp <= _lastTimestamp)
             {
                 CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.Timestamp}");
                 return;
             }
 
-            _executedActionChannel.Writer.TryWrite(UploadState.LocalClusterRunning);
+            _executedActionChannel.Writer.TryWrite(UploadState.LocalCluster);
 
+            //first queue all events
+            //note slightly changing the event time below is a workaround to ensure they come in order in the event log
+            int @eventIndex = 0;
+            foreach (var e in vector.Events ?? _emptyEvents)
+                SendEvent(this, new EventFiredArgs(e.Data, e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
+
+            //now queue vectors
             lock (_queue)
                 if (_queue.Count < 10000)  // if sending thread can't catch up, then drop packages.
                 {
@@ -117,34 +131,73 @@ namespace CA_DataUploaderLib
             DataVector WithOnlyUploadFields(DataVector fullVector)
             {
                 var fullVectorData = fullVector.Data;
-                var uploadData = new double[_uploadVectorLength];
+                var uploadData = new double[uploadDesc.Length];
                 int j = 0;
                 for (int i = 0; i < fullVector.Data.Length; i++)
                 {
-                    if (_fieldUploadMap[i])
+                    if (uploadMap[i])
                         uploadData[j++] = fullVectorData[i];
                 }
 
-                return new(uploadData, fullVector.Timestamp);
+                return new(uploadData, fullVector.Timestamp, _emptyEvents);//emptyEvents as we already queued them
             }
         }
-        public int GetPlotId() => _plot.PlotId;
-        public Task<HttpResponseMessage> DirectPost(string requestUri, byte[] bytes) => _plot.PostAsync(requestUri, _signing.GetSignature(bytes).Concat(bytes).ToArray());
-        public string GetPlotUrl() => "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + _plot.PlotName;
 
-        private async Task LoopForever(CancellationToken token)
+        /// <remarks>
+        /// This method waits until a connection has been established and if there is a connection failure it throws <see cref="InvalidOperationException"/>.
+        /// </remarks>
+        public async Task<int> GetPlotId(CancellationToken token)
+        {
+            if (!IsEnabled) throw new NotSupportedException("GetPlotId is only supported in uploader nodes");
+            var plot = await GetPlot(token);
+            return plot.PlotId;
+        }
+        private async Task<PlotConnection> GetPlot(CancellationToken token)
+        {
+            if (!IsEnabled) throw new NotSupportedException("the uploader is not enabled in this node");
+            var task = _connectionEstablishedSource.Task;
+            var cancellationSource = new TaskCompletionSource();
+            using var cancellationRegistration = token.Register(() => cancellationSource.TrySetCanceled(token));
+            await Task.WhenAny(task, cancellationSource.Task);
+            token.ThrowIfCancellationRequested();
+            return await task;
+        }
+
+        public async Task<HttpResponseMessage> DirectPost(string requestUri, byte[] bytes, CancellationToken token)
+        {
+            var plot = await GetPlot(token);
+            return await plot.PostAsync(requestUri, SignInfo.GetSignature(bytes).Concat(bytes).ToArray(), token);
+        }
+        public async Task<HttpResponseMessage> DirectPut(string requestUri, byte[] bytes, CancellationToken token)
+        {
+            var plot = await GetPlot(token);
+            return await plot.PutAsync(requestUri, SignInfo.GetSignature(bytes).Concat(bytes).ToArray(), token);
+        }
+
+        public async Task<string> GetPlotUrl(CancellationToken token)
+        {
+            var plot = await GetPlot(token);
+            return "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + plot.PlotName;
+        }
+
+        public async Task Run(CancellationToken token)
         {
             try
             {
+                var token = cts.Token;
+                var (_, uploadDesc) = Desc;
+                _plot = await PlotConnection.Establish(_loopname, SignInfo.GetPublicKey(), GetSignedVectorDescription(uploadDesc), _connectionEstablishedSource, token);
+
                 var stateTracker = WithExceptionLogging(TrackUploadState(token), "upload state tracker");
                 var vectorsSender = WithExceptionLogging(VectorsSender(token), "upload vector sender");
                 var eventsSender = WithExceptionLogging(EventsSender(token), "upload events sender");
 
                 await Task.WhenAll(stateTracker, vectorsSender, eventsSender);
             }
+            catch (OperationCanceledException) when (cts.Token.IsCancellationRequested) { }
             catch (Exception ex)
-            {//we don't normally expect to reach here, as the individual tasks above are expected to capture and logs any exceptions
-                CALog.LogErrorAndConsoleLn(LogID.A, "ServerUploader.LoopForever() exception: " + ex.Message, ex);
+            {//this will usually be a hard error to establish a plot connection 
+                OnError("ServerUploader.LoopForever() exception: " + ex.Message, ex);
             }
             finally
             {
@@ -161,7 +214,7 @@ namespace CA_DataUploaderLib
                 {
                     while (await throttle.WaitForNextTickAsync(token))
                     {
-                        stateWriter.TryWrite(UploadState.UploadVectorsCycle);
+                        stateWriter.TryWrite(UploadState.VectorUploader);
                         if (!await PostQueuedVectorAsync(stateWriter))
                             badVectors.Add(DateTime.UtcNow);
                     }
@@ -185,7 +238,7 @@ namespace CA_DataUploaderLib
                 {
                     while (await throttle.WaitForNextTickAsync(token))
                     {
-                        stateWriter.TryWrite(UploadState.UploadEventsCycle);
+                        stateWriter.TryWrite(UploadState.EventUploader);
                         await PostQueuedEventsAsync(stateWriter, badEvents);
                     }
                 }
@@ -205,21 +258,22 @@ namespace CA_DataUploaderLib
                 _ = Task.Run(() => SignalCheckStateEvery200ms(_executedActionChannel.Writer, cts), token);
                 try
                 {
+                    //note failures to upload events are not reported to the event log, as that event would often fail as well
                     await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
-                    var vectorsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadVectorsCycle);
-                    var eventsCycleCheckArgs = (Stopwatch.StartNew(), 2500, UploadState.UploadEventsCycle);
-                    var receivedVectorCheckArgs = (Stopwatch.StartNew(), 1000, UploadState.LocalClusterRunning);
+                    var vectorsCycleCheckArgs = (Stopwatch.StartNew(), 5000, UploadState.VectorUploader, addToEventLog: true);
+                    var eventsCycleCheckArgs = (Stopwatch.StartNew(), 5000, UploadState.EventUploader, addToEventLog: false);
+                    var receivedVectorCheckArgs = (Stopwatch.StartNew(), 1000, UploadState.LocalCluster, addToEventLog: true);
                     await foreach (var state in _executedActionChannel.Reader.ReadAllAsync(token))
                     {
                         switch (state)
                         {//we only process together the group them by state
-                            case UploadState.UploadVectorsCycle or UploadState.PostingVector or UploadState.PostedVector:
+                            case UploadState.VectorUploader or UploadState.VectorUpload or UploadState.UploadedVector:
                                 DetectSlowActionOnNewAction(ref vectorsCycleCheckArgs, state);
                                 break;
-                            case UploadState.LocalClusterRunning:
+                            case UploadState.LocalCluster:
                                 DetectSlowActionOnNewAction(ref receivedVectorCheckArgs, state);
                                 break;
-                            case UploadState.UploadEventsCycle or UploadState.PostingEvent or UploadState.PostedEvent:
+                            case UploadState.EventUploader or UploadState.EventUpload or UploadState.UploadedEvent:
                                 DetectSlowActionOnNewAction(ref eventsCycleCheckArgs, state);
                                 break;
                             default:
@@ -235,21 +289,21 @@ namespace CA_DataUploaderLib
                     cts.Cancel();
                 }
 
-                static void DetectSlowActionOnNewAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState) stateCheckArgs, UploadState newState)
+                void DetectSlowActionOnNewAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState, bool addToEventLog) stateCheckArgs, UploadState newState)
                 {
                     if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
-                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed} - new state {newState}", null);
+                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed} - new state {newState}", stateCheckArgs.addToEventLog, null);
 
                     stateCheckArgs.nextTargetToReportSlowAction = 2500;
                     stateCheckArgs.timeSinceLastAction.Restart();
                     stateCheckArgs.lastState = newState;
                 }
 
-                static void DetectSlowAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState) stateCheckArgs)
+                void DetectSlowAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState, bool addToEventLog) stateCheckArgs)
                 {
                     if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
                     {
-                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed}", null);
+                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed}", stateCheckArgs.addToEventLog, null);
                         stateCheckArgs.nextTargetToReportSlowAction *= 2;
                     }
                 }
@@ -298,7 +352,7 @@ namespace CA_DataUploaderLib
                 gzip.Write(buffer, 0, buffer.Length);
             }
 
-            return _signing.GetSignature(buffer).Concat(memory.ToArray()).ToArray();
+            return SignInfo.GetSignature(buffer).Concat(memory.ToArray()).ToArray();
         }
 
         private byte[] GetSignedVectorDescription(VectorDescription vectorDescription)
@@ -320,9 +374,22 @@ namespace CA_DataUploaderLib
         private byte[] GetSignedEvent(EventFiredArgs @event)
         { //this can be made more efficient to avoid extra allocations and/or use a memory pool, but these are for low frequency events so postponing looking at that.
             var bytes = @event.ToByteArray();
-            return _signing.GetSignature(bytes).Concat(bytes).ToArray();
+            return SignInfo.GetSignature(bytes).Concat(bytes).ToArray();
         }
 
+        private void OnError(string message, bool addToEventLog, Exception? ex = null)
+        {
+            if (!addToEventLog)
+            {
+                OnError(message, ex);
+                return;
+            }
+
+            Console.WriteLine(message);
+            message = ex != null ? $"{message}{Environment.NewLine}{ex}" : message;
+            SendEvent(this, new(message, EventType.LogError, DateTime.UtcNow));
+            return;
+        }
         private static void OnError(string message, Exception? ex = null)
         {
             if (ex != null)
@@ -337,7 +404,7 @@ namespace CA_DataUploaderLib
             var list = DequeueAllEntries(_queue);
             if (list == null) return ValueTask.FromResult(true); //no vectors, return success
 
-            stateWriter.TryWrite(UploadState.PostingVector);
+            stateWriter.TryWrite(UploadState.VectorUpload);
             var buffer = GetSignedVectors(list);
             var timestamp = list.First().Timestamp;
             return new ValueTask<bool>(Post());
@@ -346,9 +413,9 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    using var response = await _plot.PostVectorAsync(buffer, timestamp);
+                    using var response = await Plot.PostVectorAsync(buffer, timestamp);
                     var success = CheckAndLogFailures(response, "failed posting vector");
-                    stateWriter.TryWrite(UploadState.PostedVector);
+                    stateWriter.TryWrite(UploadState.UploadedVector);
                     return success;
                 }
                 catch (Exception ex)
@@ -367,10 +434,10 @@ namespace CA_DataUploaderLib
 
             foreach (var @event in events)
             {
-                stateWriter.TryWrite(UploadState.PostingEvent);
+                stateWriter.TryWrite(UploadState.EventUpload);
                 if (!await PostEventAsync(@event))
                     badEvents.Add(DateTime.UtcNow);
-                stateWriter.TryWrite(UploadState.PostedEvent);
+                stateWriter.TryWrite(UploadState.UploadedEvent);
             }
         }
 
@@ -389,8 +456,8 @@ namespace CA_DataUploaderLib
                 return false;
             }
 
-            Task<bool> Post(EventFiredArgs args) => CheckAndLogEvent(_plot.PostEventAsync(GetSignedEvent(args)), "event");
-            Task<bool> PostBoards(byte[] message) => CheckAndLogEvent(_plot.PostBoardsAsync(SignAndCompress(message)), "board");
+            Task<bool> Post(EventFiredArgs args) => CheckAndLogEvent(Plot.PostEventAsync(GetSignedEvent(args)), "event");
+            Task<bool> PostBoards(byte[] message) => CheckAndLogEvent(Plot.PostBoardsAsync(SignAndCompress(message)), "board");
             async Task<bool> PostSystemChangeNotificationAsync(EventFiredArgs args)
             {
                 var data = SystemChangeNotificationData.ParseJson(args.Data) ?? 
@@ -455,11 +522,6 @@ namespace CA_DataUploaderLib
             return success;
         }
 
-        public void Dispose()
-        { // class is sealed so don't need full blown IDisposable pattern.
-            _stopTokenSource.Cancel();
-        }
-
         private class PlotConnection
         {
             readonly HttpClient _client;
@@ -472,30 +534,47 @@ namespace CA_DataUploaderLib
 
             public string PlotName { get; set; }
             public int PlotId { get; }
-            public Task<HttpResponseMessage> PostVectorAsync(byte[] buffer, DateTime timestamp) => _client.PutAsJsonAsync($"/api/v2/Timeserie/UploadVectorRetroAsync?plotNameId={PlotId}&ticks={timestamp.Ticks}", buffer);
-            public Task<HttpResponseMessage> PostEventAsync(byte[] signedMessage) => _client.PutAsJsonAsync($"/api/v2/Event?plotNameId={PlotId}", signedMessage);
-            public Task<HttpResponseMessage> PostBoardsAsync(byte[] signedMessage) => _client.PutAsJsonAsync($"/api/v1/McuSerialnumber?plotNameId={PlotId}", signedMessage);
-            public Task<HttpResponseMessage> PostAsync(string requestUri, byte[] message) => _client.PutAsJsonAsync(requestUri, message);
-            public static async Task<PlotConnection> Establish(string loopName, byte[] publicKey, byte[] signedVectorDescription)
+            public Task<HttpResponseMessage> PostVectorAsync(byte[] buffer, DateTime timestamp) => PutAsync($"/api/v2/Timeserie/UploadVectorRetroAsync?plotNameId={PlotId}&ticks={timestamp.Ticks}", buffer);
+            public Task<HttpResponseMessage> PostEventAsync(byte[] signedMessage) => PutAsync($"/api/v2/Event?plotNameId={PlotId}", signedMessage);
+            public Task<HttpResponseMessage> PostBoardsAsync(byte[] signedMessage) => PutAsync($"/api/v1/McuSerialnumber?plotNameId={PlotId}", signedMessage);
+            public Task<HttpResponseMessage> PostAsync(string requestUri, byte[] message, CancellationToken token = default) 
+                => _client.PostAsJsonAsync(requestUri, message, token);
+            internal Task<HttpResponseMessage> PutAsync(string requestUri, byte[] message, CancellationToken token = default)
+                => _client.PutAsJsonAsync(requestUri, message, token);
+            public static async Task<PlotConnection> Establish(string loopName, byte[] publicKey, byte[] signedVectorDescription, TaskCompletionSource<PlotConnection> connectionEstablishedSource, CancellationToken cancellationToken)
             {
-                var connectionInfo = IOconfFile.GetConnectionInfo();
-                var client = NewClient(connectionInfo.Server);
-                var token = await GetLoginTokenWithRetries(client, connectionInfo); // retries here are important as its the first connection so running after a restart can run into the connection not being initialized
-                var (plotId, plotName) = await GetPlotIDAsync(loopName, client, token, publicKey, signedVectorDescription);
-                return new PlotConnection(client, plotId, plotName);
+                try
+                {
+                    var connectionInfo = IOconfFile.GetConnectionInfo();
+                    var client = NewClient(connectionInfo.Server);
+                    var token = await GetLoginTokenWithRetries(client, connectionInfo, cancellationToken); // retries here are important as its the first connection so running after a restart can run into the connection not being initialized
+                    var (plotId, plotName) = await GetPlotIDAsync(loopName, client, token, publicKey, signedVectorDescription, cancellationToken);
+                    var connection = new PlotConnection(client, plotId, plotName);
+                    connectionEstablishedSource.TrySetResult(connection);
+                    return connection;
+                }
+                catch (OperationCanceledException ex)
+                {
+                    connectionEstablishedSource.TrySetCanceled(ex.CancellationToken);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    connectionEstablishedSource.TrySetException(ex);
+                    throw;
+                }
             }
 
-            private static async Task<(int plotId, string plotName)> GetPlotIDAsync(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription)
+            private static async Task<(int plotId, string plotName)> GetPlotIDAsync(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription, CancellationToken cancellationToken)
             {
-                //ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                 HttpResponseMessage? response = null;
                 try
                 {
                     string query = $"/api/v1/Plotdata/GetPlotnameId?loopname={loopName}&ticks={DateTime.UtcNow.Ticks}&logintoken={loginToken}";
                     var signedValue = publicKey.Concat(signedVectorDescription).ToArray(); // Note that it will only work if converted to array and not IEnummerable
-                    response = await client.PutAsJsonAsync(query, signedValue);
+                    response = await client.PutAsJsonAsync(query, signedValue, cancellationToken);
                     response.EnsureSuccessStatusCode();
-                    var result = await response.Content.ReadFromJsonAsync<string>() ?? throw new InvalidOperationException("unexpected null result when getting plotid");
+                    var result = await response.Content.ReadFromJsonAsync<string>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("unexpected null result when getting plotid");
                     return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
                 }
                 catch (Exception ex)
@@ -503,55 +582,51 @@ namespace CA_DataUploaderLib
                     if (ex.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'" || ex.InnerException?.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'")
                         throw new HttpRequestException("Check your internet connection", ex);
 
-                    var contentTask = response?.Content?.ReadAsStringAsync();
+                    var contentTask = response?.Content?.ReadAsStringAsync(cancellationToken);
                     var error = contentTask != null ? await contentTask : null;
                     if (!string.IsNullOrEmpty(error))
                         throw new Exception(error);
 
-                    OnError("failed getting plot id", ex);
                     throw;
                 }
             }
 
-            private static async Task<string> GetLoginTokenWithRetries(HttpClient client, ConnectionInfo info)
+            private static async Task<string> GetLoginTokenWithRetries(HttpClient client, ConnectionInfo info, CancellationToken cancellationToken)
             {
                 int failureCount = 0;
                 while (true)
                 {
                     try
                     {
-                        var token = await GetLoginToken(client, info);
+                        var token = await GetLoginToken(client, info, cancellationToken);
                         if (failureCount > 0)
                             CALog.LogInfoAndConsoleLn(LogID.A, $"Reconnected after {failureCount} failed attempts.");
                         return token;
                     }
                     catch (HttpRequestException ex)
                     {
-                        if (failureCount++ > 10)
-                            throw;
-
                         OnError("Failed to connect while starting, attempting to reconnect in 5 seconds.", ex);
-                        await Task.Delay(5000);
+                        await Task.Delay(5000, cancellationToken);
                     }
                 }
             }
 
-            private static async Task<string> GetLoginToken(HttpClient client, ConnectionInfo accountInfo)
+            private static async Task<string> GetLoginToken(HttpClient client, ConnectionInfo accountInfo, CancellationToken cancellationToken)
             {
-                string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.Email}&password={accountInfo.Password}");
+                string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.Email}&password={accountInfo.Password}", cancellationToken);
                 if (string.IsNullOrEmpty(token))
-                    token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.Email}&password={accountInfo.Password}&fullName={accountInfo.Fullname}"); // attempt to create account assuming it did not exist
+                    token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.Email}&password={accountInfo.Password}&fullName={accountInfo.Fullname}", cancellationToken); // attempt to create account assuming it did not exist
                 if (!string.IsNullOrEmpty(token))
                     return token;
 
                 throw new Exception("Unable to login or create token");
             }
 
-            private static async Task<string?> Post(HttpClient client, string requestUri)
+            private static async Task<string?> Post(HttpClient client, string requestUri, CancellationToken cancellationToken)
             {
-                var response = await client.PostAsync(requestUri, null);
+                var response = await client.PostAsync(requestUri, null, cancellationToken);
                 if (response.StatusCode == System.Net.HttpStatusCode.OK && response.Content != null)
-                    return (await response.Content.ReadAsStringAsync()).Replace("\"","");
+                    return (await response.Content.ReadAsStringAsync(cancellationToken)).Replace("\"","");
                 else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                     return null;
 
@@ -588,14 +663,14 @@ namespace CA_DataUploaderLib
 
         private enum UploadState
         {
-            UploadVectorsCycle,
-            PostedVector,
-            LocalClusterRunning,
-            PostedEvent,
-            UploadEventsCycle,
-            PostingVector,
+            VectorUploader,
+            UploadedVector,
+            LocalCluster,
+            UploadedEvent,
+            EventUploader,
+            VectorUpload,
             CheckState,
-            PostingEvent
+            EventUpload
         }
     }
 }
