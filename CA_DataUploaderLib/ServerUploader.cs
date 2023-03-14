@@ -28,16 +28,14 @@ namespace CA_DataUploaderLib
         private PlotConnection Plot => _plot ?? throw new InvalidOperationException("usage of plot connection before vector description initialization");
         private readonly Signing? _signInfo;
         private Signing SignInfo => _signInfo ?? throw new NotSupportedException("signing is only supported in the uploader");
-        private readonly Queue<DataVector> _queue = new();
-        private readonly Queue<EventFiredArgs> _eventsQueue = new();
-        private readonly Dictionary<string, int> _duplicateEventsDetection = new();
-        private readonly Queue<(DateTime expirationTime, string @event)> _duplicateEventsExpirationTimes = new();
         private DateTime _lastTimestamp;
         private (bool[] uploadMap, VectorDescription uploadDesc)? _desc;
         private (bool[] uploadMap, VectorDescription uploadDesc) Desc => _desc ?? throw new InvalidOperationException("usage of desc before vector description initialization");
-        private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(10000);
+        private static readonly BoundedChannelOptions BoundedOptions = new(10000) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true };
+        private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(BoundedOptions);
+        private readonly Channel<DataVector> _vectorsChannel = Channel.CreateBounded<DataVector>(BoundedOptions);
+        private readonly Channel<EventFiredArgs> _eventsChannel = Channel.CreateBounded<EventFiredArgs>(BoundedOptions);
         private readonly CommandHandler _cmd;
-        private readonly IReadOnlyList<EventFiredArgs> _emptyEvents= new List<EventFiredArgs>();
         private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new();
 
         public string Title => nameof(ServerUploader);
@@ -69,38 +67,7 @@ namespace CA_DataUploaderLib
         public SubsystemDescriptionItems GetVectorDescriptionItems() => new(new(), new());
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
         public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs) => Enumerable.Empty<SensorSample>();
-
-        public void SendEvent(object? sender, EventFiredArgs e)
-        {
-            lock (_eventsQueue)
-            {
-                if (_eventsQueue.Count >= 10000) return;  // if sending thread can't catch up, then drop packages.
-                var duplicate = _duplicateEventsDetection.TryGetValue(e.Data, out var oldRepeatCount);
-                _duplicateEventsDetection[e.Data] = duplicate ? oldRepeatCount + 1 : 1;
-                if (duplicate && oldRepeatCount >= maxDuplicateMessagesPerMinuteRate) 
-                    return;
-
-                _eventsQueue.Enqueue(e);
-                if (!duplicate)
-                    _duplicateEventsExpirationTimes.Enqueue((DateTime.UtcNow.AddMinutes(1), e.Data));
-            }
-        }
-
-        void RemoveExpireduplicateEvents()
-        {
-            lock (_eventsQueue)
-            {
-                var now = DateTime.UtcNow;
-                while (_duplicateEventsExpirationTimes.TryPeek(out var e) && now > e.expirationTime)
-                {
-                    e = _duplicateEventsExpirationTimes.Dequeue();
-                    if (_duplicateEventsDetection.TryGetValue(e.@event, out var repeatCount) && repeatCount > maxDuplicateMessagesPerMinuteRate)
-                        _eventsQueue.Enqueue(new EventFiredArgs($"Skipped {repeatCount - maxDuplicateMessagesPerMinuteRate} duplicate messages detected within the last minute: {e.@event}", EventType.LogError, DateTime.UtcNow));
-                    _duplicateEventsDetection.Remove(e.@event);
-                }
-            }
-        }
-
+        public void SendEvent(object? sender, EventFiredArgs e) => _eventsChannel.Writer.TryWrite(e);
         private void SendVector(DataVector vector)
         {
             var (uploadMap, uploadDesc) = Desc;
@@ -111,22 +78,18 @@ namespace CA_DataUploaderLib
                 CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.timestamp}");
                 return;
             }
+            _lastTimestamp = vector.timestamp;
 
             _executedActionChannel.Writer.TryWrite(UploadState.LocalCluster);
 
             //first queue all events
             //note slightly changing the event time below is a workaround to ensure they come in order in the event log
             int @eventIndex = 0;
-            foreach (var e in vector.Events ?? _emptyEvents)
+            foreach (var e in vector.Events)
                 SendEvent(this, new EventFiredArgs(e.Data, e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
 
             //now queue vectors
-            lock (_queue)
-                if (_queue.Count < 10000)  // if sending thread can't catch up, then drop packages.
-                {
-                    _queue.Enqueue(WithOnlyUploadFields(vector));
-                    _lastTimestamp = vector.timestamp;
-                }
+            _vectorsChannel.Writer.TryWrite(WithOnlyUploadFields(vector));
 
             DataVector WithOnlyUploadFields(DataVector fullVector)
             {
@@ -139,7 +102,7 @@ namespace CA_DataUploaderLib
                         uploadData[j++] = fullVectorData[i];
                 }
 
-                return new(new(uploadData), fullVector.timestamp, _emptyEvents); //emptyEvents as we already queued them
+                return new(new(uploadData), fullVector.timestamp, Array.Empty<EventFiredArgs>()); //emptyEvents as we already queued them
             }
         }
 
@@ -234,13 +197,15 @@ namespace CA_DataUploaderLib
                 var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(IOconfFile.GetVectorUploadDelay()));
                 var stateWriter = _executedActionChannel.Writer;
                 var badEvents = new List<DateTime>();
+                Dictionary<string, int> duplicateEventsDetection = new();
+                Queue<(DateTime expirationTime, string @event)> _duplicateEventsExpirationTimes = new();
 
                 try
                 {
                     while (await throttle.WaitForNextTickAsync(token))
                     {
                         stateWriter.TryWrite(UploadState.EventUploader);
-                        await PostQueuedEventsAsync(stateWriter, badEvents);
+                        await PostQueuedEventsAsync(stateWriter, badEvents, duplicateEventsDetection, _duplicateEventsExpirationTimes);
                     }
                 }
                 catch (OperationCanceledException) { }
@@ -249,7 +214,7 @@ namespace CA_DataUploaderLib
                 CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued events");
 
                 await Task.Delay(200, CancellationToken.None); //we give an extra 200ms to let any remaining shutdown events come in
-                await PostQueuedEventsAsync(stateWriter, badEvents);
+                await PostQueuedEventsAsync(stateWriter, badEvents, duplicateEventsDetection, _duplicateEventsExpirationTimes);
                 PrintBadPackagesMessage(badEvents, "Events", true);
             }
 
@@ -331,15 +296,15 @@ namespace CA_DataUploaderLib
             }
         }
 
-        static List<T>? DequeueAllEntries<T>(Queue<T> queue)
+        static IReadOnlyList<T> DequeueAllEntries<T>(ChannelReader<T> reader)
         {
-            List<T>? list = null; // delayed initialization to avoid creating lists when there is no data.
-            lock (queue)
-                while (queue.Any())  // dequeue all. 
-                {
-                    list ??= new List<T>(); // ensure initialized
-                    list.Add(queue.Dequeue());
-                }
+            if (!reader.TryRead(out var value))
+                return Array.Empty<T>();
+
+            var list = new List<T>();
+            do
+                list.Add(value);
+            while (reader.TryRead(out value));
 
             return list;
         }
@@ -365,7 +330,7 @@ namespace CA_DataUploaderLib
             return SignAndCompress(buffer);
         }
 
-        private byte[] GetSignedVectors(List<DataVector> vectors)
+        private byte[] GetSignedVectors(IReadOnlyList<DataVector> vectors)
         {
             byte[] listLen = BitConverter.GetBytes((ushort)vectors.Count);
             var theData = vectors.SelectMany(a => a.buffer).ToArray();
@@ -402,12 +367,12 @@ namespace CA_DataUploaderLib
 
         private ValueTask<bool> PostQueuedVectorAsync(ChannelWriter<UploadState> stateWriter)
         {
-            var list = DequeueAllEntries(_queue);
-            if (list == null) return ValueTask.FromResult(true); //no vectors, return success
+            var list = DequeueAllEntries(_vectorsChannel.Reader);
+            if (list.Count == 0) return ValueTask.FromResult(true); //no vectors, return success
 
             stateWriter.TryWrite(UploadState.VectorUpload);
             var buffer = GetSignedVectors(list);
-            var timestamp = list.First().timestamp;
+            var timestamp = list[0].timestamp;
             return new ValueTask<bool>(Post());
 
             async Task<bool> Post()
@@ -427,18 +392,45 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private async ValueTask PostQueuedEventsAsync(ChannelWriter<UploadState> stateWriter, List<DateTime> badEvents)
+        private async ValueTask PostQueuedEventsAsync(
+            ChannelWriter<UploadState> stateWriter, List<DateTime> badEvents, Dictionary<string, int> duplicateEventsDetection, 
+            Queue<(DateTime expirationTime, string @event)> duplicateEventsExpirationTimes)
         {
             RemoveExpireduplicateEvents();
-            var events = DequeueAllEntries(_eventsQueue);
-            if (events == null) return;
 
-            foreach (var @event in events)
+            var events = DequeueAllEntries(_eventsChannel.Reader);
+            if (events.Count == 0) return;
+
+            foreach (var e in events)
             {
+                if (TrackDuplicate(e.Data)) continue;
+
                 stateWriter.TryWrite(UploadState.EventUpload);
-                if (!await PostEventAsync(@event))
+                if (!await PostEventAsync(e))
                     badEvents.Add(DateTime.UtcNow);
                 stateWriter.TryWrite(UploadState.UploadedEvent);
+            }
+
+            bool TrackDuplicate(string e)
+            {
+                var duplicate = duplicateEventsDetection.TryGetValue(e, out var oldRepeatCount);
+                duplicateEventsDetection[e] = duplicate ? oldRepeatCount + 1 : 1;
+                if (duplicate && oldRepeatCount >= maxDuplicateMessagesPerMinuteRate)
+                    return true;
+                if (!duplicate)
+                    duplicateEventsExpirationTimes.Enqueue((DateTime.UtcNow.AddMinutes(1), e));
+                return false;
+            }
+            void RemoveExpireduplicateEvents()
+            {
+                var now = DateTime.UtcNow;
+                while (duplicateEventsExpirationTimes.TryPeek(out var e) && now > e.expirationTime)
+                {
+                    e = duplicateEventsExpirationTimes.Dequeue();
+                    if (duplicateEventsDetection.TryGetValue(e.@event, out var repeatCount) && repeatCount > maxDuplicateMessagesPerMinuteRate)
+                        _eventsChannel.Writer.TryWrite(new EventFiredArgs($"Skipped {repeatCount - maxDuplicateMessagesPerMinuteRate} duplicate messages detected within the last minute: {e.@event}", EventType.LogError, DateTime.UtcNow));
+                    duplicateEventsDetection.Remove(e.@event);
+                }
             }
         }
 
