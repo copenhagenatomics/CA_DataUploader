@@ -37,7 +37,6 @@ namespace CA_DataUploaderLib
         private (bool[] uploadMap, VectorDescription uploadDesc) Desc => _desc ?? throw new InvalidOperationException("usage of desc before vector description initialization");
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(10000);
         private readonly CommandHandler _cmd;
-        private readonly IReadOnlyList<EventFiredArgs> _emptyEvents= new List<EventFiredArgs>();
         private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new();
 
         public string Title => nameof(ServerUploader);
@@ -53,9 +52,12 @@ namespace CA_DataUploaderLib
                 return;
             _signInfo = new Signing(_loopname);
             cmd.FullVectorDescriptionCreated += DescriptionCreated;
-            cmd.NewVectorReceived += (s,e) => SendVector(e.Vector);
-            if (nodes.Count == 0) //in 3.x, single node systems do not include events in NewVectorReceived
-                cmd.EventFired += SendEvent;//TODO: we are in 4.x now
+            var reader = cmd.GetReceivedVectorsReader();
+            _ = Task.Run(async () => 
+            {
+                await foreach (var vector in reader.ReadAllAsync(cmd.StopToken))
+                    SendVector(vector);
+            });
             cmd.AddSubsystem(this);
 
             void DescriptionCreated(object? sender, VectorDescription desc)
@@ -66,9 +68,8 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public SubsystemDescriptionItems GetVectorDescriptionItems() => new(new(), new());
+        public SubsystemDescriptionItems GetVectorDescriptionItems() => new(new());
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
-        public IEnumerable<SensorSample> GetDecisionOutputs(NewVectorReceivedArgs inputVectorReceivedArgs) => Enumerable.Empty<SensorSample>();
 
         public void SendEvent(object? sender, EventFiredArgs e)
         {
@@ -102,7 +103,7 @@ namespace CA_DataUploaderLib
         }
 
         private void SendVector(DataVector vector)
-        {
+        {//TODO: remove queues and use channels instead
             var (uploadMap, uploadDesc) = Desc;
             if (vector.Count != uploadMap.Length)
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {uploadMap.Length}");
@@ -117,7 +118,7 @@ namespace CA_DataUploaderLib
             //first queue all events
             //note slightly changing the event time below is a workaround to ensure they come in order in the event log
             int @eventIndex = 0;
-            foreach (var e in vector.Events ?? _emptyEvents)
+            foreach (var e in vector.Events)
                 SendEvent(this, new EventFiredArgs(e.Data, e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
 
             //now queue vectors
@@ -139,7 +140,7 @@ namespace CA_DataUploaderLib
                         uploadData[j++] = fullVectorData[i];
                 }
 
-                return new(uploadData, fullVector.Timestamp, _emptyEvents);//emptyEvents as we already queued them
+                return new(uploadData, fullVector.Timestamp, Array.Empty<EventFiredArgs>());//emptyEvents as we already queued them
             }
         }
 
@@ -184,7 +185,6 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                var token = cts.Token;
                 var (_, uploadDesc) = Desc;
                 _plot = await PlotConnection.Establish(_loopname, SignInfo.GetPublicKey(), GetSignedVectorDescription(uploadDesc), _connectionEstablishedSource, token);
 
@@ -194,7 +194,7 @@ namespace CA_DataUploaderLib
 
                 await Task.WhenAll(stateTracker, vectorsSender, eventsSender);
             }
-            catch (OperationCanceledException) when (cts.Token.IsCancellationRequested) { }
+            catch (OperationCanceledException ex) when (ex.CancellationToken == token) { }
             catch (Exception ex)
             {//this will usually be a hard error to establish a plot connection 
                 OnError("ServerUploader.LoopForever() exception: " + ex.Message, ex);

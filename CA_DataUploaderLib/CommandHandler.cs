@@ -92,17 +92,19 @@ namespace CA_DataUploaderLib
             }
 
             AddCommand(command, inputValidation);
-            NewVectorReceived += (s, v) =>
+            var reader = GetReceivedVectorsReader();
+            _ = Task.Run(async () => 
             {
-                foreach (var e in v.Vector.Events)
+                await foreach (var vector in reader.ReadAllAsync(StopToken))
+                foreach (var e in vector.Events)
                 {
                     if (e.EventType != (byte)EventType.Command || !e.Data.StartsWith(command)) continue;
-                    var cmd = _commandRunner.ParseCommand(e.Data);
-                    if (cmd.Count <= 0 || cmd[0] != command || !inputValidation(cmd))
-                        continue;
-
                     try
                     {
+                        var cmd = _commandRunner.ParseCommand(e.Data);
+                        if (cmd.Count <= 0 || cmd[0] != command || !inputValidation(cmd))
+                            continue;
+
                         action(cmd);
                     }
                     catch (Exception ex)
@@ -110,7 +112,7 @@ namespace CA_DataUploaderLib
                         CALog.LogErrorAndConsoleLn(LogID.A, $"error running command: {e.Data}", ex);
                     }
                 }
-            };
+            });
         }
         /// <remarks>all decisions must be added before running any subsystem, making decisions or getting vector descriptions i.e. add these early on</remarks>
         public void AddDecisions<T>(List<T> decisions) where T: LoopControlDecision => AddDecisions(decisions, _decisions);
@@ -413,7 +415,6 @@ $@"{GetCurrentNode().Name}
 {RpiVersion.GetHardware()}
 {connInfo.LoopName} - {connInfo.Email}
 {(_mapper != null ? string.Join(Environment.NewLine, Mapper.McuBoards.Select(x => x.ToString())) : "")}");
-            return true;
         }
 
         public void Dispose()

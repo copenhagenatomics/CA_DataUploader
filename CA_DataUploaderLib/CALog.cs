@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
@@ -122,12 +123,10 @@ namespace CA_DataUploaderLib
         public class EventsLogger : ISimpleLogger
         {
             private readonly CommandHandler handler;
-            private readonly bool useLocalEventsForOutput;
 
-            public EventsLogger(CommandHandler handler, bool useLocalEventsForOutput = false) 
+            public EventsLogger(CommandHandler handler) 
             {
                 this.handler = handler;
-                this.useLocalEventsForOutput = useLocalEventsForOutput;
                 EnableTempClusterOutputOnLocalActions(handler);
             }
             public void LogData(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log);
@@ -139,24 +138,26 @@ namespace CA_DataUploaderLib
             void EnableTempClusterOutputOnLocalActions(CommandHandler cmd)
             {
                 var logger = new ConsoleLogger();
-                Action subscribeAction = useLocalEventsForOutput 
-                    ? () => cmd.EventFired += OnLocalEventFired 
-                    : () => cmd.NewVectorReceived += OnVectorReceivedFired;
-                Action unsubscribeAction = useLocalEventsForOutput
-                    ? () => cmd.EventFired -= OnLocalEventFired
-                    : () => cmd.NewVectorReceived -= OnVectorReceivedFired;
+                var stopOutputToken = new CancellationTokenSource();
+                //Action subscribeAction = () => cmd.NewVectorReceived += OnVectorReceivedFired;
+                //Action unsubscribeAction = () => cmd.NewVectorReceived -= OnVectorReceivedFired;
                 EnableOnLocalUserCommands(
                     TimeSpan.FromSeconds(5),
-                    () => { Console.WriteLine("enabling local output for 5 seconds"); subscribeAction(); },
-                    () => { Console.WriteLine("disabled local output, check the event log in plots for further command(s) output"); unsubscribeAction(); });
+                    () => { Console.WriteLine("enabling local output for 5 seconds"); stopOutputToken = new(); ShowLocalConsoleOutput(stopOutputToken.Token); },
+                    () => { Console.WriteLine("disabled local output, check the event log in plots for further command(s) output"); stopOutputToken.Cancel(); });
 
-                void OnLocalEventFired(object _, EventFiredArgs e) => WriteLogEventTo(e.EventType, e.Data);
-                void OnVectorReceivedFired(object _, NewVectorWithEventsReceivedArgs args)
+                void ShowLocalConsoleOutput(CancellationToken token)
                 {
-                    var vector = args.Vector;
-                    if (vector.Events == null) return;
-                    foreach (var e in vector.Events)
-                        WriteLogEventTo(e.EventType, e.Data);
+                    _ = Task.Run(async () =>
+                    {//TODO: its not really supported to subscribe/unsubsubscribe the reader like this!
+                        var reader = cmd.GetReceivedVectorsReader();
+                        await foreach (var vector in reader.ReadAllAsync(token))
+                        {
+                            if (vector.Events == null) return;
+                            foreach (var e in vector.Events)
+                                WriteLogEventTo(e.EventType, e.Data);
+                        }
+                    });
                 }
 
                 void WriteLogEventTo(byte type, string data)
@@ -186,7 +187,7 @@ namespace CA_DataUploaderLib
                             enabled = true;
                     });
 
-                    void OnUserCommandEnableOutput(object sender, EventFiredArgs _)
+                    void OnUserCommandEnableOutput(object? sender, EventFiredArgs _)
                     {
                         timer.Change(duration, Timeout.InfiniteTimeSpan); //triggers after duration (ignores a previous trigger if pending)
                         bool justEnabled;

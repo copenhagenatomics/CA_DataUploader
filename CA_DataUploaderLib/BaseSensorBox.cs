@@ -40,12 +40,9 @@ namespace CA_DataUploaderLib
             if (!_values.Any())
                 return;  // no data
 
-            if (cmd != null)
-            {
-                SubscribeCommandsToSubsystems(cmd, mainSubsystem, _values);
-                cmd.AddSubsystem(this);
-                cmd.FullVectorIndexesCreated += InitializeBuiltInActionsIndexesAndVectorsChannel;
-            }
+            SubscribeCommandsToSubsystems(cmd, mainSubsystem, _values);
+            cmd.AddSubsystem(this);
+            cmd.FullVectorIndexesCreated += InitializeBuiltInActionsIndexesAndVectorsChannel;
 
             var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray(), boardStateIndexInFullVector: -1)).ToArray();
             foreach (var board in allBoards.Where(b => b.map.CustomWritesEnabled))
@@ -53,7 +50,7 @@ namespace CA_DataUploaderLib
             _boards = allBoards.Where(b => b.map.IsLocalBoard).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
 
-            static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler? cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived)
+            static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived)
             {
                 if (!map.IsLocalBoard)
                 {//if the board is not local we register the command validation with an empty action
@@ -101,7 +98,7 @@ namespace CA_DataUploaderLib
         private void SubscribeCommandsToSubsystems(CommandHandler cmd, string mainSubsystem, List<SensorSample.InputBased> values)
         {
             cmd.AddMultinodeCommand(mainSubsystem, _ => true, ShowQueue);
-            var subsystemOverrides = values.Select(v => v.Input.SubsystemOverride).Where(v => v != default).Distinct();
+            var subsystemOverrides = values.Select(v => v.Input.SubsystemOverride).OfType<string>().Distinct();
             foreach (var subsystem in subsystemOverrides)
             {
                 if (subsystem == mainSubsystem) continue;
