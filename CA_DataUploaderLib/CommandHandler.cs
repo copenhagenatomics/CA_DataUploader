@@ -1,4 +1,5 @@
-﻿using CA.LoopControlPluginBase;
+﻿#nullable enable
+using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using CA_DataUploaderLib.Extensions;
@@ -14,7 +15,8 @@ namespace CA_DataUploaderLib
 {
     public sealed class CommandHandler : IDisposable
     {
-        private readonly SerialNumberMapper _mapper;
+        private readonly SerialNumberMapper? _mapper;
+        private SerialNumberMapper Mapper => _mapper ?? throw new NotSupportedException("usage of SerialNumberMapper detected on an unsupported context");
         private readonly ICommandRunner _commandRunner;
         private DateTime _start = DateTime.Now;
         private readonly StringBuilder inputCommand = new();
@@ -24,14 +26,17 @@ namespace CA_DataUploaderLib
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
         private readonly CancellationTokenSource _exitCts = new();
         private readonly TaskCompletionSource _runningTaskTcs = new();
+        private readonly bool _isMultipi;
 
-        public event EventHandler<NewVectorReceivedArgs> NewVectorReceived;
-        public event EventHandler<EventFiredArgs> EventFired;
+        public event EventHandler<VectorDescription>? FullVectorDescriptionCreated;
+        public event EventHandler<NewVectorWithEventsReceivedArgs>? NewVectorReceived;
+        public event EventHandler<EventFiredArgs>? EventFired;
+        public event EventHandler<EventFiredArgs>? UserCommandReceived;
         public bool IsRunning => !_exitCts.IsCancellationRequested;
         public CancellationToken StopToken => _exitCts.Token;
         public Task RunningTask => _runningTaskTcs.Task;
 
-        public CommandHandler(SerialNumberMapper mapper = null, ICommandRunner runner = null)
+        public CommandHandler(SerialNumberMapper? mapper = null, ICommandRunner? runner = null)
         {
             _exitCts.Token.Register(() => _runningTaskTcs.TrySetCanceled());
             _commandRunner = runner ?? new DefaultCommandRunner();
@@ -40,22 +45,60 @@ namespace CA_DataUploaderLib
             new Thread(() => this.LoopForever()).Start();
             AddCommand("escape", Stop);
             AddCommand("help", HelpMenu);
-            AddCommand("up", Uptime);
-            AddCommand("version", GetVersion);
+
+            _isMultipi = IOconfFile.GetEntries<IOconfNode>().Any();
+            //we run the command in all nodes
+            AddMultinodeCommand("up", _ => true, Uptime);
+            AddMultinodeCommand("version", _ => true, GetVersion);
         }
 
+        /// <param name="inputValidation">a validation function that returns the same value regardless of the node in which it runs</param>
+        /// <param name="action">an action that can run in all nodes</param>
+        public void AddMultinodeCommand(string command, Func<List<string>, bool> inputValidation, Action<List<string>> action)
+        {
+            if (!_isMultipi)
+            {
+                AddCommand(command, a => 
+                {
+                    if (!inputValidation(a)) return false;
+                    action(a);
+                    return true;
+                });
+                return;
+            }
+
+            AddCommand(command, inputValidation);
+            NewVectorReceived += (s, v) =>
+            {
+                foreach (var e in v.Vector.Events)
+                {
+                    if (e.EventType != (byte)EventType.Command || !e.Data.StartsWith(command)) continue;
+                    var cmd = _commandRunner.ParseCommand(e.Data);
+                    if (cmd.Count <= 0 || cmd[0] != command || !inputValidation(cmd))
+                        continue;
+
+                    try
+                    {
+                        action(cmd);
+                    }
+                    catch (Exception ex)
+                    {
+                        CALog.LogErrorAndConsoleLn(LogID.A, $"error running command: {e.Data}", ex);
+                    }
+                }
+            };
+        }
         /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>
         public Action AddCommand(string name, Func<List<string>, bool> func) => _commandRunner.AddCommand(name, func);
         public void Execute(string command, bool isUserCommand = false) => HandleCommand(command, isUserCommand);
         public void AddSubsystem(ISubsystemWithVectorData subsystem) => _subsystems.Add(subsystem);
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
-        /// <remarks>This method is only aimed at single host scenarios where a single system has all the inputs</remarks>
-        public DataVector GetFullSystemVectorValues() 
+        /// <remarks>This method is only aimed at host scenarios where the system is ran in a single node with all the inputs</remarks>
+        public DataVector RunNextSingleNodeVector() 
         {
             var (samples, vectorTime) = MakeDecision(GetNodeInputs().ToList(), DateTime.UtcNow);
-            OnNewVectorReceived(samples.WithVectorTime(vectorTime));
-            return new DataVector(samples.Select(x => x.Value).ToList(), vectorTime);
+            return OnNewVectorReceived(samples.ToList(), vectorTime, Array.Empty<EventFiredArgs>()); //on 3.x single host events must be sent by the host to the uploader
         }
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
         public (IEnumerable<SensorSample>, DateTime vectorTime) MakeDecision(List<SensorSample> inputs, DateTime vectorTime)
@@ -83,7 +126,7 @@ namespace CA_DataUploaderLib
 
         private void SendDeviceDetectionEvent()
         {
-            var data = new SystemChangeNotificationData() { NodeName = GetCurrentNode().Name, Boards = _mapper.McuBoards.Select(ToBoardInfo).ToList() }.ToJson();
+            var data = new SystemChangeNotificationData() { NodeName = GetCurrentNode().Name, Boards = Mapper.McuBoards.Select(ToBoardInfo).ToList() }.ToJson();
             FireCustomEvent(data, DateTime.UtcNow, (byte)EventType.SystemChangeNotification);
 
             static SystemChangeNotificationData.BoardInfo ToBoardInfo(Board board) => new()
@@ -113,7 +156,9 @@ namespace CA_DataUploaderLib
                 .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
                 .ToList();
             var outputs = descItemsPerSubsystem.SelectMany(s => s.Outputs).ToList();
-            return new ExtendedVectorDescription(inputsPerNode, outputs, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
+            var desc = new ExtendedVectorDescription(inputsPerNode, outputs);
+            FullVectorDescriptionCreated?.Invoke(this, desc.VectorDescription);
+            return desc;
         }
 
         private static IOconfNode GetCurrentNode() => GetNodes().Single(n => n.IsCurrentSystem);
@@ -135,8 +180,12 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public void OnNewVectorReceived(IEnumerable<SensorSample> vector) =>
-            NewVectorReceived?.Invoke(this, new NewVectorReceivedArgs(vector.ToDictionary(v => v.Name, v => v.Value)));
+        public DataVector OnNewVectorReceived(IReadOnlyList<SensorSample> vector, DateTime vectorTime, IReadOnlyList<EventFiredArgs> events)
+        {
+            var eventArgs = NewVectorWithEventsReceivedArgs.From(vector, vectorTime, events);
+            NewVectorReceived?.Invoke(this, eventArgs);
+            return eventArgs.Vector;
+        }
 
         public void FireAlert(string msg, DateTime timespan)
         {
@@ -176,6 +225,8 @@ namespace CA_DataUploaderLib
         private void HandleCommand(string cmdString, bool isUserCommand)
         {
             cmdString = cmdString.Trim();
+            if (isUserCommand)
+                UserCommandReceived?.Invoke(this, new(cmdString, EventType.Command, DateTime.UtcNow));
             if (_commandRunner.Run(cmdString, isUserCommand) && isUserCommand)
                 OnUserCommandAccepted(cmdString);
         }
@@ -189,7 +240,7 @@ namespace CA_DataUploaderLib
         }
 
         /// <returns>the text line <c>null</c> if we are no longer running (_running is false)</returns>
-        private string GetCommand()
+        private string? GetCommand()
         {
             inputCommand.Clear();
             var info = Console.ReadKey(true);
@@ -269,13 +320,10 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public bool Uptime(List<string> args)
-        {
+        public void Uptime(List<string> _) => 
             CALog.LogInfoAndConsoleLn(LogID.A, $"{GetCurrentNode().Name} - {DateTime.Now.Subtract(_start).Humanize(5)}");
-            return true;
-        }
 
-        public bool GetVersion(List<string> args)
+        public void GetVersion(List<string> _)
         {
             var connInfo = IOconfFile.GetConnectionInfo();
             CALog.LogInfoAndConsoleLn(LogID.A, 
@@ -283,8 +331,7 @@ $@"{GetCurrentNode().Name}
 {RpiVersion.GetSoftware()}
 {RpiVersion.GetHardware()}
 {connInfo.LoopName} - {connInfo.email}
-{string.Join(Environment.NewLine, _mapper.McuBoards.Select(x => x.ToString()))}");
-            return true;
+{string.Join(Environment.NewLine, Mapper.McuBoards.Select(x => x.ToString()))}");
         }
 
         public void Dispose()

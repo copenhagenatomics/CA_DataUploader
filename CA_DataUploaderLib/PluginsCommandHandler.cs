@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -10,18 +11,14 @@ namespace CA_DataUploaderLib
     {
         private readonly CommandHandler cmd;
         private readonly List<Action> removeCommandActions = new();
-        private readonly List<EventHandler<NewVectorReceivedArgs>> subscribedNewVectorReceivedEvents = new();
 
         public PluginsCommandHandler(CommandHandler cmd) 
         {
             this.cmd = cmd;
+            cmd.NewVectorReceived += (s, v) => NewVectorReceived?.Invoke(s, v);
         }
 
-        public event EventHandler<NewVectorReceivedArgs> NewVectorReceived 
-        { 
-            add { cmd.NewVectorReceived += value; lock(subscribedNewVectorReceivedEvents) subscribedNewVectorReceivedEvents.Add(value); } 
-            remove { cmd.NewVectorReceived -= value; lock(subscribedNewVectorReceivedEvents) subscribedNewVectorReceivedEvents.Remove(value); }
-        }
+        public event EventHandler<NewVectorReceivedArgs>? NewVectorReceived;
         public void AddCommand(string name, Func<List<string>, bool> func) => removeCommandActions.Add(cmd.AddCommand(name, func));
         //the addToCommandHistory should be renamed isUserCommand, but not changing now to avoid a new plugins base version just for an arg name change
         //note addToCommandHistory is always false, as sent by: LoopControlCommand.ExecuteCommand
@@ -41,7 +38,7 @@ namespace CA_DataUploaderLib
             }
 
             void OnCancelled() => tcs.TrySetCanceled(token);
-            void OnNewValue(object sender, NewVectorReceivedArgs e)
+            void OnNewValue(object? sender, NewVectorReceivedArgs e)
             {
                 if (condition(e)) tcs.TrySetResult(e);
             }
@@ -49,9 +46,7 @@ namespace CA_DataUploaderLib
 
         public void Dispose()
         {// class is sealed without unmanaged resources, no need for the full disposable pattern.
-            lock(subscribedNewVectorReceivedEvents)  
-                foreach (var subscribedEvent in subscribedNewVectorReceivedEvents.ToArray())
-                    NewVectorReceived -= subscribedEvent;
+            NewVectorReceived = null; //removes all subscribers
             foreach (var removeAction in removeCommandActions)
                 removeAction();
         }

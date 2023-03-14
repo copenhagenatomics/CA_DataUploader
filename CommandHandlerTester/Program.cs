@@ -15,7 +15,7 @@ namespace CommandHandlerTester
             int i = 0;
             while (cmd.IsRunning)
             {
-                cmd.OnNewVectorReceived(new List<SensorSample> { new SensorSample("IterationSensor", i++) });
+                cmd.OnNewVectorReceived(new List<SensorSample> { new SensorSample("IterationSensor", i++) }, DateTime.UtcNow, null);
                 Thread.Sleep(1000);
             }
 
