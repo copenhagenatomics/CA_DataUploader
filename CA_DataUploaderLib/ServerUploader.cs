@@ -71,7 +71,7 @@ namespace CA_DataUploaderLib
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
         public void SendEvent(object? sender, EventFiredArgs e) => _eventsChannel.Writer.TryWrite(e);
         private void SendVector(DataVector vector)
-        {//TODO: remove queues and use channels instead
+        {
             var (uploadMap, uploadDesc) = Desc;
             if (vector.Count != uploadMap.Length)
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {uploadMap.Length}");
@@ -198,14 +198,14 @@ namespace CA_DataUploaderLib
                 var stateWriter = _executedActionChannel.Writer;
                 var badEvents = new List<DateTime>();
                 Dictionary<string, int> duplicateEventsDetection = new();
-                Queue<(DateTime expirationTime, string @event)> _duplicateEventsExpirationTimes = new();
+                Queue<(DateTime expirationTime, string @event)> duplicateEventsExpirationTimes = new();
 
                 try
                 {
                     while (await throttle.WaitForNextTickAsync(token))
                     {
                         stateWriter.TryWrite(UploadState.EventUploader);
-                        await PostQueuedEventsAsync(stateWriter, badEvents, duplicateEventsDetection, _duplicateEventsExpirationTimes);
+                        await PostQueuedEventsAsync(stateWriter, badEvents, duplicateEventsDetection, duplicateEventsExpirationTimes);
                     }
                 }
                 catch (OperationCanceledException) { }
@@ -214,7 +214,7 @@ namespace CA_DataUploaderLib
                 CALog.LogInfoAndConsoleLn(LogID.A, "uploader is stopping, trying to send remaining queued events");
 
                 await Task.Delay(200, CancellationToken.None); //we give an extra 200ms to let any remaining shutdown events come in
-                await PostQueuedEventsAsync(stateWriter, badEvents, duplicateEventsDetection, _duplicateEventsExpirationTimes);
+                await PostQueuedEventsAsync(stateWriter, badEvents, duplicateEventsDetection, duplicateEventsExpirationTimes);
                 PrintBadPackagesMessage(badEvents, "Events", true);
             }
 

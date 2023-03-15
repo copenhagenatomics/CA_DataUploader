@@ -138,22 +138,21 @@ namespace CA_DataUploaderLib
             void EnableTempClusterOutputOnLocalActions(CommandHandler cmd)
             {
                 var logger = new ConsoleLogger();
-                var stopOutputToken = new CancellationTokenSource();
-                //Action subscribeAction = () => cmd.NewVectorReceived += OnVectorReceivedFired;
-                //Action unsubscribeAction = () => cmd.NewVectorReceived -= OnVectorReceivedFired;
+                bool enabled = false;
+                ShowLocalConsoleOutputWhenEnabled();
                 EnableOnLocalUserCommands(
                     TimeSpan.FromSeconds(5),
-                    () => { Console.WriteLine("enabling local output for 5 seconds"); stopOutputToken = new(); ShowLocalConsoleOutput(stopOutputToken.Token); },
-                    () => { Console.WriteLine("disabled local output, check the event log in plots for further command(s) output"); stopOutputToken.Cancel(); });
+                    () => { Console.WriteLine("enabling local output for 5 seconds"); enabled = true; },
+                    () => { Console.WriteLine("disabled local output, check the event log in plots for further command(s) output"); enabled = false; });
 
-                void ShowLocalConsoleOutput(CancellationToken token)
+                void ShowLocalConsoleOutputWhenEnabled()
                 {
+                    var reader = cmd.GetReceivedVectorsReader();
                     _ = Task.Run(async () =>
-                    {//TODO: its not really supported to subscribe/unsubsubscribe the reader like this! maybe have a single reader
-                        var reader = cmd.GetReceivedVectorsReader();
-                        await foreach (var vector in reader.ReadAllAsync(token))
+                    {
+                        await foreach (var vector in reader.ReadAllAsync())
                         {
-                            if (vector.Events == null) return;
+                            if (!enabled) continue;
                             foreach (var e in vector.Events)
                                 WriteLogEventTo(e.EventType, e.Data);
                         }

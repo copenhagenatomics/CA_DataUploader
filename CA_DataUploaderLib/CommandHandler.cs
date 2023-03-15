@@ -41,7 +41,7 @@ namespace CA_DataUploaderLib
         /// For subsystems, this is usually the constructor of the subsystem or on a handler of <see cref="FullVectorIndexesCreated"/>.
         /// </remarks>
         public ChannelReader<DataVector> GetReceivedVectorsReader()
-        {//TODO: this vector should come with events, like the 3.x NewVectorWithEventsReceivedArgs
+        {
             var channel = Channel.CreateUnbounded<DataVector>();
             _receivedVectorsWriters.Add(channel.Writer);
             return channel.Reader;
@@ -133,22 +133,14 @@ namespace CA_DataUploaderLib
         public void AddSubsystem(ISubsystemWithVectorData subsystem) => _subsystems.Add(subsystem);
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
-        /// <remarks>This method is only aimed at host scenarios where the system is ran in a single node with all the inputs</remarks>
-        public void RunNextSingleNodeVector([NotNull] ref DataVector? vector, List<string> events) 
-        {
-            MakeDecision(GetNodeInputs().ToList(), DateTime.UtcNow, ref vector, events);
-            //TODO: it is not just that events is a string, but it is only user commands ... but we need all log events too!
-            ////re-add workarounds that read events from EventFired in for single node hosts in 3.x?
-            OnNewVectorReceived(new(vector.Data, vector.Timestamp, Array.Empty<EventFiredArgs>()));
-            //OnNewVectorReceived(new(vector.Data, vector.Timestamp, events));
-        }
+        private readonly static List<string> _emptyCommands = new(0);
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
-        public void MakeDecision(List<SensorSample> inputs, DateTime vectorTime, [NotNull]ref DataVector? vector, List<string> events)
-        {//TODO: this is not really taking all events, so consider taking all events and then filtering user commands when passing it to the decisions!
+        public void MakeDecision(List<SensorSample> inputs, DateTime vectorTime, [NotNull]ref DataVector? vector, List<string> commands)
+        {
             var extendedDesc = _fullsystemFilterAndMath.Value;
             DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, vectorTime);
             extendedDesc.ApplyInputsAndFilters(inputs, vector);
-            MakeDecisionsAfterInputsAndFilters(vector, events, extendedDesc);
+            MakeDecisionsAfterInputsAndFilters(vector, commands, extendedDesc);
         }
 
         public void MakeDecisionUsingInputsAndFiltersFromNewVector(DataVector newVector, DataVector vector, List<string> events)
@@ -161,14 +153,14 @@ namespace CA_DataUploaderLib
             MakeDecisionsAfterInputsAndFilters(vector, events, extendedDesc);
         }
 
-        private void MakeDecisionsAfterInputsAndFilters(DataVector vector, List<string> events, ExtendedVectorDescription extendedDesc)
+        private void MakeDecisionsAfterInputsAndFilters(DataVector vector, List<string> commands, ExtendedVectorDescription extendedDesc)
         {
             extendedDesc.ApplyMath(vector);
             var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.Timestamp, vector.Data);
             foreach (var decision in _decisions)
-                decision.MakeDecision(decisionsVector, events);
+                decision.MakeDecision(decisionsVector, commands);
             foreach (var decision in _safetydecisions)
-                decision.MakeDecision(decisionsVector, events);
+                decision.MakeDecision(decisionsVector, commands);
         }
 
         public Task RunSubsystems() => RunSubsystems(StopToken);
