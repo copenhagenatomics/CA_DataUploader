@@ -17,9 +17,6 @@ namespace CA_DataUploader
 
         static async Task MainAsync(string[] args)
         {
-            Queue<string> receivedCommandsInThisCycleQueue = new();
-            List<string> receivedCommandsInThisCycle = new();
-
             try
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
@@ -35,25 +32,12 @@ namespace CA_DataUploader
                     var email = IOconfSetup.UpdateIOconf(serial);
 
                     using var cmd = new CommandHandler(serial);
+                    var cloud = new ServerUploader(cmd);
                     _ = new ThermocoupleBox(cmd);
-                    using var cloud = new ServerUploader(cmd.GetFullSystemVectorDescription(), cmd);
-                    cmd.EventFired += cloud.SendEvent;
-                    cmd.EventFired += AddToReceivedCommandsQueue;
-                    CALog.LogInfoAndConsoleLn(LogID.A, "Now connected to server...");
-                    cmd.Execute("help");
-                    _ = Task.Run(() => cmd.RunSubsystems());
-
-                    int i = 0;
-                    var uploadThrottle = new TimeThrottle(100);
-                    DataVector? dataVector = null;
-                    while (cmd.IsRunning)
-                    {
-                        cmd.GetFullSystemVectorValues(ref dataVector, GetReceivedCommandsInThisCycle());
-                        cloud.SendVector(dataVector);
-                        Console.Write($"\r data points uploaded: {i++}"); // we don't want this in the log file. 
-                        uploadThrottle.Wait();
-                        if (i == 20) DULutil.OpenUrl(cloud.GetPlotUrl());
-                    }
+                    var runTask = SingleNodeRunner.Run(cmd, cloud, cmd.GetFullSystemVectorDescription(), cmd.StopToken);
+                    await Task.Delay(2000);
+                    _ = Task.Run(async () => DULutil.OpenUrl(await cloud.GetPlotUrl(cmd.StopToken)));
+                    await runTask;
                 }
                 CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
             }
@@ -63,29 +47,6 @@ namespace CA_DataUploader
             }
 
             Console.ReadKey();
-
-            void AddToReceivedCommandsQueue(object? source, EventFiredArgs args)
-            {
-                lock (receivedCommandsInThisCycleQueue)
-                {
-                    if (args.EventType == (byte)EventType.Command)
-                        return;
-
-                    receivedCommandsInThisCycleQueue.Enqueue(args.Data);
-                }
-            }
-
-            List<string> GetReceivedCommandsInThisCycle()
-            {
-                lock (receivedCommandsInThisCycleQueue)
-                {
-                    receivedCommandsInThisCycle.Clear();
-                    while (receivedCommandsInThisCycleQueue.TryDequeue(out var command))
-                        receivedCommandsInThisCycle.Add(command);
-
-                    return receivedCommandsInThisCycle;
-                }
-            }
         }
 
         private static void ShowHumanErrorMessages(Exception ex)

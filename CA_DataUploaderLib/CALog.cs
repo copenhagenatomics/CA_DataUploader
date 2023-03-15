@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
@@ -125,12 +127,70 @@ namespace CA_DataUploaderLib
             public EventsLogger(CommandHandler handler) 
             {
                 this.handler = handler;
+                EnableTempClusterOutputOnLocalActions(handler);
             }
             public void LogData(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log);
             public void LogError(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.LogError);
             public void LogError(Exception ex) => handler.FireCustomEvent(ex.ToString(), DateTime.UtcNow, (byte)EventType.LogError);
             public void LogInfo(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log);
 
+            /// <summary>prints remoteEvents to the console for 5 seconds when detecting local user commands<summary>
+            void EnableTempClusterOutputOnLocalActions(CommandHandler cmd)
+            {
+                var logger = new ConsoleLogger();
+                var enabled = 0;
+                ShowLocalConsoleOutputWhenEnabled();
+                EnableOnLocalUserCommands(
+                    TimeSpan.FromSeconds(5),
+                    () => Console.WriteLine("enabling local output for 5 seconds"),
+                    () => Console.WriteLine("disabled local output, check the event log in plots for further command(s) output"));
+
+                void ShowLocalConsoleOutputWhenEnabled()
+                {
+                    var reader = cmd.GetReceivedVectorsReader();
+                    _ = Task.Run(async () =>
+                    {
+                        await foreach (var vector in reader.ReadAllAsync())
+                        {
+                            if (Interlocked.CompareExchange(ref enabled, 0, 0) == 0)
+                                continue;
+                            foreach (var e in vector.Events)
+                                WriteLogEventTo(e.EventType, e.Data);
+                        }
+                    });
+                }
+
+                void WriteLogEventTo(byte type, string data)
+                {
+                    if (type == (byte)EventType.LogError)
+                        logger.LogError(data);
+                    else if (type == (byte)EventType.Log)
+                        logger.LogInfo(data);
+                }
+
+                void EnableOnLocalUserCommands(TimeSpan duration, Action enabledCallback, Action disabledCallback)
+                {
+                    var timer = new Timer(_ =>
+                    {
+                        if (Interlocked.CompareExchange(ref enabled, 0, 1) == 1)
+                            disabledCallback();
+                    });
+                    cmd.UserCommandReceived += OnUserCommandEnableOutput;
+                    cmd.StopToken.Register(() =>
+                    {//since we are not be able to deliver events after stopping, keep console output enabled
+                        cmd.UserCommandReceived -= OnUserCommandEnableOutput;
+                        timer.Change(Timeout.Infinite, Timeout.Infinite);//disable the timer
+                        Interlocked.CompareExchange(ref enabled, 0, 1);
+                    });
+
+                    void OnUserCommandEnableOutput(object? sender, EventFiredArgs _)
+                    {
+                        timer.Change(duration, Timeout.InfiniteTimeSpan); //triggers after duration (ignores a previous trigger if pending)
+                        if (Interlocked.CompareExchange(ref enabled, 1, 0) == 0)
+                            enabledCallback();
+                    }
+                }
+            }
         }
     }
 }

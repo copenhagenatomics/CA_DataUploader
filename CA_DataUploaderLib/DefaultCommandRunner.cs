@@ -28,8 +28,7 @@ namespace CA_DataUploaderLib
 
         public bool Run(string cmdString, bool isUserCommand)
         {
-            var cmd = cmdString.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
-
+            var cmd = ParseCommand(cmdString);
             if (!cmd.Any())
                 return false;
 
@@ -50,6 +49,9 @@ namespace CA_DataUploaderLib
 
             return res;
         }
+
+        public List<string> ParseCommand(string cmdString) => 
+            cmdString.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
 
         /// <returns><c>true</c> if at least one function accepted the command, otherwise <c>false</c></returns>
         /// <remarks>If a command returns false or throws an ArgumentException we still run the other commands.</remarks>

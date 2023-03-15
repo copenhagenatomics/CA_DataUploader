@@ -7,5 +7,6 @@ namespace CA_DataUploaderLib
     {
         Action AddCommand(string name, Func<List<string>, bool> func);
         bool Run(string cmdString, bool isUserCommand);
+        List<string> ParseCommand(string name);
     }
 }
