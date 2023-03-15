@@ -139,11 +139,12 @@ namespace CA_DataUploaderLib
             {
                 var logger = new ConsoleLogger();
                 bool enabled = false;
+                var lockObj = new object();
                 ShowLocalConsoleOutputWhenEnabled();
                 EnableOnLocalUserCommands(
                     TimeSpan.FromSeconds(5),
-                    () => { Console.WriteLine("enabling local output for 5 seconds"); enabled = true; },
-                    () => { Console.WriteLine("disabled local output, check the event log in plots for further command(s) output"); enabled = false; });
+                    () => Console.WriteLine("enabling local output for 5 seconds"),
+                    () => Console.WriteLine("disabled local output, check the event log in plots for further command(s) output"));
 
                 void ShowLocalConsoleOutputWhenEnabled()
                 {
@@ -152,7 +153,8 @@ namespace CA_DataUploaderLib
                     {
                         await foreach (var vector in reader.ReadAllAsync())
                         {
-                            if (!enabled) continue;
+                            lock(lockObj)
+                                if (!enabled) continue;
                             foreach (var e in vector.Events)
                                 WriteLogEventTo(e.EventType, e.Data);
                         }
@@ -169,8 +171,6 @@ namespace CA_DataUploaderLib
 
                 void EnableOnLocalUserCommands(TimeSpan duration, Action enabledCallback, Action disabledCallback)
                 {
-                    var enabled = false;
-                    var lockObj = new object();
                     var timer = new Timer(_ =>
                     {
                         lock (lockObj)
