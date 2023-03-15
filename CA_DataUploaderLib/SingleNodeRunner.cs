@@ -63,7 +63,7 @@ namespace CA_DataUploaderLib
             {
                 lock (receivedEventsInThisCycleQueue)
                 {
-                    receivedEventsInThisCycleQueue.Clear();
+                    receivedEventsInThisCycle.Clear();
                     while (receivedEventsInThisCycleQueue.TryDequeue(out var command))
                         receivedEventsInThisCycle.Add(command);
 
