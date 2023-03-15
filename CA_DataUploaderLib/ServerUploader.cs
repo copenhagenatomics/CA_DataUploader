@@ -80,7 +80,7 @@ namespace CA_DataUploaderLib
                 CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.Timestamp}");
                 return;
             }
-            _lastTimestamp = vector.timestamp;
+            _lastTimestamp = vector.Timestamp;
 
             _executedActionChannel.Writer.TryWrite(UploadState.LocalCluster);
 

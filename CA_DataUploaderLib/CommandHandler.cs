@@ -137,11 +137,14 @@ namespace CA_DataUploaderLib
         public void RunNextSingleNodeVector([NotNull] ref DataVector? vector, List<string> events) 
         {
             MakeDecision(GetNodeInputs().ToList(), DateTime.UtcNow, ref vector, events);
-            OnNewVectorReceived(vector);//TODO: this vector must include the events + we need to remove workarounds that read events from EventFired in for single node hosts in 3.x!
+            //TODO: it is not just that events is a string, but it is only user commands ... but we need all log events too!
+            ////re-add workarounds that read events from EventFired in for single node hosts in 3.x?
+            OnNewVectorReceived(new(vector.Data, vector.Timestamp, Array.Empty<EventFiredArgs>()));
+            //OnNewVectorReceived(new(vector.Data, vector.Timestamp, events));
         }
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
         public void MakeDecision(List<SensorSample> inputs, DateTime vectorTime, [NotNull]ref DataVector? vector, List<string> events)
-        {
+        {//TODO: this is not really taking all events, so consider taking all events and then filtering user commands when passing it to the decisions!
             var extendedDesc = _fullsystemFilterAndMath.Value;
             DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, vectorTime);
             extendedDesc.ApplyInputsAndFilters(inputs, vector);

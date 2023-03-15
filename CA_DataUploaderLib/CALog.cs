@@ -149,7 +149,7 @@ namespace CA_DataUploaderLib
                 void ShowLocalConsoleOutput(CancellationToken token)
                 {
                     _ = Task.Run(async () =>
-                    {//TODO: its not really supported to subscribe/unsubsubscribe the reader like this!
+                    {//TODO: its not really supported to subscribe/unsubsubscribe the reader like this! maybe have a single reader
                         var reader = cmd.GetReceivedVectorsReader();
                         await foreach (var vector in reader.ReadAllAsync(token))
                         {
