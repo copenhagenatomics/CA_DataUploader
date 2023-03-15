@@ -138,8 +138,7 @@ namespace CA_DataUploaderLib
             void EnableTempClusterOutputOnLocalActions(CommandHandler cmd)
             {
                 var logger = new ConsoleLogger();
-                bool enabled = false;
-                var lockObj = new object();
+                var enabled = 0;
                 ShowLocalConsoleOutputWhenEnabled();
                 EnableOnLocalUserCommands(
                     TimeSpan.FromSeconds(5),
@@ -153,8 +152,8 @@ namespace CA_DataUploaderLib
                     {
                         await foreach (var vector in reader.ReadAllAsync())
                         {
-                            lock(lockObj)
-                                if (!enabled) continue;
+                            if (Interlocked.CompareExchange(ref enabled, 0, 0) == 0)
+                                continue;
                             foreach (var e in vector.Events)
                                 WriteLogEventTo(e.EventType, e.Data);
                         }
@@ -173,29 +172,21 @@ namespace CA_DataUploaderLib
                 {
                     var timer = new Timer(_ =>
                     {
-                        lock (lockObj)
-                            enabled = false;
-                        disabledCallback();
+                        if (Interlocked.CompareExchange(ref enabled, 0, 1) == 1)
+                            disabledCallback();
                     });
                     cmd.UserCommandReceived += OnUserCommandEnableOutput;
                     cmd.StopToken.Register(() =>
                     {//since we are not be able to deliver events after stopping, keep console output enabled
                         cmd.UserCommandReceived -= OnUserCommandEnableOutput;
                         timer.Change(Timeout.Infinite, Timeout.Infinite);//disable the timer
-                        lock (lockObj)
-                            enabled = true;
+                        Interlocked.CompareExchange(ref enabled, 0, 1);
                     });
 
                     void OnUserCommandEnableOutput(object? sender, EventFiredArgs _)
                     {
                         timer.Change(duration, Timeout.InfiniteTimeSpan); //triggers after duration (ignores a previous trigger if pending)
-                        bool justEnabled;
-                        lock (lockObj)
-                        {
-                            if (justEnabled = !enabled)
-                                enabled = true;
-                        }
-                        if (justEnabled)
+                        if (Interlocked.CompareExchange(ref enabled, 1, 0) == 0)
                             enabledCallback();
                     }
                 }
