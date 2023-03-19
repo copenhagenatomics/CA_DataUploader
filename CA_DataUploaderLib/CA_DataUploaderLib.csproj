@@ -38,7 +38,6 @@
 
   <ItemGroup>
     <PackageReference Include="CoreCLR-NCalc" Version="2.2.101" />
-    <PackageReference Include="Humanizer.Core" Version="2.14.1" /> 
     <PackageReference Include="MinVer" Version="3.1.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
