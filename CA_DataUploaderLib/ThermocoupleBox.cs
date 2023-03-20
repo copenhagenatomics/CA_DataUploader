@@ -53,7 +53,7 @@ namespace CA_DataUploaderLib
 
         private static IEnumerable<IOconfInput> GetSensors()
         {
-            var values = IOconfFile.GetTypeK();
+            var values = IOconfFile.GetTemp();
             var rpiTemp = IOconfFile.GetRPiTemp();
             var expandedSensors = rpiTemp.GetDistributedExpandedInputConf();
             return values.Concat(expandedSensors);
