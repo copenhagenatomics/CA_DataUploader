@@ -123,6 +123,11 @@ namespace CA_DataUploaderLib
             string? newCalibration = configSettings.Calibration;
             if (newCalibration == default || Calibration == newCalibration)
                 return default; // ignore if there is no calibration in configuration or if the board already had the expected configuration
+            if (Calibration == default && configSettings.SkipCalibrationWhenHeaderIsMissing)
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"skipped detected board without calibration support - {ToShortDescription()}");
+                return default;
+            }
 
             var calibrationMessage = $"replaced board calibration '{Calibration}' with '{newCalibration}";
             CALog.LogInfoAndConsoleLn(LogID.A, $"{calibrationMessage}' - {ToShortDescription()}");
