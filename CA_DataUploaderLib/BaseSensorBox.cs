@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Text;
 using CA_DataUploaderLib.IOconf;
-using Humanizer;
 using System.Diagnostics;
 using System.Collections;
 using System.Threading.Tasks;
@@ -204,7 +203,7 @@ namespace CA_DataUploaderLib
                 var loops = StartLoops(boards, token);
                 await Task.WhenAll(loops);
                 if (loops.Count > 0) //we only report the exit when we actually ran loops with detected boards. If a board was not detected StartReadLoops already reports the missing boards.
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardLoops() " + DateTime.Now.Subtract(start).Humanize(5));
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardLoops() " + DateTime.Now.Subtract(start));
             }
             catch (Exception ex)
             {

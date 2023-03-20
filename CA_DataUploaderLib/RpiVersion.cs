@@ -75,14 +75,6 @@ $@"{hostAssembly?.GetName()}
             return "Unknown hardware";
         }
 
-        public static string[] GetUSBports()
-        {
-            if (_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("ls -1a /dev/USB*").Split("\n".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).Select(x => x.Replace("\r", "").Trim()).ToArray();
-
-            return SerialPort.GetPortNames();
-        }
-                
         private static Dictionary<string, string> GetVersions()
         {
             // load csv table from embedded resources

@@ -2,7 +2,6 @@
 using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
-using Humanizer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -300,7 +299,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.Now.Subtract(_start).Humanize(5));
+            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.Now.Subtract(_start));
         }
 
         private void HandleCommand(string cmdString, bool isUserCommand)
@@ -399,7 +398,7 @@ namespace CA_DataUploaderLib
         }
 
         public void Uptime(List<string> _) => 
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{GetCurrentNode().Name} - {DateTime.Now.Subtract(_start).Humanize(5)}");
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{GetCurrentNode().Name} - {DateTime.Now.Subtract(_start)}");
 
         public void GetVersion(List<string> _)
         {

@@ -21,7 +21,7 @@ namespace CA_DataUploaderLib
         public async static Task<SerialNumberMapper> DetectDevices()
         {
             var logLevel = File.Exists("IO.conf") ? IOconfFile.GetOutputLevel() : CALogLevel.Normal;
-            var boards = await Task.WhenAll(RpiVersion.GetUSBports().Select(name => AttemptToOpenDeviceConnection(name, logLevel)));
+            var boards = await Task.WhenAll(MCUBoard.GetUSBports().Select(name => AttemptToOpenDeviceConnection(name, logLevel)));
             return new SerialNumberMapper(boards.OfType<Board>());
         }
 

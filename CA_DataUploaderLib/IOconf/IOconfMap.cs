@@ -12,15 +12,19 @@ namespace CA_DataUploaderLib.IOconf
 
             var list = ToList();
             if (list[0] != "Map") throw new Exception($"IOconfMap: wrong format: {row} {Format}");
+            var isVirtualPort = IsVirtualPortName(list[1]);
             bool isWindows = RpiVersion.IsWindows();
             if (isWindows && list[1].StartsWith("COM"))
                 USBPort = list[1];
             else if (!isWindows && list[1].StartsWith("USB"))
                 USBPort = "/dev/" + list[1];
+            else if (isVirtualPort)
+                USBPort = list[1];
             else
                 SerialNumber = list[1];
 
             Name = BoxName = list[2];
+            _boardSettings = isVirtualPort ? DefaultVirtualBoardSettings : BoardSettings.Default;
 
             var customWritesIndex = list.IndexOf("customwrites");
             CustomWritesEnabled = customWritesIndex > -1;
@@ -86,7 +90,17 @@ namespace CA_DataUploaderLib.IOconf
         public bool CustomWritesEnabled { get; } = false;
         public Board? Board { get; private set; }
         public MCUBoard? McuBoard { get; private set; }
-        private BoardSettings _boardSettings = BoardSettings.Default;
+
+        private BoardSettings _boardSettings;
+        internal static bool IsVirtualPortName(string portName) => portName.StartsWith("vports/");
+        public static readonly BoardSettings DefaultVirtualBoardSettings = new()
+        {
+            ExpectedHeaderLines = 0, //no headers expected, just value lines right away
+            SkipBoardAutoDetection = true, //everything about how we detect board data is specific to our units, so this must be skipped for vports
+            //reconnect does not play well with socat based ports, so we give it plenty of extra time before running reconnects
+            MaxMillisecondsWithoutNewValues = 30000,
+            SecondsBetweenReopens = 10
+        };
 
         public override string ToString() => $"{BoxName} - {USBPort ?? SerialNumber}";
     }
