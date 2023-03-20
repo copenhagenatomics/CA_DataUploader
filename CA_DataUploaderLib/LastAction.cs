@@ -14,14 +14,14 @@ namespace CA_DataUploaderLib
         }
 
         public double Target { get; private set; } = 0;
-        public DateTime TimeToRepeat { get; private set; } = DateTime.MaxValue;
+        public DateTime TimeToRepeat { get; private set; }
         public Stopwatch TimeRunning { get; } = Stopwatch.StartNew();
         public bool ChangedOrExpired(double newtarget, DateTime currentVectorTime) =>
-            Target != newtarget || TimeRunning.ElapsedMilliseconds >= repeatMilliseconds || currentVectorTime >= TimeToRepeat;
+            Target != newtarget || (repeatMilliseconds > -1 && TimeRunning.ElapsedMilliseconds >= repeatMilliseconds) || currentVectorTime >= TimeToRepeat;
         public void ExecutedNewAction(double target, DateTime currentVectorTime)
         {
             Target = target;
-            TimeToRepeat = currentVectorTime.AddMilliseconds(repeatMilliseconds);
+            TimeToRepeat = repeatMilliseconds > -1 ? currentVectorTime.AddMilliseconds(repeatMilliseconds) : DateTime.MaxValue;
             TimeRunning.Restart();
         }
 
