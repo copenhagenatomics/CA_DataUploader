@@ -44,7 +44,6 @@ namespace CA_DataUploaderLib
         public bool InitialConnectionSucceeded {get; private set;} = false;
 
         public const string CalibrationHeader = "Calibration: ";
-        public const string CalibrationHeader2 = "CAL ";
 
         public const string GitShaHeader = "Git SHA: ";
         public const string GitShaHeader2 = "Git SHA ";
@@ -394,19 +393,12 @@ namespace CA_DataUploaderLib
             var localBuffer = buffer; // take a copy to avoid unnecesarily throwing away data coming after the header
             if (!TryReadLine(ref localBuffer, out var input))
                 return false; //we did not get a line, more data is needed
-            if (TryParseCalibration(CalibrationHeader, out calibration) || TryParseCalibration(CalibrationHeader2, out calibration))
-                buffer = localBuffer; //avoids the calibration line being treated as data
-            return true;
-
-            bool TryParseCalibration(string header, out string? calibration)
+            if (input.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase))
             {
-                calibration = default;
-                if (!input.Contains(header, StringComparison.InvariantCultureIgnoreCase)) 
-                    return false;
-
                 calibration = input[(input.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
-                return true;
+                buffer = localBuffer; //avoids the calibration line being treated as data
             }
+            return true;
         }
 
         /// <summary>detects if we are talking with a supported third party device</summary>
