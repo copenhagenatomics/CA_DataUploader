@@ -10,11 +10,12 @@ namespace CA_DataUploaderLib.IOconf
         public bool AllJunction { get; }
 
         public override bool IsSpecialDisconnectValue(double value) => value >= 10000;
-        //deltas are sensitivity in uV/C
-        public static IOconfTemp NewTypeK(string row, int lineNum) => new(row, lineNum, TypeKName, "0.000041276", "0.00004073");
-        public static IOconfTemp NewTypeJ(string row, int lineNum) => new(row, lineNum, TypeJName, "0.000057953", "0.000052136");
+        //deltas are sensitivity in V/C based on standard values for thermocouple types, such like ones mentioned at https://www.analog.com/media/en/technical-documentation/data-sheets/max31855.pdf
+        //these calibration values need to have 10 decimals because otherwise LoopControl detects a difference vs. what boards return
+        public static IOconfTemp NewTypeK(string row, int lineNum) => new(row, lineNum, TypeKName, "0.0000412760", "0.0000407300");
+        public static IOconfTemp NewTypeJ(string row, int lineNum) => new(row, lineNum, TypeJName, "0.0000579530", "0.0000521360");
         //CAL portNumber,delta,coldJunctionDelta portNumber,delta,...
-        static readonly string DefaultCalibrations = $"CAL {string.Join(" ", Enumerable.Range(1, 10).Select(i => $"{i},0.000041276,0.00004073"))}";
+        static readonly string DefaultCalibrations = $"CAL {string.Join(" ", Enumerable.Range(1, 10).Select(i => $"{i},0.0000412760,0.0000407300"))}";
 
         private IOconfTemp(string row, int lineNum, string type, string delta, string coldJunctionDelta) : 
             base(row, lineNum, type, false, new BoardSettings() { 
