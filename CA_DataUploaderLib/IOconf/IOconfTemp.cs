@@ -10,7 +10,7 @@ namespace CA_DataUploaderLib.IOconf
         public bool AllJunction { get; }
 
         public override bool IsSpecialDisconnectValue(double value) => value >= 10000;
-        //deltas are sensitivity in V/C
+        //deltas are sensitivity in V/C based on standard values for thermocouple types, such like ones mentioned at https://www.analog.com/media/en/technical-documentation/data-sheets/max31855.pdf
         //these calibration values need to have 10 decimals because otherwise LoopControl detects a difference vs. what boards return
         public static IOconfTemp NewTypeK(string row, int lineNum) => new(row, lineNum, TypeKName, "0.0000412760", "0.0000407300");
         public static IOconfTemp NewTypeJ(string row, int lineNum) => new(row, lineNum, TypeJName, "0.0000579530", "0.0000521360");
