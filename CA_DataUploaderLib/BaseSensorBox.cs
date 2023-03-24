@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Collections;
 using System.Threading.Tasks;
 using System.Threading.Channels;
+using CA_DataUploaderLib.Extensions;
 
 namespace CA_DataUploaderLib
 {
@@ -266,16 +267,11 @@ namespace CA_DataUploaderLib
                         continue;
                     }
 
-                    var receivedVector = false;
+                    DataVector? vector = null;
                     do
                     {
-                        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-                        linkedCts.CancelAfter(2000);
-                        var nextVectorTask = vectorsChannel!.ReadAsync(linkedCts.Token).AsTask();
-                        await Task.WhenAny(nextVectorTask); //wrap on Task.Any so we can explicitely deal with global cancellation vs. timeout of the linked token
-                        token.ThrowIfCancellationRequested(); //we are stopping, let's break of the top loop so stop actions run
-                        receivedVector = nextVectorTask.IsCompletedSuccessfully;
-                        var vector = receivedVector ? await nextVectorTask : null;
+                        vector = await vectorsChannel!.ReadWithSoftTimeout(2000, token);
+                        token.ThrowIfCancellationRequested(); //we are stopping, let's break of the top loop so the stop actions run
                         if (vector != null && !CheckConnectedStateInVector(board, boardStateIndexInFullVector, ref waitingBoardReconnect, vector))
                             continue; // no point trying to send commands while there is no connection to the board.
 
@@ -284,7 +280,7 @@ namespace CA_DataUploaderLib
 
                         EnsureResumeAfterTimeoutIsReported();
                     }
-                    while (!receivedVector);
+                    while (vector == null);
                 }
                 catch (TimeoutException)
                 {
