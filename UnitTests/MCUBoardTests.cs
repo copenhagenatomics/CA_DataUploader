@@ -79,6 +79,67 @@ namespace UnitTests
             await detectTask;
         }
 
+        [TestMethod]
+        public async Task ReadSerialRecognizesNormalHeader()
+        {//this was *not* gathered from a box so might not be 100% accurate, but should be good enough
+            var pipe = new Pipe();
+            var (reader, writer) = (pipe.Reader, pipe.Writer);
+            await Write(writer, "1\n");
+            var header = new MCUBoard.Header();
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
+            await Write(writer, "2\n");
+            await Write(writer, "3\n");
+            await Write(writer, "Serial Number: 1234\n");
+            await Write(writer, "Product Type: Custom Board\n");
+            await Write(writer, "Sub Product Type: 0\n");
+            await Write(writer, "MCU Family: The new Mcu\n");
+            await Write(writer, "Software Version: 1.2.3\n");
+            await Write(writer, "Compile Date: 1-1-2023\n");
+            await Write(writer, "Git SHA: abcd\n");
+            await Write(writer, "PCB Version: 1.2\n");
+            await Write(writer, "4:\n");
+            Assert.IsTrue(await res);
+            Assert.AreEqual("1234", header.SerialNumber);
+            Assert.AreEqual("Custom Board", header.ProductType);
+            Assert.AreEqual("0", header.SubProductType);
+            Assert.AreEqual("The new Mcu", header.McuFamily);
+            Assert.AreEqual("1.2.3", header.SoftwareVersion);
+            Assert.AreEqual("1-1-2023", header.SoftwareCompileDate);
+            Assert.AreEqual("abcd", header.GitSha);
+            Assert.AreEqual("1.2", header.PcbVersion);
+        }
+
+        [TestMethod]
+        public async Task ReadSerialRecognizesWithMissingValues()
+        {
+            var pipe = new Pipe();
+            var (reader, writer) = (pipe.Reader, pipe.Writer);
+            await Write(writer, "1\n");
+            var header = new MCUBoard.Header();
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
+            await Write(writer, "2\n");
+            await Write(writer, "3\n");
+            await Write(writer, "Serial Number:\n");
+            await Write(writer, "Product Type:\n");
+            await Write(writer, "Sub Product Type:\n");
+            await Write(writer, "MCU Family:\n");
+            await Write(writer, "Software Version:\n");
+            await Write(writer, "Compile Date:\n");
+            await Write(writer, "Git SHA:\n");
+            await Write(writer, "PCB Version:\n");
+            await Write(writer, "4:\n");
+            Assert.IsTrue(await res);
+            Assert.AreEqual("", header.SerialNumber);
+            Assert.AreEqual("", header.ProductType);
+            Assert.AreEqual("", header.SubProductType);
+            Assert.AreEqual("", header.McuFamily);
+            Assert.AreEqual("", header.SoftwareVersion);
+            Assert.AreEqual("", header.SoftwareCompileDate);
+            Assert.AreEqual("", header.GitSha);
+            Assert.AreEqual("", header.PcbVersion);
+        }
+
+
         private static Task<string> ReadLine(PipeReader reader) => MCUBoard.ReadLine(reader, "abc", 16, TryReadLine);
         private static ValueTask<FlushResult> Write(PipeWriter writer, string data) => Write(writer, Encoding.ASCII.GetBytes(data));
         private static ValueTask<FlushResult> Write(PipeWriter writer, byte[] bytes)
@@ -89,7 +150,6 @@ namespace UnitTests
             return writer.FlushAsync();
         }
 
-        private static bool TryReadLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line) =>
-            MCUBoard.TryReadAsciiLine(ref buffer, out line, '\n');
+        private static bool TryReadLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line) => MCUBoard.TryReadAsciiLine(ref buffer, out line, '\n');
     }
 }
