@@ -1,7 +1,6 @@
 ﻿using CA_DataUploaderLib;
 using CA_DataUploaderLib.Helpers;
 using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
@@ -34,7 +33,7 @@ namespace CA_DataUploader
                     using var cmd = new CommandHandler(serial);
                     var cloud = new ServerUploader(cmd);
                     _ = new ThermocoupleBox(cmd);
-                    var runTask = SingleNodeRunner.Run(cmd, cloud, cmd.GetFullSystemVectorDescription(), cmd.StopToken);
+                    var runTask = SingleNodeRunner.Run(cmd, cloud, cmd.StopToken);
                     await Task.Delay(2000);
                     _ = Task.Run(async () => DULutil.OpenUrl(await cloud.GetPlotUrl(cmd.StopToken)));
                     await runTask;

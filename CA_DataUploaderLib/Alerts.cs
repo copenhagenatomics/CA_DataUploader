@@ -37,10 +37,10 @@ namespace CA_DataUploaderLib
         private readonly CommandHandler _cmd;
         private bool disabled;
 
-        public Alerts(VectorDescription vectorDescription, CommandHandler cmd) : base()
+        public Alerts(CommandHandler cmd) : base()
         {
             _cmd = cmd;
-            _alerts = GetAlerts(vectorDescription, cmd).ToArray();
+            _alerts = GetAlerts(cmd.GetFullSystemVectorDescription(), cmd).ToArray();
             var reader = _cmd.GetReceivedVectorsReader();
             _ = Task.Run(() => CheckAlertsOnReceivedVectors(reader));
         }
@@ -59,7 +59,10 @@ namespace CA_DataUploaderLib
                         if (!alert.CheckValue(vector[sensorIndex], timestamp))
                             continue;
 
-                        _cmd.FireAlert(alert.Message, timestamp);
+                        if (alert.EventType == EventType.Alert)
+                            _cmd.FireAlert(alert.Message, timestamp);
+                        else
+                            CALog.LogErrorAndConsoleLn(LogID.A, alert.Message);
                         if (alert.Command == default)
                             continue;
 
@@ -85,6 +88,9 @@ namespace CA_DataUploaderLib
         {
             var indexes = vectorDesc._items.Select((f, i) => (f, i)).ToDictionary(f => f.f.Descriptor, f => f.i);
             var alerts = new List<(IOconfAlert alert, int sensorIndex)>();
+            var alertsDefinitions = IOconfFile.GetAlerts()
+                .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_alert")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;5", 0, EventType.Alert)))
+                .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_error")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;5", 0, EventType.LogError)));
             foreach (var alert in IOconfFile.GetAlerts().ToList())
             {
                 if (!indexes.TryGetValue(alert.Sensor, out var index))

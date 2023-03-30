@@ -8,14 +8,14 @@ namespace CA_DataUploaderLib
 {
     public class SingleNodeRunner
     {
-        public static async Task Run(CommandHandler cmdHandler, ServerUploader uploader, VectorDescription vectorDescription, CancellationToken token)
+        public static async Task Run(CommandHandler cmdHandler, ServerUploader uploader, CancellationToken token)
         {
             Queue<EventFiredArgs> receivedEventsInThisCycleQueue = new();
             List<EventFiredArgs> receivedEventsInThisCycle = new();
 
             try
             {
-                var alerts = new Alerts(vectorDescription, cmdHandler);
+                var alerts = new Alerts(cmdHandler);
                 CALog.LoggerForUserOutput = new CALog.EventsLogger(cmdHandler);
                 cmdHandler.Execute("help");
                 var subsystemsTask = Task.Run(() => cmdHandler.RunSubsystems(token), token);
