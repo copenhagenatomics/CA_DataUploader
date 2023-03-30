@@ -63,6 +63,7 @@ namespace CA_DataUploaderLib
                             _cmd.FireAlert(alert.Message, timestamp);
                         else
                             CALog.LogErrorAndConsoleLn(LogID.A, alert.Message);
+
                         if (alert.Command == default)
                             continue;
 
@@ -91,7 +92,7 @@ namespace CA_DataUploaderLib
             var alertsDefinitions = IOconfFile.GetAlerts()
                 .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_alert")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;5", 0, EventType.Alert)))
                 .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_error")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;5", 0, EventType.LogError)));
-            foreach (var alert in IOconfFile.GetAlerts().ToList())
+            foreach (var alert in alertsDefinitions)
             {
                 if (!indexes.TryGetValue(alert.Sensor, out var index))
                     throw new FormatException($"Alert: {alert.Name} points to missing vector field: {alert.Sensor}");
