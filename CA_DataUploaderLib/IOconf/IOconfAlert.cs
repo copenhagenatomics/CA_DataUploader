@@ -19,13 +19,15 @@ namespace CA_DataUploaderLib.IOconf
 
     public class IOconfAlert : IOconfRow
     {
-        public IOconfAlert(string row, int lineNum) : base(row, lineNum, "Alert")
+        public IOconfAlert(string row, int lineNum, EventType eventType = EventType.Alert) : base(row, lineNum, "Alert")
         {
+            Format = "Alert;Name;SensorName comparison value;[rateMinutes];[command]";
+            EventType = eventType;
             var list = ToList();
             if (list[0] != "Alert" || list.Count < 3) throw new Exception("IOconfAlert: wrong format: " + row);
    
             (Sensor, Value, MessageTemplate, type) = ParseExpression(
-                Name, list[2], "IOconfAlert: wrong format: " + row + ". Format: Alert;Name;SensorName comparison value;[rateMinutes];[command].");
+                Name, list[2], $"IOconfAlert: wrong format: {row}. Format: {Format}.");
             Message = MessageTemplate;
             if (list.Count <= 3)
                 (RateLimitMinutes, Command) = (DefaultRateLimitMinutes, default);
@@ -47,6 +49,8 @@ namespace CA_DataUploaderLib.IOconf
         //sample expression: SomeValue < 202
         private static readonly Regex comparisonRegex = new(@"^\s*([\w%]+)\s*(=|!=|>|<|>=|<=)\s*([-]?\d+(?:\.\d+)?)\s*$");
         public int RateLimitMinutes { get; }
+        public EventType EventType { get; }
+
         private const int DefaultRateLimitMinutes = 30; // by default fire the same alert max once every 30 mins.
         private DateTime LastTriggered;
 
