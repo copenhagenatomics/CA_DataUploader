@@ -46,7 +46,7 @@ namespace CA_DataUploaderLib
                 _reusableFiedsDictionary[_fieldsByIndex[i]] = vector[i];
 
             foreach (var (math, index) in _mathWithFieldIndexes)
-                vector[index] = math.Calculate(_reusableFiedsDictionary);
+                _reusableFiedsDictionary[_fieldsByIndex[index]] = vector[index] = math.Calculate(_reusableFiedsDictionary);
         }
     }
 }
