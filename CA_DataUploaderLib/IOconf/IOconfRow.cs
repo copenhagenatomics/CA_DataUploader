@@ -20,7 +20,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public string Row { get; }
         public string Type { get; }
-        protected readonly int LineNumber;
+        public int LineNumber { get; }
         public string Name { get; init; }
         protected string Format { get; init; } = string.Empty;
         public bool IsUnknown { get; }
