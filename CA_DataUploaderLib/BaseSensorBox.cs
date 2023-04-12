@@ -29,6 +29,7 @@ namespace CA_DataUploaderLib
         private readonly Dictionary<MCUBoard, List<(Func<DataVector?, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
         private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = new();
         private ChannelReader<DataVector>? _receivedVectors;
+        private static readonly HashSet<string> _usedBoxNames = new();
 
         public BaseSensorBox(CommandHandler cmd, string commandName, IEnumerable<IOconfInput> values)
         { 
@@ -45,13 +46,33 @@ namespace CA_DataUploaderLib
             cmd.FullVectorIndexesCreated += InitializeBuiltInActionsIndexesAndVectorsChannel;
 
             var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray(), boardStateIndexInFullVector: -1)).ToArray();
-            foreach (var board in allBoards.Where(b => b.map.CustomWritesEnabled))
+            foreach (var board in allBoards)
+            {
                 RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived);
+                EnforceBoardNotAlreadyInUse(board.map.BoxName);//used by another sensor type / BaseSensorBox instance
+                EnforceNoDuplicatePorts(board.map.BoxName, board.values);
+            }
+
             _boards = allBoards.Where(b => b.map.IsLocalBoard).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
 
+
+            static void EnforceNoDuplicatePorts(string boxName, SensorSample.InputBased[] sensors)
+            {
+                var duplicate = sensors.GroupBy(v => v.Input.PortNumber).FirstOrDefault(g => g.Count() > 1);
+                if (duplicate == null) return;
+                var dupSensors = string.Join(',', duplicate.Select(s => s.Input.Row));
+                throw new FormatException($"can't map the same board:port number to different IO.conf lines: {boxName}:{duplicate.Key} - {dupSensors}");
+            }
+            static void EnforceBoardNotAlreadyInUse(string boxName)
+            {
+                if (_usedBoxNames.Contains(boxName))
+                    throw new FormatException($"can't map the same board to different IO.conf line types: {boxName}");
+                _usedBoxNames.Add(boxName);
+            }
             static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived)
             {
+                if (!map.CustomWritesEnabled) return;
                 if (!map.IsLocalBoard)
                 {//if the board is not local we register the command validation with an empty action
                     cmd.AddMultinodeCommand("custom", a => a.Count >= 3 && a[1] == map.BoxName, _ => { });
