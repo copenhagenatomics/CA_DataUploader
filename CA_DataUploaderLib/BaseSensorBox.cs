@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib
         private readonly Dictionary<MCUBoard, List<(Func<DataVector?, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
         private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = new();
         private ChannelReader<DataVector>? _receivedVectors;
-        private static readonly HashSet<string> _usedBoxNames = new();
+        private static readonly Dictionary<string, string> _usedBoxNames = new();
 
         public BaseSensorBox(CommandHandler cmd, string commandName, IEnumerable<IOconfInput> values)
         { 
@@ -49,7 +49,7 @@ namespace CA_DataUploaderLib
             foreach (var board in allBoards)
             {
                 RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived);
-                EnforceBoardNotAlreadyInUse(board.map.BoxName);//used by another sensor type / BaseSensorBox instance
+                EnforceBoardNotAlreadyInUse(board.map.BoxName, board.values.First().Input.Row);//used by another sensor type / BaseSensorBox instance
                 EnforceNoDuplicatePorts(board.map.BoxName, board.values);
             }
 
@@ -61,14 +61,14 @@ namespace CA_DataUploaderLib
             {
                 var duplicate = sensors.GroupBy(v => v.Input.PortNumber).FirstOrDefault(g => g.Count() > 1);
                 if (duplicate == null) return;
-                var dupSensors = string.Join(',', duplicate.Select(s => s.Input.Row));
-                throw new FormatException($"can't map the same board:port number to different IO.conf lines: {boxName}:{duplicate.Key} - {dupSensors}");
+                var dupSensors = string.Join(Environment.NewLine, duplicate.Select(s => s.Input.Row));
+                throw new FormatException($"can't map the same board port to different IO.conf lines: {boxName};{duplicate.Key}{Environment.NewLine}{dupSensors}");
             }
-            static void EnforceBoardNotAlreadyInUse(string boxName)
+            static void EnforceBoardNotAlreadyInUse(string boxName, string newRow)
             {
-                if (_usedBoxNames.Contains(boxName))
-                    throw new FormatException($"can't map the same board to different IO.conf line types: {boxName}");
-                _usedBoxNames.Add(boxName);
+                if (_usedBoxNames.TryGetValue(boxName, out var usedRow))
+                    throw new FormatException($"can't map the same board to different IO.conf line types: {boxName}{Environment.NewLine}{usedRow}{Environment.NewLine}{newRow}");
+                _usedBoxNames.Add(boxName, newRow);
             }
             static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived)
             {
