@@ -558,8 +558,11 @@ namespace CA_DataUploaderLib
                 {
                     calibration = default;
                     var localBuffer = buffer; // take a copy to avoid unnecesarily throwing away data coming after the header
-                    if (!tryReadLine(ref localBuffer, out var input))
-                        return false; //we did not get a line, more data is needed
+                    if (!tryReadLine(ref localBuffer, out var input) || input == null || input.Trim() == string.Empty)
+                    {//we did not get a line, more data is needed
+                        buffer = localBuffer;//advance the buffer to ensure we fetch more data
+                        return false; 
+                    }
                     if (input.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase))
                     {
                         calibration = input[(input.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
