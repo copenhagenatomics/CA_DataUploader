@@ -285,7 +285,7 @@ namespace CA_DataUploaderLib
                 try
                 {
                     var cmd = GetCommand();
-                    if (cmd != null) //cmd is null when GetCommand abort due to _running being false
+                    if (!string.IsNullOrWhiteSpace(cmd)) //cmd is null when GetCommand abort due to _running being false
                         HandleCommand(cmd, true);
                 }
                 catch (Exception ex)
@@ -308,6 +308,7 @@ namespace CA_DataUploaderLib
 
         private void OnUserCommandAccepted(string cmdString)
         {
+            
             if (AcceptedCommands.LastOrDefault() != cmdString)
                 AcceptedCommands.Add(cmdString);
             AcceptedCommandsIndex = AcceptedCommands.Count;
