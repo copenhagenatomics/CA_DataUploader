@@ -356,12 +356,23 @@ namespace CA_DataUploaderLib
             SendEvent(this, new(message, EventType.LogError, DateTime.UtcNow));
             return;
         }
+
         private static void OnError(string message, Exception? ex = null)
         {
             if (ex != null)
                 CALog.LogError(LogID.A, message, ex); //note we don't use LogErrorAndConsoleLn variation, as CALog.LoggerForUserOutput may be set to generate events that are only visible on the event log.
             else
                 CALog.LogData(LogID.A, message);
+            Console.WriteLine(message);
+        }
+
+        private static void OnError(string message, string detailsForLog, Exception? ex = null)
+        {
+            var logMsg = message + Environment.NewLine + detailsForLog;
+            if (ex != null)
+                CALog.LogError(LogID.A, logMsg, ex); //note we don't use LogErrorAndConsoleLn variation, as CALog.LoggerForUserOutput may be set to generate events that are only visible on the event log.
+            else
+                CALog.LogData(LogID.A, logMsg);
             Console.WriteLine(message);
         }
 
@@ -510,9 +521,22 @@ namespace CA_DataUploaderLib
         {
             var success = response.IsSuccessStatusCode;
             if (!success)
-                OnError($"{getMessage(messageArgs)}. Response: {Environment.NewLine}{response}");
+                OnError($"{getMessage(messageArgs)}",
+                    $"Response: {Environment.NewLine}{response}{Environment.NewLine}" +
+                    $"Response Content: {Environment.NewLine}{ReadStringFromStream(response.Content?.ReadAsStream())}{Environment.NewLine}" +
+                    $"Request Message: {Environment.NewLine}{response.RequestMessage}{Environment.NewLine}");
 
             return success;
+        }
+
+        public static string ReadStringFromStream(Stream? input)
+        {
+            if (input is null)
+                return string.Empty;
+
+            using var stream = new StreamReader(input);
+            stream.BaseStream.Seek(0, SeekOrigin.Begin);
+            return stream.ReadToEnd();
         }
 
         private class PlotConnection
