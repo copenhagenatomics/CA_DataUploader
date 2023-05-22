@@ -17,7 +17,7 @@ namespace CA_DataUploaderLib
         public PluginsLoader(CommandHandler handler, string targetFolder = "plugins")
         {
             this.handler = handler;
-            this.targetFolder = targetFolder; 
+            this.targetFolder = targetFolder;
         }
 
         public void LoadPlugins()
@@ -37,7 +37,7 @@ namespace CA_DataUploaderLib
                 context.Unload();
                 return;
             }
-            
+
             CALog.LogData(LogID.A, $"loaded plugins from {assemblyFullPath} - {string.Join(",", decisions.Select(e => e.GetType().Name))}");
             handler.AddDecisions(decisions);
         }
@@ -58,8 +58,11 @@ namespace CA_DataUploaderLib
 
                 foreach (var confDecision in confDecisions.Where(cd => cd.ClassName == type.Name))
                 {
-                    var result = (T) (Activator.CreateInstance(type, new[] { confDecision.Name }.Concat(args).ToArray())
-                        ?? throw new InvalidOperationException($"Activator.CreateInstance returned null for {type.FullName}"));
+                    var result =
+                        (confDecision.Name == confDecision.ClassName
+                         ? (T?)Activator.CreateInstance(type, args)
+                         : (T?)Activator.CreateInstance(type, new[] { confDecision.Name }.Concat(args).ToArray()))
+                        ?? throw new InvalidOperationException($"Activator.CreateInstance returned null for {type.FullName}");
                     yield return result;
                 }
             }
