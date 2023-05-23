@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace CA.LoopControlPluginBase
@@ -9,7 +10,7 @@ namespace CA.LoopControlPluginBase
         string Decision { get; }
         IEnumerable<string> Fields { get; }
         /// <returns><c>false</c> if the field is not configured and its default value should be used</returns>
-        bool TryGet(string fieldName, out string val);
+        bool TryGet(string fieldName, [NotNullWhen(true)] out string? val);
 
         /// <returns><c>false</c> if the field is not configured and its default value should be used</returns>
         /// <exception cref="FormatException">if the field in the configuration failed to be parsed</exception>
@@ -50,7 +51,7 @@ namespace CA.LoopControlPluginBase
 
             foreach (var field in Fields)
                 if (!allowed.Contains(field))
-                    (unexpectedFields ?? new()).Add(field);
+                    (unexpectedFields ??= new()).Add(field);
 
             if (unexpectedFields != null)
                 throw new NotSupportedException($"Detected config fields not supported for {Decision}: {string.Join(',', unexpectedFields)}. Allowed fields: {string.Join(',', allowedFields)}");

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using CA.LoopControlPluginBase;
+using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
 {
@@ -16,7 +17,7 @@ namespace CA_DataUploaderLib
         public PluginsLoader(CommandHandler handler, string targetFolder = "plugins")
         {
             this.handler = handler;
-            this.targetFolder = targetFolder; 
+            this.targetFolder = targetFolder;
         }
 
         public void LoadPlugins()
@@ -50,12 +51,20 @@ namespace CA_DataUploaderLib
 
         static IEnumerable<T> CreateInstances<T>(Assembly assembly, params object[] args)
         {
+            var confDecisions = IOconfFile.GetEntries<IOconfCode>();
             foreach (Type type in assembly.GetTypes())
             {
                 if (!typeof(T).IsAssignableFrom(type)) continue;
-                var result = (T) (Activator.CreateInstance(type, args) 
-                    ?? throw new InvalidOperationException($"Activator.CreateInstance returned null for {type.FullName}"));
-                yield return result;
+
+                foreach (var confDecision in confDecisions.Where(cd => cd.ClassName == type.Name))
+                {
+                    var result =
+                        (confDecision.Name == confDecision.ClassName
+                         ? (T?)Activator.CreateInstance(type, args)
+                         : (T?)Activator.CreateInstance(type, new[] { confDecision.Name }.Concat(args).ToArray()))
+                        ?? throw new InvalidOperationException($"Activator.CreateInstance returned null for {type.FullName}");
+                    yield return result;
+                }
             }
         }
 
