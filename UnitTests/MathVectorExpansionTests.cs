@@ -60,6 +60,13 @@ namespace UnitTests
             CollectionAssert.AreEqual(new[] { 0.2, 2.2, 100 }, values, "the extra math statement must be ignored and must not incorrectly update the output");
         }
 
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException), "If the Math-expression references a source which is not in the vector, this should cause an exception.")]
+        public void MathReferencingSourceNotInVectorCausesException()
+        {
+            GetInitializedMathExpansion(new("Math;MyMath;NotInVector + 2", 2), new[] { "MyMath" });
+        }
+
         public static MathVectorExpansion GetInitializedMathExpansion(IOconfMath math, IEnumerable<string> allvectorfields)
         {
             var expansion = GetNewMathExpansion(math);

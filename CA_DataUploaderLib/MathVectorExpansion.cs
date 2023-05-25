@@ -29,6 +29,11 @@ namespace CA_DataUploaderLib
                 var index = fields.IndexOf(math.Name);
                 if (index < 0) throw new ArgumentException($"{math.Name} was not found in received vector fields", nameof(vectorFields));
                 _mathWithFieldIndexes.Add((math, index));
+                foreach (var source in math.SourceNames)
+                {
+                    if (!fields.Contains(source)) 
+                        throw new ArgumentException($"Math {math.Name} uses {source} which was not found in received vector fields", nameof(vectorFields));
+                }
             }
         }
 
