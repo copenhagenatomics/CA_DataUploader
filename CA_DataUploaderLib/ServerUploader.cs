@@ -77,7 +77,9 @@ namespace CA_DataUploaderLib
                 throw new ArgumentException($"wrong vector length (input, expected): {vector.Count} <> {uploadMap.Length}");
             if (vector.Timestamp <= _lastTimestamp)
             {
-                CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp} vs received {vector.Timestamp}");
+                CALog.LogData(LogID.B, $"non changing or out of order timestamp received - vector ignored: last recorded {_lastTimestamp:O} vs received {vector.Timestamp:O}");
+                if (vector.Events.Count > 0)
+                    CALog.LogData(LogID.B, $"events in vector ignored: {vector.Events.Select(e => e.Data)}");
                 return;
             }
             _lastTimestamp = vector.Timestamp;
