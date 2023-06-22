@@ -562,22 +562,19 @@ namespace CA_DataUploaderLib
         {
             _boardsState.SetAttemptingReconnectState(boxName);
             LogInfo(board, "attempting to reconnect");
-            Console.WriteLine("attempting to reconnect");
-            var lostSensorAttempts = 3;// 100;
+            var lostSensorAttempts = 100;
             var delayBetweenAttempts = TimeSpan.FromSeconds(board.ConfigSettings.SecondsBetweenReopens);
             while (!(await board.SafeReopen(token)))
             {
                 _boardsState.SetDisconnectedState(boxName);
                 if (ExactSensorAttemptsCheck(ref lostSensorAttempts))
                 { // we run this once when there has been 100 attempts
-                    Console.WriteLine("reconnect limit exceeded, reducing reconnect frequency to 15 minutes");
                     LogError(board, "reconnect limit exceeded, reducing reconnect frequency to 15 minutes");
                     delayBetweenAttempts = TimeSpan.FromMinutes(15); // 4 times x hour = 96 times x day
                 }
 
                 await Task.WhenAny(_reconnectTasks[boxName].Task, Task.Delay(delayBetweenAttempts, token));
                 token.ThrowIfCancellationRequested();
-                Console.WriteLine("after delay");
             }
 
             _boardsState.SetConnectedState(boxName);
@@ -649,7 +646,7 @@ namespace CA_DataUploaderLib
         private void LogData(MCUBoard board, string message) => CALog.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
         private void LogInfo(MCUBoard board, string message) => CALog.LogInfoAndConsoleLn(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
 
-        public class AllBoardsState : IEnumerable<(string sensorName, ConnectionState State)>
+        protected class AllBoardsState : IEnumerable<(string sensorName, ConnectionState State)>
         {
             private readonly ConnectionState[] _states;
             private readonly string[] _sensorNames;
