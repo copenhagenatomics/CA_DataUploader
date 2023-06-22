@@ -203,7 +203,7 @@ namespace CA_DataUploaderLib
                 if (vector == null)
                 {
                     await board.SafeWriteLine(getCommand(port.PortNumber, defaultTarget), token);
-                    lastAction.TimedOutWaittingForDecision(defaultTarget);
+                    lastAction.TimedOutWaitingForDecision(defaultTarget);
                     return;
                 }
 
