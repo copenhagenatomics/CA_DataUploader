@@ -1,15 +1,15 @@
 ﻿#nullable enable
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Text;
-using CA_DataUploaderLib.IOconf;
-using System.Diagnostics;
-using System.Collections;
-using System.Threading.Tasks;
-using System.Threading.Channels;
 using CA_DataUploaderLib.Extensions;
+using CA_DataUploaderLib.IOconf;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
@@ -30,9 +30,10 @@ namespace CA_DataUploaderLib
         private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = new();
         private ChannelReader<DataVector>? _receivedVectors;
         private static readonly Dictionary<string, string> _usedBoxNames = new();
+        private readonly Dictionary<string, TaskCompletionSource> _reconnectTasks = new();
 
         public BaseSensorBox(CommandHandler cmd, string commandName, IEnumerable<IOconfInput> values)
-        { 
+        {
             mainSubsystem = commandName.ToLower();
             Title = commandName;
             _cmd = cmd;
@@ -48,6 +49,7 @@ namespace CA_DataUploaderLib
             var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray(), boardStateIndexInFullVector: -1)).ToArray();
             foreach (var board in allBoards)
             {
+                RegisterReconnectBoardCommand(board.map, cmd, _reconnectTasks);
                 RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived);
                 EnforceBoardNotAlreadyInUse(board.map.BoxName, board.values.First().Input.Row);//used by another sensor type / BaseSensorBox instance
                 EnforceNoDuplicatePorts(board.map.BoxName, board.values);
@@ -83,7 +85,7 @@ namespace CA_DataUploaderLib
                 {
                     CALog.LogData(LogID.A, $"missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
                     cmd.AddMultinodeCommand(
-                        "custom", a => a.Count >= 3 && a[1] == map.BoxName, 
+                        "custom", a => a.Count >= 3 && a[1] == map.BoxName,
                         _ => { CALog.LogData(LogID.A, $"custom command failed due to missing board: {map.BoxName}"); });
                     return;
                 }
@@ -93,9 +95,36 @@ namespace CA_DataUploaderLib
                 var channelWriter = channel.Writer;
                 boardCustomCommandsReceived.Add(map.McuBoard, channel.Reader);
                 cmd.AddMultinodeCommand(
-                    "custom", 
-                    a => a.Count >= 3 && a[1] == map.BoxName, 
+                    "custom",
+                    a => a.Count >= 3 && a[1] == map.BoxName,
                     a => channelWriter.TryWrite(string.Join(' ', a.Skip(2))));
+            }
+            static void RegisterReconnectBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<string, TaskCompletionSource> reconnectTasks)
+            {
+                if (!map.IsLocalBoard)
+                {//if the board is not local we register the command validation with an empty action
+                    cmd.AddMultinodeCommand("reconnect", a => a.Count == 2 && a[1] == map.BoxName, _ => { });
+                    return;
+                }
+
+                if (map.McuBoard == null)
+                {
+                    cmd.AddMultinodeCommand(
+                        "reconnect", a => a.Count == 2 && a[1] == map.BoxName,
+                        _ => { CALog.LogData(LogID.A, $"reconnect failed due to missing board: {map.BoxName}"); });
+                    return;
+                }
+
+                reconnectTasks[map.BoxName] = new TaskCompletionSource();
+                cmd.AddMultinodeCommand(
+                    "reconnect",
+                    a => a.Count == 2 && a[1] == map.BoxName,
+                    a =>
+                    {
+                        var currentTCS = reconnectTasks[map.BoxName];
+                        reconnectTasks[map.BoxName] = new TaskCompletionSource();
+                        currentTCS.SetResult(); //Completes the task signaling to ReconnectBoard to try again (if currently waiting)
+                    });
             }
         }
 
@@ -149,12 +178,12 @@ namespace CA_DataUploaderLib
         /// <remarks>must be called before <see cref="CommandHandler.FullVectorDescriptionCreated"/> and <see cref="Run"/> are called</remarks>
         public void AddBuildInWriteAction(MCUBoard board, Func<DataVector?, MCUBoard, CancellationToken, Task> writeAction, Func<MCUBoard, CancellationToken, Task> exitAction)
         {
-            if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = new() { (writeAction, exitAction ) };
+            if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = new() { (writeAction, exitAction) };
             else actions.Add((writeAction, exitAction));
         }
 
         protected void RegisterBoardWriteActions(
-            MCUBoard board, IOconfOutput port, double defaultTarget, string targetFieldName, 
+            MCUBoard board, IOconfOutput port, double defaultTarget, string targetFieldName,
             Func<int, double, string> getCommand, int repeatMilliseconds = 2000)
         {
             var lastAction = new LastAction(defaultTarget, repeatMilliseconds);
@@ -163,8 +192,8 @@ namespace CA_DataUploaderLib
             AddBuildInWriteAction(board, WriteAction, ExitAction);
 
             void InitializeAction(object? sender, IReadOnlyDictionary<string, int> indexes) =>
-                fieldIndex = indexes.TryGetValue(targetFieldName, out var index) 
-                    ? index 
+                fieldIndex = indexes.TryGetValue(targetFieldName, out var index)
+                    ? index
                     : throw new InvalidOperationException($"missing target field: {targetFieldName}");
             Task ExitAction(MCUBoard board, CancellationToken token) => Off(board, port, token);
             Task WriteAction(DataVector? vector, MCUBoard board, CancellationToken token) => DoPortActions(vector, board, fieldIndex, lastAction, token);
@@ -241,7 +270,7 @@ namespace CA_DataUploaderLib
                     map.McuBoard?.SafeClose(closeTimeoutToken.Token);
                     _boardsState.SetDisconnectedState(map);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     LogError(map, "error closing the connection to the board", ex);
                 }
@@ -256,7 +285,7 @@ namespace CA_DataUploaderLib
 
             return boards
                 .Where(b => b.map.McuBoard != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
-                .SelectMany(b => new []{ BoardReadLoop(b.map.McuBoard!, b.map.BoxName, b.values, token), BoardWriteLoop(b.map.McuBoard!, b.boardStateIndexInFullVector, token) })
+                .SelectMany(b => new[] { BoardReadLoop(b.map.McuBoard!, b.map.BoxName, b.values, token), BoardWriteLoop(b.map.McuBoard!, b.boardStateIndexInFullVector, token) })
                 .ToList();
         }
 
@@ -265,7 +294,7 @@ namespace CA_DataUploaderLib
             var customWritesEnabled = _boardCustomCommandsReceived.TryGetValue(board, out var customCommandsChannel);
             var buildInActionsEnabled = _buildInWriteActions.TryGetValue(board, out var buildInActions);
             if (!buildInActionsEnabled && !customWritesEnabled) return;
-            ChannelReader<DataVector>? vectorsChannel = buildInActionsEnabled 
+            ChannelReader<DataVector>? vectorsChannel = buildInActionsEnabled
                 ? (_receivedVectors ?? throw new InvalidOperationException("build actions detected without receiving vectors channel being initialized"))
                 : null;
 
@@ -309,7 +338,7 @@ namespace CA_DataUploaderLib
                     await Task.WhenAny(Task.Delay(500, token)); //reduce action frequency / the WhenAny avoids exceptions if the token is canceled
                 }
                 catch (OperationCanceledException ex) when (ex.CancellationToken == token)
-                {}
+                { }
                 catch (Exception ex)
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"Error detected writting to board: {board.ToShortDescription()}", ex);
@@ -398,7 +427,7 @@ namespace CA_DataUploaderLib
                 return await ReadSensors(board, boxName, targetSamples, token);
             }
             catch (OperationCanceledException ex)
-            { 
+            {
                 if (token.IsCancellationRequested)
                     throw; // if the token is cancelled we bubble up the cancel so the caller can abort.
                 _boardsState.SetReadSensorsExceptionState(boxName);
@@ -418,7 +447,7 @@ namespace CA_DataUploaderLib
         {
             var timeSinceLastValidRead = Stopwatch.StartNew();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
-            var msBetweenReads = (int)Math.Ceiling(board.ConfigSettings.MillisecondsBetweenReads * 1.5); 
+            var msBetweenReads = (int)Math.Ceiling(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
             var timeSinceLastLog = new Stopwatch();
             var logSkipped = 0;
             //We set the state early if we detect no data is being returned or if we received values,
@@ -428,7 +457,7 @@ namespace CA_DataUploaderLib
                 var (stillConnected, line) = await TryReadLineWithStallDetection(board, boxName, msBetweenReads, token);
                 if (!stillConnected)
                     return false;  //board disconnect detected, let caller know 
-                if (line == default) 
+                if (line == default)
                     return true; //timed out reading from the board, TryReadLineWithStallDetection already updated the state after the first msBetweenReads / still considered connected
                 try
                 {
@@ -479,7 +508,7 @@ namespace CA_DataUploaderLib
         private async Task<(bool, string?)> TryReadLineWithStallDetection(MCUBoard board, string boxName, int msBetweenReads, CancellationToken token)
         {
             var readLineTask = board.SafeReadLine(token);
-            var noDataAvailableTask = Task.Delay(msBetweenReads, token); 
+            var noDataAvailableTask = Task.Delay(msBetweenReads, token);
             if (await Task.WhenAny(readLineTask, noDataAvailableTask) == noDataAvailableTask)
             {
                 LogData(board, "no data available");
@@ -511,7 +540,7 @@ namespace CA_DataUploaderLib
         }
 
         /// <returns>the list of doubles, otherwise <c>null</c></returns>
-        protected virtual List<double>? TryParseAsDoubleList(MCUBoard board, string line) => 
+        protected virtual List<double>? TryParseAsDoubleList(MCUBoard board, string line) =>
             board.ConfigSettings.Parser.TryParseAsDoubleList(line);
 
         private bool CheckFails(MCUBoard board, SensorSample.InputBased[] values)
@@ -522,7 +551,7 @@ namespace CA_DataUploaderLib
                 var msSinceLastRead = DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds;
                 if (msSinceLastRead <= board.ConfigSettings.MaxMillisecondsWithoutNewValues)
                     continue;
-                hasStaleValues = true; 
+                hasStaleValues = true;
                 LogInfo(board, $"stale sensor detected: {item.Input.Name}. {msSinceLastRead} milliseconds since last read");
             }
 
@@ -533,18 +562,22 @@ namespace CA_DataUploaderLib
         {
             _boardsState.SetAttemptingReconnectState(boxName);
             LogInfo(board, "attempting to reconnect");
-            var lostSensorAttempts = 100;
+            Console.WriteLine("attempting to reconnect");
+            var lostSensorAttempts = 3;// 100;
             var delayBetweenAttempts = TimeSpan.FromSeconds(board.ConfigSettings.SecondsBetweenReopens);
             while (!(await board.SafeReopen(token)))
             {
                 _boardsState.SetDisconnectedState(boxName);
-                if (ExactSensorAttemptsCheck(ref lostSensorAttempts)) 
+                if (ExactSensorAttemptsCheck(ref lostSensorAttempts))
                 { // we run this once when there has been 100 attempts
+                    Console.WriteLine("reconnect limit exceeded, reducing reconnect frequency to 15 minutes");
                     LogError(board, "reconnect limit exceeded, reducing reconnect frequency to 15 minutes");
                     delayBetweenAttempts = TimeSpan.FromMinutes(15); // 4 times x hour = 96 times x day
                 }
 
-                await Task.Delay(delayBetweenAttempts, token);
+                await Task.WhenAny(_reconnectTasks[boxName].Task, Task.Delay(delayBetweenAttempts, token));
+                token.ThrowIfCancellationRequested();
+                Console.WriteLine("after delay");
             }
 
             _boardsState.SetConnectedState(boxName);
@@ -553,9 +586,9 @@ namespace CA_DataUploaderLib
 
         private static bool ExactSensorAttemptsCheck(ref int lostSensorAttempts)
         {
-             if (lostSensorAttempts > 0)
+            if (lostSensorAttempts > 0)
                 lostSensorAttempts--;
-            else if (lostSensorAttempts == 0) 
+            else if (lostSensorAttempts == 0)
             {
                 lostSensorAttempts--;
                 return true;
@@ -604,19 +637,19 @@ namespace CA_DataUploaderLib
             return samples;
         }
 
-        private void LogError(IOconfMap board, string message, Exception ex) 
+        private void LogError(IOconfMap board, string message, Exception ex)
         {
             if (board.McuBoard != null)
                 LogError(board.McuBoard, message, ex);
             else
-                CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.BoxName} (missing)", ex); 
+                CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.BoxName} (missing)", ex);
         }
         private void LogError(MCUBoard board, string message, Exception ex) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}", ex);
         private void LogError(MCUBoard board, string message) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}");
         private void LogData(MCUBoard board, string message) => CALog.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
         private void LogInfo(MCUBoard board, string message) => CALog.LogInfoAndConsoleLn(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
 
-        protected class AllBoardsState : IEnumerable<(string sensorName, ConnectionState State)>
+        public class AllBoardsState : IEnumerable<(string sensorName, ConnectionState State)>
         {
             private readonly ConnectionState[] _states;
             private readonly string[] _sensorNames;
@@ -625,7 +658,7 @@ namespace CA_DataUploaderLib
             public AllBoardsState(IEnumerable<IOconfMap> boards)
             {
                 // taking a copy of the list ensures we can keep reporting the state of the board, as otherwise the calling code can remove it, for example, when it decides to ignore the board
-                var _boardList = boards.ToList(); 
+                var _boardList = boards.ToList();
                 _states = new ConnectionState[_boardList.Count];
                 _sensorNames = new string[_boardList.Count];
                 _boardsIndexes = new Dictionary<string, int>(_boardList.Count);
@@ -637,7 +670,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            public IEnumerator<(string, ConnectionState)> GetEnumerator() 
+            public IEnumerator<(string, ConnectionState)> GetEnumerator()
             {
                 for (int i = 0; i < _sensorNames.Length; i++)
                     yield return (_sensorNames[i], _states[i]);
