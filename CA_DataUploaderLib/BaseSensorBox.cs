@@ -121,9 +121,12 @@ namespace CA_DataUploaderLib
                     a => a.Count == 2 && a[1] == map.BoxName,
                     a =>
                     {
-                        var currentTCS = reconnectTasks[map.BoxName];
-                        reconnectTasks[map.BoxName] = new TaskCompletionSource();
-                        currentTCS.TrySetResult(); //Completes the task signaling to ReconnectBoard to try again (if currently waiting)
+                        lock (reconnectTasks)
+                        {
+                            var currentTCS = reconnectTasks[map.BoxName];
+                            reconnectTasks[map.BoxName] = new TaskCompletionSource();
+                            currentTCS.TrySetResult(); //Completes the task signaling to ReconnectBoard to try again (if currently waiting)
+                        }
                     });
             }
         }
@@ -573,7 +576,10 @@ namespace CA_DataUploaderLib
                     delayBetweenAttempts = TimeSpan.FromMinutes(15); // 4 times x hour = 96 times x day
                 }
 
-                await Task.WhenAny(_reconnectTasks[boxName].Task, Task.Delay(delayBetweenAttempts, token));
+                Task reconnectTask;
+                lock (_reconnectTasks)
+                    reconnectTask = _reconnectTasks[boxName].Task;
+                await Task.WhenAny(reconnectTask, Task.Delay(delayBetweenAttempts, token));
                 token.ThrowIfCancellationRequested();
             }
 
