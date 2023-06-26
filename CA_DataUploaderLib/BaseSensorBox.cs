@@ -123,7 +123,7 @@ namespace CA_DataUploaderLib
                     {
                         var currentTCS = reconnectTasks[map.BoxName];
                         reconnectTasks[map.BoxName] = new TaskCompletionSource();
-                        currentTCS.SetResult(); //Completes the task signaling to ReconnectBoard to try again (if currently waiting)
+                        currentTCS.TrySetResult(); //Completes the task signaling to ReconnectBoard to try again (if currently waiting)
                     });
             }
         }
