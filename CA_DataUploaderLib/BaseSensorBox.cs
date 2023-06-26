@@ -646,7 +646,7 @@ namespace CA_DataUploaderLib
         private void LogData(MCUBoard board, string message) => CALog.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
         private void LogInfo(MCUBoard board, string message) => CALog.LogInfoAndConsoleLn(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
 
-        protected class AllBoardsState : IEnumerable<(string sensorName, ConnectionState State)>
+        public class AllBoardsState : IEnumerable<(string sensorName, ConnectionState State)>
         {
             private readonly ConnectionState[] _states;
             private readonly string[] _sensorNames;
