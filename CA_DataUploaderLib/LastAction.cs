@@ -25,7 +25,7 @@ namespace CA_DataUploaderLib
             TimeRunning.Restart();
         }
 
-        public void TimedOutWaittingForDecision(double target)
+        public void TimedOutWaitingForDecision(double target)
         {
             //DateTime.MavValue forces execution on the next vector / also note we don't restart time running for the same reason.
             Target = target;
