@@ -25,19 +25,7 @@ namespace CA_DataUploaderLib.IOconf
         protected string Format { get; init; } = string.Empty;
         public bool IsUnknown { get; }
 
-        public List<string> ToList()
-        {
-            var list = RowWithoutComment().Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
-            // Remove consecutive empty elements from the end
-            for (var i = list.Count - 1; i >= 0; i--)
-            {
-                if (string.IsNullOrEmpty(list[i]))
-                    list.RemoveAt(i);
-                else
-                    break;
-            }
-            return list;
-        }
+        public List<string> ToList() => RowWithoutComment().Trim().TrimEnd(';').Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
 
         public string UniqueKey()
         {
