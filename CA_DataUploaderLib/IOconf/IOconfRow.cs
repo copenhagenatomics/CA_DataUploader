@@ -25,7 +25,7 @@ namespace CA_DataUploaderLib.IOconf
         protected string Format { get; init; } = string.Empty;
         public bool IsUnknown { get; }
 
-        public List<string> ToList() => RowWithoutComment().Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
+        public List<string> ToList() => RowWithoutComment().Trim().TrimEnd(';').Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
 
         public string UniqueKey()
         {
