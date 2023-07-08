@@ -64,6 +64,7 @@ namespace CA_DataUploaderLib.IOconf
         public static CALogLevel GetOutputLevel() => GetLoopConfig().LogLevel;
         public static IEnumerable<IOconfMap> GetMap() => GetEntries<IOconfMap>();
         public static IEnumerable<IOconfGeneric> GetGeneric()  => GetEntries<IOconfGeneric>();
+        public static IEnumerable<IOconfGenericOutput> GetGenericOutputs() => GetEntries<IOconfGenericOutput>();
         public static IEnumerable<IOconfTemp> GetTemp() => GetEntries<IOconfTemp>();
         public static IOconfRPiTemp GetRPiTemp() => GetEntries<IOconfRPiTemp>().SingleOrDefault() ?? IOconfRPiTemp.Default;
         public static IEnumerable<IOconfHeater> GetHeater() => GetEntries<IOconfHeater>();
