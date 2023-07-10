@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<ProjectGuid>{C74C4DFC-74A1-40D4-A8DB-A0546ED810FD}</ProjectGuid>
+		<TestProjectType>UnitTest</TestProjectType>
+		<LangVersion>10.0</LangVersion>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.0" />
+		<PackageReference Include="MSTest.TestAdapter" Version="2.2.10" />
+		<PackageReference Include="MSTest.TestFramework" Version="2.2.10" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\CA_DataUploaderLib\CA_DataUploaderLib.csproj" />
+	</ItemGroup>
+</Project>

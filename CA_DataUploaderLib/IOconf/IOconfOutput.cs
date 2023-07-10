@@ -21,7 +21,7 @@ namespace CA_DataUploaderLib.IOconf
 
         protected static IOconfMap GetMap(string boxName, BoardSettings settings)
         {
-            var maps = IOconfFile.GetMap();
+            var maps = TestableIOconfFile.Instance.GetMap();
             var map = maps.SingleOrDefault(x => x.BoxName == boxName);
             if (map == null)
                 throw new Exception($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
