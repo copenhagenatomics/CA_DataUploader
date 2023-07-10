@@ -23,6 +23,7 @@ namespace CA_DataUploaderLib.IOconf
             ("Filter", (r, l) => new IOconfFilter(r, l)),
             ("RPiTemp", (r, l) => new IOconfRPiTemp(r, l)),
             ("GenericSensor", (r, l) => new IOconfGeneric(r, l)),
+            ("GenericOutput", (r, l) => new IOconfGenericOutput(r, l)),
             ("SwitchboardSensor", (r, l) => new IOconfSwitchboardSensor(r, l)),
             ("Node", (r, l) => new IOconfNode(r, l)),
             ("Code", (r, l) => new IOconfCode(r, l)),

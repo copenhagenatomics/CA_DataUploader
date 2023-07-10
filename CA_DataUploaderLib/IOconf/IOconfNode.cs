@@ -14,7 +14,7 @@ namespace CA_DataUploaderLib.IOconf
         private readonly IPEndPoint? _endPoint;
 
         private static readonly Lazy<IOconfNode> _singleNode = new(() => 
-            new IOconfNode(IOconfFile.GetLoopName()) { IsCurrentSystem = true, IsUploader = true }
+            new IOconfNode(TestableIOconfFile.Instance.GetLoopName()) { IsCurrentSystem = true, IsUploader = true }
         );
         private static byte _nodeInstances;
 

@@ -30,6 +30,35 @@ namespace UnitTests
             Assert.AreEqual(405, math.Calculate(new() { {"heater1", 400} }));
         }
 
+        [TestMethod]
+        public void CanLoadGenericOutputLine()
+        {
+            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[]{new IOconfMap("Map;acserial;realacbox2", 0)} });
+            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "GenericOutput;generic_ac_on;realacbox2;0;p1 $heater1_onoff 3" });
+            var rows = rowsEnum.ToArray();
+            Assert.AreEqual(1, rows.Length);
+            Assert.IsInstanceOfType(rows[0], typeof(IOconfGenericOutput));
+            var output = (IOconfGenericOutput)rows[0];
+            Assert.AreEqual("generic_ac_on", output.Name);
+            Assert.AreEqual(0, output.DefaultValue);
+            Assert.AreEqual("heater1_onoff", output.TargetField);
+            Assert.AreEqual("p1 5 3", output.GetCommand(5));
+        }
+
+        [TestMethod]
+        public void CanLoadGenericOutputLineWithBraces()
+        {
+            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { new IOconfMap("Map;acserial;realacbox2", 0) } });
+            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "GenericOutput;generic_ac_on;realacbox2;0;p1 on 3 ${heater1_onoff}00%" });
+            var rows = rowsEnum.ToArray();
+            Assert.AreEqual(1, rows.Length);
+            Assert.IsInstanceOfType(rows[0], typeof(IOconfGenericOutput));
+            var output = (IOconfGenericOutput)rows[0];
+            Assert.AreEqual("generic_ac_on", output.Name);
+            Assert.AreEqual(0, output.DefaultValue);
+            Assert.AreEqual("heater1_onoff", output.TargetField);
+            Assert.AreEqual("p1 on 3 100%", output.GetCommand(1));
+        }
 
         [TestMethod]
         public void CanLoadCustomConfigWithoutMixingPrefix()
