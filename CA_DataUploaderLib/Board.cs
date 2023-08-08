@@ -4,7 +4,7 @@ namespace CA_DataUploaderLib
 {
     public class Board
     {
-        public Board(string portname, IOconfMap? map)
+        public Board(string portname, IOconfMap? map, string? productType = null)
         {
             PortName = portname;
             Map = map;
@@ -13,6 +13,7 @@ namespace CA_DataUploaderLib
                 map.Setboard(this);
                 BoxName = map.BoxName;
             }
+            ProductType = productType;
         }
 
         public string PortName { get; }
