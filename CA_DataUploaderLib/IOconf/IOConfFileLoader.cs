@@ -29,9 +29,14 @@ namespace CA_DataUploaderLib.IOconf
             ("Code", (r, l) => new IOconfCode(r, l)),
         };
 
+        public static bool FileExists()
+        {
+            return File.Exists("IO.conf");
+        }
+
         public static (List<string>, IEnumerable<IOconfRow>) Load()
         {
-            if (!File.Exists("IO.conf"))
+            if (!FileExists())
             {
                 throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
             }

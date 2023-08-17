@@ -5,7 +5,6 @@ using System.Threading;
 using System.IO.Ports;
 using CA_DataUploaderLib.IOconf;
 using System.Collections.Generic;
-using System.IO;
 using System.IO.Pipelines;
 using System.Linq;
 using System.Threading.Tasks;
@@ -86,7 +85,7 @@ namespace CA_DataUploaderLib
                 board.ProductType = "NA";
                 board.InitialConnectionSucceeded = skipBoardAutoDetection || await board.ReadSerialNumber(board.pipeReader);
 
-                if (File.Exists("IO.conf"))
+                if (IOconfFileLoader.FileExists())
                 { // note that unlike the discovery at MCUBoard.OpenDeviceConnection that only considers the usb port, in here we can find the boards by the serial number too.
                     foreach (var ioconfMap in IOconfFile.GetMap())
                     {
@@ -210,7 +209,7 @@ namespace CA_DataUploaderLib
         public async static Task<MCUBoard?> OpenDeviceConnection(string name)
         {
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
-            var map = File.Exists("IO.conf") ? IOconfFile.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name) : null;
+            var map = IOconfFileLoader.FileExists() ? IOconfFile.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name) : null;
             var initialBaudrate = map != null && map.BaudRate != 0 ? map.BaudRate : 115200;
             var isVport = IOconfMap.IsVirtualPortName(name);
             bool skipAutoDetection = isVport || (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;
