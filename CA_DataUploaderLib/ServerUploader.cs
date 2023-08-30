@@ -130,6 +130,11 @@ namespace CA_DataUploaderLib
             return await task;
         }
 
+        public async Task<HttpResponseMessage> DirectRequest(HttpRequestMessage request, CancellationToken token)
+        {
+            var plot = await GetPlot(token);
+            return await plot.SendAsync(request, token);
+        }
         public async Task<HttpResponseMessage> DirectPost(string requestUri, byte[] bytes, CancellationToken token)
         {
             var plot = await GetPlot(token);
@@ -558,6 +563,7 @@ namespace CA_DataUploaderLib
             public Task<HttpResponseMessage> PostBoardsAsync(byte[] signedMessage) => PutAsync($"/api/v1/McuSerialnumber?plotNameId={PlotId}", signedMessage);
             public Task<HttpResponseMessage> PostAsync(string requestUri, byte[] message, CancellationToken token = default) 
                 => _client.PostAsJsonAsync(requestUri, message, token);
+            public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token = default) => _client.SendAsync(request, token);
             internal Task<HttpResponseMessage> PutAsync(string requestUri, byte[] message, CancellationToken token = default)
                 => _client.PutAsJsonAsync(requestUri, message, token);
             public static async Task<PlotConnection> Establish(string loopName, byte[] publicKey, byte[] signedVectorDescription, TaskCompletionSource<PlotConnection> connectionEstablishedSource, CancellationToken cancellationToken)
