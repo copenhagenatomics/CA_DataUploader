@@ -49,5 +49,11 @@ namespace CA_DataUploaderLib.IOconf
         {
             return Type.PadRight(20) + " " + Name;
         }
+
+        /// <summary>
+        /// This method is called after the whole IOconf file has been loaded. 
+        /// Can be used for verification/initialization of things which would be premature to do during construction.
+        /// </summary>
+        internal virtual void ValidateDependencies() {}
     }
 }
