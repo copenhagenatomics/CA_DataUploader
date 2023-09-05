@@ -24,9 +24,10 @@ namespace CA_DataUploaderLib.IOconf
             // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization / static ctor rejects the custom entries.
             Table.Clear();
             var (rawLines, entries) = IOconfFileLoader.Load();
+            foreach (var entry in entries)
+                entry.ValidateDependencies();
             Table.AddRange(entries);
             RawLines = rawLines;
-            Table.ForEach(e => e.ValidateDependencies());
             CheckRules();
         }
 
@@ -40,7 +41,7 @@ namespace CA_DataUploaderLib.IOconf
             // no heater can be in several oven areas
             var heaters = GetOven().Where(x => x.OvenArea > 0).GroupBy(x => x.HeatingElement);
             foreach(var heater in heaters.Where(x => x.Select(y => y.OvenArea).Distinct().Count() > 1))
-                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Heater: {heater.Key?.Name} occurred in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}");
+                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Heater: {heater.Key.Name} occurred in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}");
         }
 
         private static IOconfLoopName GetLoopConfig() => GetEntries<IOconfLoopName>().SingleOrDefault() ?? IOconfLoopName.Default;

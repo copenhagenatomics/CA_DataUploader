@@ -38,7 +38,7 @@ namespace CA_DataUploaderLib.IOconf
             MaxOutputPercentage = maxOutputPercentage / 100d;
         }
 
-        internal override void ValidateDependencies()
+        public override void ValidateDependencies()
         {
             var list = ToList();
             HeatingElement = IOconfFile.GetHeater().Single(x => x.Name == list[2]);
@@ -50,10 +50,22 @@ namespace CA_DataUploaderLib.IOconf
             BoardStateSensorNames = IOconfFile.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
         }
 
+        private IOconfHeater? heatingElement;
+        private ReadOnlyCollection<string>? boardStateSensorNames;
+
         public readonly int OvenArea;
-        public IOconfHeater? HeatingElement { get; private set; }
+
+        public IOconfHeater HeatingElement
+        { 
+            get => heatingElement ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(HeatingElement)}."); 
+            private set => heatingElement = value; 
+        }
         public string TemperatureSensorName { get; }
-        public ReadOnlyCollection<string> BoardStateSensorNames { get; private set; } = new ReadOnlyCollection<string>(Array.Empty<string>());
+        public ReadOnlyCollection<string> BoardStateSensorNames 
+        { 
+            get => boardStateSensorNames ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(BoardStateSensorNames)}.");
+            private set => boardStateSensorNames = value; 
+        }
         //with the current formula the gain pretty much means seconds to gain 1C
         //by default we assume the HeatingElement can heat the temperature sensor 5 degrees x second on. 
         public double ProportionalGain { get; } = 0.2d; 

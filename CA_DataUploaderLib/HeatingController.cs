@@ -22,7 +22,7 @@ namespace CA_DataUploaderLib
 
             //notice that the decisions states and outputs are handled by the registered decisions, while the switchboard inputs and actuations are handled by the switchboard controller
             cmd.AddDecisions(allAreas.Select(a => new OvenAreaDecision(new($"ovenarea{a}", a))).ToList());
-            cmd.AddDecisions(heatersConfigs.Select(h => new HeaterDecision(h, ovens.SingleOrDefault(x => x.HeatingElement?.Name == h.Name))).ToList());
+            cmd.AddDecisions(heatersConfigs.Select(h => new HeaterDecision(h, ovens.SingleOrDefault(x => x.HeatingElement.Name == h.Name))).ToList());
             SwitchBoardController.Initialize(cmd);
         }
 
