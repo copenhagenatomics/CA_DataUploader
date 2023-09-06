@@ -18,14 +18,7 @@ namespace CA_DataUploaderLib.IOconf
             if (OvenArea < 1)
                 throw new Exception("Oven area must be a number bigger or equal to 1");
             
-            HeatingElement = IOconfFile.GetHeater().Single(x => x.Name == list[2]);
             TemperatureSensorName = list[3];
-            var isTemp = IOconfFile.GetTemp().Any(t => t.Name == TemperatureSensorName);
-            var isMath = IOconfFile.GetMath().Any(m => m.Name == TemperatureSensorName);
-            var isFilter = IOconfFile.GetFilters().Any(f => f.NameInVector == TemperatureSensorName);
-            if (!isTemp && !isMath && !isFilter)
-                throw new Exception($"Failed to find sensor: {TemperatureSensorName} for oven: {row}");
-            BoardStateSensorNames = IOconfFile.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
 
             if (list.Count < 5) return;
             if (!list[4].TryToDouble(out var proportionalGain))
@@ -45,10 +38,34 @@ namespace CA_DataUploaderLib.IOconf
             MaxOutputPercentage = maxOutputPercentage / 100d;
         }
 
+        public override void ValidateDependencies()
+        {
+            var list = ToList();
+            HeatingElement = IOconfFile.GetHeater().Single(x => x.Name == list[2]);
+            var isTemp = IOconfFile.GetTemp().Any(t => t.Name == TemperatureSensorName);
+            var isMath = IOconfFile.GetMath().Any(m => m.Name == TemperatureSensorName);
+            var isFilter = IOconfFile.GetFilters().Any(f => f.NameInVector == TemperatureSensorName);
+            if (!isTemp && !isMath && !isFilter)
+                throw new Exception($"Failed to find sensor: {TemperatureSensorName} for oven: {Row}");
+            BoardStateSensorNames = IOconfFile.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
+        }
+
+        private IOconfHeater? heatingElement;
+        private ReadOnlyCollection<string>? boardStateSensorNames;
+
         public readonly int OvenArea;
-        public readonly IOconfHeater HeatingElement;
+
+        public IOconfHeater HeatingElement
+        { 
+            get => heatingElement ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(HeatingElement)}."); 
+            private set => heatingElement = value; 
+        }
         public string TemperatureSensorName { get; }
-        public ReadOnlyCollection<string> BoardStateSensorNames {get;}
+        public ReadOnlyCollection<string> BoardStateSensorNames 
+        { 
+            get => boardStateSensorNames ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(BoardStateSensorNames)}.");
+            private set => boardStateSensorNames = value; 
+        }
         //with the current formula the gain pretty much means seconds to gain 1C
         //by default we assume the HeatingElement can heat the temperature sensor 5 degrees x second on. 
         public double ProportionalGain { get; } = 0.2d; 
