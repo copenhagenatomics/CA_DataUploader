@@ -55,7 +55,7 @@ namespace CA_DataUploaderLib.IOconf
         }
         private static IOconfMap GetMap(string boxName, BoardSettings settings, bool skipBoardSettings)
         {
-            var maps = IOconfFile.GetMap();
+            var maps = TestableIOconfFile.Instance.GetMap();
             var map = maps.SingleOrDefault(x => x.BoxName == boxName) ?? 
                 throw new Exception($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
             // Map.BoardSettings == BoardSettings.Default is there since some boards need separate board settings, but have multiple sensor entries. 
