@@ -27,14 +27,16 @@ namespace CA_DataUploaderLib.IOconf
 
             var list = ToList();
             AllJunction = false;
-            if (list[3].ToLower() == "all")
+            if (Skip)
+                return;
+            else if (list[3].ToLower() == "all")
             {
                 AllJunction = true;   // all => special command to show all junction temperatures including the first as average (used for calibration)
                 PortNumber = 1;
             }
-            else if (!Skip && !HasPort)
+            else if (!HasPort)
                 throw new Exception($"{type}: wrong port number: {row}");
-            else if (!Skip && (PortNumber < 1 || PortNumber > 34)) 
+            else if (PortNumber < 1 || PortNumber > 34)
                 throw new Exception($"{type}: invalid port number: {row}");
 
             if (PortNumber < 11) //only ports 1 to 10 are for thermocouples
