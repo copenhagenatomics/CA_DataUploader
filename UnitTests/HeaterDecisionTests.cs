@@ -322,7 +322,7 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void PControlUsesUsesMaxConfigurationForCommandValuesOutsideOfRange()
+        public void PControlUsesUsesMaxConfigurationForCommandValuesAboveAllowedRange()
         {
             var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;2;00:00:30;100", 0);
             NewOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
@@ -331,8 +331,82 @@ namespace UnitTests
             CheckDecisionsBehaviorMatchesAProportionalGainOf2(new[] { "ovenarea 0 pgain 10", "ovenarea 0 maxoutput 150", "ovenarea 0 controlperiodseconds 120" });
         }
 
+        [DataRow(-1, 2, false)]
+        [DataRow(-100, 2, false)]
+        [DataRow(100, -1, false)]
+        [DataRow(100, -100, false)]
+        [DataRow(-1, 2, true)]
+        [DataRow(-100, 2, true)]
+        [DataRow(100, -1, true)]
+        [DataRow(100, -100, true)]
+        [DataTestMethod]//note we don't include 0 above, as that is the default vector value which is interpreted as the field not being set
+        public void PControlDoesNotTurnOnWithMaxOutputAndOrPGainValuesBelow0(int maxoutput, int pgain, bool useVector)
+        {
+            var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;2;00:00:30;100", 0);
+            NewOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
+            NewOvenAreaDecisionConfig(new("ovenarea1", 1, ovenProportionalControlUpdatesConf));
+            MakeDecisions(new List<string>() { "ovenarea 0 maxoutput -1", "oven 50" });
+            if (useVector)
+            {
+                Field("ovenarea0_maxoutput") = maxoutput;
+                Field("ovenarea0_pgain") = pgain;
+                MakeDecisions("oven 50");
+            }
+            else
+                MakeDecisions(new List<string>() { $"ovenarea 0 maxoutput {maxoutput}", $"ovenarea 0 pgain {pgain}", "oven 50" });
+
+            Assert.AreEqual(0.0, Field("heater_onoff"), "should be off");
+            Field("temp") = 10;
+            MakeDecisions(time: vector.Timestamp.AddSeconds(30));
+            Assert.AreEqual(0.0, Field("heater_onoff"), "should still be off regardless of having a large temp difference");
+            MakeDecisions(time: vector.Timestamp.AddSeconds(60));
+            Assert.AreEqual(0.0, Field("heater_onoff"), "should still be off after 60 seconds");
+            Field("temp") = 90;
+            MakeDecisions(time: vector.Timestamp.AddSeconds(90));
+            Assert.AreEqual(0.0, Field("heater_onoff"), "this would only turn on if the pgain is unexpectedly negative");
+        }
+
+        [DataRow(-1, false)]
+        [DataRow(-1000, false)]
+        [DataRow(0.1, false)]
+        [DataRow(-1, true)]
+        [DataRow(-1000, true)]
+        [DataRow(0.1, true)]
+        [DataTestMethod] //note we don't include 0 above, as that is the default vector value which is interpreted as the field not being set
+        public void PControlReactsInmediatelyWhenControlPeriodIsBelowOrEqual100Ms(double controlperiodseconds, bool useVector)
+        {
+            var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;2;00:00:30;100", 0);
+            NewOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
+            NewOvenAreaDecisionConfig(new("ovenarea1", 1, ovenProportionalControlUpdatesConf));
+            NewHeaterDecisionConfig(NewConfig.WithProportionalGain(2).Build());
+            if (useVector)
+            {
+                Field("ovenarea0_controlperiodseconds") = controlperiodseconds;
+                MakeDecisions("oven 50");
+            }
+            else
+                MakeDecisions(new List<string>() { $"ovenarea 0 controlperiodseconds {controlperiodseconds}", "oven 50" });
+            Assert.AreEqual(1.0, Field("heater_onoff"), "should be on as we are below the target");
+            Field("temp") = 49;
+            MakeDecisions(time: vector.Timestamp.AddSeconds(0.1));
+            Assert.AreEqual(1.0, Field("heater_onoff"), "should still be on 1C below target");
+            Field("temp") = 51;
+            MakeDecisions(time: vector.Timestamp.AddSeconds(0.2));
+            Assert.AreEqual(0.0, Field("heater_onoff"), "should turn off inmediately on the cycle ");
+            Field("temp") = 49;
+            MakeDecisions(time: vector.Timestamp.AddSeconds(0.3));
+            Assert.AreEqual(1.0, Field("heater_onoff"), "should still turn on inmediately");
+            MakeDecisions(time: vector.Timestamp.AddSeconds(0.4));
+            Assert.AreEqual(1.0, Field("heater_onoff"), "it should decide to keep the heater on");
+            MakeDecisions(time: vector.Timestamp.AddSeconds(29));
+            Assert.AreEqual(1.0, Field("heater_onoff"), "it should still decide to keep the heater on");
+            Field("temp") = 51;
+            MakeDecisions(time: vector.Timestamp.AddSeconds(29.1));
+            Assert.AreEqual(0.0, Field("heater_onoff"), "should still turn off inmediately");
+        }
+
         [TestMethod]
-        public void PControlUsesUsesMaxConfigurationForVectorValuesOutsideOfRange()
+        public void PControlUsesUsesMaxConfigurationForVectorValuesAboveAllowedRange()
         {
             var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;2;00:00:30;100", 0);
             NewOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));

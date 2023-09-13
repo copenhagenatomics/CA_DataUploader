@@ -186,7 +186,7 @@ namespace CA_DataUploaderLib
                                 break;
                             case States.InControlPeriod:
                                 var secondsOn = GetProportionalControlSecondsOn();
-                                nextcontrolperiod = _latestVector.TimeAfter((int)((controlperiodseconds_defined && controlperiodseconds != 0 ? controlperiodseconds : _config.ControlPeriod.TotalSeconds) * 1000));
+                                nextcontrolperiod = _latestVector.TimeAfter((int)(GetControlPeriodSeconds() * 1000));
                                 controlperiodtimeoff = _latestVector.TimeAfter(secondsOn < 0.1d ? 0 : (int)(secondsOn * 1000));
                                 on = _latestVector.Reached(controlperiodtimeoff) ? 0 : 1;
                                 break;
@@ -209,7 +209,7 @@ namespace CA_DataUploaderLib
                                 break;
                             case (States.InControlPeriod, Events.oven):
                                 var secondsOn = GetProportionalControlSecondsOn();
-                                controlperiodtimeoff = nextcontrolperiod.ToVectorDate().AddMilliseconds(-(int)((controlperiodseconds_defined && controlperiodseconds != 0 ? controlperiodseconds : _config.ControlPeriod.TotalSeconds)*1000))
+                                controlperiodtimeoff = nextcontrolperiod.ToVectorDate().AddMilliseconds(-(int)(GetControlPeriodSeconds() * 1000))
                                     .AddMilliseconds(secondsOn < 0.1d ? 0 : (int)(secondsOn * 1000)).ToVectorDouble();
                                 on = _latestVector.Reached(controlperiodtimeoff) ? 0 : 1;
                                 break;
@@ -222,10 +222,17 @@ namespace CA_DataUploaderLib
                         MakeDecision(Events.none); //ensure completion transitions run
                 }
 
+                /// <remarks>
+                /// Negative pgain or max output are treated as 0 and always return 0 seconds.
+                /// 
+                /// A negative control period is treated as 0.1 seconds, which means on every decision we re-evaluate if we should have the heater on or off.
+                /// Because we don't support turning off the heater in between decisions, this should normally keep the heater full on until the target is reached and then turn off as soon as possible.
+                /// </remarks>
                 double GetProportionalControlSecondsOn() =>
                     Math.Min( //note we only use the vector based proportional control arguments if the fields are defined and set (they are enabled in configuration and have a non 0 value) and otherwise use the values in the Oven line
-                        (Math.Min(target, _config.MaxTemperature) - ovensensor) * (pgain_defined && pgain != 0 ? pgain : _config.ProportionalGain),
-                        (maxoutput_defined && maxoutput != 0 ? maxoutput : _config.MaxOutputPercentage) * (controlperiodseconds_defined && controlperiodseconds != 0 ? controlperiodseconds : _config.ControlPeriod.TotalSeconds));
+                        (Math.Min(target, _config.MaxTemperature) - ovensensor) * Math.Max(0, pgain_defined && pgain != 0 ? pgain : _config.ProportionalGain),
+                        Math.Max(0, maxoutput_defined && maxoutput != 0 ? maxoutput : _config.MaxOutputPercentage) * GetControlPeriodSeconds());
+                private double GetControlPeriodSeconds() => Math.Max(0.1, controlperiodseconds_defined && controlperiodseconds != 0 ? controlperiodseconds : _config.ControlPeriod.TotalSeconds);
             }
 
             public class Indexes
