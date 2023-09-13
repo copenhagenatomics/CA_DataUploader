@@ -19,9 +19,10 @@ namespace CA_DataUploaderLib
 
             var ovens = IOconfFile.GetOven().ToList();
             var allAreas = IOconfFile.GetOven().Select(x => x.OvenArea).Distinct();
+            var ovenProportionalControlUpdatesConf = IOconfFile.GetEntries<IOconfOvenProportionalControlUpdates>().SingleOrDefault();
 
             //notice that the decisions states and outputs are handled by the registered decisions, while the switchboard inputs and actuations are handled by the switchboard controller
-            cmd.AddDecisions(allAreas.Select(a => new OvenAreaDecision(new($"ovenarea{a}", a))).ToList());
+            cmd.AddDecisions(allAreas.Select(a => new OvenAreaDecision(new($"ovenarea{a}", a, ovenProportionalControlUpdatesConf))).ToList());
             cmd.AddDecisions(heatersConfigs.Select(h => new HeaterDecision(h, ovens.SingleOrDefault(x => x.HeatingElement.Name == h.Name))).ToList());
             SwitchBoardController.Initialize(cmd);
         }
@@ -117,6 +118,13 @@ namespace CA_DataUploaderLib
                 public double on { get => _latestVector[_indexes.on]; set => _latestVector[_indexes.on] = value; }
                 public double nextcontrolperiod { get => _latestVector[_indexes.nextcontrolperiod]; set => _latestVector[_indexes.nextcontrolperiod] = value; }
                 public double controlperiodtimeoff { get => _latestVector[_indexes.controlperiodtimeoff]; set => _latestVector[_indexes.controlperiodtimeoff] = value; }
+                public double pgain { get => _latestVector[_indexes.pgain]; set => _latestVector[_indexes.pgain] = value; }
+                public bool pgain_defined => _indexes.pgain != -1;
+                public double controlperiodseconds { get => _latestVector[_indexes.controlperiodseconds]; set => _latestVector[_indexes.controlperiodseconds] = value; }
+                public bool controlperiodseconds_defined => _indexes.controlperiodseconds != -1;
+                public double maxoutput { get => _latestVector[_indexes.maxoutput]; set => _latestVector[_indexes.maxoutput] = value; }
+                public bool maxoutput_defined => _indexes.maxoutput != -1;
+
                 public bool TemperatureBoardsConnected
                 {
                     get
@@ -177,11 +185,8 @@ namespace CA_DataUploaderLib
                                 on = 1;
                                 break;
                             case States.InControlPeriod:
-                                var secondsOn = Math.Min(
-                                    (Math.Min(target, _config.MaxTemperature) - ovensensor) * _config.ProportionalGain,
-                                    _config.MaxOutputPercentage * _config.ControlPeriod.TotalSeconds
-                                    );
-                                nextcontrolperiod = _latestVector.TimeAfter((int)_config.ControlPeriod.TotalMilliseconds);
+                                var secondsOn = GetProportionalControlSecondsOn();
+                                nextcontrolperiod = _latestVector.TimeAfter((int)(GetControlPeriodSeconds() * 1000));
                                 controlperiodtimeoff = _latestVector.TimeAfter(secondsOn < 0.1d ? 0 : (int)(secondsOn * 1000));
                                 on = _latestVector.Reached(controlperiodtimeoff) ? 0 : 1;
                                 break;
@@ -203,11 +208,8 @@ namespace CA_DataUploaderLib
                                 on = _latestVector.Reached(controlperiodtimeoff) ? 0 : 1;
                                 break;
                             case (States.InControlPeriod, Events.oven):
-                                var secondsOn = Math.Min(
-                                    (Math.Min(target, _config.MaxTemperature) - ovensensor) * _config.ProportionalGain,
-                                    _config.MaxOutputPercentage * _config.ControlPeriod.TotalSeconds
-                                    );
-                                controlperiodtimeoff = nextcontrolperiod.ToVectorDate().AddMilliseconds(-_config.ControlPeriod.TotalMilliseconds)
+                                var secondsOn = GetProportionalControlSecondsOn();
+                                controlperiodtimeoff = nextcontrolperiod.ToVectorDate().AddMilliseconds(-(int)(GetControlPeriodSeconds() * 1000))
                                     .AddMilliseconds(secondsOn < 0.1d ? 0 : (int)(secondsOn * 1000)).ToVectorDouble();
                                 on = _latestVector.Reached(controlperiodtimeoff) ? 0 : 1;
                                 break;
@@ -219,6 +221,18 @@ namespace CA_DataUploaderLib
                     if (oldState != State)
                         MakeDecision(Events.none); //ensure completion transitions run
                 }
+
+                /// <remarks>
+                /// Negative pgain or max output are treated as 0 and always return 0 seconds.
+                /// 
+                /// A negative control period is treated as 0.1 seconds, which means on every decision we re-evaluate if we should have the heater on or off.
+                /// Because we don't support turning off the heater in between decisions, this should normally keep the heater full on until the target is reached and then turn off as soon as possible.
+                /// </remarks>
+                double GetProportionalControlSecondsOn() =>
+                    Math.Min( //note we only use the vector based proportional control arguments if the fields are defined and set (they are enabled in configuration and have a non 0 value) and otherwise use the values in the Oven line
+                        (Math.Min(target, _config.MaxTemperature) - ovensensor) * Math.Max(0, pgain_defined && pgain != 0 ? pgain : _config.ProportionalGain),
+                        Math.Max(0, maxoutput_defined && maxoutput != 0 ? maxoutput : _config.MaxOutputPercentage) * GetControlPeriodSeconds());
+                private double GetControlPeriodSeconds() => Math.Max(0.1, controlperiodseconds_defined && controlperiodseconds != 0 ? controlperiodseconds : _config.ControlPeriod.TotalSeconds);
             }
 
             public class Indexes
@@ -230,6 +244,9 @@ namespace CA_DataUploaderLib
                 public int controlperiodtimeoff { get; } = -1;
                 public int ovensensor { get; internal set; } = -1;
                 public int[] TemperatureBoardsStates;
+                public int pgain { get; internal set; } = -1;
+                public int controlperiodseconds { get; internal set; } = -1;
+                public int maxoutput { get; internal set; } = -1;
 
                 public Indexes(CA.LoopControlPluginBase.VectorDescription desc, Config _config)
                 {
@@ -254,6 +271,13 @@ namespace CA_DataUploaderLib
                         for (int j = 0; j < TemperatureBoardsStates.Length; j++)
                             if (field == _config.TemperatureBoardStateSensorNames[j])
                                 TemperatureBoardsStates[j] = i;
+                        if (field == $"ovenarea{_config.Area}_pgain")
+                            pgain = i;
+                        if (field == $"ovenarea{_config.Area}_controlperiodseconds")
+                            controlperiodseconds = i;
+                        if (field == $"ovenarea{_config.Area}_maxoutput")
+                            maxoutput = i;
+
                     }
 
                     if (state == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_state", nameof(desc));
@@ -271,31 +295,42 @@ namespace CA_DataUploaderLib
 
         public class OvenAreaDecision : LoopControlDecision
         {
-            public enum States { initial, Off, Running }
-            public enum Events { none, vector, oven, ovenarea, emergencyshutdown };
+            public enum States { initial, Off, Running, ReceivedOvenCommand }
+            public enum Events { none, vector, oven, ovenarea, emergencyshutdown, pgain, controlperiodseconds, maxoutputs };
             private readonly (string prefix, Events e, bool targetRequired)[] _eventsMap;
             private readonly Config _config;
 
             private Indexes? _indexes;
             public override string Name => _config.Name;
-            public override PluginField[] PluginFields => new PluginField[] { $"{Name}_state", $"{Name}_target" };
+            public override PluginField[] PluginFields { get; }
             public override string[] HandledEvents { get; }
             public OvenAreaDecision(Config config)
             {
                 _config = config;
-                _eventsMap = new (string prefix, Events e, bool targetRequired)[] {
+                var canUpdatePArgs = config.OvenProportionalControlUpdatesConf != null;
+                PluginFields = canUpdatePArgs ?
+                    new PluginField[] { $"{Name}_state", $"{Name}_target", $"{Name}_pgain", $"{Name}_controlperiodseconds", $"{Name}_maxoutput" } :
+                    new PluginField[] { $"{Name}_state", $"{Name}_target" };
+                var eventsMap = new List<(string prefix, Events e, bool targetRequired)>() {
                     (prefix: "oven", Events.oven, true),
                     (prefix: $"ovenarea {config.Area}", Events.ovenarea, true),
                     (prefix: $"ovenarea all", Events.ovenarea, true),
                     (prefix: "emergencyshutdown", Events.emergencyshutdown, false)};
-                HandledEvents = new[] { "oven", $"ovenarea {config.Area}", "ovenarea all", "emergencyshutdown" };
+                if (canUpdatePArgs)
+                {
+                    eventsMap.Insert(0, (prefix: $"ovenarea {config.Area} pgain", Events.pgain, true));
+                    eventsMap.Insert(0, (prefix: $"ovenarea {config.Area} controlperiodseconds", Events.controlperiodseconds, true));
+                    eventsMap.Insert(0, (prefix: $"ovenarea {config.Area} maxoutput", Events.maxoutputs, true));
+                }
+                _eventsMap = eventsMap.ToArray();
+                HandledEvents = eventsMap.Select(e => e.prefix).ToArray();
             }
 
             public override void Initialize(CA.LoopControlPluginBase.VectorDescription desc) => _indexes = new(desc, _config);
             public override void MakeDecision(CA.LoopControlPluginBase.DataVector vector, List<string> events)
             {
                 if (_indexes == null) throw new InvalidOperationException("Unexpected call to MakeDecision before Initialize was called first");
-                var model = new Model(vector, _indexes);
+                var model = new Model(vector, _indexes, _config);
 
                 foreach (var e in events)
                 foreach (var (prefix, typedEvent, targetRequired) in _eventsMap)
@@ -313,29 +348,36 @@ namespace CA_DataUploaderLib
 
             public class Config
             {
-                public Config(string name, int area)
+                public Config(string name, int area, IOconfOvenProportionalControlUpdates? ovenProportionalControlUpdatesConf = null)
                 {
                     Name = name;
                     Area = area;
+                    OvenProportionalControlUpdatesConf = ovenProportionalControlUpdatesConf;
                 }
 
                 public int Area { get; init; }
                 public string Name { get; }
+                public IOconfOvenProportionalControlUpdates? OvenProportionalControlUpdatesConf { get; }
             }
 
 #pragma warning disable IDE1006 // Naming Styles - decisions are coded using a similar approach to decisions plugins, which avoid casing rules in properties to more have naming more similar to the original fields
             public ref struct Model
             {
                 private readonly Indexes _indexes;
+                private readonly Config _config;
                 private readonly CA.LoopControlPluginBase.DataVector _latestVector;
 
-                public Model(CA.LoopControlPluginBase.DataVector latestVector, Indexes indexes)
+                public Model(CA.LoopControlPluginBase.DataVector latestVector, Indexes indexes, Config config)
                 {
                     _latestVector = latestVector;
                     _indexes = indexes;
+                    _config = config;
                 }
                 public States State { get => (States)_latestVector[_indexes.state]; set => _latestVector[_indexes.state] = (int)value; }
                 public double target { get => _latestVector[_indexes.target]; set => _latestVector[_indexes.target] = value; }
+                public double pgain { get => _latestVector[_indexes.pgain]; set => _latestVector[_indexes.pgain] = value; }
+                public double controlperiodseconds { get => _latestVector[_indexes.controlperiodseconds]; set => _latestVector[_indexes.controlperiodseconds] = value; }
+                public double maxoutput { get => _latestVector[_indexes.maxoutput]; set => _latestVector[_indexes.maxoutput] = value; }
 
                 internal void MakeDecision(Events e, double data = 0)
                 {
@@ -343,6 +385,9 @@ namespace CA_DataUploaderLib
                     State = (oldState, e) switch
                     {
                         (States.initial, _) => States.Off,
+                        (States.Off, Events.oven or Events.ovenarea) => States.ReceivedOvenCommand,
+                        (States.ReceivedOvenCommand, _) when target > 0 => States.Running,
+                        (States.ReceivedOvenCommand, _) => States.Off,
                         (States.Off, Events.vector) when target > 0 => States.Running,
                         (States.Running, Events.emergencyshutdown) => States.Off,
                         (States.Running, Events.vector) when target == 0 => States.Off,
@@ -355,6 +400,9 @@ namespace CA_DataUploaderLib
                             case States.Off:
                                 target = 0;
                                 break;
+                            case States.ReceivedOvenCommand:
+                                target = data;
+                                break;
                             default: //any state without entry actions goes here
                                 break;
                         }
@@ -365,6 +413,23 @@ namespace CA_DataUploaderLib
                         {
                             case (States.Off or States.Running, Events.oven or Events.ovenarea):
                                 target = data;
+                                break;
+                            case (States.Off or States.Running, Events.pgain):
+                                pgain = Math.Min(data, _config.OvenProportionalControlUpdatesConf!.MaxProportionalGain);
+                                break;
+                            case (States.Off or States.Running, Events.controlperiodseconds):
+                                controlperiodseconds = Math.Min(data, _config.OvenProportionalControlUpdatesConf!.MaxControlPeriod.TotalSeconds);
+                                break;
+                            case (States.Off or States.Running, Events.maxoutputs):
+                                maxoutput = Math.Min(data / 100, _config.OvenProportionalControlUpdatesConf!.MaxOutputPercentage);
+                                break;
+                            case (States.Off or States.Running, Events.vector):
+                                if (_config.OvenProportionalControlUpdatesConf != null)
+                                {
+                                    pgain = Math.Min(pgain, _config.OvenProportionalControlUpdatesConf.MaxProportionalGain);
+                                    controlperiodseconds = Math.Min(controlperiodseconds, _config.OvenProportionalControlUpdatesConf.MaxControlPeriod.TotalSeconds);
+                                    maxoutput = Math.Min(maxoutput, _config.OvenProportionalControlUpdatesConf.MaxOutputPercentage);
+                                }
                                 break;
                             default: //any state without event actions goes here
                                 break;
@@ -380,6 +445,9 @@ namespace CA_DataUploaderLib
             {
                 public int state { get; } = -1;
                 public int target { get; internal set; } = -1;
+                public int pgain { get; internal set; } = -1;
+                public int controlperiodseconds { get; internal set; } = -1;
+                public int maxoutput { get; internal set; } = -1;
 
                 public Indexes(CA.LoopControlPluginBase.VectorDescription desc, Config _config)
                 {
@@ -390,10 +458,19 @@ namespace CA_DataUploaderLib
                             state = i;
                         if (field == $"{_config.Name}_target")
                             target = i;
+                        if (field == $"{_config.Name}_pgain")
+                            pgain = i;
+                        if (field == $"{_config.Name}_controlperiodseconds")
+                            controlperiodseconds = i;
+                        if (field == $"{_config.Name}_maxoutput")
+                            maxoutput = i;
                     }
 
                     if (state == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_state", nameof(desc));
                     if (target == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_target", nameof(desc));
+                    if (pgain == -1 && _config.OvenProportionalControlUpdatesConf != null) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_pgain", nameof(desc));
+                    if (controlperiodseconds == -1 && _config.OvenProportionalControlUpdatesConf != null) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_controlperiodseconds", nameof(desc));
+                    if (maxoutput == -1 && _config.OvenProportionalControlUpdatesConf != null) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_maxoutput", nameof(desc));
                 }
             }
 #pragma warning restore IDE1006 // Naming Styles

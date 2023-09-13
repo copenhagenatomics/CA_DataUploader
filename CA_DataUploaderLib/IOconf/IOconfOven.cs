@@ -17,7 +17,8 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception($"IOconfOven: wrong OvenArea number: {row} {Format}");
             if (OvenArea < 1)
                 throw new Exception("Oven area must be a number bigger or equal to 1");
-            
+
+            HeaterName = list[2];
             TemperatureSensorName = list[3];
 
             if (list.Count < 5) return;
@@ -41,7 +42,7 @@ namespace CA_DataUploaderLib.IOconf
         public override void ValidateDependencies()
         {
             var list = ToList();
-            HeatingElement = IOconfFile.GetHeater().Single(x => x.Name == list[2]);
+            HeatingElement = IOconfFile.GetHeater().Single(x => x.Name == HeaterName);
             var isTemp = IOconfFile.GetTemp().Any(t => t.Name == TemperatureSensorName);
             var isMath = IOconfFile.GetMath().Any(m => m.Name == TemperatureSensorName);
             var isFilter = IOconfFile.GetFilters().Any(f => f.NameInVector == TemperatureSensorName);
@@ -61,6 +62,7 @@ namespace CA_DataUploaderLib.IOconf
             private set => heatingElement = value; 
         }
         public string TemperatureSensorName { get; }
+        public string HeaterName { get; }
         public ReadOnlyCollection<string> BoardStateSensorNames 
         { 
             get => boardStateSensorNames ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(BoardStateSensorNames)}.");
