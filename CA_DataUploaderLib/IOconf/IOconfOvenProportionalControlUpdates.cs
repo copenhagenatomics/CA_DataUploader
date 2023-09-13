@@ -30,6 +30,7 @@ namespace CA_DataUploaderLib.IOconf
         /// <remarks><see cref="IOconfOven.ProportionalGain"/></remarks>
         public double MaxProportionalGain { get; }
         public TimeSpan MaxControlPeriod { get; }
+        /// <summary>the percentage in the 0 to 1 range (the line in IO.conf instead is entered in the 0-100 range, as we do for <see cref="IOconfOven.MaxOutputPercentage"/>)</summary>
         public double MaxOutputPercentage { get; }
     }
 }
