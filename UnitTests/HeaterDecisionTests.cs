@@ -322,7 +322,7 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void PControlUsesUsesMaxConfigurationForCommandValuesAboveAllowedRange()
+        public void PControlUsesMaxConfigurationForCommandValuesAboveAllowedRange()
         {
             var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;2;00:00:30;100", 0);
             NewOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
@@ -406,7 +406,7 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void PControlUsesUsesMaxConfigurationForVectorValuesAboveAllowedRange()
+        public void PControlUsesMaxConfigurationForVectorValuesAboveAllowedRange()
         {
             var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;2;00:00:30;100", 0);
             NewOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
