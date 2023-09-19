@@ -21,11 +21,11 @@ namespace CA_DataUploaderLib.Helpers
         /// </summary>
         public IReadOnlyList<(IOconfNode, IReadOnlyList<VectorDescriptionItem>)> InputsPerNode { get; set; }
 
-        public ExtendedVectorDescription(List<(IOconfNode, IReadOnlyList<VectorDescriptionItem> values)> inputsPerNode, List<VectorDescriptionItem> outputs)
+        public ExtendedVectorDescription(List<(IOconfNode, IReadOnlyList<VectorDescriptionItem> values)> inputsPerNode, List<VectorDescriptionItem> globalInputs, List<VectorDescriptionItem> outputs)
         {
             _logLevel = IOconfFile.GetOutputLevel();
             InputsPerNode = inputsPerNode;
-            List<VectorDescriptionItem> allItems = inputsPerNode.SelectMany(n => n.values).ToList();
+            List<VectorDescriptionItem> allItems = inputsPerNode.SelectMany(n => n.values).Concat(globalInputs).ToList();
             _values = GetFilters(allItems);
             allItems.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Output.Name, DataTypeEnum.Input)));
             RemoveHiddenSources(allItems, i => i.Descriptor);

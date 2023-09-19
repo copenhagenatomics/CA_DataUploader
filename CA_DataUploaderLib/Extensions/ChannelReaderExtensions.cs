@@ -6,6 +6,7 @@ namespace CA_DataUploaderLib.Extensions
 {
     public static class ChannelReaderExtensions
     {
+        /// <returns><c>null</c> if it timed out, otherwise the read value.</returns>
         public static async Task<T?> ReadWithSoftTimeout<T>(this ChannelReader<T> reader, int timeoutMs, CancellationToken token)
         {
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token);
