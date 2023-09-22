@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib
                     var events = GetReceivedEventsInThisCycle();
                     var commands = events.Where(e => e.EventType == (byte)EventType.Command);
                     var stringCommands = commands.Any() ? commands.Select(e => e.Data).ToList() : emptyCommands;
-                    cmdHandler.MakeDecision(cmdHandler.GetNodeInputs().ToList(), DateTime.UtcNow, ref vector, stringCommands);
+                    cmdHandler.MakeDecision(cmdHandler.GetNodeInputs().Concat(cmdHandler.GetGlobalInputs()).ToList(), DateTime.UtcNow, ref vector, stringCommands);
                     vector = new(vector.Data.ToArray(), vector.Timestamp, new List<EventFiredArgs>(events));//note we create copies to avoid changes in the next cycle affecting data of the previous cycle (specially via OnNewVectorReceived)
                     cmdHandler.OnNewVectorReceived(vector);
                     await Task.WhenAny(sendThrottle.WaitAsync(token));//whenany for no exceptions on cancel

@@ -133,6 +133,7 @@ namespace CA_DataUploaderLib
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
+        public IEnumerable<SensorSample> GetGlobalInputs() => _subsystems.SelectMany(s => s.GetGlobalInputValues());
         public void MakeDecision(List<SensorSample> inputs, DateTime vectorTime, [NotNull]ref DataVector? vector, List<string> commands)
         {
             var extendedDesc = _fullsystemFilterAndMath.Value;
@@ -198,12 +199,13 @@ namespace CA_DataUploaderLib
                 .Where(n => n.inputs.Count > 0)
                 .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
                 .ToList();
+            var globalInputs = descItemsPerSubsystem.SelectMany(s => s.GlobalInputs).ToList();
             OrderDecisionsBasedOnIOconf(_decisions);
             var decisions = _decisions.Concat(_safetydecisions);
             SetConfigBasedOnIOconf(decisions);
             CALog.LogData(LogID.A, $"decisions order: {string.Join(',', decisions.Select(d => d.Name))}");
             var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type) { Upload = f.Upload })).ToList();
-            var desc = new ExtendedVectorDescription(inputsPerNode, outputs);
+            var desc = new ExtendedVectorDescription(inputsPerNode, globalInputs, outputs);
             CA.LoopControlPluginBase.VectorDescription inmutableVectorDesc = new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray());
             foreach (var decision in decisions)
                 decision.Initialize(inmutableVectorDesc);
