@@ -46,25 +46,25 @@ namespace CA_DataUploaderLib.IOconf
             }
 
             // returns currents 0-3, board temperature (, sensorport_rms, sensorport_max)
-            public override List<double>? TryParseAsDoubleList(string line)
+            public override (List<double>?, uint) TryParseAsDoubleList(string line)
             {
                 var match = _oldswitchBoxCurrentsRegex.Match(line);
                 if (!match.Success) 
                     return TryParseOnlyNumbersAsDoubleList(line);
-                return GetValuesFromGroups(match.Groups);
+                return (GetValuesFromGroups(match.Groups), 0);
             }
 
             // returns currents 0-3, board temperature (, sensorport_rms, sensorport_max)
-            public List<double>? TryParseOnlyNumbersAsDoubleList(string line)
+            public (List<double>?, uint) TryParseOnlyNumbersAsDoubleList(string line)
             {
-                var numbers = base.TryParseAsDoubleList(line); //the base implementation deals with any amount of simple numbers separated by commas.
+                var (numbers, status) = base.TryParseAsDoubleList(line); //the base implementation deals with any amount of simple numbers separated by commas.
                 if (numbers == null)
-                    return null;
+                    return (null, 0);
                 if (numbers.Count < 4)
-                    return null; //invalid line, must have at least 4 currents
+                    return (null, 0); //invalid line, must have at least 4 currents
                 if (numbers.Count == 4)
                     numbers.Add(10000);//some versions did not report temperature
-                return numbers;
+                return (numbers, status);
             }
 
             public override bool MatchesValuesFormat(string line) => _oldswitchBoxCurrentsRegex.IsMatch(line);

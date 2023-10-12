@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using System.Linq;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using CA_DataUploaderLib.Extensions;
 
@@ -35,19 +36,25 @@ namespace CA_DataUploaderLib.IOconf
         public class LineParser
         {
             public static LineParser Default { get; } = new LineParser();
-            private static readonly Regex _hasCommaSeparatedNumbers = new(@"^\s*-?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*-?(?:[0-9]*[.])?[0-9]+\s*)*,?\s*$");
+            private static readonly Regex _hasCommaSeparatedNumbers = new(@"^\s*-?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*-?(?:[0-9]*[.])?[0-9]+\s*)*(?<Status>,\s*0x[0-9a-fA-F]+)?,?\s*$");
 
             /// <returns>the list of doubles, or null when the line did not match the expected format</returns>
-            public virtual List<double>? TryParseAsDoubleList(string line)
+            public virtual (List<double>?, uint) TryParseAsDoubleList(string line)
             {
-                if (!_hasCommaSeparatedNumbers.IsMatch(line))
-                    return null;
+                var status = 0U;
+                var lineMatch = _hasCommaSeparatedNumbers.Match(line);
+                if (!lineMatch.Success)
+                    return (null, status);
 
-                return line.Split(",".ToCharArray())
+                var statusString = lineMatch.Groups["Status"].Value.Trim(',', ' ');
+                if (!string.IsNullOrEmpty(statusString) && statusString.StartsWith("0x"))
+                    uint.TryParse(statusString[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out status);
+
+                return (line.Split(",".ToCharArray())
                     .Select(x => x.Trim())
-                    .Where(x => x.Length > 0)
+                    .Where(x => x.Length > 0 && !x.Contains("0x"))
                     .Select(x => x.ToDouble())
-                    .ToList();
+                    .ToList(), status);
             }
 
             public virtual bool MatchesValuesFormat(string line) => _hasCommaSeparatedNumbers.IsMatch(line);

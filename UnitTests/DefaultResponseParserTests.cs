@@ -6,13 +6,21 @@ namespace UnitTests
     [TestClass]
     public class DefaultResponseParserTests
     {
-        [TestMethod]
-        public void PressureLineIsParsed()
+        [DataRow("0.01,-0.05,0.06\r", 0U, 0.01, -0.05, 0.06)]
+        [DataRow("0.01,-0.05,0.06,", 0U, 0.01, -0.05, 0.06)]
+        [DataRow("0.01, -0.05, 0.06", 0U, 0.01, -0.05, 0.06)]
+        [DataRow("0.01,-0.05,0.06,0x0", 0U, 0.01, -0.05, 0.06)]
+        [DataRow("0.01,-0.05,0.06,0xa ", 10U, 0.01, -0.05, 0.06)]
+        [DataRow("0.01,-0.05,0.06,0xa,", 10U, 0.01, -0.05, 0.06)] //Comma after status supported, but not expected
+        [DataRow("0.01,-0.05,0.06, 0xA", 10U, 0.01, -0.05, 0.06)]
+        [DataRow("0.01,-0.05,0.06,0xffffffff", uint.MaxValue, 0.01, -0.05, 0.06)]
+        [DataTestMethod]
+        public void DefaultSettingsParsesExpectedValuesFormat(string line, uint expectedStatus, params double[] expectedValues)
         {
-            string testString = "0.00, 0.05, -1.80, -1.80, -1.80, -1.78\r";
-            var values = BoardSettings.Default.Parser.TryParseAsDoubleList(testString);
-            Assert.IsNotNull(values);
-            CollectionAssert.AreEqual(new [] {0d, 0.05, -1.8, -1.8, -1.8, -1.78}, values);
+            var parser = BoardSettings.Default.Parser;
+            var (values, status) = parser.TryParseAsDoubleList(line);
+            CollectionAssert.AreEqual(expectedValues, values);
+            Assert.AreEqual(expectedStatus, status);
         }
     }
 }

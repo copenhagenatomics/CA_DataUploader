@@ -31,6 +31,7 @@ namespace CA_DataUploaderLib
         private ChannelReader<DataVector>? _receivedVectors;
         private static readonly Dictionary<string, string> _usedBoxNames = new();
         private readonly Dictionary<string, TaskCompletionSource> _reconnectTasks = new();
+        private uint _lastStatus = 0U;
 
         public BaseSensorBox(CommandHandler cmd, string commandName, IEnumerable<IOconfInput> values)
         {
@@ -464,7 +465,7 @@ namespace CA_DataUploaderLib
                     return true; //timed out reading from the board, TryReadLineWithStallDetection already updated the state after the first msBetweenReads / still considered connected
                 try
                 {
-                    var numbers = TryParseAsDoubleList(board, line);
+                    var (numbers, status) = TryParseAsDoubleList(board, line);
                     if (numbers != null)
                     {
                         ProcessLine(numbers, board, targetSamples);
@@ -477,6 +478,10 @@ namespace CA_DataUploaderLib
                         if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                             _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                     }
+
+                    if (status != _lastStatus && (status & 0x8000) != 0) //Was there a change in status and is the most significant bit set?
+                        LowFrequencyLog((args, skipMessage) => LogError(args.board, $"board responded with status 0x{args.status:X}{skipMessage}"), (board, status));
+                    _lastStatus = status;
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in msBetweenReads
@@ -542,8 +547,8 @@ namespace CA_DataUploaderLib
             }
         }
 
-        /// <returns>the list of doubles, otherwise <c>null</c></returns>
-        protected virtual List<double>? TryParseAsDoubleList(MCUBoard board, string line) =>
+        /// <returns>the list of doubles (potentially <c>null</c>) and a status value</returns>
+        protected virtual (List<double>?, uint) TryParseAsDoubleList(MCUBoard board, string line) =>
             board.ConfigSettings.Parser.TryParseAsDoubleList(line);
 
         private bool CheckFails(MCUBoard board, SensorSample.InputBased[] values)
