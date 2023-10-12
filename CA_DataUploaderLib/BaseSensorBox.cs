@@ -473,30 +473,30 @@ namespace CA_DataUploaderLib
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
-                        LowFrequencyLog(msg => LogInfo(board, msg), $"unexpected board response {line.Replace("\r", "\\r")}");// we avoid \r as it makes the output hard to read
+                        LowFrequencyLog((args, skipMessage) => LogInfo(args.board, $"unexpected board response {args.line.Replace("\r", "\\r")}{skipMessage}"), (board, line));// we avoid \r as it makes the output hard to read
                         if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                             _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                     }
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in msBetweenReads
-                    LowFrequencyLog(msg => LogError(board, msg, ex), $"failed handling board response {line.Replace("\r", "\\r")}"); // we avoid \r as it makes the output hard to read
+                    LowFrequencyLog((args, skipMessage) => LogError(args.board, $"failed handling board response {args.line.Replace("\r", "\\r")}{skipMessage}", args.ex), (board, line, ex)); // we avoid \r as it makes the output hard to read
                     if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                         _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                 }
             }
 
-            void LowFrequencyLog(Action<string> logAction, string message)
+            void LowFrequencyLog<T>(Action<T, string> logAction, T args)
             {
                 if (timeSinceLastLog.IsRunning && timeSinceLastLog.ElapsedMilliseconds < 5 * 60000)
                 {
                     if (logSkipped++ == 0)
-                        LogError(board, $"{message}{Environment.NewLine}Skipping further messages for this board (max 2 messages every 5 minutes)");
+                        logAction(args, $"{Environment.NewLine}Skipping further messages for this board (max 2 messages every 5 minutes)");
                     return;
                 }
 
                 timeSinceLastLog.Restart();
-                logAction(message);
+                logAction(args, "");
                 logSkipped = 0;
             }
         }
