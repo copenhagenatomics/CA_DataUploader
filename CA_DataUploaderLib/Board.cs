@@ -39,5 +39,6 @@ namespace CA_DataUploaderLib
         }
 
         public override string ToString() => $"Product Type: {ProductType,-20} Serial Number: {SerialNumber,-12} Port name: {PortName}";
+        public string ToShortDescription() => $"{BoxName} {ProductType} {SerialNumber} {PortName}";
     }
 }

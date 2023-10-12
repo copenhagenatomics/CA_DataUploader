@@ -154,7 +154,6 @@ namespace CA_DataUploaderLib
         public string ToDebugString(string seperator) =>
             $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {port.BaudRate}{seperator}{serialNumberHeader} {SerialNumber}{seperator}{productTypeHeader} {ProductType}{seperator}{pcbVersionHeader}{PcbVersion}{seperator}{softwareVersionHeader} {SoftwareVersion}{seperator}{CalibrationHeader} {Calibration}{seperator}";
         public override string ToString() => $"{productTypeHeader} {ProductType,-20} {serialNumberHeader} {SerialNumber,-12} Port name: {PortName}";
-        public string ToShortDescription() => $"{BoxName} {ProductType} {SerialNumber} {PortName}";
 
         /// <summary>
         /// Reopens the connection skipping the header.
