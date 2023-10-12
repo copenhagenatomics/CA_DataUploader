@@ -547,7 +547,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        /// <returns>the list of doubles (potentially <c>null</c>) and a status value</returns>
+        /// <returns>the list of doubles (<c>null</c> if failing to parse the line) and a status value</returns>
         protected virtual (List<double>?, uint) TryParseAsDoubleList(MCUBoard board, string line) =>
             board.ConfigSettings.Parser.TryParseAsDoubleList(line);
 

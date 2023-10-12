@@ -35,7 +35,7 @@ namespace CA.LoopControlPluginBase
                 return false;
 
             if (!int.TryParse(stringVal, NumberStyles.Integer, CultureInfo.InvariantCulture, out val))
-                throw new FormatException($"failed to int field {fieldName} value {stringVal} for {Decision}");
+                throw new FormatException($"failed to parse int field {fieldName} value {stringVal} for {Decision}");
 
             return true;
         }
