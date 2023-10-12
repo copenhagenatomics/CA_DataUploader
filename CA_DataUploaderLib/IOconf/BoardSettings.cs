@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Globalization;
@@ -36,7 +37,7 @@ namespace CA_DataUploaderLib.IOconf
         public class LineParser
         {
             public static LineParser Default { get; } = new LineParser();
-            private static readonly Regex _hasCommaSeparatedNumbers = new(@"^\s*-?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*-?(?:[0-9]*[.])?[0-9]+\s*)*(?<Status>,\s*0x[0-9a-fA-F]+)?,?\s*$");
+            private static readonly Regex _hasCommaSeparatedNumbers = new(@"^\s*(?<Values>-?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*-?(?:[0-9]*[.])?[0-9]+\s*)*)(?:,\s*0x(?<Status>[0-9a-fA-F]+))?,?\s*$");
 
             /// <returns>the list of doubles, or null when the line did not match the expected format</returns>
             public virtual (List<double>?, uint) TryParseAsDoubleList(string line)
@@ -46,13 +47,10 @@ namespace CA_DataUploaderLib.IOconf
                 if (!lineMatch.Success)
                     return (null, status);
 
-                var statusString = lineMatch.Groups["Status"].Value.Trim(',', ' ');
-                if (!string.IsNullOrEmpty(statusString) && statusString.StartsWith("0x"))
-                    uint.TryParse(statusString[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out status);
+                if (lineMatch.Groups["Status"].Success)
+                    uint.TryParse(lineMatch.Groups["Status"].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out status);
 
-                return (line.Split(",".ToCharArray())
-                    .Select(x => x.Trim())
-                    .Where(x => x.Length > 0 && !x.Contains("0x"))
+                return (lineMatch.Groups["Values"].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
                     .Select(x => x.ToDouble())
                     .ToList(), status);
             }
