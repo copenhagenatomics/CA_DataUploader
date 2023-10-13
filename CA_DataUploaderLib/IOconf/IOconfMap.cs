@@ -97,8 +97,12 @@ namespace CA_DataUploaderLib.IOconf
         {
             ExpectedHeaderLines = 0, //no headers expected, just value lines right away
             SkipBoardAutoDetection = true, //everything about how we detect board data is specific to our units, so this must be skipped for vports
-            //reconnect does not play well with socat based ports, so we give it plenty of extra time before running reconnects
-            MaxMillisecondsWithoutNewValues = 30000,
+            //reconnect does not play well with socat based ports, so we let it go a full hour without data
+            //we should greatly reduce it if we find a way of running socat that plays well with the way reconnects run
+            MaxMillisecondsWithoutNewValues = 3600000, 
+            //this was randomly set to 10 seconds we needed in our current vports use,
+            //but we might introduce a setting in the future for this e.g. a MapSettings line that allows changing these times.
+            MillisecondsBetweenReads = 10000,
             SecondsBetweenReopens = 10
         };
 
