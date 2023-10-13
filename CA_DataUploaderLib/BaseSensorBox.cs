@@ -29,6 +29,7 @@ namespace CA_DataUploaderLib
         private readonly PluginsCommandHandler _cmdAdvanced;
         private readonly Dictionary<MCUBoard, List<(Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
         private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = new();
+        private uint _lastStatus = 0U;
 
         public BaseSensorBox(
             CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values)
@@ -338,7 +339,9 @@ namespace CA_DataUploaderLib
         {
             var timeSinceLastValidRead = Stopwatch.StartNew();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
-            var msBetweenReads = (int)Math.Ceiling(board.ConfigSettings.MillisecondsBetweenReads * 1.5); 
+            var msBetweenReads = (int)Math.Ceiling(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
+            Stopwatch timeSinceLastLogInfo = new(), timeSinceLastLogError = new();
+            int logInfoSkipped = 0, logErrorSkipped = 0;
             //We set the state early if we detect no data is being returned or if we received values,
             //but we only set ReturningNonValues if it has passed msBetweenReads since the last valid read
             while (true) // we only stop reading if a disconnect or timeout is detected
@@ -350,7 +353,7 @@ namespace CA_DataUploaderLib
                     return true; //timed out reading from the board, TryReadLineWithStallDetection already updated the state after the first msBetweenReads / still considered connected
                 try
                 {
-                    var numbers = TryParseAsDoubleList(board, line);
+                    var (numbers, status) = TryParseAsDoubleList(board, line);
                     if (numbers != null)
                     {
                         ProcessLine(numbers, board, targetSamples);
@@ -359,17 +362,39 @@ namespace CA_DataUploaderLib
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
-                        LogInfo(board, $"unexpected board response {line.Replace("\r", "\\r")}"); // we avoid \r as it makes the output hard to read
+                        LowFrequencyLogInfo((args, skipMessage) => LogInfo(args.board, $"Unexpected board response {args.line.Replace("\r", "\\r")}{skipMessage}"), (board, line));// we avoid \r as it makes the output hard to read
                         if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                             _boardsState.SetState(board, ConnectionState.ReturningNonValues);
                     }
+
+                    if (status != _lastStatus && (status & 0x80000000) != 0) //Was there a change in status and is the most significant bit set?
+                        LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Board responded with error status 0x{args.status:X}{skipMessage}"), (board, status));
+                    _lastStatus = status;
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in msBetweenReads
-                    LogError(board, $"failed handling board response {line.Replace("\r", "\\r")}", ex); // we avoid \r as it makes the output hard to read
+                    LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Failed handling board response {args.line.Replace("\r", "\\r")}{skipMessage}", args.ex), (board, line, ex)); // we avoid \r as it makes the output hard to read
                     if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                         _boardsState.SetState(board, ConnectionState.ReturningNonValues);
                 }
+            }
+
+            void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastLogInfo, ref logInfoSkipped);
+
+            void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastLogError, ref logErrorSkipped);
+
+            void LowFrequencyLog<T>(Action<T, string> logAction, T args, Stopwatch timeSinceLastLog, ref int logSkipped)
+            {
+                if (timeSinceLastLog.IsRunning && timeSinceLastLog.ElapsedMilliseconds < 5 * 60000)
+                {
+                    if (logSkipped++ == 0)
+                        logAction(args, $"{Environment.NewLine}Skipping further messages for this board (max 2 messages every 5 minutes)");
+                    return;
+                }
+
+                timeSinceLastLog.Restart();
+                logAction(args, "");
+                logSkipped = 0;
             }
         }
 
@@ -414,8 +439,8 @@ namespace CA_DataUploaderLib
             }
         }
 
-        /// <returns>the list of doubles, otherwise <c>null</c></returns>
-        protected virtual List<double> TryParseAsDoubleList(MCUBoard board, string line) => 
+        /// <returns>the list of doubles (<c>null</c> if failing to parse the line) and a status value</returns>
+        protected virtual (List<double>, uint) TryParseAsDoubleList(MCUBoard board, string line) =>
             board.ConfigSettings.Parser.TryParseAsDoubleList(line);
 
         private bool CheckFails(MCUBoard board, SensorSample[] values)
@@ -521,10 +546,10 @@ namespace CA_DataUploaderLib
             else
                 CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.BoxName} (missing)", ex); 
         }
-        private void LogError(MCUBoard board, string message, Exception ex) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}", ex);
-        private void LogError(MCUBoard board, string message) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}");
-        private void LogData(MCUBoard board, string message) => CALog.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
-        private void LogInfo(MCUBoard board, string message) => CALog.LogInfoAndConsoleLn(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
+        private void LogError(Board board, string message, Exception ex) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}", ex);
+        private void LogError(Board board, string message) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}");
+        private void LogData(Board board, string message) => CALog.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
+        private void LogInfo(Board board, string message) => CALog.LogInfoAndConsoleLn(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
         protected virtual void Dispose(bool disposing) => _boardLoopsStopTokenSource.Cancel();
         public void Dispose()
         {
