@@ -67,7 +67,8 @@ namespace CA_DataUploaderLib.IOconf
                 return (numbers, status);
             }
 
-            public override bool MatchesValuesFormat(string line) => _oldswitchBoxCurrentsRegex.IsMatch(line);
+            public override bool MatchesValuesFormat(string line) => _oldswitchBoxCurrentsRegex.IsMatch(line) || base.MatchesValuesFormat(line);
+
             // returns currents 0-3, board temperature
             private static List<double> GetValuesFromGroups(GroupCollection groups)
             {
