@@ -452,8 +452,8 @@ namespace CA_DataUploaderLib
             var timeSinceLastValidRead = Stopwatch.StartNew();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
             var msBetweenReads = (int)Math.Ceiling(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
-            var timeSinceLastLog = new Stopwatch();
-            var logSkipped = 0;
+            Stopwatch timeSinceLastLogInfo = new(), timeSinceLastLogError = new();
+            int logInfoSkipped = 0, logErrorSkipped = 0;
             //We set the state early if we detect no data is being returned or if we received values,
             //but we only set ReturningNonValues if it has passed msBetweenReads since the last valid read
             while (true) // we only stop reading if a disconnect or timeout is detected
@@ -474,24 +474,28 @@ namespace CA_DataUploaderLib
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
-                        LowFrequencyLog((args, skipMessage) => LogInfo(args.board, $"unexpected board response {args.line.Replace("\r", "\\r")}{skipMessage}"), (board, line));// we avoid \r as it makes the output hard to read
+                        LowFrequencyLogInfo((args, skipMessage) => LogInfo(args.board, $"Unexpected board response {args.line.Replace("\r", "\\r")}{skipMessage}"), (board, line));// we avoid \r as it makes the output hard to read
                         if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                             _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                     }
 
-                    if (status != _lastStatus && (status & 0x8000) != 0) //Was there a change in status and is the most significant bit set?
-                        LowFrequencyLog((args, skipMessage) => LogError(args.board, $"board responded with status 0x{args.status:X}{skipMessage}"), (board, status));
+                    if (status != _lastStatus && (status & 0x80000000) != 0) //Was there a change in status and is the most significant bit set?
+                        LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Board responded with error status 0x{args.status:X}{skipMessage}"), (board, status));
                     _lastStatus = status;
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in msBetweenReads
-                    LowFrequencyLog((args, skipMessage) => LogError(args.board, $"failed handling board response {args.line.Replace("\r", "\\r")}{skipMessage}", args.ex), (board, line, ex)); // we avoid \r as it makes the output hard to read
+                    LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Failed handling board response {args.line.Replace("\r", "\\r")}{skipMessage}", args.ex), (board, line, ex)); // we avoid \r as it makes the output hard to read
                     if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                         _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                 }
             }
 
-            void LowFrequencyLog<T>(Action<T, string> logAction, T args)
+            void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastLogInfo, ref logInfoSkipped);
+
+            void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastLogError, ref logErrorSkipped);
+
+            void LowFrequencyLog<T>(Action<T, string> logAction, T args, Stopwatch timeSinceLastLog, ref int logSkipped)
             {
                 if (timeSinceLastLog.IsRunning && timeSinceLastLog.ElapsedMilliseconds < 5 * 60000)
                 {
