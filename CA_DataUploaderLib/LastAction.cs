@@ -1,35 +1,45 @@
 ﻿using System;
-using System.Diagnostics;
 
 namespace CA_DataUploaderLib
 {
     public class LastAction
     {
         private readonly int repeatMilliseconds;
+        private readonly TimeProvider timeProvider;
+        private long lastActionExecutedTime;
 
-        public LastAction(double target, int repeatMilliseconds)
+        public LastAction(double target, int repeatMilliseconds) : this(target, repeatMilliseconds, TimeProvider.System)
         {
             Target = target;
             this.repeatMilliseconds = repeatMilliseconds;
         }
 
+        public LastAction(double target, int repeatMilliseconds, TimeProvider timeProvider)
+        {
+            Target = target;
+            this.repeatMilliseconds = repeatMilliseconds;
+            this.timeProvider = timeProvider;
+        }
+
         public double Target { get; private set; } = 0;
         public DateTime TimeToRepeat { get; private set; }
-        public Stopwatch TimeRunning { get; } = Stopwatch.StartNew();
         public bool ChangedOrExpired(double newtarget, DateTime currentVectorTime) =>
-            Target != newtarget || (repeatMilliseconds > -1 && TimeRunning.ElapsedMilliseconds >= repeatMilliseconds) || currentVectorTime >= TimeToRepeat;
+            Target != newtarget || (repeatMilliseconds > -1 && timeProvider.GetElapsedTime(lastActionExecutedTime).TotalMilliseconds >= repeatMilliseconds) || currentVectorTime >= TimeToRepeat;
         public void ExecutedNewAction(double target, DateTime currentVectorTime)
         {
             Target = target;
             TimeToRepeat = repeatMilliseconds > -1 ? currentVectorTime.AddMilliseconds(repeatMilliseconds) : DateTime.MaxValue;
-            TimeRunning.Restart();
+            lastActionExecutedTime = timeProvider.GetTimestamp();
         }
 
         public void TimedOutWaitingForDecision(double target)
         {
-            //DateTime.MavValue forces execution on the next vector / also note we don't restart time running for the same reason.
+            //DateTime.MinValue forces execution on the next vector / also note we don't restart time running for the same reason.
             Target = target;
-            TimeToRepeat = DateTime.MaxValue;
+            TimeToRepeat = DateTime.MinValue;
         }
+
+        /// <remarks>This method is only for unit testing purposes</remarks>
+        public void ResetVectorBasedTimeout(DateTime currentVectorTime) => TimeToRepeat = repeatMilliseconds > -1 ? currentVectorTime.AddMilliseconds(repeatMilliseconds) : DateTime.MaxValue;
     }
 }
