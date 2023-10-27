@@ -23,6 +23,12 @@ namespace CA_DataUploaderLib
 
         public double Target { get; private set; } = 0;
         public DateTime TimeToRepeat { get; private set; }
+        /// <remarks>
+        /// We determine whether the last action has expired (should be repeated) by checking the time passed in 2 different ways,
+        /// one based purely on the vector times and another based on the local system time. We do this to avoid the related 
+        /// actuator from stopping if either of these 2 mechanisms and related fields are affected by a radiation caused bit flip.
+        /// Note however that there are many other ways that bit flips could affect related actuations and also the functioning of this very class.
+        /// </remarks>
         public bool ChangedOrExpired(double newtarget, DateTime currentVectorTime) =>
             Target != newtarget || (repeatMilliseconds > -1 && timeProvider.GetElapsedTime(lastActionExecutedTime).TotalMilliseconds >= repeatMilliseconds) || currentVectorTime >= TimeToRepeat;
         public void ExecutedNewAction(double target, DateTime currentVectorTime)
