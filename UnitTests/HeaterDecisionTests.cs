@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using CA.LoopControlPluginBase;
 using CA_DataUploaderLib;
@@ -218,7 +219,7 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void ReconnectedUnderTargetTemperatureStartsPostponedControlPeriodInmediately()
+        public void ReconnectedUnderTargetTemperatureStartsPostponedControlPeriodImmediately()
         {
             Field("temperature_state") = (int)BaseSensorBox.ConnectionState.Connecting;
             MakeDecisions("oven 200");
@@ -272,7 +273,7 @@ namespace UnitTests
 
         [TestMethod]
         //Important: at the time of writing, even though the oven target can be changed by other plugins, only the oven command currently applies it within the same control period
-        public void WhenTargetIsChangedActuatesInmediately()
+        public void WhenTargetIsChangedActuatesImmediately()
         {
             MakeDecisions("oven 40");
             MakeDecisions("oven 100", vector.Timestamp.AddSeconds(1));
@@ -373,7 +374,7 @@ namespace UnitTests
         [DataRow(-1000, true)]
         [DataRow(0.1, true)]
         [DataTestMethod] //note we don't include 0 above, as that is the default vector value which is interpreted as the field not being set
-        public void PControlReactsInmediatelyWhenControlPeriodIsBelowOrEqual100Ms(double controlperiodseconds, bool useVector)
+        public void PControlReactsImmediatelyWhenControlPeriodIsBelowOrEqual100Ms(double controlperiodseconds, bool useVector)
         {
             var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;2;00:00:30;100", 0);
             NewOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
@@ -385,24 +386,24 @@ namespace UnitTests
                 MakeDecisions("oven 50");
             }
             else
-                MakeDecisions(new List<string>() { $"ovenarea 0 controlperiodseconds {controlperiodseconds}", "oven 50" });
+                MakeDecisions(new List<string>() { $"ovenarea 0 controlperiodseconds {controlperiodseconds.ToString(CultureInfo.InvariantCulture)}", "oven 50" });
             Assert.AreEqual(1.0, Field("heater_onoff"), "should be on as we are below the target");
             Field("temp") = 49;
             MakeDecisions(time: vector.Timestamp.AddSeconds(0.1));
             Assert.AreEqual(1.0, Field("heater_onoff"), "should still be on 1C below target");
             Field("temp") = 51;
             MakeDecisions(time: vector.Timestamp.AddSeconds(0.2));
-            Assert.AreEqual(0.0, Field("heater_onoff"), "should turn off inmediately on the cycle ");
+            Assert.AreEqual(0.0, Field("heater_onoff"), "should turn off immediately on the cycle ");
             Field("temp") = 49;
             MakeDecisions(time: vector.Timestamp.AddSeconds(0.3));
-            Assert.AreEqual(1.0, Field("heater_onoff"), "should still turn on inmediately");
+            Assert.AreEqual(1.0, Field("heater_onoff"), "should still turn on imediately");
             MakeDecisions(time: vector.Timestamp.AddSeconds(0.4));
             Assert.AreEqual(1.0, Field("heater_onoff"), "it should decide to keep the heater on");
             MakeDecisions(time: vector.Timestamp.AddSeconds(29));
             Assert.AreEqual(1.0, Field("heater_onoff"), "it should still decide to keep the heater on");
             Field("temp") = 51;
             MakeDecisions(time: vector.Timestamp.AddSeconds(29.1));
-            Assert.AreEqual(0.0, Field("heater_onoff"), "should still turn off inmediately");
+            Assert.AreEqual(0.0, Field("heater_onoff"), "should still turn off immediately");
         }
 
         [TestMethod]
