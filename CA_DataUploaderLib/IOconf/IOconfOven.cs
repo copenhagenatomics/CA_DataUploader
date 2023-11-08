@@ -42,12 +42,12 @@ namespace CA_DataUploaderLib.IOconf
         public override void ValidateDependencies()
         {
             var list = ToList();
-            HeatingElement = IOconfFile.GetHeater().Single(x => x.Name == HeaterName);
+            HeatingElement = IOconfFile.GetHeater().SingleOrDefault(x => x.Name == HeaterName) ?? throw new FormatException($"Failed to find HeatingElement: {HeaterName} for oven: {Row}");
             var isTemp = IOconfFile.GetTemp().Any(t => t.Name == TemperatureSensorName);
             var isMath = IOconfFile.GetMath().Any(m => m.Name == TemperatureSensorName);
             var isFilter = IOconfFile.GetFilters().Any(f => f.NameInVector == TemperatureSensorName);
             if (!isTemp && !isMath && !isFilter)
-                throw new Exception($"Failed to find sensor: {TemperatureSensorName} for oven: {Row}");
+                throw new FormatException($"Failed to find sensor: {TemperatureSensorName} for oven: {Row}");
             BoardStateSensorNames = IOconfFile.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
         }
 
