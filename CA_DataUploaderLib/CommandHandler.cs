@@ -1,5 +1,6 @@
 ﻿#nullable enable
 using CA.LoopControlPluginBase;
+using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using System;
@@ -9,9 +10,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 using System.Threading.Channels;
-using CA_DataUploaderLib.Extensions;
-using System.Globalization;
 
 namespace CA_DataUploaderLib
 {
@@ -300,6 +300,7 @@ namespace CA_DataUploaderLib
         private void HandleCommand(string cmdString, bool isUserCommand)
         {
             cmdString = cmdString.Trim();
+            cmdString = Regex.Replace(cmdString, @"\s+", " "); // Merge multiple whitespace characters
             if (isUserCommand)
                 UserCommandReceived?.Invoke(this, new(cmdString, EventType.Command, DateTime.UtcNow));
             if (_commandRunner.Run(cmdString, isUserCommand) && isUserCommand)
@@ -308,7 +309,6 @@ namespace CA_DataUploaderLib
 
         private void OnUserCommandAccepted(string cmdString)
         {
-            
             if (AcceptedCommands.LastOrDefault() != cmdString)
                 AcceptedCommands.Add(cmdString);
             AcceptedCommandsIndex = AcceptedCommands.Count;
