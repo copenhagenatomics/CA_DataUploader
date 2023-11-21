@@ -46,7 +46,8 @@ namespace CA_DataUploaderLib.IOconf
             var isTemp = IOconfFile.GetTemp().Any(t => t.Name == TemperatureSensorName);
             var isMath = IOconfFile.GetMath().Any(m => m.Name == TemperatureSensorName);
             var isFilter = IOconfFile.GetFilters().Any(f => f.NameInVector == TemperatureSensorName);
-            if (!isTemp && !isMath && !isFilter)
+            var isRedundancy = IOconfFile.GetEntries<Redundancy.IOconfRedundant>().Any(f => f.Name == TemperatureSensorName);
+            if (!isTemp && !isMath && !isFilter && !isRedundancy)
                 throw new FormatException($"Failed to find sensor: {TemperatureSensorName} for oven: {Row}");
             BoardStateSensorNames = IOconfFile.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
         }
