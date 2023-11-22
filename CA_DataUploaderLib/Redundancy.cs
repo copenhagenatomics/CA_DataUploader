@@ -21,8 +21,10 @@ namespace CA_DataUploaderLib
             IOconfFileLoader.AddLoader(IOconfRedundantSensors.RowType, (row, lineNumber) => new IOconfRedundantSensors(row, lineNumber));
             IOconfFileLoader.AddLoader(IOconfRedundantValidRange.RowType, (row, lineNumber) => new IOconfRedundantValidRange(row, lineNumber));
             IOconfFileLoader.AddLoader(IOconfRedundantInvalidDefault.RowType, (row, lineNumber) => new IOconfRedundantInvalidDefault(row, lineNumber));
+            IOconfFileLoader.AddLoader(IOconfRedundantStrategy.RowType, (row, lineNumber) => new IOconfRedundantStrategy(row, lineNumber));
         }
 
+        public enum RedundancyStrategy { Median, Max, Min, Average }
         public class IOconfRedundant : IOconfRow
         {
             protected IOconfRedundant(string row, int lineNum, string type) : base(row, lineNum, type) { }
@@ -37,7 +39,8 @@ namespace CA_DataUploaderLib
                         ?? throw new FormatException($"Redundancy - missing sensors for: {Environment.NewLine + string.Join(Environment.NewLine, configs.Select(c => c.Row))}");
                     var validRange = configs.OfType<IOconfRedundantValidRange>().SingleOrDefault()?.ValidRange ?? (double.MinValue, double.MaxValue);
                     var invalidDefault = configs.OfType<IOconfRedundantInvalidDefault>().SingleOrDefault()?.InvalidDefault ?? 10000;
-                    yield return new(sensorsConfig.Name, sensorsConfig.Sensors, sensorsConfig.SensorBoardStates, validRange, invalidDefault);
+                    var strategy = configs.OfType<IOconfRedundantStrategy>().SingleOrDefault()?.Strategy ?? RedundancyStrategy.Median;
+                    yield return new(sensorsConfig.Name, sensorsConfig.Sensors, sensorsConfig.SensorBoardStates, validRange, invalidDefault, strategy);
                 }
             }
         }
@@ -98,6 +101,23 @@ namespace CA_DataUploaderLib
             }
         }
 
+        private class IOconfRedundantStrategy : IOconfRedundant
+        {
+            public const string RowType = "RedundantStrategy";
+
+            public IOconfRedundantStrategy(string row, int lineNum) : base(row, lineNum, RowType)
+            {
+                var vals = ToList();
+                if (vals.Count < 3) throw new FormatException($"Too few values. Format: {RowType};Name;Median/Max/Min/Average. Row {Row}");
+                if (!Enum.TryParse<RedundancyStrategy>(vals[2], out var redundancyStrategy))
+                    throw new FormatException($"Failed to parse strategy. Format: {RowType};Name;Strategy. Row {Row}");
+
+                Strategy = redundancyStrategy;
+            }
+
+            public RedundancyStrategy Strategy { get; }
+        }
+
         public class Decision : LoopControlDecision
         {
             public enum Events { none, vector };
@@ -118,7 +138,7 @@ namespace CA_DataUploaderLib
 
             public class Config
             {
-                public Config(string name, List<string> sensors, List<List<string>> sensorBoardStates, (double min, double max) validRange, double defaultInvalidValue)
+                public Config(string name, List<string> sensors, List<List<string>> sensorBoardStates, (double min, double max) validRange, double defaultInvalidValue, RedundancyStrategy strategy)
                 {
                     Name = name;
                     Sensors = sensors;
@@ -127,6 +147,7 @@ namespace CA_DataUploaderLib
                         throw new ArgumentException($"Redundancy: {name} - sensors.Count must be equal to sensorBoardStates.Count");
                     ValidRange = validRange;
                     DefaultInvalidValue = defaultInvalidValue;
+                    Strategy = strategy;
                     ReusableBuffer = new double[sensors.Count];
                 }
 
@@ -134,8 +155,51 @@ namespace CA_DataUploaderLib
                 public (double min, double max) ValidRange { get; }
                 public double[] ReusableBuffer { get; }
                 public double DefaultInvalidValue { get; }
+                public RedundancyStrategy Strategy { get; }
                 public List<List<string>> SensorBoardStates { get; }
                 public string Name { get; }
+
+                public double Calculate(Span<double> values) => Strategy switch
+                {
+                    RedundancyStrategy.Median => Median(values),
+                    RedundancyStrategy.Max => Max(values),
+                    RedundancyStrategy.Min => Min(values),
+                    RedundancyStrategy.Average => Average(values),
+                    _ => throw new ArgumentException($"Unexpected redundancy strategy: {Strategy}")
+                };
+
+                /// <remarks>Important: this method has the side effect of sorting the received <see cref="Span{double}"/></remarks>
+                static double Median(Span<double> values)
+                {
+                    values.Sort();
+                    int middle = values.Length / 2;
+                    return values.Length % 2 != 0 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
+                }
+
+                private static double Average(Span<double> values)
+                {
+                    double sum = 0;
+                    foreach (var v in values)
+                        sum += v;
+                    return sum / values.Length;
+                }
+
+                private static double Min(Span<double> values)
+                {
+                    double min = double.MaxValue;
+                    foreach (var v in values)
+                        min = Math.Min(min, v);
+
+                    return min;
+                }
+
+                private static double Max(Span<double> values)
+                {
+                    double max = double.MinValue;
+                    foreach (var v in values)
+                        max = Math.Max(max, v);
+                    return max;
+                }
             }
 
 #pragma warning disable IDE1006 // Naming Styles - decisions are coded using a similar approach to decisions plugins, which avoid casing rules in properties to more have naming more similar to the original fields
@@ -169,7 +233,7 @@ namespace CA_DataUploaderLib
                     }
 
                     validValues = validValues[..validValuesCount];
-                    value = !validValues.IsEmpty ? Median(validValues) : _config.DefaultInvalidValue;
+                    value = !validValues.IsEmpty ? _config.Calculate(validValues) : _config.DefaultInvalidValue;
                 }
 
                 bool BoardsConnected(int index)
@@ -179,14 +243,6 @@ namespace CA_DataUploaderLib
                             return false;
 
                     return true;
-                }
-
-                /// <remarks>Important: this method has the side effect of sorting the received <see cref="Span{double}"/></remarks>
-                static double Median(Span<double> values)
-                {
-                    values.Sort();
-                    int middle = values.Length / 2;
-                    return values.Length % 2 != 0 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
                 }
             }
 
