@@ -107,9 +107,9 @@ namespace CA_DataUploaderLib
             public IOconfRedundantStrategy(string row, int lineNum) : base(row, lineNum, RowType)
             {
                 var vals = ToList();
-                if (vals.Count < 3) throw new FormatException($"Too few values. Format: {RowType};Name;[Median/Max/Min/Average]. Row {Row}");
+                if (vals.Count < 3) throw new FormatException($"Too few values. Format: {RowType};Name;Median/Max/Min/Average. Row {Row}");
                 if (!Enum.TryParse<RedundancyStrategy>(vals[2], out var redundancyStrategy))
-                    throw new FormatException($"Failed to parse invalid default value. Format: {RowType};Name;RedundantStrategy. Row {Row}");
+                    throw new FormatException($"Failed to parse strategy. Format: {RowType};Name;Strategy. Row {Row}");
 
                 Strategy = redundancyStrategy;
             }

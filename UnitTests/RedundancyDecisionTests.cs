@@ -17,14 +17,14 @@ namespace UnitTests
         public void Setup() => testContext = new DecisionTestContext(
             new List<LoopControlDecision>() {
                 new Redundancy.Decision(new (
-                    "red5",
+                    "red5median",
                     new(){"a","b","c","d", "e" },
                     new(){ new() { "abox"}, new() { "bbox"}, new() { "cbox"}, new() { "dbox"}, new() { "ebox"} },
                     (0,2000),
                     10000,
                     Redundancy.RedundancyStrategy.Median)),
                 new Redundancy.Decision(new (
-                    "red4",
+                    "red4median",
                     new(){"a","b","c","d" },
                     new(){ new() { "abox"}, new() { "bbox"}, new() { "cbox"}, new() { "dbox"} },
                     (0,2000), 
@@ -69,54 +69,54 @@ namespace UnitTests
         public void UsesMedianOf5()
         {
             MakeDecisions();
-            Assert.AreEqual(17.0, Field("red5"));
+            Assert.AreEqual(17.0, Field("red5median"));
             Field("c") = 21;
             MakeDecisions();
-            Assert.AreEqual(19.0, Field("red5"));
+            Assert.AreEqual(19.0, Field("red5median"));
             Field("c") = 13;
             MakeDecisions();
-            Assert.AreEqual(14.0, Field("red5"));
+            Assert.AreEqual(14.0, Field("red5median"));
             Field("c") = 17;
             Field("cbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
-            Assert.AreEqual(16.5, Field("red5"), "must ignore stale sensor data and use median of the remaining 4");
+            Assert.AreEqual(16.5, Field("red5median"), "must ignore stale sensor data and use median of the remaining 4");
             Field("cbox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
             Field("c") = 3000;
             MakeDecisions();
-            Assert.AreEqual(16.5, Field("red5"), "must ignore stale sensor data outside the range and use median of the remaining 4");
+            Assert.AreEqual(16.5, Field("red5median"), "must ignore stale sensor data outside the range and use median of the remaining 4");
             Field("c") = 17;
             MakeDecisions();
-            Assert.AreEqual(17, Field("red5"), "must use the sensor value if it becomes valid again");
+            Assert.AreEqual(17, Field("red5median"), "must use the sensor value if it becomes valid again");
             Field("abox") = Field("bbox") = Field("cbox") = Field("dbox") = Field("ebox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
-            Assert.AreEqual(10000, Field("red5"), "must use default invalid value when all sensors are stale");
+            Assert.AreEqual(10000, Field("red5median"), "must use default invalid value when all sensors are stale");
         }
 
         [TestMethod]
         public void UsesMedianOf4()
         {
             MakeDecisions();
-            Assert.AreEqual(15.5, Field("red4"));
+            Assert.AreEqual(15.5, Field("red4median"));
             Field("c") = 21;
             MakeDecisions();
-            Assert.AreEqual(16.5, Field("red4"));
+            Assert.AreEqual(16.5, Field("red4median"));
             Field("c") = 13;
             MakeDecisions();
-            Assert.AreEqual(13.5, Field("red4"));
+            Assert.AreEqual(13.5, Field("red4median"));
             Field("c") = 17;
             Field("cbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
-            Assert.AreEqual(14, Field("red4"), "must ignore stale sensor data and use median of the remaining 3");
+            Assert.AreEqual(14, Field("red4median"), "must ignore stale sensor data and use median of the remaining 3");
             Field("cbox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
             Field("c") = 3000;
             MakeDecisions();
-            Assert.AreEqual(14, Field("red4"), "must ignore stale sensor data outside the range and use median of the remaining 3");
+            Assert.AreEqual(14, Field("red4median"), "must ignore stale sensor data outside the range and use median of the remaining 3");
             Field("c") = 17;
             MakeDecisions();
-            Assert.AreEqual(15.5, Field("red4"), "must use the sensor value if it becomes valid again");
+            Assert.AreEqual(15.5, Field("red4median"), "must use the sensor value if it becomes valid again");
             Field("abox") = Field("bbox") = Field("cbox") = Field("dbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
-            Assert.AreEqual(-0.001, Field("red4"), "must use default invalid value when all sensors are stale");
+            Assert.AreEqual(-0.001, Field("red4median"), "must use default invalid value when all sensors are stale");
         }
 
         [TestMethod]
@@ -124,26 +124,26 @@ namespace UnitTests
         {
             MakeDecisions();
             const string FieldName = "red5min";
-            Assert.AreEqual(10.0, this.Field(FieldName));
+            Assert.AreEqual(10.0, Field(FieldName));
             Field("c") = 21;
             MakeDecisions();
-            Assert.AreEqual(10.0, this.Field(FieldName), "must not change min when adding a higher max");
+            Assert.AreEqual(10.0, Field(FieldName), "must not change min when adding a higher max");
             Field("c") = 9;
             MakeDecisions();
-            Assert.AreEqual(9.0, this.Field(FieldName));
+            Assert.AreEqual(9.0, Field(FieldName));
             Field("cbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
-            Assert.AreEqual(10.0, this.Field(FieldName), "must ignore stale sensor data and use min of the remaining 4");
+            Assert.AreEqual(10.0, Field(FieldName), "must ignore stale sensor data and use min of the remaining 4");
             Field("cbox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
             Field("c") = -5;
             MakeDecisions();
-            Assert.AreEqual(10.0, this.Field(FieldName), "must ignore stale sensor data outside the range and use min of the remaining 4");
+            Assert.AreEqual(10.0, Field(FieldName), "must ignore stale sensor data outside the range and use min of the remaining 4");
             Field("c") = 8;
             MakeDecisions();
-            Assert.AreEqual(8.0, this.Field(FieldName), "must use the sensor value if it becomes valid again");
+            Assert.AreEqual(8.0, Field(FieldName), "must use the sensor value if it becomes valid again");
             Field("abox") = Field("bbox") = Field("cbox") = Field("dbox") = Field("ebox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
-            Assert.AreEqual(10000, this.Field(FieldName), "must use default invalid value when all sensors are stale");
+            Assert.AreEqual(10000, Field(FieldName), "must use default invalid value when all sensors are stale");
         }
 
 
@@ -152,26 +152,26 @@ namespace UnitTests
         {
             MakeDecisions();
             const string FieldName = "red5max";
-            Assert.AreEqual(20.0, this.Field(FieldName));
+            Assert.AreEqual(20.0, Field(FieldName));
             Field("c") = 2;
             MakeDecisions();
-            Assert.AreEqual(20.0, this.Field(FieldName), "must not change max when adding a lower min");
+            Assert.AreEqual(20.0, Field(FieldName), "must not change max when adding a lower min");
             Field("c") = 21;
             MakeDecisions();
-            Assert.AreEqual(21.0, this.Field(FieldName));
+            Assert.AreEqual(21.0, Field(FieldName));
             Field("cbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
-            Assert.AreEqual(20.0, this.Field(FieldName), "must ignore stale sensor data and use max of the remaining 4");
+            Assert.AreEqual(20.0, Field(FieldName), "must ignore stale sensor data and use max of the remaining 4");
             Field("cbox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
             Field("c") = 30000;
             MakeDecisions();
-            Assert.AreEqual(20.0, this.Field(FieldName), "must ignore stale sensor data outside the range and use max of the remaining 4");
+            Assert.AreEqual(20.0, Field(FieldName), "must ignore stale sensor data outside the range and use max of the remaining 4");
             Field("c") = 22;
             MakeDecisions();
-            Assert.AreEqual(22.0, this.Field(FieldName), "must use the sensor value if it becomes valid again");
+            Assert.AreEqual(22.0, Field(FieldName), "must use the sensor value if it becomes valid again");
             Field("abox") = Field("bbox") = Field("cbox") = Field("dbox") = Field("ebox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
-            Assert.AreEqual(10000, this.Field(FieldName), "must use default invalid value when all sensors are stale");
+            Assert.AreEqual(10000, Field(FieldName), "must use default invalid value when all sensors are stale");
         }
 
 
@@ -180,27 +180,27 @@ namespace UnitTests
         {
             MakeDecisions();
             const string FieldName = "red5avg";
-            Assert.AreEqual(16.0, this.Field(FieldName));
+            Assert.AreEqual(16.0, Field(FieldName));
             Field("c") = 21;
             MakeDecisions();
-            Assert.AreEqual(16.8, this.Field(FieldName));
+            Assert.AreEqual(16.8, Field(FieldName));
             Field("c") = 13;
             MakeDecisions();
-            Assert.AreEqual(15.2, this.Field(FieldName));
+            Assert.AreEqual(15.2, Field(FieldName));
             Field("c") = 17;
             Field("cbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
-            Assert.AreEqual(15.75, this.Field(FieldName), "must ignore stale sensor data and use median of the remaining 4");
+            Assert.AreEqual(15.75, Field(FieldName), "must ignore stale sensor data and use average of the remaining 4");
             Field("cbox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
             Field("c") = 3000;
             MakeDecisions();
-            Assert.AreEqual(15.75, this.Field(FieldName), "must ignore stale sensor data outside the range and use median of the remaining 4");
+            Assert.AreEqual(15.75, Field(FieldName), "must ignore stale sensor data outside the range and use average of the remaining 4");
             Field("c") = 17;
             MakeDecisions();
-            Assert.AreEqual(16.0, this.Field(FieldName), "must use the sensor value if it becomes valid again");
+            Assert.AreEqual(16.0, Field(FieldName), "must use the sensor value if it becomes valid again");
             Field("abox") = Field("bbox") = Field("cbox") = Field("dbox") = Field("ebox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
-            Assert.AreEqual(10000, this.Field(FieldName), "must use default invalid value when all sensors are stale");
+            Assert.AreEqual(10000, Field(FieldName), "must use default invalid value when all sensors are stale");
         }
     }
 }
