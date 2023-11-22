@@ -1,8 +1,8 @@
 #nullable enable
-using System.Collections.Generic;
 using CA.LoopControlPluginBase;
 using CA_DataUploaderLib;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Collections.Generic;
 
 namespace UnitTests
 {

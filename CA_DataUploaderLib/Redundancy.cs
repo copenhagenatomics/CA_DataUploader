@@ -1,9 +1,9 @@
 ﻿using CA.LoopControlPluginBase;
-using System.Collections.Generic;
-using System;
-using CA_DataUploaderLib.IOconf;
-using System.Linq;
 using CA_DataUploaderLib.Extensions;
+using CA_DataUploaderLib.IOconf;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace CA_DataUploaderLib
 {
