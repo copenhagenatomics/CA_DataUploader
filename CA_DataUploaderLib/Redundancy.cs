@@ -49,12 +49,12 @@ namespace CA_DataUploaderLib
             public List<string> Sensors { get; }
             public List<List<string>> SensorBoardStates { get; }
 
-            public IOconfRedundantSensors(string row, int lineNum) : base(row, lineNum, "RedundantSensors")
+            public IOconfRedundantSensors(string row, int lineNum) : base(row, lineNum, RowType)
             {
                 Sensors = ToList().Skip(2).ToList();
                 SensorBoardStates = Sensors.Select(s => new List<string>()).ToList();
                 if (Sensors.Count < 1)
-                    throw new FormatException($"Missing sensors. Format: RedundantSensors;Name;Sensor1;Sensor2...;Sensorn. Line: {Row}");
+                    throw new FormatException($"Missing sensors. Format: {RowType};Name;Sensor1;Sensor2...;Sensorn. Line: {Row}");
             }
 
             public override void ValidateDependencies()
@@ -70,12 +70,12 @@ namespace CA_DataUploaderLib
 
             public (double min, double max) ValidRange { get; }
 
-            public IOconfRedundantValidRange(string row, int lineNum) : base(row, lineNum, "RedundantValidRange")
+            public IOconfRedundantValidRange(string row, int lineNum) : base(row, lineNum, RowType)
             {
                 var vals = ToList();
-                if (vals.Count < 4) throw new FormatException($"Too few values. Format: RedundantValidRange;Name;MinValue;MaxValue. Row {Row}");
+                if (vals.Count < 4) throw new FormatException($"Too few values. Format: {RowType};Name;MinValue;MaxValue. Row {Row}");
                 if (!vals[2].TryToDouble(out var min) || !vals[3].TryToDouble(out var max))
-                    throw new FormatException($"Failed to parse min/max. Format: RedundantValidRange;Name;MinValue;MaxValue. Row {Row}");
+                    throw new FormatException($"Failed to parse min/max. Format: {RowType};Name;MinValue;MaxValue. Row {Row}");
 
                 ValidRange = (min, max);
             }
@@ -87,12 +87,12 @@ namespace CA_DataUploaderLib
 
             public double InvalidDefault { get; }
 
-            public IOconfRedundantInvalidDefault(string row, int lineNum) : base(row, lineNum, "RedundantInvalidDefault")
+            public IOconfRedundantInvalidDefault(string row, int lineNum) : base(row, lineNum, RowType)
             {
                 var vals = ToList();
-                if (vals.Count < 3) throw new FormatException($"Too few values. Format: RedundantInvalidDefault;Name;InvalidDefaultValue. Row {Row}");
+                if (vals.Count < 3) throw new FormatException($"Too few values. Format: {RowType};Name;InvalidDefaultValue. Row {Row}");
                 if (!vals[2].TryToDouble(out var invalidDefault))
-                    throw new FormatException($"Failed to parse invalid default value. Format: RedundantInvalidDefault;Name;InvalidDefaultValue. Row {Row}");
+                    throw new FormatException($"Failed to parse invalid default value. Format: {RowType};Name;InvalidDefaultValue. Row {Row}");
 
                 InvalidDefault = invalidDefault;
             }
