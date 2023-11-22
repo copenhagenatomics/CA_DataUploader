@@ -18,9 +18,9 @@ namespace CA_DataUploaderLib
 
         public static void RegisterSystemExtensions()
         {
-            IOconfFileLoader.AddLoader("RedundantSensors", (row, lineNumber) => new IOconfRedundantSensors(row, lineNumber));
-            IOconfFileLoader.AddLoader("RedundantValidRange", (row, lineNumber) => new IOconfRedundantValidRange(row, lineNumber));
-            IOconfFileLoader.AddLoader("RedundantInvalidDefault", (row, lineNumber) => new IOconfRedundantInvalidDefault(row, lineNumber));
+            IOconfFileLoader.AddLoader(IOconfRedundantSensors.RowType, (row, lineNumber) => new IOconfRedundantSensors(row, lineNumber));
+            IOconfFileLoader.AddLoader(IOconfRedundantValidRange.RowType, (row, lineNumber) => new IOconfRedundantValidRange(row, lineNumber));
+            IOconfFileLoader.AddLoader(IOconfRedundantInvalidDefault.RowType, (row, lineNumber) => new IOconfRedundantInvalidDefault(row, lineNumber));
         }
 
         public class IOconfRedundant : IOconfRow
@@ -33,22 +33,19 @@ namespace CA_DataUploaderLib
                 foreach (var group in grouped)
                 {
                     var configs = group.ToList();
-                    var sensorsConfig = configs.OfType<IOconfRedundantSensors>().SingleOrDefault();
-                    var rangeConfig = configs.OfType<IOconfRedundantValidRange>().SingleOrDefault();
-                    var invalidDefaultConfig = configs.OfType<IOconfRedundantInvalidDefault>().SingleOrDefault();
-                    if (sensorsConfig == null && (rangeConfig != null || invalidDefaultConfig != null))
-                        throw new FormatException($"Redundancy - missing sensors for: {rangeConfig?.Row ?? invalidDefaultConfig?.Row}");
-
-                    var validRange = rangeConfig != null ? rangeConfig.ValidRange : (double.MinValue, double.MaxValue);
-                    var invalidDefault = invalidDefaultConfig != null ? invalidDefaultConfig.InvalidDefault : 10000;
-                    if (sensorsConfig != null)
-                        yield return new(sensorsConfig.Name, sensorsConfig.Sensors, sensorsConfig.SensorBoardStates, validRange, invalidDefault);
+                    var sensorsConfig = configs.OfType<IOconfRedundantSensors>().SingleOrDefault() 
+                        ?? throw new FormatException($"Redundancy - missing sensors for: {Environment.NewLine + string.Join(Environment.NewLine, configs.Select(c => c.Row))}");
+                    var validRange = configs.OfType<IOconfRedundantValidRange>().SingleOrDefault()?.ValidRange ?? (double.MinValue, double.MaxValue);
+                    var invalidDefault = configs.OfType<IOconfRedundantInvalidDefault>().SingleOrDefault()?.InvalidDefault ?? 10000;
+                    yield return new(sensorsConfig.Name, sensorsConfig.Sensors, sensorsConfig.SensorBoardStates, validRange, invalidDefault);
                 }
             }
         }
 
         private class IOconfRedundantSensors : IOconfRedundant
         {
+            public const string RowType = "RedundantSensors";
+
             public List<string> Sensors { get; }
             public List<List<string>> SensorBoardStates { get; }
 
@@ -69,12 +66,14 @@ namespace CA_DataUploaderLib
 
         private class IOconfRedundantValidRange : IOconfRedundant
         {
+            public const string RowType = "RedundantValidRange";
+
             public (double min, double max) ValidRange { get; }
 
             public IOconfRedundantValidRange(string row, int lineNum) : base(row, lineNum, "RedundantValidRange")
             {
                 var vals = ToList();
-                if (vals.Count < 4) throw new FormatException($"Too little values. Format: RedundantValidRange;Name;MinValue;MaxValue. Row {Row}");
+                if (vals.Count < 4) throw new FormatException($"Too few values. Format: RedundantValidRange;Name;MinValue;MaxValue. Row {Row}");
                 if (!vals[2].TryToDouble(out var min) || !vals[3].TryToDouble(out var max))
                     throw new FormatException($"Failed to parse min/max. Format: RedundantValidRange;Name;MinValue;MaxValue. Row {Row}");
 
@@ -84,14 +83,16 @@ namespace CA_DataUploaderLib
 
         private class IOconfRedundantInvalidDefault : IOconfRedundant
         {
+            public const string RowType = "RedundantInvalidDefault";
+
             public double InvalidDefault { get; }
 
             public IOconfRedundantInvalidDefault(string row, int lineNum) : base(row, lineNum, "RedundantInvalidDefault")
             {
                 var vals = ToList();
-                if (vals.Count < 3) throw new FormatException($"Too little values. Format: RedundantInvalidDefault;Name;InvalidDefaultValue. Row {Row}");
+                if (vals.Count < 3) throw new FormatException($"Too few values. Format: RedundantInvalidDefault;Name;InvalidDefaultValue. Row {Row}");
                 if (!vals[2].TryToDouble(out var invalidDefault))
-                    throw new FormatException($"Failed to parse invalid default value. Format: RedundantValidRange;Name;InvalidDefaultValue. Row {Row}");
+                    throw new FormatException($"Failed to parse invalid default value. Format: RedundantInvalidDefault;Name;InvalidDefaultValue. Row {Row}");
 
                 InvalidDefault = invalidDefault;
             }

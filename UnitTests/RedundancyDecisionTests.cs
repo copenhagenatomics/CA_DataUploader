@@ -61,6 +61,7 @@ namespace UnitTests
             Field("c") = 3000;
             MakeDecisions();
             Assert.AreEqual(16.5, Field("red5"), "must ignore stale sensor data outside the range and use median of the remaining 4");
+            Field("c") = 17;
             Field("abox") = Field("bbox") = Field("cbox") = Field("dbox") = Field("ebox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
             Assert.AreEqual(10000, Field("red5"), "must use default invalid value when all sensors are stale");
@@ -85,6 +86,7 @@ namespace UnitTests
             Field("c") = 3000;
             MakeDecisions();
             Assert.AreEqual(14, Field("red4"), "must ignore stale sensor data outside the range and use median of the remaining 3");
+            Field("c") = 17;
             Field("abox") = Field("bbox") = Field("cbox") = Field("dbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
             Assert.AreEqual(-0.001, Field("red4"), "must use default invalid value when all sensors are stale");
