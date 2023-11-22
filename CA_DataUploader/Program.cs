@@ -20,6 +20,7 @@ namespace CA_DataUploader
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
                 Console.WriteLine("Initializing...");
+                Redundancy.RegisterSystemExtensions();
                 using (var serial = await SerialNumberMapper.DetectDevices())
                 {
                     if (args.Length > 0 && args[0] == "-listdevices")
@@ -32,6 +33,7 @@ namespace CA_DataUploader
 
                     using var cmd = new CommandHandler(serial);
                     var cloud = new ServerUploader(cmd);
+                    _ = new Redundancy(cmd);
                     _ = new ThermocoupleBox(cmd);
                     var runTask = SingleNodeRunner.Run(cmd, cloud, cmd.StopToken);
                     await Task.Delay(2000);
