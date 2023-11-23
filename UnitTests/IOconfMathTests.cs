@@ -1,6 +1,5 @@
 ﻿using CA_DataUploaderLib.IOconf;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NCalc;
 using System;
 using System.Collections.Generic;
 
@@ -68,6 +67,13 @@ namespace UnitTests
         {
             var math = new IOconfMath(row, 0);
             Assert.AreEqual(expectedSources, string.Join(',', math.SourceNames));
+        }
+
+        [TestMethod]
+        public void CanParseLinesWithComments()
+        {
+            var math = new IOconfMath("Math;MyName;2 / MyValue   // This is a comment", 0);
+            Assert.AreEqual(0.5d, math.Calculate(new Dictionary<string, object> { { "MyValue", 4 } }));
         }
     }
 }

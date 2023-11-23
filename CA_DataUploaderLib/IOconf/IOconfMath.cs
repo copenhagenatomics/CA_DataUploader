@@ -19,7 +19,7 @@ namespace CA_DataUploaderLib.IOconf
 
             try
             {
-                var compiledExpression = Expression.Compile(row[(Name.Length + 6)..], true);
+                var compiledExpression = Expression.Compile(RowWithoutComment()[(Name.Length + 6)..], true);
                 expression = new Expression(compiledExpression);
             }
             catch (Exception ex)
