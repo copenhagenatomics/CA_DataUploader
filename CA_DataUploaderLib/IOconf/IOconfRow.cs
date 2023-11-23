@@ -36,7 +36,7 @@ namespace CA_DataUploaderLib.IOconf
             return list[0] + Name;
         }
 
-        private string RowWithoutComment()
+        protected string RowWithoutComment()
         {
             var temp = Row;
             var pos = Row.IndexOf("//");
