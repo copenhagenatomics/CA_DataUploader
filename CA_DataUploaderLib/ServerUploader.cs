@@ -138,13 +138,15 @@ namespace CA_DataUploaderLib
         public async Task<HttpResponseMessage> DirectPost(string requestUri, byte[] bytes, CancellationToken token)
         {
             var plot = await GetPlot(token);
-            return await plot.PostAsync(requestUri, SignInfo.GetSignature(bytes).Concat(bytes).ToArray(), token);
+            return await plot.PostAsync(requestUri, Sign(bytes), token);
         }
         public async Task<HttpResponseMessage> DirectPut(string requestUri, byte[] bytes, CancellationToken token)
         {
             var plot = await GetPlot(token);
-            return await plot.PutAsync(requestUri, SignInfo.GetSignature(bytes).Concat(bytes).ToArray(), token);
+            return await plot.PutAsync(requestUri, Sign(bytes), token);
         }
+
+        public byte[] Sign(byte[] bytes) => SignInfo.GetSignature(bytes).Concat(bytes).ToArray();
 
         public async Task<string> GetPlotUrl(CancellationToken token)
         {
@@ -346,8 +348,7 @@ namespace CA_DataUploaderLib
 
         private byte[] GetSignedEvent(EventFiredArgs @event)
         { //this can be made more efficient to avoid extra allocations and/or use a memory pool, but these are for low frequency events so postponing looking at that.
-            var bytes = @event.ToByteArray();
-            return SignInfo.GetSignature(bytes).Concat(bytes).ToArray();
+            return Sign(@event.ToByteArray());
         }
 
         private void OnError(string message, bool addToEventLog, Exception? ex = null)
