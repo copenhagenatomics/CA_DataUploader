@@ -148,6 +148,12 @@ namespace CA_DataUploaderLib
 
         public byte[] Sign(byte[] bytes) => SignInfo.GetSignature(bytes).Concat(bytes).ToArray();
 
+        public async Task<string> GetPlotUrl(CancellationToken token)
+        {
+            var plot = await GetPlot(token);
+            return "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + plot.PlotName;
+        }
+
         public async Task Run(CancellationToken token)
         {
             try
