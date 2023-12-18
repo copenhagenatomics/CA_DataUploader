@@ -1,5 +1,4 @@
 ﻿#nullable enable
-using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 using System;
@@ -152,6 +151,16 @@ namespace CA_DataUploaderLib
         {
             var plot = await GetPlot(token);
             return "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + plot.PlotName;
+        }
+
+        public static async Task<bool> ConnectionTest()
+        {
+            var client = new HttpClient
+            {
+                BaseAddress = new Uri(IOconfFile.GetLoopServer())
+            };
+            var response = await client.GetAsync("/api/v1/LoopControl/PingTest");
+            return response.IsSuccessStatusCode;
         }
 
         public async Task Run(CancellationToken token)
