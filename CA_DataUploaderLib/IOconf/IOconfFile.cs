@@ -60,6 +60,7 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public static string GetLoopName() => GetLoopConfig().Name;
+        public static string GetLoopServer() => GetLoopConfig().Server;
         public static int GetVectorUploadDelay() => GetEntries<IOconfSamplingRates>().SingleOrDefault()?.VectorUploadDelay ?? 1000;
         public static int GetMainLoopDelay() => GetEntries<IOconfSamplingRates>().SingleOrDefault()?.MainLoopDelay ?? 200;
         public static CALogLevel GetOutputLevel() => GetLoopConfig().LogLevel;
