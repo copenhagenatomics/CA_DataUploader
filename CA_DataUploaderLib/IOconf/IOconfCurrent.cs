@@ -26,7 +26,7 @@ namespace CA_DataUploaderLib.IOconf
             if (list.Count < 5)
                 throw new FormatException($"{nameof(IOconfCurrent)}: wrong format: {row}. Expected format: {Format}");
 
-            if (!double.TryParse(list[4], NumberStyles.Float, CultureInfo.InvariantCulture, out double loadSideRating) || !double.IsPositive(loadSideRating))
+            if (!double.TryParse(list[4], NumberStyles.Float, CultureInfo.InvariantCulture, out double loadSideRating) || double.IsNegative(loadSideRating))
                 throw new FormatException($"Unsupported load side rating at line '{Row}'. Only positive numbers are allowed. Expected format: {Format}.");
 
             var meterSideRating = 5.0; // A default meter side rating of 5.0A which can optionally be changed
