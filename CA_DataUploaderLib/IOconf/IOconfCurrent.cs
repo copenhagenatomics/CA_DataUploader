@@ -46,8 +46,6 @@ namespace CA_DataUploaderLib.IOconf
                 if (supportsCalibration)
                 {
                     var nfi = new NumberFormatInfo() { NumberDecimalDigits = 2 };
-                    // TODO: Map.Board.Calibration is different from Map.BoardSettings.Calibration!
-                    // Should we update Map.BoardSettings.Calibration based on Map.Board.Calibration?
                     UpdatePortCalibration(Map.BoardSettings, currentTransformerRatio.ToString("F", nfi), PortNumber);
                 }
                 else
