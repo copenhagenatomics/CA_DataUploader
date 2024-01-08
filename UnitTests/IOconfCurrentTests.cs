@@ -55,16 +55,16 @@ namespace UnitTests
             IOconfMap? mapLine = null;
             using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0) } });
             var loadSideRating = 150;
-            string? boardCalibration = "CAL 1,60.00,0 2,60.00,0 3,60.00,0";
+            string? boardCalibration = "CAL 1,60.000000,0 2,60.000000,0 3,60.000000,0";
 
             // Act
             var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
             mapLine!.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
 
             // Assert
-            var twoDecimalDigits = new NumberFormatInfo() { NumberDecimalDigits = 2 };
-            var expectedScalar = (loadSideRating / 5).ToString("F", twoDecimalDigits);
-            var expectedBoardCalibration = $"CAL 1,60.00,0 2,{expectedScalar},0 3,60.00,0";
+            var decimalDigits = new NumberFormatInfo() { NumberDecimalDigits = 6 };
+            var expectedScalar = (loadSideRating / 5).ToString("F", decimalDigits);
+            var expectedBoardCalibration = $"CAL 1,60.000000,0 2,{expectedScalar},0 3,60.000000,0";
             Assert.AreEqual(expectedBoardCalibration, mapLine!.BoardSettings.Calibration);
         }
 
@@ -76,16 +76,16 @@ namespace UnitTests
             using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0) } });
             var loadSideRating = 150;
             var meterSideRating = 2;
-            string? boardCalibration = "CAL 1,60.00,0 2,60.00,0 3,60.00,0";
+            string? boardCalibration = "CAL 1,60.000000,0 2,60.000000,0 3,60.000000,0";
 
             // Act
             var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}; {meterSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
             mapLine!.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
 
             // Assert
-            var twoDecimalDigits = new NumberFormatInfo() { NumberDecimalDigits = 2 };
-            var expectedScalar = (loadSideRating / meterSideRating).ToString("F", twoDecimalDigits);
-            var expectedBoardCalibration = $"CAL 1,60.00,0 2,{expectedScalar},0 3,60.00,0";
+            var decimalDigits = new NumberFormatInfo() { NumberDecimalDigits = 6 };
+            var expectedScalar = (loadSideRating / meterSideRating).ToString("F", decimalDigits);
+            var expectedBoardCalibration = $"CAL 1,60.000000,0 2,{expectedScalar},0 3,60.000000,0";
             Assert.AreEqual(expectedBoardCalibration, mapLine!.BoardSettings.Calibration);
         }
 

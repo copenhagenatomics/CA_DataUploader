@@ -8,7 +8,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         public const string TypeName = "Current";
 
-        static readonly string DefaultCalibration = $"CAL {string.Join(" ", Enumerable.Range(1, 3).Select(i => $"{i},60.00,0"))}";
+        static readonly string DefaultCalibration = $"CAL {string.Join(" ", Enumerable.Range(1, 3).Select(i => $"{i},60.000000,0"))}";
 
         public IOconfCurrent(string row, int lineNum) :
             base(row, lineNum, TypeName, false, new BoardSettings()
@@ -45,7 +45,7 @@ namespace CA_DataUploaderLib.IOconf
                 var supportsCalibration = calibrationFromBoard is not null && calibrationFromBoard.StartsWith("CAL");
                 if (supportsCalibration)
                 {
-                    var nfi = new NumberFormatInfo() { NumberDecimalDigits = 2 };
+                    var nfi = new NumberFormatInfo() { NumberDecimalDigits = 6 };
                     UpdatePortCalibration(Map.BoardSettings, currentTransformerRatio.ToString("F", nfi), PortNumber);
                 }
                 else
