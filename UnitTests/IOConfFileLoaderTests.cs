@@ -70,6 +70,19 @@ namespace UnitTests
             Assert.IsInstanceOfType(rows[0], typeof(IOConfMathing));
         }
 
+        [TestMethod]
+        public void CanLoadCurrentLine()
+        {
+            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { new IOconfMap("Map;ctserial;ct01", 0) } }); 
+            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "Current;current_ct01;ct01;2;300" });
+            var rows = rowsEnum.ToArray();
+            Assert.AreEqual(1, rows.Length);
+            Assert.IsInstanceOfType(rows[0], typeof(IOconfCurrent));
+            var current = (IOconfCurrent)rows[0];
+            Assert.AreEqual("current_ct01", current.Name);
+            Assert.AreEqual(2, current.PortNumber);
+        }
+
         private class IOConfMathing : IOconfRow
         {
             public IOConfMathing(string row, int lineIndex) : base(row, lineIndex, "Mathing") {}
