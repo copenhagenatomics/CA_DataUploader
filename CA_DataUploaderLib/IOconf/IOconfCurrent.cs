@@ -50,7 +50,8 @@ namespace CA_DataUploaderLib.IOconf
                 }
                 else
                 {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Warning: old current board {Map.Name} cannot use new format for sensor {Name}.");
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Error: old current board {Map.Name} cannot use new format for sensor {Name}. Disconnecting board.");
+                    Map.ForceDisconnectBoard();
                 }
             }
         }
