@@ -21,8 +21,10 @@ namespace CA_DataUploader
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
                 Console.WriteLine("Initializing...");
                 Redundancy.RegisterSystemExtensions();
-                using (var serial = await SerialNumberMapper.DetectDevices())
+                using (var serial = new SerialNumberMapper())
                 {
+                    await serial.DetectDevices();
+
                     if (args.Length > 0 && args[0] == "-listdevices")
                         return; // SerialNumberMapper already lists devices, no need for further output.
 
