@@ -32,6 +32,7 @@ namespace CA_DataUploaderLib
         private readonly TaskCompletionSource _runningTaskTcs = new();
         private readonly bool _isMultipi;
         private readonly List<ChannelWriter<DataVector>> _receivedVectorsWriters = new();
+        private readonly Queue<EventFiredArgs> _locallyFiredEvents = new();
 
         /// <remarks>
         /// This method is not thread safe, so in general call it from the main thread/async flow before the program cycles are started.
@@ -270,7 +271,26 @@ namespace CA_DataUploaderLib
         public void FireAlert(string msg, DateTime timespan) => FireCustomEvent(msg, timespan, (byte)EventType.Alert);
         /// <summary>registers a custom event (low frequency, such like user commands and alerts that have a max firing rate)</summary>
         /// <remarks>preferably use values above 100 for eventType to avoid future collisions with built in event types</remarks>
-        public void FireCustomEvent(string msg, DateTime timespan, byte eventType) => EventFired?.Invoke(this, new EventFiredArgs(msg, eventType, timespan));
+        public void FireCustomEvent(string msg, DateTime timespan, byte eventType) 
+        {
+            EventFired?.Invoke(this, new EventFiredArgs(msg, eventType, timespan));
+            lock (_locallyFiredEvents)
+                _locallyFiredEvents.Enqueue(new EventFiredArgs(msg, eventType, timespan));
+        }
+
+        /// <summary>
+        /// Returns a list of dequeued events.
+        /// </summary>
+        /// <param name="max">The maximum number of events to dequeue.</param>
+        public List<EventFiredArgs>? DequeueEvents(int max = int.MaxValue)
+        {
+            List<EventFiredArgs>? list = null; // delayed initialization to avoid creating lists when there is no data.
+            lock (_locallyFiredEvents)
+                for (int i = 0; i < max && _locallyFiredEvents.TryDequeue(out var e); i++)
+                    (list ??= new List<EventFiredArgs>()).Add(e);
+            return list;
+        }
+
         private bool Stop(List<string> args)
         {
             _exitCts.Cancel();
