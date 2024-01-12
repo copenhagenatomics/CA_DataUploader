@@ -1,6 +1,7 @@
 ﻿#nullable enable
 using System;
 using System.Linq;
+using System.Threading;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -67,6 +68,17 @@ namespace CA_DataUploaderLib.IOconf
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Force the board to be disconnected - e.g. in case of misconfiguration.
+        /// NOTE: this has to be called before running subsystems!
+        /// </summary>
+        public void ForceDisconnectBoard()
+        {
+            McuBoard?.SafeClose(CancellationToken.None).Wait();
+            Board = null;
+            McuBoard = null;
         }
 
         public string? USBPort { get; }

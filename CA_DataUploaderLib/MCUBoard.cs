@@ -1,17 +1,17 @@
 ﻿#nullable enable
 using CA_DataUploaderLib.Extensions;
-using System;
-using System.Threading;
-using System.IO.Ports;
-using CA_DataUploaderLib.IOconf;
-using System.Collections.Generic;
-using System.IO.Pipelines;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Buffers;
-using System.Text;
-using System.Diagnostics.CodeAnalysis;
 using CA_DataUploaderLib.Helpers;
+using CA_DataUploaderLib.IOconf;
+using System;
+using System.Buffers;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.IO.Pipelines;
+using System.IO.Ports;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
@@ -111,11 +111,11 @@ namespace CA_DataUploaderLib
             }
             else if (board != null && board.BoxName == null && board.SerialNumber.IsNullOrEmpty())
             {//note we don't log this for devices without serial that were mapped by usb (last check above)
-                CALog.LogInfoAndConsoleLn(LogID.B, $"some data without serial detected for device at port {name} - {baudrate}");
+                CALog.LogInfoAndConsoleLn(LogID.B, $"Some data without serial detected for device at port {name} - {baudrate}");
             }
             else if (board != null && !board.SerialNumber.IsNullOrEmpty() && (board.ProductType.IsNullOrEmpty() || board.SoftwareVersion.IsNullOrEmpty() || board.PcbVersion.IsNullOrEmpty()))
             {
-                CALog.LogInfoAndConsoleLn(LogID.B, $"detected board with incomplete header {name} - {baudrate}");
+                CALog.LogInfoAndConsoleLn(LogID.B, $"Detected board with incomplete header {name} - {baudrate}");
             }
 
             return board;
@@ -128,11 +128,11 @@ namespace CA_DataUploaderLib
                 return default; // ignore if there is no calibration in configuration or if the board already had the expected configuration
             if (Calibration == default && configSettings.SkipCalibrationWhenHeaderIsMissing)
             {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"skipped detected board without calibration support - {ToShortDescription()}");
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Skipped detected board without calibration support - {ToShortDescription()}");
                 return default;
             }
 
-            var calibrationMessage = $"replaced board calibration '{Calibration}' with '{newCalibration}";
+            var calibrationMessage = $"Replaced board calibration '{Calibration}' with '{newCalibration}";
             CALog.LogInfoAndConsoleLn(LogID.A, $"{calibrationMessage}' - {ToShortDescription()}");
             await SafeWriteLine(newCalibration, CancellationToken.None);
             UpdatedCalibration = newCalibration;

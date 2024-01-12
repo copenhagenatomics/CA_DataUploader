@@ -21,25 +21,26 @@ namespace CA_DataUploader
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
                 Console.WriteLine("Initializing...");
                 Redundancy.RegisterSystemExtensions();
-                using (var serial = await SerialNumberMapper.DetectDevices())
-                {
-                    if (args.Length > 0 && args[0] == "-listdevices")
-                        return; // SerialNumberMapper already lists devices, no need for further output.
+                var serial = new SerialNumberMapper();
+                await serial.DetectDevices();
 
-                    // close all ports which are not Hub10
-                    serial.McuBoards.OfType<MCUBoard>().Where(x => x.ProductType?.Contains("Temperature") != true && x.ProductType?.Contains("Hub10STM") != true).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
+                if (args.Length > 0 && args[0] == "-listdevices")
+                    return; // SerialNumberMapper already lists devices, no need for further output.
 
-                    var email = IOconfSetup.UpdateIOconf(serial);
+                // close all ports which are not Hub10
+                serial.McuBoards.OfType<MCUBoard>().Where(x => x.ProductType?.Contains("Temperature") != true && x.ProductType?.Contains("Hub10STM") != true).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
 
-                    using var cmd = new CommandHandler(serial);
-                    var cloud = new ServerUploader(cmd);
-                    _ = new Redundancy(cmd);
-                    _ = new ThermocoupleBox(cmd);
-                    var runTask = SingleNodeRunner.Run(cmd, cloud, cmd.StopToken);
-                    await Task.Delay(2000);
-                    _ = Task.Run(async () => DULutil.OpenUrl(await cloud.GetPlotUrl(cmd.StopToken)));
-                    await runTask;
-                }
+                var email = IOconfSetup.UpdateIOconf(serial);
+
+                using var cmd = new CommandHandler(serial);
+                var cloud = new ServerUploader(cmd);
+                _ = new Redundancy(cmd);
+                _ = new ThermocoupleBox(cmd);
+                var runTask = SingleNodeRunner.Run(cmd, cloud, cmd.StopToken);
+                await Task.Delay(2000);
+                _ = Task.Run(async () => DULutil.OpenUrl(await cloud.GetPlotUrl(cmd.StopToken)));
+                await runTask;
+                
                 CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
             }
             catch (Exception ex)

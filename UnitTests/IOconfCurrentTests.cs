@@ -32,7 +32,7 @@ namespace UnitTests
 
 
         [TestMethod]
-        public void BoardNotSupportingCalibrationDoesNotGetUpdated()
+        public void BoardNotSupportingCalibrationDoesNotGetUpdatedAndGetsDisconnected()
         {
             // Arrange
             IOconfMap? mapLine = null;
@@ -46,6 +46,8 @@ namespace UnitTests
 
             // Assert
             Assert.IsNull(mapLine!.BoardSettings.Calibration);
+            Assert.IsNull(mapLine!.Board);
+            Assert.IsNull(mapLine!.McuBoard);
         }
 
         [TestMethod]

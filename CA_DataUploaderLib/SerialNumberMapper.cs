@@ -7,24 +7,22 @@ using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
-    public sealed class SerialNumberMapper : IDisposable
+    public sealed class SerialNumberMapper
     {
         private static List<Func<string, Board?>> CustomDetections { get; } = new();
-        public List<Board> McuBoards { get; }
+        public List<Board> McuBoards { get; } = new();
 
-        private SerialNumberMapper(IEnumerable<Board> boards)
+        public SerialNumberMapper()
         {
-            McuBoards = new List<Board>(boards);
         }
 
-        public async static Task<SerialNumberMapper> DetectDevices()
+        public async Task DetectDevices()
         {
             var logLevel = IOconfFileLoader.FileExists() ? IOconfFile.GetOutputLevel() : CALogLevel.Normal;
             var boards = await Task.WhenAll(MCUBoard.GetUSBports().Select(name => AttemptToOpenDeviceConnection(name, logLevel)));
-            return new SerialNumberMapper(boards.OfType<Board>());
+            McuBoards.AddRange(boards.OfType<Board>());
         }
 
-        public static Task<SerialNumberMapper> SkipDetection() => Task.FromResult(new SerialNumberMapper(Enumerable.Empty<Board>()));
         /// <summary>Registers custom board detection, typically a board that does not support a terminal like interface i.e. not tty on linux</summary>
         /// <remarks>
         /// The custom detections must be registered before <see cref="DetectDevices"/> is called.
@@ -57,7 +55,8 @@ namespace CA_DataUploaderLib
                 }
 
                 string logline = logLevel == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
-                CALog.LogInfoAndConsoleLn(LogID.A, logline);
+                Console.WriteLine(logline);      // Always write this in the console
+                CALog.LogData(LogID.A, logline); // + local log, but don't send it to the event log.
                 return mcu;
             }
             catch (UnauthorizedAccessException ex)
@@ -70,10 +69,6 @@ namespace CA_DataUploaderLib
             }
 
             return default;
-        }
-
-        public void Dispose()
-        { // class is sealed without unmanaged resources, no need for the full disposable pattern.
         }
     }
 }
