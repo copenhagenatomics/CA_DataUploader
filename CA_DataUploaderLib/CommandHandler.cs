@@ -279,7 +279,7 @@ namespace CA_DataUploaderLib
         }
 
         /// <summary>
-        /// Returns a list of dequeued events.
+        /// Returns a (new) list of dequeued events.
         /// </summary>
         /// <param name="max">The maximum number of events to dequeue.</param>
         public List<EventFiredArgs>? DequeueEvents(int max = int.MaxValue)

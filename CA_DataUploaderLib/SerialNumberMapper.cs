@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
-    public sealed class SerialNumberMapper : IDisposable
+    public sealed class SerialNumberMapper
     {
         private static List<Func<string, Board?>> CustomDetections { get; } = new();
         public List<Board> McuBoards { get; } = new();
@@ -69,10 +69,6 @@ namespace CA_DataUploaderLib
             }
 
             return default;
-        }
-
-        public void Dispose()
-        { // class is sealed without unmanaged resources, no need for the full disposable pattern.
         }
     }
 }

@@ -10,9 +10,6 @@ namespace CA_DataUploaderLib
     {
         public static async Task Run(CommandHandler cmdHandler, ServerUploader uploader, CancellationToken token)
         {
-            Queue<EventFiredArgs> receivedEventsInThisCycleQueue = new();
-            List<EventFiredArgs> receivedEventsInThisCycle = new();
-
             try
             {
                 var alerts = new Alerts(cmdHandler);
@@ -27,7 +24,7 @@ namespace CA_DataUploaderLib
                     var commands = events?.Where(e => e.EventType == (byte)EventType.Command);
                     var stringCommands = commands is not null && commands.Any() ? commands.Select(e => e.Data).ToList() : emptyCommands;
                     cmdHandler.MakeDecision(cmdHandler.GetNodeInputs().Concat(cmdHandler.GetGlobalInputs()).ToList(), DateTime.UtcNow, ref vector, stringCommands);
-                    vector = new(vector.Data.ToArray(), vector.Timestamp, events is not null ? new List<EventFiredArgs>(events) : null);//note we create copies to avoid changes in the next cycle affecting data of the previous cycle (specially via OnNewVectorReceived)
+                    vector = new(vector.Data.ToArray(), vector.Timestamp, events);
                     cmdHandler.OnNewVectorReceived(vector);
                     await Task.WhenAny(sendThrottle.WaitAsync(token));//whenany for no exceptions on cancel
                 }
