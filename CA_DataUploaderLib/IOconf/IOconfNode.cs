@@ -48,5 +48,7 @@ namespace CA_DataUploaderLib.IOconf
         public bool IsUploader { get; private init; }
         public static bool IsCurrentSystemAnUploader(IReadOnlyCollection<IOconfNode> allNodes) => 
             allNodes.SingleOrDefault(n => n.IsCurrentSystem)?.IsUploader ?? allNodes.Count == 0;
+
+        protected override void ValidateName(string name) { } // no validation
     }
 }

@@ -119,5 +119,7 @@ namespace CA_DataUploaderLib.IOconf
         };
 
         public override string ToString() => $"{BoxName} - {USBPort ?? SerialNumber}";
+
+        protected override void ValidateName(string name) { } // no validation
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.RegularExpressions;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -18,5 +19,11 @@ namespace CA_DataUploaderLib.IOconf
 
         public readonly CALogLevel LogLevel;
         public readonly string Server;
+
+        protected override void ValidateName(string name)
+        {
+            if (!new Regex(@"^[a-zA-Z_-]+[a-zA-Z0-9_-]*$").IsMatch(name))
+                throw new Exception($"Invalid loop name: {name}. Name can only contain letters, numbers (except as the first character), hyphen and underscore.");
+        }
     }
 }

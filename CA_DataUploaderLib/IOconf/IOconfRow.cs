@@ -2,11 +2,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfRow
     {
+        private string _name = string.Empty;
+
         public IOconfRow(string row, int lineNum, string type, bool isUnknown = false)
         {
             Row = row;
@@ -21,7 +24,15 @@ namespace CA_DataUploaderLib.IOconf
         public string Row { get; }
         public string Type { get; }
         public int LineNumber { get; }
-        public string Name { get; init; }
+        public string Name 
+        { 
+            get => _name; 
+            init
+            {
+                ValidateName(value);
+                _name = value;
+            }
+        }
         protected string Format { get; init; } = string.Empty;
         public bool IsUnknown { get; }
 
@@ -30,10 +41,12 @@ namespace CA_DataUploaderLib.IOconf
         public string UniqueKey()
         {
             var list = ToList();
-            if(GetType() == typeof(IOconfOven))
+            if (GetType() == typeof(IOconfOven))
                 return list[0] + list[2] + list[3];  // you could argue that this should somehow include 1 too. 
 
-            return list[0] + Name;
+            return IsUnknown
+                ? list[0] + Name.ToLower()
+                : Name.ToLower();
         }
 
         protected string RowWithoutComment()
@@ -55,5 +68,13 @@ namespace CA_DataUploaderLib.IOconf
         /// Can be used for verification/initialization of things which would be premature to do during construction.
         /// </summary>
         public virtual void ValidateDependencies() {}
+
+        protected virtual void ValidateName(string name)
+        {
+            if (!ValidateNameRegex.IsMatch(name))
+                throw new Exception($"Invalid name: {name}. Name can only contain letters, numbers (except as the first character) and underscore.");
+        }
+
+        private static readonly Regex ValidateNameRegex = new(@"^[a-zA-Z_]+[a-zA-Z0-9_]*$");
     }
 }
