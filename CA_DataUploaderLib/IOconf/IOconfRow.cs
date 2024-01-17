@@ -43,6 +43,8 @@ namespace CA_DataUploaderLib.IOconf
             var list = ToList();
             if (GetType() == typeof(IOconfOven))
                 return list[0] + list[2] + list[3];  // you could argue that this should somehow include 1 too. 
+            if (GetType() == typeof(IOconfFilter))
+                return ((IOconfFilter)this).NameInVector.ToLower();
 
             return IsUnknown
                 ? list[0] + Name.ToLower()
