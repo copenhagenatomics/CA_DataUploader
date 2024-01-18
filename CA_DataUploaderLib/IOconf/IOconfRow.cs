@@ -38,6 +38,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public List<string> ToList() => RowWithoutComment().Trim().TrimEnd(';').Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
 
+        // TODO: change to virtual method
         public string UniqueKey()
         {
             var list = ToList();
@@ -77,6 +78,6 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception($"Invalid name: {name}. Name can only contain letters, numbers (except as the first character) and underscore.");
         }
 
-        private static readonly Regex ValidateNameRegex = new(@"^[a-zA-Z_]+[a-zA-Z0-9_]*$");
+        protected static readonly Regex ValidateNameRegex = new(@"^[a-zA-Z_]+[a-zA-Z0-9_]*$");
     }
 }
