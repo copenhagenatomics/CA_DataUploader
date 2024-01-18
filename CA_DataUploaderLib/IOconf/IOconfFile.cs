@@ -32,8 +32,8 @@ namespace CA_DataUploaderLib.IOconf
 
         private static void CheckRules()
         {
-            // All rows have to be uniquely named/identified
-            var dupes = Table.GroupBy(x => x.UniqueKey());
+            // All rows have to be uniquely named/identified (exclude Account and LoopName-lines)
+            var dupes = Table.Where(e => e is not IOconfAccount && e is not IOconfLoopName).GroupBy(x => x.UniqueKey());
             foreach (var d in dupes.Where(x => x.Count() > 1))
                 CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Different entries cannot use the same name:{Environment.NewLine + "\t" + string.Join(Environment.NewLine + "\t", d)}");
 
