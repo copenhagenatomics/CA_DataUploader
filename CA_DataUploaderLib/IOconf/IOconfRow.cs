@@ -38,17 +38,10 @@ namespace CA_DataUploaderLib.IOconf
 
         public List<string> ToList() => RowWithoutComment().Trim().TrimEnd(';').Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
 
-        // TODO: change to virtual method
-        public string UniqueKey()
+        public virtual string UniqueKey()
         {
-            var list = ToList();
-            if (GetType() == typeof(IOconfOven))
-                return list[0] + list[2] + list[3];  // you could argue that this should somehow include 1 too. 
-            if (GetType() == typeof(IOconfFilter))
-                return ((IOconfFilter)this).NameInVector.ToLower();
-
             return IsUnknown
-                ? list[0] + Name.ToLower()
+                ? Type + Name.ToLower()
                 : Name.ToLower();
         }
 
