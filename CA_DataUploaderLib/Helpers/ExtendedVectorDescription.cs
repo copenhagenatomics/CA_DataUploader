@@ -30,14 +30,17 @@ namespace CA_DataUploaderLib.Helpers
             allItems.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Output.Name, DataTypeEnum.Input)));
             RemoveHiddenSources(allItems, i => i.Descriptor);
             InputsAndFiltersCount = allItems.Count;
+            _outputCount = outputs.Count;
+
             _mathVectorExpansion = new MathVectorExpansion();
             allItems.AddRange(_mathVectorExpansion.GetVectorDescriptionEntries());
             allItems.AddRange(outputs);
-            _outputCount = outputs.Count;
-            _mathVectorExpansion.Initialize(allItems.Select(i => i.Descriptor));
-            var duplicates = allItems.GroupBy(x => x.Descriptor).Where(x => x.Count() > 1).Select(x => x.Key);
+            
+            var duplicates = allItems.GroupBy(x => x.Descriptor, StringComparer.InvariantCultureIgnoreCase).Where(x => x.Count() > 1).Select(x => x.Key);
             if (duplicates.Any())
-                throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", duplicates));
+                throw new Exception("Different fields cannot use the same name (even if the casing is different). Please rename: " + string.Join(", ", duplicates));
+            
+            _mathVectorExpansion.Initialize(allItems.Select(i => i.Descriptor));
             VectorDescription = new VectorDescription(allItems, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
         }
 

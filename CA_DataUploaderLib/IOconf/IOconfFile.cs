@@ -32,10 +32,10 @@ namespace CA_DataUploaderLib.IOconf
 
         private static void CheckRules()
         {
-            // no two rows can have the same type,name combination. 
-            var groups = Table.GroupBy(x => x.UniqueKey());
-            foreach (var g in groups.Where(x => x.Count() > 1))
-                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Name: {g.First().ToList()[1]} occurred {g.Count()} times in this group: {g.First().ToList()[0]}");
+            // All rows have to be uniquely named/identified (exclude Account and LoopName-lines)
+            var dupes = Table.Where(e => e is not IOconfAccount && e is not IOconfLoopName).GroupBy(x => x.UniqueKey());
+            foreach (var d in dupes.Where(x => x.Count() > 1))
+                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Different entries cannot use the same name:{Environment.NewLine + "\t" + string.Join(Environment.NewLine + "\t", d)}");
 
             // no heater can be in several oven areas
             var heaters = GetOven().Where(x => x.OvenArea > 0).GroupBy(x => x.HeatingElement);

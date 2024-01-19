@@ -52,6 +52,12 @@ namespace CA_DataUploaderLib.IOconf
             BoardStateSensorNames = IOconfFile.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
         }
 
+        public override string UniqueKey()
+        {
+            var list = ToList();
+            return list[0] + list[2] + list[3];  // you could argue that this should somehow include 1 too. 
+        }
+
         private IOconfHeater? heatingElement;
         private ReadOnlyCollection<string>? boardStateSensorNames;
 

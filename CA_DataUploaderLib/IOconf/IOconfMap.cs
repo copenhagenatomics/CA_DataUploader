@@ -1,12 +1,15 @@
 ﻿#nullable enable
 using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfMap : IOconfRow
     {
+        private Regex ValidateMapNameRegex = new(".*"); // Accepts anything - is replaced in the constructor before Name is updated.
+
         public IOconfMap(string row, int lineNum) : base(row, lineNum, "Map")
         {
             Format = "Map;SerialNo/COM1/USB1-1.1;BoxName;[NodeName];[baud rate];[customwrites]";
@@ -24,6 +27,7 @@ namespace CA_DataUploaderLib.IOconf
             else
                 SerialNumber = list[1];
 
+            ValidateMapNameRegex = ValidateNameRegex;
             Name = BoxName = list[2];
             _boardSettings = isVirtualPort ? DefaultVirtualBoardSettings : BoardSettings.Default;
 
@@ -119,5 +123,11 @@ namespace CA_DataUploaderLib.IOconf
         };
 
         public override string ToString() => $"{BoxName} - {USBPort ?? SerialNumber}";
+
+        protected override void ValidateName(string name) 
+        {
+            if (!ValidateMapNameRegex.IsMatch(name))
+                throw new Exception($"Invalid map name: {name}. Name can only contain letters, numbers (except as the first character) and underscore.");
+        }
     }
 }

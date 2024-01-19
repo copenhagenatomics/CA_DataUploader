@@ -12,5 +12,7 @@
 
         public readonly string Email;
         public readonly string Password;
+
+        protected override void ValidateName(string name) { } // no validation
     }
 }
