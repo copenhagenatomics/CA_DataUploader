@@ -38,12 +38,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public List<string> ToList() => RowWithoutComment().Trim().TrimEnd(';').Split(";".ToCharArray()).Select(x => x.Trim()).ToList();
 
-        public virtual string UniqueKey()
-        {
-            return IsUnknown
-                ? Type + Name.ToLower()
-                : Name.ToLower();
-        }
+        public virtual string UniqueKey() => Type + Name.ToLower();
 
         protected string RowWithoutComment()
         {

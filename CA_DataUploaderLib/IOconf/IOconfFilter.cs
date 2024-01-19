@@ -36,7 +36,5 @@ namespace CA_DataUploaderLib.IOconf
             // source validation happens later, as there is not a 1-1 relation of IOConfFile entries and values getting into the Vector i.e. some oxygen sensors have 3 values. 
             SourceNames = sources;
         }
-
-        public override string UniqueKey() => NameInVector.ToLower();
     }
 }
