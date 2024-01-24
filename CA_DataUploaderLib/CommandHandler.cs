@@ -342,7 +342,7 @@ namespace CA_DataUploaderLib
             var info = await ReadConsoleKeyAsync(StopToken, true);
             if (info is null)
                 return null;
-            while (info.Value.Key != ConsoleKey.Enter)
+            while (info is not null && info.Value.Key != ConsoleKey.Enter)
             {
                 if (!IsRunning)
                     return null; //no longer running, abort
@@ -350,7 +350,8 @@ namespace CA_DataUploaderLib
                 {
                     inputCommand.Clear();//clear input typed before the esc sequence
                     Console.WriteLine("You are about to stop the control program, type y if you want to continue");
-                    var confirmedStop = Console.ReadKey().KeyChar == 'y';
+                    info = await ReadConsoleKeyAsync(StopToken, true);
+                    var confirmedStop = info is not null && info.Value.KeyChar == 'y';
                     var msg = confirmedStop ? "Stop sequence initiated" : "Stop sequence aborted";
                     Console.WriteLine(msg); //ensure there is console output for this interactive local action regardless of the logger
                     CALog.LogData(LogID.A, msg); //no need to write the line to the screen again + no need to show it in remote logging, as confirmed stops show as the "escape" command.
@@ -372,7 +373,7 @@ namespace CA_DataUploaderLib
                     Console.Write(info.Value.KeyChar);
                     inputCommand.Append(info.Value.KeyChar);
                 }
-                info = Console.ReadKey(true);
+                info = await ReadConsoleKeyAsync(StopToken, true);
             }
 
             Console.WriteLine(string.Empty); //write the newline as the user pressed enter
