@@ -30,9 +30,10 @@ namespace CA_DataUploaderLib.IOconf
             foreach (var node in nodes)
             {
                 //note there is no map entry for the IOconfRpiTemp as it not an external box, but at the moment we only expose the IOconfNode through it
-                var map = new IOconfMap($"Map;RpiFakeBox;{Name}_{node.Name}Box;{node.Name}", LineNumber);
-                yield return NewPortInput($"{Name}_{node.Name}Gpu", map, 1);
-                yield return NewPortInput($"{Name}_{node.Name}Cpu", map, 2);
+                var nodeNameClean = node.Name.Replace("-", "");
+                var map = new IOconfMap($"Map;RpiFakeBox;{Name}_{nodeNameClean}Box;{node.Name}", LineNumber);
+                yield return NewPortInput($"{Name}_{nodeNameClean}Gpu", map, 1);
+                yield return NewPortInput($"{Name}_{nodeNameClean}Cpu", map, 2);
             }
         }
         private IOconfInput NewPortInput(string name, IOconfMap map, int portNumber) => new(Row, LineNumber, Type, map, portNumber) { Name = name, Skip = true };
