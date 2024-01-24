@@ -66,8 +66,8 @@ namespace CA_DataUploaderLib
             _commandRunner = runner ?? new DefaultCommandRunner();
             _mapper = mapper;
             _fullsystemFilterAndMath = new Lazy<ExtendedVectorDescription>(GetFullSystemFilterAndMath);
-            new Thread(() => this.LoopForever()).Start();
-            AddCommand("escape", Stop);
+            _ = Task.Run(LoopForever);
+            AddCommand("escape", _ => Stop());
             AddCommand("help", HelpMenu);
 
             _isMultipi = IOconfFile.GetEntries<IOconfNode>().Any();
@@ -291,20 +291,20 @@ namespace CA_DataUploaderLib
             return list;
         }
 
-        private bool Stop(List<string> args)
+        public bool Stop()
         {
             _exitCts.Cancel();
             return true;
         }
 
-        private void LoopForever()
+        private async Task LoopForever()
         {
             _start = DateTime.Now;
             while (IsRunning)
             {
                 try
                 {
-                    var cmd = GetCommand();
+                    var cmd = await GetCommand();
                     if (!string.IsNullOrWhiteSpace(cmd)) //cmd is null when GetCommand abort due to _running being false
                         HandleCommand(cmd, true);
                 }
@@ -336,45 +336,72 @@ namespace CA_DataUploaderLib
         }
 
         /// <returns>the text line <c>null</c> if we are no longer running (_running is false)</returns>
-        private string? GetCommand()
+        private async Task<string?> GetCommand()
         {
             inputCommand.Clear();
-            var info = Console.ReadKey(true);
-            while (info.Key != ConsoleKey.Enter)
+            var info = await ReadConsoleKeyAsync(StopToken, true);
+            if (info is null)
+                return null;
+            while (info is not null && info.Value.Key != ConsoleKey.Enter)
             {
                 if (!IsRunning)
                     return null; //no longer running, abort
-                else if (info.Key == ConsoleKey.Escape)
+                else if (info.Value.Key == ConsoleKey.Escape)
                 {
                     inputCommand.Clear();//clear input typed before the esc sequence
                     Console.WriteLine("You are about to stop the control program, type y if you want to continue");
-                    var confirmedStop = Console.ReadKey().KeyChar == 'y';
+                    info = await ReadConsoleKeyAsync(StopToken, true);
+                    var confirmedStop = info is not null && info.Value.KeyChar == 'y';
                     var msg = confirmedStop ? "Stop sequence initiated" : "Stop sequence aborted";
                     Console.WriteLine(msg); //ensure there is console output for this interactive local action regardless of the logger
                     CALog.LogData(LogID.A, msg); //no need to write the line to the screen again + no need to show it in remote logging, as confirmed stops show as the "escape" command.
                     if (confirmedStop)
                         return "escape";
                 }
-                else if (info.Key == ConsoleKey.Backspace)
+                else if (info.Value.Key == ConsoleKey.Backspace)
                 {
                     Console.Write("\b \b"); // https://stackoverflow.com/a/53976873/66372
                     if (inputCommand.Length > 0)
                         inputCommand.Remove(inputCommand.Length - 1, 1);
                 }
-                else if (info.Key == ConsoleKey.UpArrow)
+                else if (info.Value.Key == ConsoleKey.UpArrow)
                     RestorePreviousAcceptedCommand();
-                else if (info.Key == ConsoleKey.DownArrow)
+                else if (info.Value.Key == ConsoleKey.DownArrow)
                     RestoreNextAcceptedCommand();
                 else
                 {
-                    Console.Write(info.KeyChar);
-                    inputCommand.Append(info.KeyChar);
+                    Console.Write(info.Value.KeyChar);
+                    inputCommand.Append(info.Value.KeyChar);
                 }
-                info = Console.ReadKey(true);
+                info = await ReadConsoleKeyAsync(StopToken, true);
             }
 
             Console.WriteLine(string.Empty); //write the newline as the user pressed enter
             return inputCommand.ToString();
+        }
+
+        public static async Task<ConsoleKeyInfo?> ReadConsoleKeyAsync(CancellationToken cancellationToken, bool intercept = false)
+        {
+            // If there is a key available, return it without waiting
+            if (Console.KeyAvailable)
+            {
+                return Console.ReadKey(intercept);
+            }
+
+            // Otherwise
+            var result = await Task.WhenAny(Task.Run<ConsoleKeyInfo?>(async () =>
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    await Task.Delay(100);
+                    if (Console.KeyAvailable)
+                    {
+                        return Console.ReadKey(intercept);
+                    }
+                }
+                return null;
+            }, cancellationToken));
+            return result.IsCanceled ? null : await result;
         }
 
         private void RestoreNextAcceptedCommand()
