@@ -14,6 +14,8 @@ namespace CA_DataUploaderLib.Helpers
         private readonly List<FilterSample> _values;
         private readonly MathVectorExpansion _mathVectorExpansion;
         private readonly int _outputCount;
+        private readonly IIOconf _ioconf;
+
         public VectorDescription VectorDescription { get; }
         public int InputsAndFiltersCount { get; }
         /// <summary>
@@ -21,9 +23,10 @@ namespace CA_DataUploaderLib.Helpers
         /// </summary>
         public IReadOnlyList<(IOconfNode, IReadOnlyList<VectorDescriptionItem>)> InputsPerNode { get; set; }
 
-        public ExtendedVectorDescription(List<(IOconfNode, IReadOnlyList<VectorDescriptionItem> values)> inputsPerNode, List<VectorDescriptionItem> globalInputs, List<VectorDescriptionItem> outputs)
+        public ExtendedVectorDescription(IIOconf ioconf, List<(IOconfNode, IReadOnlyList<VectorDescriptionItem> values)> inputsPerNode, List<VectorDescriptionItem> globalInputs, List<VectorDescriptionItem> outputs)
         {
-            _logLevel = IOconfFile.GetOutputLevel();
+            _ioconf = ioconf;
+            _logLevel = ioconf.GetOutputLevel();
             InputsPerNode = inputsPerNode;
             List<VectorDescriptionItem> allItems = inputsPerNode.SelectMany(n => n.values).Concat(globalInputs).ToList();
             _values = GetFilters(allItems);
@@ -32,7 +35,7 @@ namespace CA_DataUploaderLib.Helpers
             InputsAndFiltersCount = allItems.Count;
             _outputCount = outputs.Count;
 
-            _mathVectorExpansion = new MathVectorExpansion();
+            _mathVectorExpansion = new MathVectorExpansion(ioconf.GetMath);
             allItems.AddRange(_mathVectorExpansion.GetVectorDescriptionEntries());
             allItems.AddRange(outputs);
             
@@ -46,9 +49,9 @@ namespace CA_DataUploaderLib.Helpers
 
         public int GetIndex(VectorDescriptionItem item) { return VectorDescription._items.IndexOf(item); }
 
-        private static List<FilterSample> GetFilters(List<VectorDescriptionItem> inputs)
+        private List<FilterSample> GetFilters(List<VectorDescriptionItem> inputs)
         {
-            var filters = IOconfFile.GetFilters().ToList();
+            var filters = _ioconf.GetFilters().ToList();
             var filtersWithoutItem = filters.SelectMany(f => f.SourceNames.Select(s => new { Filter = f, Source = s })).Where(f => !inputs.Any(i => i.Descriptor == f.Source)).ToList();
             foreach (var filter in filtersWithoutItem)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Filter: {filter.Filter.Name} points to missing sensor: {filter.Source}");

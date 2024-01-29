@@ -37,10 +37,10 @@ namespace CA_DataUploaderLib
         private readonly CommandHandler _cmd;
         private bool disabled;
 
-        public Alerts(CommandHandler cmd) : base()
+        public Alerts(IIOconf ioconf, CommandHandler cmd) : base()
         {
             _cmd = cmd;
-            _alerts = GetAlerts(cmd.GetFullSystemVectorDescription(), cmd).ToArray();
+            _alerts = GetAlerts(cmd.GetFullSystemVectorDescription(), ioconf, cmd).ToArray();
             var reader = _cmd.GetReceivedVectorsReader();
             _ = Task.Run(() => CheckAlertsOnReceivedVectors(reader));
         }
@@ -85,11 +85,11 @@ namespace CA_DataUploaderLib
             catch (OperationCanceledException) { }
         }
 
-        private static List<(IOconfAlert alert, int sensorIndex)> GetAlerts(VectorDescription vectorDesc, CommandHandler cmd)
+        private static List<(IOconfAlert alert, int sensorIndex)> GetAlerts(VectorDescription vectorDesc, IIOconf ioconf, CommandHandler cmd)
         {
             var indexes = vectorDesc._items.Select((f, i) => (f, i)).ToDictionary(f => f.f.Descriptor, f => f.i);
             var alerts = new List<(IOconfAlert alert, int sensorIndex)>();
-            var alertsDefinitions = IOconfFile.GetAlerts()
+            var alertsDefinitions = ioconf.GetAlerts()
                 .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_alert")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;5", 0, EventType.Alert)))
                 .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_error")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;5", 0, EventType.LogError)));
             foreach (var alert in alertsDefinitions)

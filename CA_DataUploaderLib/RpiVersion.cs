@@ -16,13 +16,13 @@ namespace CA_DataUploaderLib
     {
         private static readonly OperatingSystem _OS = Environment.OSVersion;
 
-        public static string GetWelcomeMessage(string purpose)
+        public static string GetWelcomeMessage(string purpose, CALogLevel logLevel)
         {
             var sb = new StringBuilder();
             sb.AppendLine("This is Open Source code by Copenhagen Atomics");
             sb.AppendLine(purpose);
             sb.AppendLine();
-            if (IOconfFile.GetOutputLevel() == CALogLevel.Debug)
+            if (logLevel == CALogLevel.Debug)
             {
                 sb.AppendLine("UTC time now: " + DateTime.UtcNow.ToString("ddd MMM dd. HH:mm:ss"));
                 sb.AppendLine(GetSoftware());

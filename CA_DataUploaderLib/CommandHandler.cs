@@ -17,6 +17,7 @@ namespace CA_DataUploaderLib
 {
     public sealed class CommandHandler : IDisposable
     {
+        private readonly IIOconf _ioconf;
         private readonly SerialNumberMapper? _mapper;
         private SerialNumberMapper Mapper => _mapper ?? throw new NotSupportedException("usage of SerialNumberMapper detected on an unsupported context");
         private readonly ICommandRunner _commandRunner;
@@ -55,7 +56,7 @@ namespace CA_DataUploaderLib
         public CancellationToken StopToken => _exitCts.Token;
         public Task RunningTask => _runningTaskTcs.Task;
 
-        public CommandHandler(SerialNumberMapper? mapper = null, ICommandRunner? runner = null)
+        public CommandHandler(IIOconf ioconf, SerialNumberMapper? mapper = null, ICommandRunner? runner = null)
         {
             _exitCts.Token.Register(() =>
             {
@@ -64,13 +65,14 @@ namespace CA_DataUploaderLib
                     writer.TryComplete();
             });
             _commandRunner = runner ?? new DefaultCommandRunner();
+            _ioconf = ioconf;
             _mapper = mapper;
             _fullsystemFilterAndMath = new Lazy<ExtendedVectorDescription>(GetFullSystemFilterAndMath);
             _ = Task.Run(LoopForever);
             AddCommand("escape", _ => Stop());
             AddCommand("help", HelpMenu);
 
-            _isMultipi = IOconfFile.GetEntries<IOconfNode>().Any();
+            _isMultipi = _ioconf.GetEntries<IOconfNode>().Any();
             //we run the command in all nodes
             AddMultinodeCommand("up", _ => true, Uptime);
             AddMultinodeCommand("version", _ => true, GetVersion);
@@ -206,7 +208,7 @@ namespace CA_DataUploaderLib
             SetConfigBasedOnIOconf(decisions);
             CALog.LogData(LogID.A, $"decisions order: {string.Join(',', decisions.Select(d => d.Name))}");
             var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type) { Upload = f.Upload })).ToList();
-            var desc = new ExtendedVectorDescription(inputsPerNode, globalInputs, outputs);
+            var desc = new ExtendedVectorDescription(_ioconf, inputsPerNode, globalInputs, outputs);
             CA.LoopControlPluginBase.VectorDescription inmutableVectorDesc = new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray());
             foreach (var decision in decisions)
                 decision.Initialize(inmutableVectorDesc);
@@ -217,11 +219,11 @@ namespace CA_DataUploaderLib
 
             /// <summary>gets a comparer that can be used to order plugins based on the order listed in IO.conf</summary>
             /// <remarks>all decisions listed in the IO.conf come after the decisions not listed. The decisions that are not listed keep the order in which they were added</remarks>
-            static void OrderDecisionsBasedOnIOconf(List<LoopControlDecision> decisions)
+            void OrderDecisionsBasedOnIOconf(List<LoopControlDecision> decisions)
             {
                 //indexes are the original position at first and we later change the index of those found in IO.conf to decisions.Count + the conf order/index (so those in IO.conf come after non listed + in conf order).
                 var decisionsIndexes = decisions.Select((decision, index) => (decision, index)).ToDictionary(tuple => tuple.decision.Name, tuple => (tuple.decision, tuple.index)); 
-                var confDecisions = IOconfFile.GetEntries<IOconfCode>();
+                var confDecisions = _ioconf.GetEntries<IOconfCode>();
                 foreach (var conf in confDecisions)
                 {
                     if (!decisionsIndexes.TryGetValue(conf.Name, out var decisionAndIndex)) 
@@ -239,7 +241,7 @@ namespace CA_DataUploaderLib
             void SetConfigBasedOnIOconf(IEnumerable<LoopControlDecision> decisions)
             {
                 var decisionsNames = new HashSet<string>(decisions.Select(d => d.Name));
-                var configEntries = IOconfFile.GetEntries<IOconfRow>();
+                var configEntries = _ioconf.GetEntries<IOconfRow>();
                 var unknownEntriesWithoutDecisions = configEntries.Where(e => e.IsUnknown && !decisionsNames.Contains(e.Type)).Select(r => r.Row).ToList();
                 if (unknownEntriesWithoutDecisions.Count > 0)
                     throw new NotSupportedException($"invalid config lines detected: {Environment.NewLine + string.Join(Environment.NewLine, unknownEntriesWithoutDecisions)}");
@@ -250,11 +252,11 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private static IOconfNode GetCurrentNode() => GetNodes().Single(n => n.IsCurrentSystem);
-        private static List<IOconfNode> GetNodes()
+        private IOconfNode GetCurrentNode() => GetNodes().Single(n => n.IsCurrentSystem);
+        private List<IOconfNode> GetNodes()
         {
-            var nodes = IOconfFile.GetEntries<IOconfNode>().ToList();
-            return nodes.Count > 0 ? nodes : new() { IOconfNode.SingleNode };
+            var nodes = _ioconf.GetEntries<IOconfNode>().ToList();
+            return nodes.Count > 0 ? nodes : new() { IOconfNode.GetSingleNode(_ioconf.GetLoopName()) };
         }
 
         public void OnNewVectorReceived(DataVector args)
@@ -445,7 +447,7 @@ namespace CA_DataUploaderLib
 
         public void GetVersion(List<string> _)
         {
-            var connInfo = IOconfFile.GetConnectionInfo();
+            var connInfo = _ioconf.GetConnectionInfo();
             CALog.LogInfoAndConsoleLn(LogID.A, 
 $@"{GetCurrentNode().Name}
 {RpiVersion.GetSoftware()}

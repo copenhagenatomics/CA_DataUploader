@@ -9,11 +9,11 @@ namespace CA_DataUploaderLib
 {
     public class Redundancy
     {
-        public Redundancy(CommandHandler cmd)
+        public Redundancy(IIOconf ioconf, CommandHandler cmd)
         {
-            var configs = IOconfRedundant.ToDecisionConfigs(IOconfFile.GetEntries<IOconfRedundant>());
+            var configs = IOconfRedundant.ToDecisionConfigs(ioconf.GetEntries<IOconfRedundant>());
             cmd.AddDecisions(configs.Select(r => new Decision(r)).ToList());
-            SwitchBoardController.Initialize(cmd);
+            SwitchBoardController.Initialize(ioconf, cmd);
         }
 
         public static void RegisterSystemExtensions()
@@ -60,10 +60,10 @@ namespace CA_DataUploaderLib
                     throw new FormatException($"Missing sensors. Format: {RowType};Name;Sensor1;Sensor2...;Sensorn. Line: {Row}");
             }
 
-            public override void ValidateDependencies()
+            public override void ValidateDependencies(IIOconf ioconf)
             {
                 for (int i = 0; i < Sensors.Count; i++)
-                    SensorBoardStates[i].AddRange(IOconfFile.GetBoardStateNames(Sensors[i]));
+                    SensorBoardStates[i].AddRange(ioconf.GetBoardStateNames(Sensors[i]));
             }
         }
 

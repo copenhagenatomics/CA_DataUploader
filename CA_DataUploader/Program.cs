@@ -1,5 +1,6 @@
 ﻿using CA_DataUploaderLib;
 using CA_DataUploaderLib.Helpers;
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Data;
 using System.Linq;
@@ -18,10 +19,11 @@ namespace CA_DataUploader
         {
             try
             {
-                CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
+                var ioconf = IOconfFile.Instance;
+                CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud", ioconf.GetOutputLevel()));
                 Console.WriteLine("Initializing...");
                 Redundancy.RegisterSystemExtensions();
-                var serial = new SerialNumberMapper();
+                var serial = new SerialNumberMapper(ioconf);
                 await serial.DetectDevices();
 
                 if (args.Length > 0 && args[0] == "-listdevices")
@@ -30,13 +32,13 @@ namespace CA_DataUploader
                 // close all ports which are not Hub10
                 serial.McuBoards.OfType<MCUBoard>().Where(x => x.ProductType?.Contains("Temperature") != true && x.ProductType?.Contains("Hub10STM") != true).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
 
-                var email = IOconfSetup.UpdateIOconf(serial);
+                var email = IOconfSetup.UpdateIOconf(ioconf, serial);
 
-                using var cmd = new CommandHandler(serial);
-                var cloud = new ServerUploader(cmd);
-                _ = new Redundancy(cmd);
-                _ = new ThermocoupleBox(cmd);
-                var runTask = SingleNodeRunner.Run(cmd, cloud, cmd.StopToken);
+                using var cmd = new CommandHandler(ioconf, serial);
+                var cloud = new ServerUploader(ioconf, cmd);
+                _ = new Redundancy(ioconf, cmd);
+                _ = new ThermocoupleBox(ioconf, cmd);
+                var runTask = SingleNodeRunner.Run(ioconf, cmd, cloud, cmd.StopToken);
                 await Task.Delay(2000);
                 _ = Task.Run(async () => DULutil.OpenUrl(await cloud.GetPlotUrl(cmd.StopToken)));
                 await runTask;

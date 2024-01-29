@@ -44,6 +44,7 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
             }
 
+            IOconfNode.ResetNodeIndexCount();
             var list = File.ReadAllLines("IO.conf").ToList();
             return (list, ParseLines(list));
         }

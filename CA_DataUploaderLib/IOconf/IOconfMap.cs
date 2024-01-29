@@ -8,6 +8,8 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfMap : IOconfRow
     {
+        private readonly string? _distributedNodeName;
+        private IOconfNode? _distributedNode;
         private Regex ValidateMapNameRegex = new(".*"); // Accepts anything - is replaced in the constructor before Name is updated.
 
         public IOconfMap(string row, int lineNum) : base(row, lineNum, "Map")
@@ -40,19 +42,23 @@ namespace CA_DataUploaderLib.IOconf
             if (list.Count <= 3)
                 return;
 
-            var distributedNodeName = list.Count == 5 ? list[3] : default;
+            _distributedNodeName = list.Count == 5 ? list[3] : default;
             var baudrate = 0;
             if (list.Count >= 5 && !int.TryParse(list[4], out baudrate))
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Failed to parse the baud rate for the board: {BoxName}. Attempting with defaults.");
             else if (list.Count == 4 && int.TryParse(list[3], out baudrate))
                 BaudRate = baudrate;
             else
-                distributedNodeName = list[3];
+                _distributedNodeName = list[3];
 
             BaudRate = baudrate;
-            DistributedNode = distributedNodeName != default 
-                ? IOconfFile.GetEntries<IOconfNode>().SingleOrDefault(n => n.Name == distributedNodeName) ?? throw new Exception($"Failed to find node in configuration for Map: {row}. Format: {Format}")
-                : !IOconfFile.GetEntries<IOconfNode>().Any() ? DistributedNode : throw new Exception($"The node name is not optional for distributed deployments: {row}. Format: {Format}");
+        }
+
+        public override void ValidateDependencies(IIOconf ioconf) 
+        {
+            DistributedNode = _distributedNodeName != default 
+                ? ioconf.GetEntries<IOconfNode>().SingleOrDefault(n => n.Name == _distributedNodeName) ?? throw new Exception($"Failed to find node in configuration for Map: {Row}. Format: {Format}")
+                : !ioconf.GetEntries<IOconfNode>().Any() ? IOconfNode.GetSingleNode(ioconf.GetLoopName()) : throw new Exception($"The node name is not optional for distributed deployments: {Row}. Format: {Format}");
         }
 
         public event EventHandler<EventArgs>? OnBoardDetected;
@@ -100,8 +106,14 @@ namespace CA_DataUploaderLib.IOconf
         /// <summary>the baud rate as specified in configuration and otherwise 0</summary>
         /// <remarks>check <see cref="BoardSettings" /> for additional baud rate set by configurations</remarks>
         public int BaudRate { get; private set; }
+        /// <summary>The power phase as specified in the configuration i.e. 1, 2 or 3 - otherwise 0</summary>
+        public int PowerPhase { get; } = 0;
         /// <summary>the cluster node that is directly connected to the device or <c>default</c> when using </summary>
-        public IOconfNode DistributedNode { get; } = IOconfNode.SingleNode;
+        public IOconfNode DistributedNode 
+        { 
+            get => _distributedNode ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(DistributedNode)}.");
+            private set => _distributedNode = value;
+        }
         public bool IsLocalBoard => DistributedNode.IsCurrentSystem;
         public bool CustomWritesEnabled { get; } = false;
         public Board? Board { get; private set; }

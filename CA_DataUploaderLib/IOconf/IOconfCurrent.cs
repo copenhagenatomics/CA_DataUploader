@@ -6,6 +6,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfCurrent : IOconfInput
     {
+        private double _currentTransformerRatio;
         public const string TypeName = "Current";
 
         static readonly string DefaultCalibration = $"CAL {string.Join(" ", Enumerable.Range(1, 3).Select(i => $"{i},60.000000,0"))}";
@@ -33,8 +34,13 @@ namespace CA_DataUploaderLib.IOconf
             if (list.Count >= 6 && (!double.TryParse(list[5], NumberStyles.Float, CultureInfo.InvariantCulture, out meterSideRating) || meterSideRating <= 0.0 || meterSideRating > 5.0))
                 throw new FormatException($"Unsupported meter side rating at line '{Row}'. Only numbers between 0 and 5 are allowed. Expected format: {Format}.");
 
-            var currentTransformerRatio = loadSideRating / meterSideRating;
+            _currentTransformerRatio = loadSideRating / meterSideRating;
+        }
 
+        public override void ValidateDependencies(IIOconf ioconf)
+        {
+            base.ValidateDependencies(ioconf);
+            
             Map.OnBoardDetected += OnBoardDetected;
 
             // We need to read the current calibration from the board to know if it is supported
@@ -46,7 +52,7 @@ namespace CA_DataUploaderLib.IOconf
                 if (supportsCalibration)
                 {
                     var nfi = new NumberFormatInfo() { NumberDecimalDigits = 6 };
-                    UpdatePortCalibration(Map.BoardSettings, currentTransformerRatio.ToString("F", nfi), PortNumber);
+                    UpdatePortCalibration(Map.BoardSettings, _currentTransformerRatio.ToString("F", nfi), PortNumber);
                 }
                 else
                 {

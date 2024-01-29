@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib
     {
         private readonly SensorSample? _rpiGpuSample;
         private readonly SensorSample? _rpiCpuSample;
-        public ThermocoupleBox(CommandHandler cmd) : base(cmd, "Temperatures", GetSensors()) 
+        public ThermocoupleBox(IIOconf ioconf, CommandHandler cmd) : base(cmd, "Temperatures", GetSensors(ioconf)) 
         { // these are disabled / null when RpiTemp is disabled
             _rpiGpuSample = _values.FirstOrDefault(x => IOconfRPiTemp.IsLocalGpuSensor(x.Input));
             _rpiCpuSample = _values.FirstOrDefault(x => IOconfRPiTemp.IsLocalCpuSensor(x.Input));
@@ -51,11 +51,11 @@ namespace CA_DataUploaderLib
             
         }
 
-        private static IEnumerable<IOconfInput> GetSensors()
+        private static IEnumerable<IOconfInput> GetSensors(IIOconf ioconf)
         {
-            var values = IOconfFile.GetTemp();
-            var rpiTemp = IOconfFile.GetRPiTemp();
-            var expandedSensors = rpiTemp.GetDistributedExpandedInputConf();
+            var values = ioconf.GetTemp();
+            var rpiTemp = ioconf.GetRPiTemp();
+            var expandedSensors = rpiTemp.GetDistributedExpandedInputConf(ioconf);
             return values.Concat(expandedSensors);
         }
     }

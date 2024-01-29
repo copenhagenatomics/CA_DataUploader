@@ -10,7 +10,7 @@ namespace CA_DataUploader
 {
     public class IOconfSetup
     {
-        public static string UpdateIOconf(SerialNumberMapper serial)
+        public static string UpdateIOconf(IIOconf ioconf, SerialNumberMapper serial)
         {
             var mcuList = serial.McuBoards.Where(x => x.SerialNumber?.StartsWith("unknown") != true);
             if (!mcuList.Any())
@@ -88,7 +88,7 @@ namespace CA_DataUploader
 
             File.Delete("IO.conf");
             File.WriteAllLines("IO.conf", lines);
-            ReloadIOconf(serial);
+            ReloadIOconf(ioconf, serial);
 
             if (mcuList.Count() > 1)
             {
@@ -131,11 +131,11 @@ namespace CA_DataUploader
             return true;
         }
 
-        private static void ReloadIOconf(SerialNumberMapper serial)
+        private static void ReloadIOconf(IIOconf ioconf, SerialNumberMapper serial)
         {
-            IOconfFile.Reload();
+            ioconf.Reload();
             foreach (var board in serial.McuBoards)
-            foreach (var ioconfMap in IOconfFile.GetMap())
+            foreach (var ioconfMap in ioconf.GetMap())
                 board.TrySetMap(ioconfMap);
         }
     }

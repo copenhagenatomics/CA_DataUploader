@@ -66,7 +66,7 @@ namespace CA_DataUploaderLib
             TryReadLine = TryReadAsciiLine; //this is the default which can be changed in ReadSerial based on the ThirdPartyProtocolDetection
         }
 
-        private async static Task<MCUBoard?> Create(string name, int baudrate, bool skipBoardAutoDetection, bool enableDtrRts = true)
+        private async static Task<MCUBoard?> Create(IIOconf? ioconf, string name, int baudrate, bool skipBoardAutoDetection, bool enableDtrRts = true)
         {
             MCUBoard? board = null;
             try
@@ -85,9 +85,9 @@ namespace CA_DataUploaderLib
                 board.ProductType = "NA";
                 board.InitialConnectionSucceeded = skipBoardAutoDetection || await board.ReadSerialNumber(board.pipeReader);
 
-                if (IOconfFileLoader.FileExists())
+                if (ioconf is not null)
                 { // note that unlike the discovery at MCUBoard.OpenDeviceConnection that only considers the usb port, in here we can find the boards by the serial number too.
-                    foreach (var ioconfMap in IOconfFile.GetMap())
+                    foreach (var ioconfMap in ioconf.GetMap())
                     {
                         if (board.TrySetMap(ioconfMap))
                         {
@@ -205,18 +205,18 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        public async static Task<MCUBoard?> OpenDeviceConnection(string name)
+        public async static Task<MCUBoard?> OpenDeviceConnection(IIOconf? ioconf, string name)
         {
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
-            var map = IOconfFileLoader.FileExists() ? IOconfFile.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name) : null;
+            var map = ioconf is not null ? ioconf.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name) : null;
             var initialBaudrate = map != null && map.BaudRate != 0 ? map.BaudRate : 115200;
             var isVport = IOconfMap.IsVirtualPortName(name);
             bool skipAutoDetection = isVport || (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;
             if (skipAutoDetection)
                 CALog.LogInfoAndConsoleLn(LogID.A, $"device detection disabled for {name}({map})");
-            var mcu = await Create(name, initialBaudrate, skipAutoDetection, !isVport);
+            var mcu = await Create(ioconf, name, initialBaudrate, skipAutoDetection, !isVport);
             if (mcu == null || !mcu.InitialConnectionSucceeded)
-                mcu = await OpenWithAutoDetection(name, initialBaudrate);
+                mcu = await OpenWithAutoDetection(ioconf, name, initialBaudrate);
             if (mcu == null)
                 return null; //we normally only get here if the SerialPort(usbport) constructor failed, which might be due to a wrong port
             if (mcu.SerialNumber.IsNullOrEmpty())
@@ -257,15 +257,15 @@ namespace CA_DataUploaderLib
             return lines;
         }
 
-        private async static Task<MCUBoard?> OpenWithAutoDetection(string name, int previouslyAttemptedBaudRate)
+        private async static Task<MCUBoard?> OpenWithAutoDetection(IIOconf? ioconf, string name, int previouslyAttemptedBaudRate)
         {
             var skipAutoDetection = false;
             if (previouslyAttemptedBaudRate == 115200)
-                return await Create(name, 9600, skipAutoDetection);
+                return await Create(ioconf, name, 9600, skipAutoDetection);
             if (previouslyAttemptedBaudRate == 9600)
-                return await Create(name, 115200, skipAutoDetection);
-            var board = await Create(name, 115200, skipAutoDetection);
-            return board != null && board.InitialConnectionSucceeded ? board : await Create(name, 9600, skipAutoDetection);
+                return await Create(ioconf, name, 115200, skipAutoDetection);
+            var board = await Create(ioconf, name, 115200, skipAutoDetection);
+            return board != null && board.InitialConnectionSucceeded ? board : await Create(ioconf, name, 9600, skipAutoDetection);
         }
 
         /// <returns><c>true</c> if we were able to read</returns>

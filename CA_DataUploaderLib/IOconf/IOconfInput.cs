@@ -6,6 +6,9 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfInput : IOconfRow
     {
+        private readonly BoardSettings _boardSettings = BoardSettings.Default;
+        private IOconfMap? _map;
+
         public IOconfInput(string row, int lineNum, string type) : this(row, lineNum, type, true, BoardSettings.Default) { }
         public IOconfInput(string row, int lineNum, string type, bool parsePortRequired, BoardSettings boardSettings) : base(row, lineNum, type)
         {
@@ -14,7 +17,7 @@ namespace CA_DataUploaderLib.IOconf
             (HasPort, Skip, PortNumber) = GetPort(row, type, parsePortRequired, list);
             BoxName = list[2];
             BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
-            Map = GetMap(BoxName, boardSettings, Skip);
+            _boardSettings = boardSettings;
         }
 
         public IOconfInput(string row, int lineNum, string type, IOconfMap map, int portNumber) : base(row, lineNum, type)
@@ -26,6 +29,13 @@ namespace CA_DataUploaderLib.IOconf
             BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
         }
 
+        public override void ValidateDependencies(IIOconf ioconf)
+        {
+            if (_map is not null) return;
+
+            Map = GetMap(ioconf, BoxName, _boardSettings, Skip);
+        }
+
         public virtual bool IsSpecialDisconnectValue(double value) => false;
 
         public string BoxName { get; init; }
@@ -34,7 +44,11 @@ namespace CA_DataUploaderLib.IOconf
         public int PortNumber = 1;
 
         public bool Skip { get; init; }
-        public IOconfMap Map { get; }
+        public IOconfMap Map
+        {
+            get => _map ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
+            private set => _map = value;
+        }
         protected bool HasPort { get; }
         public string? SubsystemOverride { get; init; }
         public bool Upload { get; init; } = true;
@@ -53,9 +67,10 @@ namespace CA_DataUploaderLib.IOconf
             else
                 return (false, false, 1);
         }
-        private static IOconfMap GetMap(string boxName, BoardSettings settings, bool skipBoardSettings)
+
+        private static IOconfMap GetMap(IIOconf ioconf, string boxName, BoardSettings settings, bool skipBoardSettings)
         {
-            var maps = TestableIOconfFile.Instance.GetMap();
+            var maps = ioconf.GetMap();
             var map = maps.SingleOrDefault(x => x.BoxName == boxName) ?? 
                 throw new Exception($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
             // Map.BoardSettings == BoardSettings.Default is there since some boards need separate board settings, but have multiple sensor entries. 
@@ -67,6 +82,9 @@ namespace CA_DataUploaderLib.IOconf
 
         public class Expandable : IOconfRow
         {
+            private readonly BoardSettings _boardSettings;
+            private IOconfMap? _map;
+            
             public Expandable(string row, int lineNum, string type, bool parsePortRequired, BoardSettings boardSettings) : base(row, lineNum, type)
             {
                 Format = $"{type};Name;BoxName;[port number]";
@@ -74,13 +92,24 @@ namespace CA_DataUploaderLib.IOconf
                 (_, var skip, PortNumber) = GetPort(row, type, parsePortRequired, list);
                 if (skip)
                     throw new Exception($"{type}: unexpected skip: {row}");
-                Map = GetMap(list[2], boardSettings, false);
+                BoxName = list[2];
+                _boardSettings = boardSettings;
             }
 
-            public string BoxName => Map.BoxName;
+            public override void ValidateDependencies(IIOconf ioconf)
+            {
+                Map = GetMap(ioconf, BoxName, _boardSettings, false);
+            }
+
+            public string BoxName { get; }
             /// <summary>the 1-based port number</summary>
             public int PortNumber = 1;
-            public IOconfMap Map { get; }
+            
+            public IOconfMap Map
+            {
+                get => _map ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
+                private set => _map = value;
+            }
 
             protected IOconfInput NewInput(string name, int portNumber, string? subsystemOverride = null) => 
                 new(Row, LineNumber, Type, Map, portNumber) { Name = name, SubsystemOverride = subsystemOverride };

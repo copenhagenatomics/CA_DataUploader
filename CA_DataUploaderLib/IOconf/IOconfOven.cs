@@ -39,17 +39,17 @@ namespace CA_DataUploaderLib.IOconf
             MaxOutputPercentage = maxOutputPercentage / 100d;
         }
 
-        public override void ValidateDependencies()
+        public override void ValidateDependencies(IIOconf ioconf)
         {
             var list = ToList();
-            HeatingElement = IOconfFile.GetHeater().SingleOrDefault(x => x.Name == HeaterName) ?? throw new FormatException($"Failed to find HeatingElement: {HeaterName} for oven: {Row}");
-            var isTemp = IOconfFile.GetTemp().Any(t => t.Name == TemperatureSensorName);
-            var isMath = IOconfFile.GetMath().Any(m => m.Name == TemperatureSensorName);
-            var isFilter = IOconfFile.GetFilters().Any(f => f.NameInVector == TemperatureSensorName);
-            var isRedundancy = IOconfFile.GetEntries<Redundancy.IOconfRedundant>().Any(f => f.Name == TemperatureSensorName);
+            HeatingElement = ioconf.GetHeater().SingleOrDefault(x => x.Name == HeaterName) ?? throw new FormatException($"Failed to find HeatingElement: {HeaterName} for oven: {Row}");
+            var isTemp = ioconf.GetTemp().Any(t => t.Name == TemperatureSensorName);
+            var isMath = ioconf.GetMath().Any(m => m.Name == TemperatureSensorName);
+            var isFilter = ioconf.GetFilters().Any(f => f.NameInVector == TemperatureSensorName);
+            var isRedundancy = ioconf.GetEntries<Redundancy.IOconfRedundant>().Any(f => f.Name == TemperatureSensorName);
             if (!isTemp && !isMath && !isFilter && !isRedundancy)
                 throw new FormatException($"Failed to find sensor: {TemperatureSensorName} for oven: {Row}");
-            BoardStateSensorNames = IOconfFile.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
+            BoardStateSensorNames = ioconf.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
         }
 
         public override string UniqueKey()

@@ -5,9 +5,9 @@ namespace CA_DataUploaderLib
 {
     public class GenericSensorBox : BaseSensorBox
     {
-        public GenericSensorBox(CommandHandler cmd) : base(cmd, "Generic", IOconfFile.GetGeneric()) 
+        public GenericSensorBox(IIOconf ioconf, CommandHandler cmd) : base(cmd, "Generic", ioconf.GetGeneric()) 
         {
-            var outputs = IOconfFile.GetGenericOutputs();
+            var outputs = ioconf.GetGenericOutputs();
             foreach (var output in outputs.Where(o => o.Map.IsLocalBoard && o.Map.McuBoard != null))
                 RegisterBoardWriteActions(
                     output.Map.McuBoard!, output, output.DefaultValue, output.TargetField, (_, v) => output.GetCommand(v), output.RepeatMilliseconds);

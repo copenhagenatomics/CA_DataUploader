@@ -16,6 +16,8 @@ namespace CA_DataUploaderLib.IOconf
         public static IOconfTemp NewTypeJ(string row, int lineNum) => new(row, lineNum, TypeJName, "0.0000579530", "0.0000521360");
         //CAL portNumber,delta,coldJunctionDelta portNumber,delta,...
         static readonly string DefaultCalibrations = $"CAL {string.Join(" ", Enumerable.Range(1, 10).Select(i => $"{i},0.0000412760,0.0000407300"))}";
+        
+        private readonly string _delta, _coldJunctionDelta;
 
         private IOconfTemp(string row, int lineNum, string type, string delta, string coldJunctionDelta) : 
             base(row, lineNum, type, false, new BoardSettings() { 
@@ -38,9 +40,17 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception($"{type}: wrong port number: {row}");
             else if (PortNumber < 1 || PortNumber > 34)
                 throw new Exception($"{type}: invalid port number: {row}");
+            
+            _delta = delta;
+            _coldJunctionDelta = coldJunctionDelta;
+        }
+
+        public override void ValidateDependencies(IIOconf ioconf)
+        {
+            base.ValidateDependencies(ioconf);
 
             if (PortNumber < 11) //only ports 1 to 10 are for thermocouples
-                UpdatePortCalibration(Map.BoardSettings, delta, coldJunctionDelta, PortNumber);
+                UpdatePortCalibration(Map.BoardSettings, _delta, _coldJunctionDelta, PortNumber);
         }
 
         private static void UpdatePortCalibration(BoardSettings settings, string delta, string coldJunctionDelta, int portNumber)

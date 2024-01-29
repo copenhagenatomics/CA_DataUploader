@@ -9,25 +9,24 @@ namespace CA_DataUploaderLib
     {
         private static readonly object ControllerInitializationLock = new();
         private static SwitchBoardController? _instance;
-        private static readonly List<IOconfOut230Vac> ports = IOconfFile.GetEntries<IOconfOut230Vac>().ToList();
 
-        private SwitchBoardController(CommandHandler cmd) : base(cmd, "switchboards",
-            ports.SelectMany(p => p.GetExpandedInputConf())
-            .Concat(ports.GroupBy(p => p.BoxName).Select(g => g.First().GetBoardTemperatureInputConf()))
-            .Concat(IOconfFile.GetEntries<IOconfSwitchboardSensor>().SelectMany(i => i.GetExpandedConf())))
+        private SwitchBoardController(IIOconf ioconf, CommandHandler cmd) : base(cmd, "switchboards",
+            ioconf.GetEntries<IOconfOut230Vac>().SelectMany(p => p.GetExpandedInputConf())
+            .Concat(ioconf.GetEntries<IOconfOut230Vac>().GroupBy(p => p.BoxName).Select(g => g.First().GetBoardTemperatureInputConf()))
+            .Concat(ioconf.GetEntries<IOconfSwitchboardSensor>().SelectMany(i => i.GetExpandedConf())))
         {
             //we ignore remote boards and boards missing during the start sequence (as we don't have auto reconnect logic yet for those). Note the BaseSensorBox already reports the missing local boards.
-            foreach (var port in ports.Where(p => p.Map.IsLocalBoard && p.Map.McuBoard != null))
+            foreach (var port in ioconf.GetEntries<IOconfOut230Vac>().Where(p => p.Map.IsLocalBoard && p.Map.McuBoard != null))
                 RegisterBoardWriteActions(port.Map.McuBoard!, port, 0, port.Name + "_onoff", GetCommand);
 
             static string GetCommand(int portNumber, double target) => target > 0.0 ? $"p{portNumber} on 3 {target:0%}" : $"p{portNumber} off";
         }
 
-        public static void Initialize(CommandHandler cmd)
+        public static void Initialize(IIOconf ioconf, CommandHandler cmd)
         {
             if (_instance != null) return;
             lock (ControllerInitializationLock)
-                _instance ??= new SwitchBoardController(cmd);
+                _instance ??= new SwitchBoardController(ioconf, cmd);
         }
     }
 }

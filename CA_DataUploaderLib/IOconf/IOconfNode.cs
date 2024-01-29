@@ -12,10 +12,7 @@ namespace CA_DataUploaderLib.IOconf
     public class IOconfNode : IOconfRow
     {
         private readonly IPEndPoint? _endPoint;
-
-        private static readonly Lazy<IOconfNode> _singleNode = new(() => 
-            new IOconfNode(TestableIOconfFile.Instance.GetLoopName()) { IsCurrentSystem = true, IsUploader = true }
-        );
+        private static IOconfNode? _singleNode;
         private static byte _nodeInstances;
 
         public IOconfNode(string row, int lineNum) : base(row, lineNum, "Node")
@@ -39,7 +36,8 @@ namespace CA_DataUploaderLib.IOconf
 
         /// <summary>resets the node instance count used to determine the node index, used for testing purposes</summary>
         public static void ResetNodeIndexCount() => _nodeInstances = 0;
-        public static IOconfNode SingleNode => _singleNode.Value;
+        public static IOconfNode GetSingleNode(string loopName) => _singleNode ??= new IOconfNode(loopName) { IsCurrentSystem = true, IsUploader = true };
+
         public IPEndPoint EndPoint => _endPoint ?? throw new InvalidOperationException($"Endpoint is only supported when running with distributed configuration");
         public bool IsCurrentSystem { get; set; }
         /// <summary>position of the node in the config (starting at 0)</summary>
