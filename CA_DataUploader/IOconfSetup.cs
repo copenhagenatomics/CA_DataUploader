@@ -10,7 +10,7 @@ namespace CA_DataUploader
 {
     public class IOconfSetup
     {
-        public static string UpdateIOconf(IIOconf ioconf, SerialNumberMapper serial)
+        public static void UpdateIOconf(SerialNumberMapper serial)
         {
             var mcuList = serial.McuBoards.Where(x => x.SerialNumber?.StartsWith("unknown") != true);
             if (!mcuList.Any())
@@ -26,13 +26,7 @@ namespace CA_DataUploader
                 var answer = Console.ReadLine() ?? throw new NotSupportedException("failed to answer from console input");
                 if (answer.ToLower().StartsWith("y"))
                 {
-                    if (lines.Any(x => x.StartsWith("Account")))
-                    {
-                        var user = lines.First(x => x.StartsWith("Account")).Split(";".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).ToList();
-                        return user[2].Trim(); // return the email address. 
-                    }
-
-                    return "";
+                    return;
                 }
             }
 
@@ -88,7 +82,7 @@ namespace CA_DataUploader
 
             File.Delete("IO.conf");
             File.WriteAllLines("IO.conf", lines);
-            ReloadIOconf(ioconf, serial);
+            ReloadIOconf(serial);
 
             if (mcuList.Count() > 1)
             {
@@ -97,8 +91,6 @@ namespace CA_DataUploader
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 DULutil.OpenUrl("https://github.com/copenhagenatomics/CA_DataUploader/wiki/IO.conf-documentation");
             }
-
-            return email;
         }
 
         private static bool IsValidEmail(string email)
@@ -131,11 +123,11 @@ namespace CA_DataUploader
             return true;
         }
 
-        private static void ReloadIOconf(IIOconf ioconf, SerialNumberMapper serial)
+        private static void ReloadIOconf(SerialNumberMapper serial)
         {
-            ioconf.Reload();
+            IOconfFile.Instance.Reload();
             foreach (var board in serial.McuBoards)
-            foreach (var ioconfMap in ioconf.GetMap())
+            foreach (var ioconfMap in IOconfFile.Instance.GetMap())
                 board.TrySetMap(ioconfMap);
         }
     }

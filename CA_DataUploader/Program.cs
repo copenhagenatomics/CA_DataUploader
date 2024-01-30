@@ -19,11 +19,11 @@ namespace CA_DataUploader
         {
             try
             {
-                var ioconf = IOconfFile.Instance;
-                CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud", ioconf.GetOutputLevel()));
+                var loglevel = IOconfFileLoader.FileExists() ? IOconfFile.Instance.GetOutputLevel() : IOconfLoopName.Default.LogLevel;
+                CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud", loglevel));
                 Console.WriteLine("Initializing...");
                 Redundancy.RegisterSystemExtensions();
-                var serial = new SerialNumberMapper(ioconf);
+                var serial = new SerialNumberMapper(null);
                 await serial.DetectDevices();
 
                 if (args.Length > 0 && args[0] == "-listdevices")
@@ -32,8 +32,9 @@ namespace CA_DataUploader
                 // close all ports which are not Hub10
                 serial.McuBoards.OfType<MCUBoard>().Where(x => x.ProductType?.Contains("Temperature") != true && x.ProductType?.Contains("Hub10STM") != true).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
 
-                var email = IOconfSetup.UpdateIOconf(ioconf, serial);
+                IOconfSetup.UpdateIOconf(serial);
 
+                var ioconf = IOconfFile.Instance;
                 using var cmd = new CommandHandler(ioconf, serial);
                 var cloud = new ServerUploader(ioconf, cmd);
                 _ = new Redundancy(ioconf, cmd);
