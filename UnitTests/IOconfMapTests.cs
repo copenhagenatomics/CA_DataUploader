@@ -1,5 +1,6 @@
 ﻿using CA_DataUploaderLib.IOconf;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using System;
 
 namespace UnitTests
@@ -50,6 +51,66 @@ namespace UnitTests
         public void ValidName(string name)
         {
             _ = new IOconfMap($"Map; anything_goes_here; {name}", 0);
+        }
+
+        [TestMethod]
+        public void ValidateDependencies_WhenNodeNameIsNotSpecifiedForSinglePiSystem_DistributedNodeGetsUpdated()
+        {
+            // Arrange
+            var ioConfMock = new Mock<IIOconf>();
+            ioConfMock.Setup(x => x.GetLoopName()).Returns("TestLoop");
+            var mapline = new IOconfMap($"Map; 1234567890; MiscBox", 1);
+
+            // Act
+            mapline.ValidateDependencies(ioConfMock.Object);
+
+            // Assert
+            Assert.AreEqual("TestLoop", mapline.DistributedNode.Name);
+        }
+
+        [TestMethod]
+        public void ValidateDependencies_WhenNodeNameIsSpecifiedForDistributedSystem_DistributedNodeGetsUpdated()
+        {
+            // Arrange
+            var nodeLine = new IOconfNode("Node; pi42; 192.168.100.42", 0);
+            var ioConfMock = new Mock<IIOconf>();
+            ioConfMock.Setup(x => x.GetLoopName()).Returns("TestLoop");
+            ioConfMock.Setup(x => x.GetEntries<IOconfNode>()).Returns(new[] { nodeLine });
+            var mapline = new IOconfMap($"Map; 1234567890; MiscBox; pi42", 1);
+
+            // Act
+            mapline.ValidateDependencies(ioConfMock.Object);
+
+            // Assert
+            Assert.AreEqual(nodeLine, mapline.DistributedNode);
+        }
+
+        [TestMethod]
+        public void ValidateDependencies_WhenNodeNamePointsToSomethingNonExistent_AnExceptionIsThrown()
+        {
+            // Arrange
+            var ioConfMock = new Mock<IIOconf>();
+            ioConfMock.Setup(x => x.GetLoopName()).Returns("TestLoop");
+            ioConfMock.Setup(x => x.GetEntries<IOconfNode>()).Returns(new[] { new IOconfNode("Node; pi42; 192.168.100.42", 0) });
+            var mapline = new IOconfMap($"Map; 1234567890; MiscBox; pi42incorrect", 1);
+
+            // Act + Assert
+            var ex = Assert.ThrowsException<Exception>(() => mapline.ValidateDependencies(ioConfMock.Object));
+            Assert.IsTrue(ex.Message.StartsWith($"Failed to find node in configuration for Map"), ex.Message);
+
+        }
+
+        [TestMethod]
+        public void ValidateDependencies_WhenNodeNameIsNotSpecifiedForDistributedSystem_AnExceptionIsThrown()
+        {
+            // Arrange
+            var ioConfMock = new Mock<IIOconf>();
+            ioConfMock.Setup(x => x.GetEntries<IOconfNode>()).Returns(new[] { new IOconfNode("Node; pi42; 192.168.100.42", 0) });
+            var mapline = new IOconfMap($"Map; 1234567890; MiscBox", 1);
+
+            // Act + Assert
+            var ex = Assert.ThrowsException<Exception>(() => mapline.ValidateDependencies(ioConfMock.Object));
+            Assert.IsTrue(ex.Message.StartsWith($"The node name is not optional for distributed deployments"), ex.Message);
         }
     }
 }
