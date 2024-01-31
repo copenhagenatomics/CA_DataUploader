@@ -11,7 +11,7 @@ namespace CA_DataUploaderLib
     {
         private readonly IIOconf? ioconf;
 
-        private static List<Func<string, Board?>> CustomDetections { get; } = new();
+        private static List<Func<IIOconf?, string, Board?>> CustomDetections { get; } = new();
         public List<Board> McuBoards { get; } = new();
 
         public SerialNumberMapper(IIOconf? ioconf)
@@ -38,13 +38,13 @@ namespace CA_DataUploaderLib
         /// 
         /// An alternative for boards with a terminal like interface, supported by <see cref="BaseSensorBox"/>, is to use <see cref="MCUBoard.AddCustomProtocol(MCUBoard.CustomProtocolDetectionDelegate)"/>.
         /// </remarks>
-        public static void RegisterCustomDetection(Func<string, Board?> detectionFunction) => CustomDetections.Add(detectionFunction);
+        public static void RegisterCustomDetection(Func<IIOconf?, string, Board?> detectionFunction) => CustomDetections.Add(detectionFunction);
         private static async Task<Board?> AttemptToOpenDeviceConnection(IIOconf? ioconf, string name)
         {
             try
             {
                 foreach (var detection in CustomDetections)
-                    if (detection(name) is Board board)
+                    if (detection(ioconf, name) is Board board)
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, board.ToString());
                         return board;
