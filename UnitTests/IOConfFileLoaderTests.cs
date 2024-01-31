@@ -5,7 +5,7 @@ using System.Linq;
 namespace UnitTests
 {
     [TestClass]
-    public class IOConfFileLoaderTests
+    public class IOconfFileLoaderTests
     {
         [TestMethod]
         public void CanLoadAccountLine()
@@ -61,7 +61,7 @@ namespace UnitTests
         [TestMethod]
         public void CanLoadCustomConfigWithoutMixingPrefix()
         {
-            IOconfFileLoader.AddLoader("Mathing", (row, lineIndex) => new IOConfMathing(row, lineIndex));
+            IOconfFileLoader.Loader.AddLoader("Mathing", (row, lineIndex) => new IOConfMathing(row, lineIndex));
             var rowsEnum = IOconfFileLoader.ParseLines(new[] { "Mathing;mymath;heater1 + 5" });
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);

@@ -16,12 +16,12 @@ namespace CA_DataUploaderLib
             SwitchBoardController.Initialize(ioconf, cmd);
         }
 
-        public static void RegisterSystemExtensions()
+        public static void RegisterSystemExtensions(IIOconfLoader loader)
         {
-            IOconfFileLoader.AddLoader(IOconfRedundantSensors.RowType, (row, lineNumber) => new IOconfRedundantSensors(row, lineNumber));
-            IOconfFileLoader.AddLoader(IOconfRedundantValidRange.RowType, (row, lineNumber) => new IOconfRedundantValidRange(row, lineNumber));
-            IOconfFileLoader.AddLoader(IOconfRedundantInvalidDefault.RowType, (row, lineNumber) => new IOconfRedundantInvalidDefault(row, lineNumber));
-            IOconfFileLoader.AddLoader(IOconfRedundantStrategy.RowType, (row, lineNumber) => new IOconfRedundantStrategy(row, lineNumber));
+            loader.AddLoader(IOconfRedundantSensors.RowType, (row, lineNumber) => new IOconfRedundantSensors(row, lineNumber));
+            loader.AddLoader(IOconfRedundantValidRange.RowType, (row, lineNumber) => new IOconfRedundantValidRange(row, lineNumber));
+            loader.AddLoader(IOconfRedundantInvalidDefault.RowType, (row, lineNumber) => new IOconfRedundantInvalidDefault(row, lineNumber));
+            loader.AddLoader(IOconfRedundantStrategy.RowType, (row, lineNumber) => new IOconfRedundantStrategy(row, lineNumber));
         }
 
         public enum RedundancyStrategy { Median, Max, Min, Average }

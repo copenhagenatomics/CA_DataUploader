@@ -22,8 +22,8 @@ namespace CA_DataUploader
                 var loglevel = IOconfFileLoader.FileExists() ? IOconfFile.Instance.GetOutputLevel() : IOconfLoopName.Default.LogLevel;
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud", loglevel));
                 Console.WriteLine("Initializing...");
-                Redundancy.RegisterSystemExtensions();
-                var serial = new SerialNumberMapper(null);
+                Redundancy.RegisterSystemExtensions(IOconfFileLoader.Loader);
+                var serial = new SerialNumberMapper(IOconfFileLoader.FileExists() ? IOconfFile.Instance : null);
                 await serial.DetectDevices();
 
                 if (args.Length > 0 && args[0] == "-listdevices")

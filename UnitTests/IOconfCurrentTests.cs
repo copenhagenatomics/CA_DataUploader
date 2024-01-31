@@ -14,38 +14,19 @@ namespace UnitTests
         private readonly string portName = RpiVersion.IsWindows() ? "COM3" : "USB1-2-3";
         private readonly string portPrefix = RpiVersion.IsWindows() ? "" : "/dev/";
 
-        [TestMethod]
-        public void BoardWithoutCalibrationDoesNotGetUpdated()
+        [DataRow(null)]
+        [DataRow("Old")]
+        [DataTestMethod]
+        public void BoardWithoutSupportedCalibrationDoesNotGetUpdatedAndGetsDisconnected(string? boardCalibration)
         {
             // Arrange
             var mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0);
-            var ioConfMock = GenereateIOconfMock(mapLine);
-            mapLine.ValidateDependencies(ioConfMock);
+            var ioConfMock = GenerateIOconfMock(mapLine);
             var loadSideRating = 300;
-            string? boardCalibration = null;
 
             // Act
             var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
-            ioConf.ValidateDependencies(ioConfMock);
-            mapLine.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
-
-            // Assert
-            Assert.IsNull(mapLine!.BoardSettings.Calibration);
-        }
-
-
-        [TestMethod]
-        public void BoardNotSupportingCalibrationDoesNotGetUpdatedAndGetsDisconnected()
-        {
-            // Arrange
-            var mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0);
-            var ioConfMock = GenereateIOconfMock(mapLine);
             mapLine.ValidateDependencies(ioConfMock);
-            var loadSideRating = 300;
-            string? boardCalibration = "Old";
-
-            // Act
-            var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
             ioConf.ValidateDependencies(ioConfMock);
             mapLine.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
 
@@ -60,13 +41,13 @@ namespace UnitTests
         {
             // Arrange
             var mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0);
-            var ioConfMock = GenereateIOconfMock(mapLine);
-            mapLine.ValidateDependencies(ioConfMock);
+            var ioConfMock = GenerateIOconfMock(mapLine);
             var loadSideRating = 150;
             string? boardCalibration = "CAL 1,60.000000,0 2,60.000000,0 3,60.000000,0";
 
             // Act
             var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
+            mapLine.ValidateDependencies(ioConfMock);
             ioConf.ValidateDependencies(ioConfMock);
             mapLine.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
 
@@ -82,14 +63,14 @@ namespace UnitTests
         {
             // Arrange
             var mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0);
-            var ioConfMock = GenereateIOconfMock(mapLine);
-            mapLine.ValidateDependencies(ioConfMock);
+            var ioConfMock = GenerateIOconfMock(mapLine);
             var loadSideRating = 150;
             var meterSideRating = 2;
             string? boardCalibration = "CAL 1,60.000000,0 2,60.000000,0 3,60.000000,0";
 
             // Act
             var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}; {meterSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
+            mapLine.ValidateDependencies(ioConfMock);
             ioConf.ValidateDependencies(ioConfMock);
             mapLine.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
 
@@ -158,7 +139,7 @@ namespace UnitTests
             }
         }
 
-        private static IIOconf GenereateIOconfMock(IOconfMap mapLine)
+        private static IIOconf GenerateIOconfMock(IOconfMap mapLine)
         {
             var ioConfMock = new Mock<IIOconf>();
             ioConfMock.Setup(x => x.GetLoopName()).Returns("TestLoop");

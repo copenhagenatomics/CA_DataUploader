@@ -24,7 +24,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public void Reload()
         {
-            // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization / static ctor rejects the custom entries.
+            // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization rejects the custom entries.
             Table.Clear();
             var (rawLines, entries) = IOconfFileLoader.Load();
             Table.AddRange(entries);
@@ -83,7 +83,7 @@ namespace CA_DataUploaderLib.IOconf
         public IEnumerable<IOconfInput> GetInputs() => GetEntries<IOconfInput>();
         public IEnumerable<T> GetEntries<T>() => Table.OfType<T>();
         public string GetRawFile() => string.Join(Environment.NewLine, RawLines);
-        ///<remr filters and math it returs the board state of all their sources.</remarks>
+        ///<remarks> filters and math it returns the board state of all their sources.</remarks>
         public IEnumerable<string> GetBoardStateNames(string sensor)
         {
             var sensorsChecked = new HashSet<string>();

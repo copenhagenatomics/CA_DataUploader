@@ -26,6 +26,8 @@ namespace CA_DataUploaderLib.IOconf
             })
         {
             Format = $"{type};Name;BoxName;[port number];[skip/all]";
+            _delta = delta;
+            _coldJunctionDelta = coldJunctionDelta;
 
             var list = ToList();
             AllJunction = false;
@@ -40,9 +42,6 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception($"{type}: wrong port number: {row}");
             else if (PortNumber < 1 || PortNumber > 34)
                 throw new Exception($"{type}: invalid port number: {row}");
-            
-            _delta = delta;
-            _coldJunctionDelta = coldJunctionDelta;
         }
 
         public override void ValidateDependencies(IIOconf ioconf)
