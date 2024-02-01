@@ -9,17 +9,19 @@ namespace CA_DataUploaderLib
 {
     public sealed class SerialNumberMapper
     {
-        private static List<Func<string, Board?>> CustomDetections { get; } = new();
+        private readonly IIOconf? ioconf;
+
+        private static List<Func<IIOconf?, string, Board?>> CustomDetections { get; } = new();
         public List<Board> McuBoards { get; } = new();
 
-        public SerialNumberMapper()
+        public SerialNumberMapper(IIOconf? ioconf)
         {
+            this.ioconf = ioconf;
         }
 
         public async Task DetectDevices()
         {
-            var logLevel = IOconfFileLoader.FileExists() ? IOconfFile.GetOutputLevel() : CALogLevel.Normal;
-            var boards = await Task.WhenAll(MCUBoard.GetUSBports().Select(name => AttemptToOpenDeviceConnection(name, logLevel)));
+            var boards = await Task.WhenAll(MCUBoard.GetUSBports().Select(name => AttemptToOpenDeviceConnection(ioconf, name)));
             McuBoards.AddRange(boards.OfType<Board>());
         }
 
@@ -36,25 +38,25 @@ namespace CA_DataUploaderLib
         /// 
         /// An alternative for boards with a terminal like interface, supported by <see cref="BaseSensorBox"/>, is to use <see cref="MCUBoard.AddCustomProtocol(MCUBoard.CustomProtocolDetectionDelegate)"/>.
         /// </remarks>
-        public static void RegisterCustomDetection(Func<string, Board?> detectionFunction) => CustomDetections.Add(detectionFunction);
-        private static async Task<Board?> AttemptToOpenDeviceConnection(string name, CALogLevel logLevel)
+        public static void RegisterCustomDetection(Func<IIOconf?, string, Board?> detectionFunction) => CustomDetections.Add(detectionFunction);
+        private static async Task<Board?> AttemptToOpenDeviceConnection(IIOconf? ioconf, string name)
         {
             try
             {
                 foreach (var detection in CustomDetections)
-                    if (detection(name) is Board board)
+                    if (detection(ioconf, name) is Board board)
                     {
                         CALog.LogInfoAndConsoleLn(LogID.A, board.ToString());
                         return board;
                     }
-                var mcu = await MCUBoard.OpenDeviceConnection(name);
+                var mcu = await MCUBoard.OpenDeviceConnection(ioconf, name);
                 if (mcu == null)
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}");
                     return default;
                 }
 
-                string logline = logLevel == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
+                string logline = ioconf?.GetOutputLevel() == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
                 Console.WriteLine(logline);      // Always write this in the console
                 CALog.LogData(LogID.A, logline); // + local log, but don't send it to the event log.
                 return mcu;

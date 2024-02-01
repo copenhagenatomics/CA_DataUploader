@@ -11,20 +11,20 @@ namespace CA_DataUploaderLib
 {
     public sealed class HeatingController
     {
-        public HeatingController(CommandHandler cmd)
+        public HeatingController(IIOconf ioconf, CommandHandler cmd)
         {
-            var heatersConfigs = IOconfFile.GetHeater().ToList();
+            var heatersConfigs = ioconf.GetHeater().ToList();
             if (!heatersConfigs.Any())
                 return;
 
-            var ovens = IOconfFile.GetOven().ToList();
-            var allAreas = IOconfFile.GetOven().Select(x => x.OvenArea).Distinct();
-            var ovenProportionalControlUpdatesConf = IOconfFile.GetEntries<IOconfOvenProportionalControlUpdates>().SingleOrDefault();
+            var ovens = ioconf.GetOven().ToList();
+            var allAreas = ioconf.GetOven().Select(x => x.OvenArea).Distinct();
+            var ovenProportionalControlUpdatesConf = ioconf.GetEntries<IOconfOvenProportionalControlUpdates>().SingleOrDefault();
 
             //notice that the decisions states and outputs are handled by the registered decisions, while the switchboard inputs and actuations are handled by the switchboard controller
             cmd.AddDecisions(allAreas.Select(a => new OvenAreaDecision(new($"ovenarea{a}", a, ovenProportionalControlUpdatesConf))).ToList());
             cmd.AddDecisions(heatersConfigs.Select(h => new HeaterDecision(h, ovens.SingleOrDefault(x => x.HeatingElement.Name == h.Name))).ToList());
-            SwitchBoardController.Initialize(cmd);
+            SwitchBoardController.Initialize(ioconf, cmd);
         }
 
         public class HeaterDecision : LoopControlDecision

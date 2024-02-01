@@ -6,12 +6,15 @@ using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public static class IOconfFile
+    public class IOconfFile : IIOconf
     {
-        private static readonly List<IOconfRow> Table = new();
-        public static List<string> RawLines { get; private set; } = new();
+        private readonly List<IOconfRow> Table = new();
+        public List<string> RawLines { get; private set; } = new();
 
-        static IOconfFile()
+        private static readonly Lazy<IOconfFile> lazy = new(() => new IOconfFile());
+        public static IIOconf Instance => lazy.Value;
+
+        public IOconfFile()
         {
             if (!Table.Any())
             {
@@ -19,18 +22,18 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        public static void Reload()
-        { 
-            // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization / static ctor rejects the custom entries.
+        public void Reload()
+        {
+            // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization rejects the custom entries.
             Table.Clear();
             var (rawLines, entries) = IOconfFileLoader.Load();
             Table.AddRange(entries);
             RawLines = rawLines;
-            Table.ForEach(e => e.ValidateDependencies());
+            Table.ForEach(e => e.ValidateDependencies(this));
             CheckRules();
         }
 
-        private static void CheckRules()
+        private void CheckRules()
         {
             // no two rows can have the same type,name combination. 
             var groups = Table.GroupBy(x => x.UniqueKey());
@@ -39,13 +42,13 @@ namespace CA_DataUploaderLib.IOconf
 
             // no heater can be in several oven areas
             var heaters = GetOven().Where(x => x.OvenArea > 0).GroupBy(x => x.HeatingElement);
-            foreach(var heater in heaters.Where(x => x.Select(y => y.OvenArea).Distinct().Count() > 1))
+            foreach (var heater in heaters.Where(x => x.Select(y => y.OvenArea).Distinct().Count() > 1))
                 CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Heater: {heater.Key.Name} occurred in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}");
         }
 
-        private static IOconfLoopName GetLoopConfig() => GetEntries<IOconfLoopName>().SingleOrDefault() ?? IOconfLoopName.Default;
+        private IOconfLoopName GetLoopConfig() => GetEntries<IOconfLoopName>().SingleOrDefault() ?? IOconfLoopName.Default;
 
-        public static ConnectionInfo GetConnectionInfo()
+        public ConnectionInfo GetConnectionInfo()
         {
             try
             {
@@ -59,33 +62,34 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        public static string GetLoopName() => GetLoopConfig().Name;
-        public static string GetLoopServer() => GetLoopConfig().Server;
-        public static int GetVectorUploadDelay() => GetEntries<IOconfSamplingRates>().SingleOrDefault()?.VectorUploadDelay ?? 1000;
-        public static int GetMainLoopDelay() => GetEntries<IOconfSamplingRates>().SingleOrDefault()?.MainLoopDelay ?? 200;
-        public static CALogLevel GetOutputLevel() => GetLoopConfig().LogLevel;
-        public static IEnumerable<IOconfMap> GetMap() => GetEntries<IOconfMap>();
-        public static IEnumerable<IOconfGeneric> GetGeneric()  => GetEntries<IOconfGeneric>();
-        public static IEnumerable<IOconfGenericOutput> GetGenericOutputs() => GetEntries<IOconfGenericOutput>();
-        public static IEnumerable<IOconfTemp> GetTemp() => GetEntries<IOconfTemp>();
-        public static IOconfRPiTemp GetRPiTemp() => GetEntries<IOconfRPiTemp>().SingleOrDefault() ?? IOconfRPiTemp.Default;
-        public static IEnumerable<IOconfHeater> GetHeater() => GetEntries<IOconfHeater>();
-        public static IEnumerable<IOconfOven> GetOven() => GetEntries<IOconfOven>();
-        public static IEnumerable<IOconfAlert> GetAlerts()=> GetEntries<IOconfAlert>();
-        public static IEnumerable<IOconfMath> GetMath() => GetEntries<IOconfMath>();
-        public static IEnumerable<IOconfFilter> GetFilters() => GetEntries<IOconfFilter>();
-        public static IEnumerable<IOconfOutput> GetOutputs() => GetEntries<IOconfOutput>();
-        public static IEnumerable<IOconfState> GetStates() => GetEntries<IOconfState>();
-        public static IEnumerable<IOconfInput> GetInputs() => GetEntries<IOconfInput>();
-        public static IEnumerable<T> GetEntries<T>() => Table.OfType<T>();
-        public static string GetRawFile() => string.Join(Environment.NewLine, RawLines);
-        ///<remarks>for filters and math it returs the board state of all their sources.</remarks>
-        public static IEnumerable<string> GetBoardStateNames(string sensor)
+        public string GetLoopName() => GetLoopConfig().Name;
+        public string GetLoopServer() => GetLoopConfig().Server;
+
+        public int GetVectorUploadDelay() => GetEntries<IOconfSamplingRates>().SingleOrDefault()?.VectorUploadDelay ?? 1000;
+        public int GetMainLoopDelay() => GetEntries<IOconfSamplingRates>().SingleOrDefault()?.MainLoopDelay ?? 200;
+        public CALogLevel GetOutputLevel() => GetLoopConfig().LogLevel;
+        public IEnumerable<IOconfMap> GetMap() => GetEntries<IOconfMap>();
+        public IEnumerable<IOconfGeneric> GetGeneric() => GetEntries<IOconfGeneric>();
+        public IEnumerable<IOconfGenericOutput> GetGenericOutputs() => GetEntries<IOconfGenericOutput>();
+        public IEnumerable<IOconfTemp> GetTemp() => GetEntries<IOconfTemp>();
+        public IOconfRPiTemp GetRPiTemp() => GetEntries<IOconfRPiTemp>().SingleOrDefault() ?? IOconfRPiTemp.Default;
+        public IEnumerable<IOconfHeater> GetHeater() => GetEntries<IOconfHeater>();
+        public IEnumerable<IOconfOven> GetOven() => GetEntries<IOconfOven>();
+        public IEnumerable<IOconfAlert> GetAlerts() => GetEntries<IOconfAlert>();
+        public IEnumerable<IOconfMath> GetMath() => GetEntries<IOconfMath>();
+        public IEnumerable<IOconfFilter> GetFilters() => GetEntries<IOconfFilter>();
+        public IEnumerable<IOconfOutput> GetOutputs() => GetEntries<IOconfOutput>();
+        public IEnumerable<IOconfState> GetStates() => GetEntries<IOconfState>();
+        public IEnumerable<IOconfInput> GetInputs() => GetEntries<IOconfInput>();
+        public IEnumerable<T> GetEntries<T>() => Table.OfType<T>();
+        public string GetRawFile() => string.Join(Environment.NewLine, RawLines);
+        ///<remarks> filters and math it returns the board state of all their sources.</remarks>
+        public IEnumerable<string> GetBoardStateNames(string sensor)
         {
             var sensorsChecked = new HashSet<string>();
             return GetBoardStateNamesForSensors(new[] { sensor }, sensorsChecked);
 
-            static IEnumerable<string> GetBoardStateNamesForSensors(IEnumerable<string> sensors, HashSet<string> sensorsChecked)
+            IEnumerable<string> GetBoardStateNamesForSensors(IEnumerable<string> sensors, HashSet<string> sensorsChecked)
             {
                 var newSensors = sensors.ToHashSet();
                 newSensors.ExceptWith(sensorsChecked);

@@ -1,6 +1,7 @@
 ﻿using CA_DataUploaderLib;
 using CA_DataUploaderLib.IOconf;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using System;
 using System.Globalization;
 
@@ -13,36 +14,21 @@ namespace UnitTests
         private readonly string portName = RpiVersion.IsWindows() ? "COM3" : "USB1-2-3";
         private readonly string portPrefix = RpiVersion.IsWindows() ? "" : "/dev/";
 
-        [TestMethod]
-        public void BoardWithoutCalibrationDoesNotGetUpdated()
+        [DataRow(null)]
+        [DataRow("Old")]
+        [DataTestMethod]
+        public void BoardWithoutSupportedCalibrationDoesNotGetUpdatedAndGetsDisconnected(string? boardCalibration)
         {
             // Arrange
-            IOconfMap? mapLine = null;
-            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0) } });
+            var mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0);
+            var ioConfMock = GenerateIOconfMock(mapLine);
             var loadSideRating = 300;
-            string? boardCalibration = null;
 
             // Act
             var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
-            mapLine!.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
-
-            // Assert
-            Assert.IsNull(mapLine!.BoardSettings.Calibration);
-        }
-
-
-        [TestMethod]
-        public void BoardNotSupportingCalibrationDoesNotGetUpdatedAndGetsDisconnected()
-        {
-            // Arrange
-            IOconfMap? mapLine = null;
-            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0) } });
-            var loadSideRating = 300;
-            string? boardCalibration = "Old";
-
-            // Act
-            var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
-            mapLine!.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
+            mapLine.ValidateDependencies(ioConfMock);
+            ioConf.ValidateDependencies(ioConfMock);
+            mapLine.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
 
             // Assert
             Assert.IsNull(mapLine!.BoardSettings.Calibration);
@@ -54,14 +40,16 @@ namespace UnitTests
         public void BoardCalibrationGetsUpdated()
         {
             // Arrange
-            IOconfMap? mapLine = null;
-            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0) } });
+            var mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0);
+            var ioConfMock = GenerateIOconfMock(mapLine);
             var loadSideRating = 150;
             string? boardCalibration = "CAL 1,60.000000,0 2,60.000000,0 3,60.000000,0";
 
             // Act
             var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
-            mapLine!.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
+            mapLine.ValidateDependencies(ioConfMock);
+            ioConf.ValidateDependencies(ioConfMock);
+            mapLine.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
 
             // Assert
             var decimalDigits = new NumberFormatInfo() { NumberDecimalDigits = 6 };
@@ -74,15 +62,17 @@ namespace UnitTests
         public void BoardCalibrationWithCustomMeterSideRatingGetsUpdated()
         {
             // Arrange
-            IOconfMap? mapLine = null;
-            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0) } });
+            var mapLine = new IOconfMap($"Map; {portName}; {boxName}", 0);
+            var ioConfMock = GenerateIOconfMock(mapLine);
             var loadSideRating = 150;
             var meterSideRating = 2;
             string? boardCalibration = "CAL 1,60.000000,0 2,60.000000,0 3,60.000000,0";
 
             // Act
             var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}; {meterSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
-            mapLine!.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
+            mapLine.ValidateDependencies(ioConfMock);
+            ioConf.ValidateDependencies(ioConfMock);
+            mapLine.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
 
             // Assert
             var decimalDigits = new NumberFormatInfo() { NumberDecimalDigits = 6 };
@@ -94,9 +84,6 @@ namespace UnitTests
         [TestMethod]
         public void LoadSideRatingHasToBeSpecified()
         {
-            // Arrange
-            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { new IOconfMap($"Map; {portName}; {boxName}", 0) } });
-
             // Act + Assert
             var ex = Assert.ThrowsException<FormatException>(() => new IOconfCurrent($"Current; myCurrent; {boxName}; 2;  // <- no value here", 0));
             Assert.IsTrue(ex.Message.Contains("wrong format"), "missing expected part of the exception message");
@@ -114,13 +101,10 @@ namespace UnitTests
         [DataTestMethod]
         public void LoadSideRatingHasToBeAValidNumber(string input, bool valid)
         {
-            // Arrange
-            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { new IOconfMap($"Map; {portName}; {boxName}", 0) } });
-
             // Act + Assert
             if (valid)
             {
-                new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {input}", 0);
+                _ = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {input}", 0);
             }
             else
             {
@@ -143,13 +127,10 @@ namespace UnitTests
         [DataTestMethod]
         public void MeterSideRatingHasToBeAValidNumberWhenSpecified(string input, bool valid)
         {
-            // Arrange
-            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { new IOconfMap($"Map; {portName}; {boxName}", 0) } });
-
             // Act + Assert
             if (valid)
             {
-                new IOconfCurrent($"Current; myCurrent; {boxName}; 2; 300; {input}", 0);
+                _ = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; 300; {input}", 0);
             }
             else
             {
@@ -158,6 +139,13 @@ namespace UnitTests
             }
         }
 
+        private static IIOconf GenerateIOconfMock(IOconfMap mapLine)
+        {
+            var ioConfMock = new Mock<IIOconf>();
+            ioConfMock.Setup(x => x.GetLoopName()).Returns("TestLoop");
+            ioConfMock.Setup(x => x.GetMap()).Returns(new[] { mapLine });
+            return ioConfMock.Object;
+        }
 
         private class TestBoard : Board
         {

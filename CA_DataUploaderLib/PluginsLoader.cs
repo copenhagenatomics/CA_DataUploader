@@ -12,10 +12,12 @@ namespace CA_DataUploaderLib
     public class PluginsLoader
     { // see https://docs.microsoft.com/en-us/dotnet/core/tutorials/creating-app-with-plugin-support
         private readonly string targetFolder;
+        private readonly IIOconf ioconf;
         readonly CommandHandler handler;
 
-        public PluginsLoader(CommandHandler handler, string targetFolder = "plugins")
+        public PluginsLoader(IIOconf ioconf, CommandHandler handler, string targetFolder = "plugins")
         {
+            this.ioconf = ioconf;
             this.handler = handler;
             this.targetFolder = targetFolder;
         }
@@ -49,9 +51,9 @@ namespace CA_DataUploaderLib
             return (context, context.LoadFromStream(fs));
         }
 
-        static IEnumerable<T> CreateInstances<T>(Assembly assembly, params object[] args)
+        IEnumerable<T> CreateInstances<T>(Assembly assembly, params object[] args)
         {
-            var confDecisions = IOconfFile.GetEntries<IOconfCode>();
+            var confDecisions = ioconf.GetEntries<IOconfCode>();
             foreach (Type type in assembly.GetTypes())
             {
                 if (!typeof(T).IsAssignableFrom(type)) continue;

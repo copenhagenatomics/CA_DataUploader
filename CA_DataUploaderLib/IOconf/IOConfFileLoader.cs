@@ -8,29 +8,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public static class IOconfFileLoader
     {
-        private readonly static List<(string rowType, Func<string, int, IOconfRow> loader)> Loaders = new()
-        {
-            ("LoopName", (r, l) => new IOconfLoopName(r, l)),
-            ("Account", (r, l) => new IOconfAccount(r, l)),
-            ("SampleRates", (r, l) => new IOconfSamplingRates(r, l)),
-            ("Map", (r, l) => new IOconfMap(r, l)),
-            ("Math", (r, l) => new IOconfMath(r, l)),
-            ("Alert", (r, l) => new IOconfAlert(r, l)),
-            (IOconfTemp.TypeKName, IOconfTemp.NewTypeK),
-            (IOconfTemp.TypeJName, IOconfTemp.NewTypeJ),
-            ("Heater", (r, l) => new IOconfHeater(r, l)),
-            ("Oven", (r, l) => new IOconfOven(r, l)),
-            (IOconfOvenProportionalControlUpdates.TypeName, (r, l) => new IOconfOvenProportionalControlUpdates(r, l)),
-            ("Filter", (r, l) => new IOconfFilter(r, l)),
-            ("RPiTemp", (r, l) => new IOconfRPiTemp(r, l)),
-            ("GenericSensor", (r, l) => new IOconfGeneric(r, l)),
-            ("GenericOutput", (r, l) => new IOconfGenericOutput(r, l)),
-            ("SwitchboardSensor", (r, l) => new IOconfSwitchboardSensor(r, l)),
-            ("Node", (r, l) => new IOconfNode(r, l)),
-            ("Code", (r, l) => new IOconfCode(r, l)),
-            (IOconfCurrent.TypeName, (r, l) => new IOconfCurrent(r, l)),
-            (IOconfCurrentFault.TypeName, (r, l) => new IOconfCurrentFault(r, l)),
-        };
+        public static IIOconfLoader Loader { get; } = new IOconfLoader();
 
         public static bool FileExists()
         {
@@ -44,6 +22,7 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
             }
 
+            IOconfNode.ResetNodeIndexCount();
             var list = File.ReadAllLines("IO.conf").ToList();
             return (list, ParseLines(list));
         }
@@ -56,21 +35,13 @@ namespace CA_DataUploaderLib.IOconf
             return lines2.Select(x => CreateType(x, linesList.IndexOf(x)));
         }
 
-        public static void AddLoader(string rowType, Func<string, int, IOconfRow> loader)
-        {
-            if (GetLoader(rowType) != null)
-                throw new ArgumentException($"the specified loader rowType is already in use: {rowType}", nameof(rowType));
-
-            Loaders.Add((rowType, loader));
-        }
-
         private static IOconfRow CreateType(string row, int lineNum)
         {
             try
             {
                 var separatorIndex = row.IndexOf(';');
                 var rowType = separatorIndex > -1 ? row.AsSpan()[..separatorIndex].Trim() : row;
-                var loader = GetLoader(rowType) ?? ((r, l) => new IOconfRow(r, l, "Unknown", true));
+                var loader = Loader.GetLoader(rowType) ?? ((r, l) => new IOconfRow(r, l, "Unknown", true));
                 return loader(row, lineNum);
             }
             catch (Exception ex)
@@ -78,15 +49,6 @@ namespace CA_DataUploaderLib.IOconf
                 CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in line {lineNum} of {Directory.GetCurrentDirectory()}\\IO.conf {Environment.NewLine}{row}{Environment.NewLine}" + ex.ToString());
                 throw;
             }
-        }
-
-        private static Func<string, int, IOconfRow>? GetLoader(ReadOnlySpan<char> rowType)
-        {
-            foreach (var loader in Loaders)
-                if (rowType.Equals(loader.rowType, StringComparison.InvariantCultureIgnoreCase))
-                    return loader.loader;
-
-            return null;
         }
     }
 }

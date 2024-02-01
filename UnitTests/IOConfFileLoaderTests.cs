@@ -5,7 +5,7 @@ using System.Linq;
 namespace UnitTests
 {
     [TestClass]
-    public class IOConfFileLoaderTests
+    public class IOconfFileLoaderTests
     {
         [TestMethod]
         public void CanLoadAccountLine()
@@ -33,7 +33,6 @@ namespace UnitTests
         [TestMethod]
         public void CanLoadGenericOutputLine()
         {
-            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[]{new IOconfMap("Map;acserial;realacbox2", 0)} });
             var rowsEnum = IOconfFileLoader.ParseLines(new[] { "GenericOutput;generic_ac_on;realacbox2;0;p1 $heater1_onoff 3" });
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
@@ -48,7 +47,6 @@ namespace UnitTests
         [TestMethod]
         public void CanLoadGenericOutputLineWithBraces()
         {
-            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { new IOconfMap("Map;acserial;realacbox2", 0) } });
             var rowsEnum = IOconfFileLoader.ParseLines(new[] { "GenericOutput;generic_ac_on;realacbox2;0;p1 on 3 ${heater1_onoff}00%" });
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
@@ -63,7 +61,7 @@ namespace UnitTests
         [TestMethod]
         public void CanLoadCustomConfigWithoutMixingPrefix()
         {
-            IOconfFileLoader.AddLoader("Mathing", (row, lineIndex) => new IOConfMathing(row, lineIndex));
+            IOconfFileLoader.Loader.AddLoader("Mathing", (row, lineIndex) => new IOConfMathing(row, lineIndex));
             var rowsEnum = IOconfFileLoader.ParseLines(new[] { "Mathing;mymath;heater1 + 5" });
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
@@ -73,7 +71,6 @@ namespace UnitTests
         [TestMethod]
         public void CanLoadCurrentLine()
         {
-            using var _ = TestableIOconfFile.Override(new() { GetMap = () => new[] { new IOconfMap("Map;ctserial;ct01", 0) } }); 
             var rowsEnum = IOconfFileLoader.ParseLines(new[] { "Current;current_ct01;ct01;2;300" });
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);

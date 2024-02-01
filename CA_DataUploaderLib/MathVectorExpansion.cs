@@ -13,7 +13,6 @@ namespace CA_DataUploaderLib
         private readonly Dictionary<int, string> _fieldsByIndex = new();
         private readonly List<(IOconfMath math, int mathFieldIndex)> _mathWithFieldIndexes = new();
 
-        public MathVectorExpansion() : this(IOconfFile.GetMath) { }
         public MathVectorExpansion(Func<IEnumerable<IOconfMath>> getMath) => _mathStatements = getMath().ToList();
         public int Count => _mathStatements.Count;
         public IEnumerable<VectorDescriptionItem> GetVectorDescriptionEntries() => _mathStatements.Select(m => new VectorDescriptionItem("double", m.Name, DataTypeEnum.State));

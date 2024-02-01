@@ -3,16 +3,17 @@ using System;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Linq;
+using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
 {
     public class SingleNodeRunner
     {
-        public static async Task Run(CommandHandler cmdHandler, ServerUploader uploader, CancellationToken token)
+        public static async Task Run(IIOconf ioconf, CommandHandler cmdHandler, ServerUploader uploader, CancellationToken token)
         {
             try
             {
-                var alerts = new Alerts(cmdHandler);
+                var alerts = new Alerts(ioconf, cmdHandler);
                 var subsystemsTask = Task.Run(() => cmdHandler.RunSubsystems(token), token);
                 var sendThrottle = new TimeThrottle(100);
                 DataVector? vector = null;

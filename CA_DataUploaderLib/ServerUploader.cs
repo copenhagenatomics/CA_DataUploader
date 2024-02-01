@@ -34,17 +34,19 @@ namespace CA_DataUploaderLib
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(BoundedOptions);
         private readonly Channel<DataVector> _vectorsChannel = Channel.CreateBounded<DataVector>(BoundedOptions);
         private readonly Channel<EventFiredArgs> _eventsChannel = Channel.CreateBounded<EventFiredArgs>(BoundedOptions);
+        private readonly IIOconf _ioconf;
         private readonly CommandHandler _cmd;
         private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new();
 
         public string Title => nameof(ServerUploader);
         public bool IsEnabled { get; }
 
-        public ServerUploader(CommandHandler cmd)
+        public ServerUploader(IIOconf ioconf, CommandHandler cmd)
         {
+            _ioconf = ioconf;
             _cmd = cmd;
-            _loopname = IOconfFile.GetLoopName();
-            var nodes = IOconfFile.GetEntries<IOconfNode>().ToList();
+            _loopname = ioconf.GetLoopName();
+            var nodes = ioconf.GetEntries<IOconfNode>().ToList();
             IsEnabled = IOconfNode.IsCurrentSystemAnUploader(nodes);
             if (!IsEnabled) 
                 return;
@@ -61,7 +63,7 @@ namespace CA_DataUploaderLib
             void DescriptionCreated(object? sender, VectorDescription desc)
             {
                 var fieldUploadMap = desc._items.Select(v => v.Upload).ToArray();
-                var uploadDescription = new VectorDescription(desc._items.Where(v => v.Upload).ToList(), desc.Hardware, desc.Software) { IOconf = IOconfFile.GetRawFile() };
+                var uploadDescription = new VectorDescription(desc._items.Where(v => v.Upload).ToList(), desc.Hardware, desc.Software) { IOconf = _ioconf.GetRawFile() };
                 _desc = (fieldUploadMap, uploadDescription);
             }
         }
@@ -153,11 +155,11 @@ namespace CA_DataUploaderLib
             return "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + plot.PlotName;
         }
 
-        public static async Task<bool> ConnectionTest()
+        public static async Task<bool> ConnectionTest(string loopServer)
         {
             var client = new HttpClient
             {
-                BaseAddress = new Uri(IOconfFile.GetLoopServer())
+                BaseAddress = new Uri(loopServer)
             };
             var response = await client.GetAsync("/api/v1/LoopControl/PingTest");
             return response.IsSuccessStatusCode;
@@ -168,7 +170,7 @@ namespace CA_DataUploaderLib
             try
             {
                 var (_, uploadDesc) = Desc;
-                _plot = await PlotConnection.Establish(_loopname, SignInfo.GetPublicKey(), GetSignedVectorDescription(uploadDesc), _connectionEstablishedSource, token);
+                _plot = await PlotConnection.Establish(_ioconf.GetConnectionInfo(), SignInfo.GetPublicKey(), GetSignedVectorDescription(uploadDesc), _connectionEstablishedSource, token);
 
                 var stateTracker = WithExceptionLogging(TrackUploadState(token), "upload state tracker");
                 var vectorsSender = WithExceptionLogging(VectorsSender(token), "upload vector sender");
@@ -188,7 +190,7 @@ namespace CA_DataUploaderLib
 
             async Task VectorsSender(CancellationToken token)
             {
-                var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(IOconfFile.GetVectorUploadDelay()));
+                var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(_ioconf.GetVectorUploadDelay()));
                 var stateWriter = _executedActionChannel.Writer;
                 var badVectors = new List<DateTime>();
 
@@ -212,7 +214,7 @@ namespace CA_DataUploaderLib
             async Task EventsSender(CancellationToken token)
             {
                 //note this uses this uses the vector upload delay for the frequency for no special reason, it was just an easy value to use for this
-                var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(IOconfFile.GetVectorUploadDelay()));
+                var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(_ioconf.GetVectorUploadDelay()));
                 var stateWriter = _executedActionChannel.Writer;
                 var badEvents = new List<DateTime>();
                 Dictionary<string, int> duplicateEventsDetection = new();
@@ -576,14 +578,13 @@ namespace CA_DataUploaderLib
             public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token = default) => _client.SendAsync(request, token);
             internal Task<HttpResponseMessage> PutAsync(string requestUri, byte[] message, CancellationToken token = default)
                 => _client.PutAsJsonAsync(requestUri, message, token);
-            public static async Task<PlotConnection> Establish(string loopName, byte[] publicKey, byte[] signedVectorDescription, TaskCompletionSource<PlotConnection> connectionEstablishedSource, CancellationToken cancellationToken)
+            public static async Task<PlotConnection> Establish(ConnectionInfo connectionInfo, byte[] publicKey, byte[] signedVectorDescription, TaskCompletionSource<PlotConnection> connectionEstablishedSource, CancellationToken cancellationToken)
             {
                 try
                 {
-                    var connectionInfo = IOconfFile.GetConnectionInfo();
                     var client = NewClient(connectionInfo.Server);
                     var token = await GetLoginTokenWithRetries(client, connectionInfo, cancellationToken); // retries here are important as its the first connection so running after a restart can run into the connection not being initialized
-                    var (plotId, plotName) = await GetPlotIDAsync(loopName, client, token, publicKey, signedVectorDescription, cancellationToken);
+                    var (plotId, plotName) = await GetPlotIDAsync(connectionInfo.LoopName, client, token, publicKey, signedVectorDescription, cancellationToken);
                     var connection = new PlotConnection(client, plotId, plotName);
                     connectionEstablishedSource.TrySetResult(connection);
                     return connection;

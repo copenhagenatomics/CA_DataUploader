@@ -6,11 +6,11 @@ namespace CA_DataUploaderLib
 {
     public class CurrentBox : BaseSensorBox
     {
-        public CurrentBox(CommandHandler cmd) : base(cmd, "Current", GetSensorConfigs()) { }
+        public CurrentBox(IIOconf ioconf, CommandHandler cmd) : base(cmd, "Current", GetSensorConfigs(ioconf)) { }
 
-        private static IEnumerable<IOconfInput> GetSensorConfigs()
+        private static IEnumerable<IOconfInput> GetSensorConfigs(IIOconf ioconf)
         {
-            return IOconfFile.GetEntries<IOconfCurrent>().Cast<IOconfInput>().Concat(IOconfFile.GetEntries<IOconfCurrentFault>());
+            return ioconf.GetEntries<IOconfCurrent>().Cast<IOconfInput>().Concat(ioconf.GetEntries<IOconfCurrentFault>());
         }
     }
 }
