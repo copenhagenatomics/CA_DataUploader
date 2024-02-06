@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
@@ -17,6 +18,8 @@ namespace CA_DataUploaderLib.IOconf
             if (parsePort && !int.TryParse(list[3], out PortNumber)) throw new Exception($"{type}: wrong port number: {row}");
             if (PortNumber < 1) throw new Exception($"{type}: port numbers must start at 1 {row}");
         }
+
+        public virtual IEnumerable<IOconfInput> GetExpandedInputConf() => Enumerable.Empty<IOconfInput>();
 
         public override void ValidateDependencies(IIOconf ioconf)
         {

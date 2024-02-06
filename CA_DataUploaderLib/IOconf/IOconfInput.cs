@@ -101,6 +101,8 @@ namespace CA_DataUploaderLib.IOconf
                 Map = GetMap(ioconf, BoxName, _boardSettings, false);
             }
 
+            public virtual IEnumerable<IOconfInput> GetExpandedConf() => Enumerable.Empty<IOconfInput>();
+
             public string BoxName { get; }
             /// <summary>the 1-based port number</summary>
             public int PortNumber = 1;
