@@ -56,7 +56,7 @@ namespace CA_DataUploaderLib
         public CancellationToken StopToken => _exitCts.Token;
         public Task RunningTask => _runningTaskTcs.Task;
 
-        public CommandHandler(IIOconf ioconf, SerialNumberMapper? mapper = null, ICommandRunner? runner = null)
+        public CommandHandler(IIOconf ioconf, SerialNumberMapper? mapper = null, ICommandRunner? runner = null, bool runCommandLoop = false)
         {
             _exitCts.Token.Register(() =>
             {
@@ -68,7 +68,8 @@ namespace CA_DataUploaderLib
             _ioconf = ioconf;
             _mapper = mapper;
             _fullsystemFilterAndMath = new Lazy<ExtendedVectorDescription>(GetFullSystemFilterAndMath);
-            _ = Task.Run(LoopForever);
+            if (runCommandLoop)
+                _ = Task.Run(LoopForever);
             AddCommand("escape", _ => Stop());
             AddCommand("help", HelpMenu);
 
