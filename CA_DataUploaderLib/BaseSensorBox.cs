@@ -65,7 +65,7 @@ namespace CA_DataUploaderLib
                 var duplicate = sensors.GroupBy(v => v.Input.PortNumber).FirstOrDefault(g => g.Count() > 1);
                 if (duplicate == null) return;
                 var dupSensors = string.Join(Environment.NewLine, duplicate.Select(s => s.Input.Row));
-                throw new FormatException($"can't map the same board port to different IO.conf lines: {boxName};{duplicate.Key}{Environment.NewLine}{dupSensors}");
+                throw new FormatException($"Can't map the same board port to different IO.conf lines: {boxName};{duplicate.Key}{Environment.NewLine}{dupSensors}");
             }
             static void EnforceBoardNotAlreadyInUse(string boxName, string newRow, CommandHandler cmd)
             {
@@ -89,10 +89,10 @@ namespace CA_DataUploaderLib
 
                 if (map.McuBoard == null)
                 {
-                    CALog.LogData(LogID.A, $"missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
+                    CALog.LogData(LogID.A, $"Missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
                     cmd.AddMultinodeCommand(
                         "custom", a => a.Count >= 3 && a[1] == map.BoxName,
-                        _ => { CALog.LogData(LogID.A, $"custom command failed due to missing board: {map.BoxName}"); });
+                        _ => { CALog.LogData(LogID.A, $"Custom command failed due to missing board: {map.BoxName}"); });
                     return;
                 }
 
@@ -117,7 +117,7 @@ namespace CA_DataUploaderLib
                 {
                     cmd.AddMultinodeCommand(
                         "reconnect", a => a.Count == 2 && a[1] == map.BoxName,
-                        _ => { CALog.LogData(LogID.A, $"reconnect failed due to missing board: {map.BoxName}"); });
+                        _ => { CALog.LogData(LogID.A, $"Reconnect failed due to missing board: {map.BoxName}"); });
                     return;
                 }
 
@@ -144,7 +144,7 @@ namespace CA_DataUploaderLib
             {
                 var (map, values, _) = _boards[i];
                 string name = map.BoxName + "_state";
-                if (!indexes.TryGetValue(name, out var index)) throw new ArgumentException($"failed to find box state in full vector: {name}");
+                if (!indexes.TryGetValue(name, out var index)) throw new ArgumentException($"Failed to find box state in full vector: {name}");
                 _boards[i] = (map, values, index);
                 hasBoardWithBuildInActions |= map.McuBoard != null && _buildInWriteActions.TryGetValue(map.McuBoard, out var _);
             }
@@ -203,7 +203,7 @@ namespace CA_DataUploaderLib
             void InitializeAction(object? sender, IReadOnlyDictionary<string, int> indexes) =>
                 fieldIndex = indexes.TryGetValue(targetFieldName, out var index)
                     ? index
-                    : throw new InvalidOperationException($"missing target field: {targetFieldName}");
+                    : throw new InvalidOperationException($"Missing target field: {targetFieldName}");
             Task ExitAction(MCUBoard board, CancellationToken token) => Off(board, port, token);
             Task WriteAction(DataVector? vector, MCUBoard board, CancellationToken token) => DoPortActions(vector, board, fieldIndex, lastAction, token);
 
@@ -227,7 +227,7 @@ namespace CA_DataUploaderLib
             async Task Off(MCUBoard board, IOconfOutput port, CancellationToken token)
             {
                 await board.SafeWriteLine(getCommand(port.PortNumber, defaultTarget), token);
-                CALog.LogInfoAndConsoleLn(LogID.A, $"port has been set to default position ({defaultTarget:F2}): {port.Name}");
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Port has been set to default position ({defaultTarget:F2}): {port.Name}");
             }
         }
 
@@ -281,7 +281,7 @@ namespace CA_DataUploaderLib
                 }
                 catch (Exception ex)
                 {
-                    LogError(map, "error closing the connection to the board", ex);
+                    LogError(map, "Error closing the connection to the board", ex);
                 }
             }
         }
@@ -304,7 +304,7 @@ namespace CA_DataUploaderLib
             var buildInActionsEnabled = _buildInWriteActions.TryGetValue(board, out var buildInActions);
             if (!buildInActionsEnabled && !customWritesEnabled) return;
             ChannelReader<DataVector>? vectorsChannel = buildInActionsEnabled
-                ? (_receivedVectors ?? throw new InvalidOperationException("build actions detected without receiving vectors channel being initialized"))
+                ? (_receivedVectors ?? throw new InvalidOperationException("Build actions detected without receiving vectors channel being initialized"))
                 : null;
 
             // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operation.
@@ -372,7 +372,7 @@ namespace CA_DataUploaderLib
             void EnsureTimeoutIsReportedOnce()
             {
                 if (tryingToRecoverAfterTimeoutWatch.IsRunning) return;
-                CALog.LogInfoAndConsoleLn(LogID.A, $"timed out writing to board, reducing action frequency until reconnect - {board.ToShortDescription()}");
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Timed out writing to board, reducing action frequency until reconnect - {board.ToShortDescription()}");
                 tryingToRecoverAfterTimeoutWatch.Restart();
             }
 
@@ -380,7 +380,7 @@ namespace CA_DataUploaderLib
             {
                 if (!tryingToRecoverAfterTimeoutWatch.IsRunning) return;
                 tryingToRecoverAfterTimeoutWatch.Stop();
-                CALog.LogInfoAndConsoleLn(LogID.A, $"wrote to board without time outs after {tryingToRecoverAfterTimeoutWatch.Elapsed}, resuming normal action frequency - {board.ToShortDescription()}");
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Wrote to board without time outs after {tryingToRecoverAfterTimeoutWatch.Elapsed}, resuming normal action frequency - {board.ToShortDescription()}");
             }
 
             static bool CheckConnectedStateInVector(MCUBoard board, int boardState, ref bool waitingBoardReconnect, DataVector vector)
@@ -389,12 +389,12 @@ namespace CA_DataUploaderLib
                 var connected = vectorState >= ConnectionState.Connected;
                 if (waitingBoardReconnect && connected)
                 {
-                    CALog.LogData(LogID.B, $"resuming writes after reconnect on {board.ToShortDescription()}");
+                    CALog.LogData(LogID.B, $"Resuming writes after reconnect on {board.ToShortDescription()}");
                     waitingBoardReconnect = false;
                 }
                 else if (!waitingBoardReconnect && !connected)
                 {
-                    CALog.LogData(LogID.B, $"stopping writes until connection is reestablished (state: {vectorState}) on: - {board.ToShortDescription()}");
+                    CALog.LogData(LogID.B, $"Stopping writes until connection is reestablished (state: {vectorState}) on: - {board.ToShortDescription()}");
                     waitingBoardReconnect = true;
                 }
                 return connected;
@@ -416,14 +416,14 @@ namespace CA_DataUploaderLib
                     if (!token.IsCancellationRequested)
                     {
                         _boardsState.SetReadSensorsExceptionState(boxName);
-                        LogError(board, "unexpected error on board read loop", ex);
+                        LogError(board, "Unexpected error on board read loop", ex);
                     }
                 }
                 catch (Exception ex)
                 { // we expect most errors to be handled within SafeReadSensors and in the SafeReopen of the ReconnectBoard,
                   // so seeing this in the log is most likely a bug handling some error case.
                     _boardsState.SetReadSensorsExceptionState(boxName);
-                    LogError(board, "unexpected error on board read loop", ex);
+                    LogError(board, "Unexpected error on board read loop", ex);
                 }
             }
         }
@@ -440,13 +440,13 @@ namespace CA_DataUploaderLib
                 if (token.IsCancellationRequested)
                     throw; // if the token is cancelled we bubble up the cancel so the caller can abort.
                 _boardsState.SetReadSensorsExceptionState(boxName);
-                LogError(board, "error reading sensor data", ex);
+                LogError(board, "Error reading sensor data", ex);
                 return true; //ReadSensor normally should return false if the board is detected as disconnected, so we say the board is still connected here since the caller will still do stale values detection
             }
             catch (Exception ex)
             { // seeing this is the log is not unexpected in cases where we have trouble communicating to a board.
                 _boardsState.SetReadSensorsExceptionState(boxName);
-                LogError(board, "error reading sensor data", ex);
+                LogError(board, "Error reading sensor data", ex);
                 return true; //ReadSensor normally should return false if the board is detected as disconnected, so we say the board is still connected here since the caller will still do stale values detection
             }
         }
@@ -528,7 +528,7 @@ namespace CA_DataUploaderLib
             var noDataAvailableTask = Task.Delay(msBetweenReads, token);
             if (await Task.WhenAny(readLineTask, noDataAvailableTask) == noDataAvailableTask)
             {
-                LogData(board, "no data available");
+                LogData(board, "No data available");
                 _boardsState.SetState(boxName, ConnectionState.NoDataAvailable); //report the state early before waiting up to 2 seconds for the data (readLineTask)
             }
 
@@ -538,7 +538,7 @@ namespace CA_DataUploaderLib
             }
             catch (ObjectDisposedException)
             {
-                LogData(board, "detected closed connection");
+                LogData(board, "Detected closed connection");
                 return (false, default);
             }
             catch (ArgumentOutOfRangeException ex)
@@ -546,12 +546,12 @@ namespace CA_DataUploaderLib
                 //typically readline reports ObjectDisposedException once when disconnecting a temp hub and later calls fail with "ArgumentOutOfRangeException: Non-negative number required."
                 //calling code is expected to handle the disconnected board returned by ObjectDisposedException so this is logged and displayed as an error.
                 //more testing is needed with switchboards, as potentially a write could get the ObjectDisposeException which might end up hitting this catch statement.
-                LogError(board, "detected closed connection", ex);
+                LogError(board, "Detected closed connection", ex);
                 return (false, default);
             }
             catch (TimeoutException)
             {
-                LogData(board, "timed out reading data");
+                LogData(board, "Timed out reading data");
                 return (true, default);
             }
         }
@@ -569,7 +569,7 @@ namespace CA_DataUploaderLib
                 if (msSinceLastRead <= board.ConfigSettings.MaxMillisecondsWithoutNewValues)
                     continue;
                 hasStaleValues = true;
-                LogInfo(board, $"stale sensor detected: {item.Input.Name}. {msSinceLastRead} milliseconds since last read");
+                LogInfo(board, $"Stale sensor detected: {item.Input.Name}. {msSinceLastRead} milliseconds since last read");
             }
 
             return hasStaleValues;
@@ -578,7 +578,7 @@ namespace CA_DataUploaderLib
         private async Task ReconnectBoard(MCUBoard board, string boxName, CancellationToken token)
         {
             _boardsState.SetAttemptingReconnectState(boxName);
-            LogInfo(board, "attempting to reconnect");
+            LogInfo(board, "Attempting to reconnect");
             var lostSensorAttempts = 100;
             var delayBetweenAttempts = TimeSpan.FromSeconds(board.ConfigSettings.SecondsBetweenReopens);
             while (!(await board.SafeReopen(token)))
@@ -586,7 +586,7 @@ namespace CA_DataUploaderLib
                 _boardsState.SetDisconnectedState(boxName);
                 if (ExactSensorAttemptsCheck(ref lostSensorAttempts))
                 { // we run this once when there has been 100 attempts
-                    LogError(board, "reconnect limit exceeded, reducing reconnect frequency to 15 minutes");
+                    LogError(board, "Reconnect limit exceeded, reducing reconnect frequency to 15 minutes");
                     delayBetweenAttempts = TimeSpan.FromMinutes(15); // 4 times x hour = 96 times x day
                 }
 
@@ -598,7 +598,7 @@ namespace CA_DataUploaderLib
             }
 
             _boardsState.SetConnectedState(boxName);
-            LogInfo(board, "board reconnection succeeded");
+            LogInfo(board, "Board reconnection succeeded");
         }
 
         private static bool ExactSensorAttemptsCheck(ref int lostSensorAttempts)
@@ -640,7 +640,7 @@ namespace CA_DataUploaderLib
 
             var remainingAttempts = sensor.InvalidReadsRemainingAttempts;
             if (ExactSensorAttemptsCheck(ref remainingAttempts))
-                LogError(board, $"sensor {sensor.Name} has been unreachable for at least 5 minutes (returning 10k+ values)");
+                LogError(board, $"Sensor {sensor.Name} has been unreachable for at least 5 minutes (returning 10k+ values)");
 
             sensor.InvalidReadsRemainingAttempts = remainingAttempts;
         }
