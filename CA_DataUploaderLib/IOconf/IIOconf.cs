@@ -5,7 +5,6 @@ namespace CA_DataUploaderLib.IOconf
 {
     public interface IIOconf
     {
-        public void Reload();
         public ConnectionInfo GetConnectionInfo();
         public string GetLoopName();
         public string GetLoopServer();

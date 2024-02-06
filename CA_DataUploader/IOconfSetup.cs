@@ -125,7 +125,7 @@ namespace CA_DataUploader
 
         private static void ReloadIOconf(SerialNumberMapper serial)
         {
-            IOconfFile.Instance.Reload();
+            ((IOconfFile) IOconfFile.Instance).Reload();
             foreach (var board in serial.McuBoards)
             foreach (var ioconfMap in IOconfFile.Instance.GetMap())
                 board.TrySetMap(ioconfMap);
