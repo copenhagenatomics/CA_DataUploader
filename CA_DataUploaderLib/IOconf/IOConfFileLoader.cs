@@ -22,13 +22,15 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
             }
 
-            IOconfNode.ResetNodeIndexCount();
             var list = File.ReadAllLines("IO.conf").ToList();
             return (list, ParseLines(list));
         }
 
         public static IEnumerable<IOconfRow> ParseLines(IEnumerable<string> lines)
         {
+            IOconfNode.ResetNodeIndexCount();
+            IOconfCode.ResetNodeIndexCount();
+
             var linesList = lines.Select(x => x.Trim()).ToList();
             // remove empty lines and commented out lines
             var lines2 = linesList.Where(x => !x.StartsWith("//") && x.Length > 2).ToList();

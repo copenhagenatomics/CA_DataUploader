@@ -16,10 +16,15 @@ namespace CA_DataUploaderLib.IOconf
 
         public IOconfFile()
         {
-            if (!Table.Any())
-            {
-                Reload();
-            }
+            Reload();
+        }
+
+        public IOconfFile(List<string> rawLines)
+        {
+            Table.AddRange(IOconfFileLoader.ParseLines(rawLines));
+            RawLines = rawLines;
+            Table.ForEach(e => e.ValidateDependencies(this));
+            CheckRules();
         }
 
         public void Reload()
