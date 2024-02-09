@@ -23,6 +23,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             Table.AddRange(IOconfFileLoader.ParseLines(rawLines));
             RawLines = rawLines;
+            EnsureRPiTempEntry();
             Table.ForEach(e => e.ValidateDependencies(this));
             CheckRules();
         }
@@ -34,8 +35,17 @@ namespace CA_DataUploaderLib.IOconf
             var (rawLines, entries) = IOconfFileLoader.Load();
             Table.AddRange(entries);
             RawLines = rawLines;
+            EnsureRPiTempEntry();
             Table.ForEach(e => e.ValidateDependencies(this));
             CheckRules();
+        }
+
+        private void EnsureRPiTempEntry()
+        {
+            if (Table.OfType<IOconfRPiTemp>().Any())
+                return;
+            Table.Add(IOconfRPiTemp.Default);
+            RawLines.Add(IOconfRPiTemp.Default.Row);
         }
 
         private void CheckRules()
