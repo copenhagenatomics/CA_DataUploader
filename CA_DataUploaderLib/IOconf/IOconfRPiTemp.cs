@@ -5,7 +5,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfRPiTemp : IOconfRow
     {
-        public static IOconfRPiTemp Default { get; } = new IOconfRPiTemp("RPiTemp;RPiTemp", 0);
+        public static IOconfRPiTemp Default { get; } = new IOconfRPiTemp("RPiTemp; RPiTemp", 0);
         public readonly bool Disabled;
         public IOconfRPiTemp(string row, int lineNum) : base(row, lineNum, "RPiTemp")
         {

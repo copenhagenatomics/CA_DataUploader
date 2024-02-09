@@ -70,5 +70,7 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         protected static readonly Regex ValidateNameRegex = new(@"^[a-zA-Z_]+[a-zA-Z0-9_]*$");
+
+        public virtual CA.LoopControlPluginBase.LoopControlDecision? TryCreateDecision() => null;
     }
 }

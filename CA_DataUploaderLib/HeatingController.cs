@@ -18,12 +18,10 @@ namespace CA_DataUploaderLib
                 return;
 
             var ovens = ioconf.GetOven().ToList();
-            var allAreas = ioconf.GetOven().Select(x => x.OvenArea).Distinct();
-            var ovenProportionalControlUpdatesConf = ioconf.GetEntries<IOconfOvenProportionalControlUpdates>().SingleOrDefault();
 
             //notice that the decisions states and outputs are handled by the registered decisions, while the switchboard inputs and actuations are handled by the switchboard controller
-            cmd.AddDecisions(allAreas.Select(a => new OvenAreaDecision(new($"ovenarea{a}", a, ovenProportionalControlUpdatesConf))).ToList());
-            cmd.AddDecisions(heatersConfigs.Select(h => new HeaterDecision(h, ovens.SingleOrDefault(x => x.HeatingElement.Name == h.Name))).ToList());
+            cmd.AddDecisions(ovens.GroupBy(x => x.OvenArea).Select(og => og.First().CreateDecision(ioconf)).ToList());
+            cmd.AddDecisions(heatersConfigs.Select(h => h.CreateDecision(ioconf)).ToList());
             SwitchBoardController.Initialize(ioconf, cmd);
         }
 
