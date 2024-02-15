@@ -4,6 +4,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace UnitTests
 {
@@ -65,6 +66,26 @@ namespace UnitTests
         public void MathReferencingSourceNotInVectorCausesException()
         {
             GetInitializedMathExpansion(new("Math;MyMath;NotInVector + 2", 2), new[] { "MyMath" });
+        }
+
+        [TestMethod]
+        public async Task CanExpandVectorInParallel()
+        {
+            var math = GetInitializedMathExpansion(
+                new("Math;MyMath;f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10", 0), 
+                new[] { "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "MyMath" });
+            await ParallelHelper.ForRacingThreads(0, 100, i =>
+            {
+                var values = new double[11];
+                for (int j = 0; j < 10; j++)
+                    values[j] = i + j;
+                var expected = values.Take(10).Sum();
+                return () =>
+                {
+                    math.Apply(values);
+                    Assert.AreEqual(expected, values[10], "detected thread safety issue");
+                };
+            });
         }
 
         public static MathVectorExpansion GetInitializedMathExpansion(IOconfMath math, IEnumerable<string> allvectorfields)

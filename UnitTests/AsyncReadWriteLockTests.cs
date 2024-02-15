@@ -2,9 +2,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace UnitTests
@@ -22,7 +20,7 @@ namespace UnitTests
             var results = new ConcurrentQueue<(int index, int value)>();
             int writeBlockSize = 40, readersForEveryWriter = 9;
             bool IsWriter(int index) => index % (readersForEveryWriter + 1) == 0;
-            await ForRacingThreads(0, 100, i => async () =>
+            await ParallelHelper.ForRacingThreads(0, 100, i => async () =>
             {
                 if (IsWriter(i))
                 {//writer: report values for the write block
@@ -54,24 +52,6 @@ namespace UnitTests
                 else//check reader reported -1
                     Assert.AreEqual((index, -1), resultsList[i], failureMessage);
             }
-        }
-
-        private static Task ForRacingThreads(int start, int count, Func<int, Func<Task>> getAction) => 
-            RunRacingThreads(Enumerable.Range(start, count).Select(i => getAction(i)).ToList());
-        private static async Task RunRacingThreads(IReadOnlyCollection<Func<Task>> actions)
-        {
-            //We use a CountdownEvent to ensure all threads are created and ready to race before running the actions.
-            //We use SetMinThreads to ensure we have enough pool threads, as otherwise it takes way too long to start or even blocks
-            ThreadPool.SetMinThreads(actions.Count, actions.Count);
-            var readyEvent = new CountdownEvent(actions.Count);
-            await Task.WhenAll(actions
-                .Select(action => Task.Run(() => 
-                { 
-                    readyEvent.Signal(); //we are ready to run
-                    readyEvent.Wait();  //wait for all others to be ready to run
-                    return action(); 
-                }))
-                ).ConfigureAwait(false);
         }
     }
 }
