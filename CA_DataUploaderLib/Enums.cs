@@ -15,9 +15,9 @@ namespace CA_DataUploaderLib
     {
         None = 0,       // Silent
         Exception = 1,  // Exceptions
-        Error = 2,      // Below + errors
-        Warning = 3,    // Below + warnings
-        Normal = 4,     // Below + default output
+        Error = 2,      // Above + errors
+        Warning = 3,    // Above+ warnings
+        Normal = 4,     // Above + default output
         Debug = 5       // All possible logging is output. 
     }
 }
