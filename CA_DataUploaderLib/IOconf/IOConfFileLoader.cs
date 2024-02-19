@@ -28,8 +28,8 @@ namespace CA_DataUploaderLib.IOconf
 
         public static IEnumerable<IOconfRow> ParseLines(IEnumerable<string> lines)
         {
-            IOconfNode.ResetNodeIndexCount();
-            IOconfCode.ResetNodeIndexCount();
+            IOconfNode.ResetIndex();
+            IOconfCode.ResetIndex();
 
             var linesList = lines.Select(x => x.Trim()).ToList();
             // remove empty lines and commented out lines

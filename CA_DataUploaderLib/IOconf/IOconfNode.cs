@@ -34,8 +34,8 @@ namespace CA_DataUploaderLib.IOconf
         private IOconfNode(string name) : base($"Node;{name}", 0, "Node") { }
         
 
-        /// <summary>resets the node instance count used to determine the node index, used for testing purposes</summary>
-        public static void ResetNodeIndexCount() => _nodeInstances = 0;
+        /// <summary>Resets the node instance count used to determine the node index, used for testing purposes</summary>
+        public static void ResetIndex() => _nodeInstances = 0;
         public static IOconfNode GetSingleNode(string loopName) => _singleNode ??= new IOconfNode(loopName) { IsCurrentSystem = true, IsUploader = true };
 
         public IPEndPoint EndPoint => _endPoint ?? throw new InvalidOperationException($"Endpoint is only supported when running with distributed configuration");
