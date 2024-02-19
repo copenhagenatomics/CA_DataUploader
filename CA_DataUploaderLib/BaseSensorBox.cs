@@ -70,13 +70,14 @@ namespace CA_DataUploaderLib
             static void EnforceBoardNotAlreadyInUse(string boxName, string newRow, CommandHandler cmd)
             {
                 if (!_usedBoxNames.ContainsKey(cmd))
+                {
                     _usedBoxNames[cmd] = new();
+                    cmd.StopToken.Register(() => _usedBoxNames.Remove(cmd));
+                }
 
                 if (_usedBoxNames[cmd].TryGetValue(boxName, out var usedRow))
                     throw new FormatException($"Can't map the same board to different IO.conf line types: {boxName}{Environment.NewLine}{usedRow}{Environment.NewLine}{newRow}");
                 _usedBoxNames[cmd].Add(boxName, newRow);
-
-                cmd.StopToken.Register(() => _usedBoxNames.Remove(cmd));
             }
             static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived)
             {
