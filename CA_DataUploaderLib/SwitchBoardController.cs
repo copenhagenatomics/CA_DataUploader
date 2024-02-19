@@ -24,10 +24,12 @@ namespace CA_DataUploaderLib
 
         public static void Initialize(IIOconf ioconf, CommandHandler cmd)
         {
-            if (_instanceDictionary.ContainsKey(cmd)) return;
             lock (ControllerInitializationLock)
+            {
+                if (_instanceDictionary.ContainsKey(cmd)) return;
                 _instanceDictionary[cmd] = new SwitchBoardController(ioconf, cmd);
-            cmd.StopToken.Register(() => _instanceDictionary.Remove(cmd));
+            }
+            cmd.StopToken.Register(() => { lock (ControllerInitializationLock) _instanceDictionary.Remove(cmd); });
         }
     }
 }
