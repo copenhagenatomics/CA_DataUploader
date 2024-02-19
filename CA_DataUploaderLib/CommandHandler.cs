@@ -56,7 +56,7 @@ namespace CA_DataUploaderLib
         public CancellationToken StopToken => _exitCts.Token;
         public Task RunningTask => _runningTaskTcs.Task;
 
-        public CommandHandler(IIOconf ioconf, SerialNumberMapper? mapper = null, ICommandRunner? runner = null, bool runCommandLoop = false)
+        public CommandHandler(IIOconf ioconf, SerialNumberMapper? mapper = null, ICommandRunner? runner = null, bool runCommandLoop = true)
         {
             _exitCts.Token.Register(() =>
             {
