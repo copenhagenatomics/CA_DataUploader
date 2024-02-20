@@ -21,6 +21,14 @@ namespace CA_DataUploaderLib.IOconf
 
         public virtual IEnumerable<IOconfInput> GetExpandedInputConf() => Enumerable.Empty<IOconfInput>();
 
+        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        {
+            foreach (var input in GetExpandedInputConf())
+                yield return input.Name;
+            foreach (var name in base.GetExpandedNames(ioconf))
+                yield return name;
+        }
+
         public override void ValidateDependencies(IIOconf ioconf)
         {
             Map = GetMap(ioconf, BoxName, _boardSettings);

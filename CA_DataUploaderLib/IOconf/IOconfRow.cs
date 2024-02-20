@@ -71,6 +71,16 @@ namespace CA_DataUploaderLib.IOconf
 
         protected static readonly Regex ValidateNameRegex = new(@"^[a-zA-Z_]+[a-zA-Z0-9_]*$");
 
-        public virtual CA.LoopControlPluginBase.LoopControlDecision? TryCreateDecision() => null;
+        /// <summary>
+        /// Returns the full list of expanded vector field names from this class and it's associated decisions.
+        /// </summary>
+        public virtual IEnumerable<string> GetExpandedNames(IIOconf ioconf) 
+        { 
+            if (this is IIOconfRowWithDecision entryWithDecision)
+            {
+                foreach (var pluginField in entryWithDecision.CreateDecision(ioconf).PluginFields)
+                    yield return pluginField.Name;
+            }
+        }
     }
 }

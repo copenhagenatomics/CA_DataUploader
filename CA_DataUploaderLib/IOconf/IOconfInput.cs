@@ -36,6 +36,13 @@ namespace CA_DataUploaderLib.IOconf
             Map = GetMap(ioconf, BoxName, _boardSettings, Skip);
         }
 
+        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        {
+            yield return Name;
+            foreach (var name in base.GetExpandedNames(ioconf))
+                yield return name;
+        }
+
         public virtual bool IsSpecialDisconnectValue(double value) => false;
 
         public string BoxName { get; init; }
@@ -102,6 +109,14 @@ namespace CA_DataUploaderLib.IOconf
             }
 
             public virtual IEnumerable<IOconfInput> GetExpandedConf() => Enumerable.Empty<IOconfInput>();
+
+            public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+            {
+                foreach (var input in GetExpandedConf())
+                    yield return input.Name;
+                foreach (var name in base.GetExpandedNames(ioconf))
+                    yield return name;
+            }
 
             public string BoxName { get; }
             /// <summary>the 1-based port number</summary>

@@ -21,6 +21,13 @@ namespace CA_DataUploaderLib.IOconf
             yield return NewPortInput(CurrentSensorName, 0 + PortNumber);
         }
 
+        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        {
+            yield return Name;
+            foreach (var name in base.GetExpandedNames(ioconf))
+                yield return name;
+        }
+
         /// <remarks>This config is general for the board, so caller must make sure to use a single instance x board</remarks>
         public IOconfInput GetBoardTemperatureInputConf() => NewPortInput(Map.BoxName + "_temperature", 5);
         public static BoardSettings GetNewSwitchboardBoardSettings(string row) => 

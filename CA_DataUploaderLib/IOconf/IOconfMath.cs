@@ -30,6 +30,11 @@ namespace CA_DataUploaderLib.IOconf
             SourceNames = GetSources();
         }
 
+        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        {
+            yield return Name;
+        }
+
         private readonly Expression expression;
 
         // https://www.codeproject.com/Articles/18880/State-of-the-Art-Expression-Evaluation
