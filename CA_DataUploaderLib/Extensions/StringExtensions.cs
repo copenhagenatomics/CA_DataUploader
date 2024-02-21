@@ -31,8 +31,8 @@ namespace CA_DataUploaderLib.Extensions
         public static double ToDouble(this string s) => double.Parse(s, NumberStyles.Float, CultureInfo.InvariantCulture);
         public static bool TryToDouble(this string s, out double val) => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out val);
         public static bool TryToDouble(this ReadOnlySpan<char> s, out double val) => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out val);
-        public static List<string> SplitNewLine(this string s) => s.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).ToList();
-        public static List<string> SplitNewLineAndTrim(this string s) => s.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        public static List<string> SplitNewLine(this string s, bool removeEmptyEntries = true) => s.Split(new[] { Environment.NewLine }, removeEmptyEntries ? StringSplitOptions.RemoveEmptyEntries : StringSplitOptions.None).ToList();
+        public static List<string> SplitNewLineAndTrim(this string s, bool removeEmptyEntries = true) => s.Split(new[] { Environment.NewLine }, removeEmptyEntries ? StringSplitOptions.RemoveEmptyEntries : StringSplitOptions.None | StringSplitOptions.TrimEntries).ToList();
         private static bool TryGetIndex(string s, string match, out int pos) => (pos = s.IndexOf(match)) >= 0;
     }
 }
