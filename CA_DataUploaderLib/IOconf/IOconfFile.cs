@@ -19,11 +19,13 @@ namespace CA_DataUploaderLib.IOconf
             Reload();
         }
 
-        public IOconfFile(List<string> rawLines)
+        public IOconfFile(List<string> rawLines, bool performCheck = true)
         {
             Table.AddRange(IOconfFileLoader.ParseLines(rawLines));
             RawLines = rawLines;
-            CheckConfig();
+            EnsureRPiTempEntry();
+            if (performCheck)
+                CheckConfig();
         }
 
         public void Reload()
@@ -33,12 +35,12 @@ namespace CA_DataUploaderLib.IOconf
             var (rawLines, entries) = IOconfFileLoader.Load();
             Table.AddRange(entries);
             RawLines = rawLines;
+            EnsureRPiTempEntry();
             CheckConfig();
         }
 
-        private void CheckConfig()
+        public void CheckConfig()
         {
-            EnsureRPiTempEntry();
             CheckUniquenessRule();
             Table.ForEach(e => e.ValidateDependencies(this));
             CheckOvenHeaterRelationshipRule();
