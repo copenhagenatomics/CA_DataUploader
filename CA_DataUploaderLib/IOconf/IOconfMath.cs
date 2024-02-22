@@ -1,5 +1,6 @@
 ﻿#nullable enable
 using NCalc;
+using NCalc.Domain;
 using System;
 using System.Collections.Generic;
 
@@ -19,8 +20,7 @@ namespace CA_DataUploaderLib.IOconf
 
             try
             {
-                var compiledExpression = Expression.Compile(RowWithoutComment()[(Name.Length + 6)..], true);
-                expression = new Expression(compiledExpression);
+                compiledExpression = Expression.Compile(RowWithoutComment()[(Name.Length + 6)..], true);
             }
             catch (Exception ex)
             {
@@ -35,7 +35,7 @@ namespace CA_DataUploaderLib.IOconf
             yield return Name;
         }
 
-        private readonly Expression expression;
+        private readonly LogicalExpression compiledExpression;
 
         // https://www.codeproject.com/Articles/18880/State-of-the-Art-Expression-Evaluation
         // uses NCalc 2 for .NET core. 
@@ -44,6 +44,7 @@ namespace CA_DataUploaderLib.IOconf
         // https://github.com/sklose/NCalc2/blob/master/test/NCalc.Tests/Fixtures.cs
         public double Calculate(Dictionary<string, object> values)
         {
+            var expression = new Expression(compiledExpression);
             expression.Parameters = values;
             // Convert.ToDouble allows some expressions that return int, decimals or even boolean to work
             // note that some expression may even return different values depending on the branch hit i.e. when using if(...)
@@ -53,6 +54,7 @@ namespace CA_DataUploaderLib.IOconf
         private List<string> GetSources() 
         {
             HashSet<string> sources = new();
+            var expression = new Expression(compiledExpression);
             expression.EvaluateFunction += EvalFunction; 
             expression.EvaluateParameter += EvalParameter;
             try

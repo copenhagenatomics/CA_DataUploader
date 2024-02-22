@@ -13,11 +13,11 @@ namespace CA_DataUploaderLib
 
     public enum CALogLevel     // see also Syste.LogLevel
     {
-        None = 0,   // silent
-        Normal = 1,  // Default output
-        Exception = 2,  // only exceptions
-        Error = 3,  // only exceptions and errors
-        Warning = 4, // all of the above + warnings
-        Debug = 5   // all possible loggint is output. 
+        None = 0,       // Silent
+        Exception = 1,  // Exceptions
+        Error = 2,      // Above + errors
+        Warning = 3,    // Above+ warnings
+        Normal = 4,     // Above + default output
+        Debug = 5       // All possible logging is output. 
     }
 }
