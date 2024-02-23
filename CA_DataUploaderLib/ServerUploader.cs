@@ -246,9 +246,9 @@ namespace CA_DataUploaderLib
                 {
                     //note failures to upload events are not reported to the event log, as that event would often fail as well
                     await Task.Delay(5000, token); //give some time for initialization + other nodes starting in multipi.
-                    var vectorsCycleCheckArgs = (Stopwatch.StartNew(), 5000, UploadState.VectorUploader, addToEventLog: true);
-                    var eventsCycleCheckArgs = (Stopwatch.StartNew(), 5000, UploadState.EventUploader, addToEventLog: false);
-                    var receivedVectorCheckArgs = (Stopwatch.StartNew(), 1000, UploadState.LocalCluster, addToEventLog: true);
+                    var vectorsCycleCheckArgs = (Stopwatch.StartNew(), 15000, 15000, UploadState.VectorUploader, addToEventLog: true);
+                    var eventsCycleCheckArgs = (Stopwatch.StartNew(), 15000, 15000, UploadState.EventUploader, addToEventLog: false);
+                    var receivedVectorCheckArgs = (Stopwatch.StartNew(), 1000, 1000, UploadState.LocalCluster, addToEventLog: true);
                     await foreach (var state in _executedActionChannel.Reader.ReadAllAsync(token))
                     {
                         switch (state)
@@ -275,21 +275,21 @@ namespace CA_DataUploaderLib
                     cts.Cancel();
                 }
 
-                void DetectSlowActionOnNewAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState, bool addToEventLog) stateCheckArgs, UploadState newState)
+                void DetectSlowActionOnNewAction(ref (Stopwatch timeSinceLastAction, int firstTargetToReportSlowAction, int nextTargetToReportSlowAction, UploadState lastState, bool addToEventLog) stateCheckArgs, UploadState newState)
                 {
                     if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
-                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed} - new state {newState}", stateCheckArgs.addToEventLog, null);
+                        OnError($"detected slow {stateCheckArgs.lastState} - target: {stateCheckArgs.nextTargetToReportSlowAction} - new state {newState}", stateCheckArgs.addToEventLog, null);
 
-                    stateCheckArgs.nextTargetToReportSlowAction = 2500;
+                    stateCheckArgs.nextTargetToReportSlowAction = stateCheckArgs.firstTargetToReportSlowAction;
                     stateCheckArgs.timeSinceLastAction.Restart();
                     stateCheckArgs.lastState = newState;
                 }
 
-                void DetectSlowAction(ref (Stopwatch timeSinceLastAction, int nextTargetToReportSlowAction, UploadState lastState, bool addToEventLog) stateCheckArgs)
+                void DetectSlowAction(ref (Stopwatch timeSinceLastAction, int firstTargetToReportSlowAction, int nextTargetToReportSlowAction, UploadState lastState, bool addToEventLog) stateCheckArgs)
                 {
                     if (stateCheckArgs.timeSinceLastAction.ElapsedMilliseconds > stateCheckArgs.nextTargetToReportSlowAction)
                     {
-                        OnError($"detected slow {stateCheckArgs.lastState} - time passed: {stateCheckArgs.timeSinceLastAction.Elapsed}", stateCheckArgs.addToEventLog, null);
+                        OnError($"detected slow {stateCheckArgs.lastState} - target: {stateCheckArgs.nextTargetToReportSlowAction}", stateCheckArgs.addToEventLog, null);
                         stateCheckArgs.nextTargetToReportSlowAction *= 2;
                     }
                 }
