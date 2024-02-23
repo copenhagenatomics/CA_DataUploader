@@ -37,6 +37,29 @@ namespace CA_DataUploaderLib.IOconf
             return lines2.Select(x => CreateType(x, linesList.IndexOf(x)));
         }
 
+        /// <summary>
+        /// Writes the supplied contents to a file IO.conf on disk.
+        /// Renames any existing configuration to IO.conf.backup1 (trailing number increasing).
+        /// </summary>
+        /// <param name="ioconf"></param>
+        public static void WriteToDisk(string ioconf)
+        {
+            var filename = "IO.conf";
+            if (File.Exists(filename))
+            {
+                var count = 1;
+                string newFilename;
+                do
+                {
+                    newFilename = filename + ".backup" + count++;
+                }
+                while (File.Exists(newFilename));
+
+                File.Move(filename, newFilename);
+            }
+            File.WriteAllText(filename, ioconf);
+        }
+
         private static IOconfRow CreateType(string row, int lineNum)
         {
             try
