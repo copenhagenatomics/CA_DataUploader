@@ -8,7 +8,7 @@ namespace CA_DataUploaderLib
     public sealed class SwitchBoardController : BaseSensorBox
     {
         private static readonly object ControllerInitializationLock = new();
-        private static SwitchBoardController? _instance;
+        private static readonly Dictionary<CommandHandler, SwitchBoardController> _instanceDictionary = new();
 
         private SwitchBoardController(IIOconf ioconf, CommandHandler cmd) : base(cmd, "switchboards",
             ioconf.GetEntries<IOconfOut230Vac>().SelectMany(p => p.GetExpandedInputConf())
@@ -24,9 +24,12 @@ namespace CA_DataUploaderLib
 
         public static void Initialize(IIOconf ioconf, CommandHandler cmd)
         {
-            if (_instance != null) return;
             lock (ControllerInitializationLock)
-                _instance ??= new SwitchBoardController(ioconf, cmd);
+            {
+                if (_instanceDictionary.ContainsKey(cmd)) return;
+                _instanceDictionary[cmd] = new SwitchBoardController(ioconf, cmd);
+            }
+            cmd.StopToken.Register(() => { lock (ControllerInitializationLock) _instanceDictionary.Remove(cmd); });
         }
     }
 }

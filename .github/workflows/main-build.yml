@@ -13,11 +13,11 @@ jobs:
   nuget-packages:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0'
     - name: Restore dependencies
@@ -29,7 +29,7 @@ jobs:
     - name: Pack CA_DataUploaderLib
       run: dotnet pack CA_DataUploaderLib -c Release -o out
     - name: make generated nuget packages available as workflow artifacts too
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: nugetpackages
         path: out
@@ -40,11 +40,11 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags') }}
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '6.0'
     - name: Generate DataUploader - linux-x64
@@ -80,7 +80,7 @@ jobs:
       run: zip -qq -r CA_DataUploader-win-x86.zip uploader
       working-directory: out/win-x86
     - name: Release
-      uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844
+      uses: softprops/action-gh-release@4634c16e79c963813287e889244c50009e7f0981
       with:
         files: 'out/**/*.zip'
         draft: true

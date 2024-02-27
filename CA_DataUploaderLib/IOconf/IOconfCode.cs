@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib.IOconf
         public int Index { get; }
         public Version Version { get; }
 
-        /// <summary>resets the node instance count used to determine the node index, can be used for testing purposes</summary>
-        public static void ResetNodeIndexCount() => _nodeInstances = 0;
+        /// <summary>Resets the instance count used to determine the index, can be used for testing purposes</summary>
+        public static void ResetIndex() => _nodeInstances = 0;
     }
 }

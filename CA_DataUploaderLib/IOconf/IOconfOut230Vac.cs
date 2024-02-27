@@ -16,9 +16,16 @@ namespace CA_DataUploaderLib.IOconf
         public string CurrentSensorName { get; }
         public string BoardStateSensorName { get; } 
         public bool IsSwitchboardControllerOutput { get; }
-        public IEnumerable<IOconfInput> GetExpandedInputConf()
+        public override IEnumerable<IOconfInput> GetExpandedInputConf()
         { // note "_onoff" is not included as its not an input but the current expected on/off state as seen by the control loop.
             yield return NewPortInput(CurrentSensorName, 0 + PortNumber);
+        }
+
+        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        {
+            yield return Name;
+            foreach (var name in base.GetExpandedNames(ioconf))
+                yield return name;
         }
 
         /// <remarks>This config is general for the board, so caller must make sure to use a single instance x board</remarks>

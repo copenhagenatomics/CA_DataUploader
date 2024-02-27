@@ -10,7 +10,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             ("LoopName", (r, l) => new IOconfLoopName(r, l)),
             ("Account", (r, l) => new IOconfAccount(r, l)),
-            ("SampleRates", (r, l) => new IOconfSamplingRates(r, l)),
+            (IOconfSamplingRates.TypeName, (r, l) => new IOconfSamplingRates(r, l)),
             ("Map", (r, l) => new IOconfMap(r, l)),
             ("Math", (r, l) => new IOconfMath(r, l)),
             ("Alert", (r, l) => new IOconfAlert(r, l)),

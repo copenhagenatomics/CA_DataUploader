@@ -23,6 +23,9 @@ namespace CA_DataUploaderLib.IOconf
 
         public string Row { get; }
         public string Type { get; }
+        /// <summary>
+        /// 0-based line number in the configuration.
+        /// </summary>
         public int LineNumber { get; }
         public string Name 
         { 
@@ -67,5 +70,17 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         protected static readonly Regex ValidateNameRegex = new(@"^[a-zA-Z_]+[a-zA-Z0-9_]*$");
+
+        /// <summary>
+        /// Returns the full list of expanded vector field names from this class and it's associated decisions.
+        /// </summary>
+        public virtual IEnumerable<string> GetExpandedNames(IIOconf ioconf) 
+        { 
+            if (this is IIOconfRowWithDecision entryWithDecision)
+            {
+                foreach (var pluginField in entryWithDecision.CreateDecision(ioconf).PluginFields)
+                    yield return pluginField.Name;
+            }
+        }
     }
 }

@@ -16,10 +16,16 @@ namespace CA_DataUploaderLib.IOconf
 
         public IOconfFile()
         {
-            if (!Table.Any())
-            {
-                Reload();
-            }
+            Reload();
+        }
+
+        public IOconfFile(List<string> rawLines, bool performCheck = true)
+        {
+            Table.AddRange(IOconfFileLoader.ParseLines(rawLines));
+            RawLines = rawLines;
+            EnsureRPiTempEntry();
+            if (performCheck)
+                CheckConfig();
         }
 
         public void Reload()
@@ -29,21 +35,45 @@ namespace CA_DataUploaderLib.IOconf
             var (rawLines, entries) = IOconfFileLoader.Load();
             Table.AddRange(entries);
             RawLines = rawLines;
-            Table.ForEach(e => e.ValidateDependencies(this));
-            CheckRules();
+            EnsureRPiTempEntry();
+            CheckConfig();
         }
 
-        private void CheckRules()
+        public void CheckConfig()
+        {
+            CheckUniquenessRule();
+            Table.ForEach(e => e.ValidateDependencies(this));
+            CheckOvenHeaterRelationshipRule();
+        }
+
+        private void EnsureRPiTempEntry()
+        {
+            if (Table.OfType<IOconfRPiTemp>().Any())
+                return;
+            Table.Add(IOconfRPiTemp.Default);
+            RawLines.Add(IOconfRPiTemp.Default.Row);
+        }
+
+        private void CheckUniquenessRule()
         {
             // no two rows can have the same type,name combination. 
             var groups = Table.GroupBy(x => x.UniqueKey());
+            var errorMessage = string.Empty;
             foreach (var g in groups.Where(x => x.Count() > 1))
-                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Name: {g.First().ToList()[1]} occurred {g.Count()} times in this group: {g.First().ToList()[0]}");
+                errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"ERROR in IO.conf: Name: {g.First().ToList()[1]} occurred {g.Count()} times in this group: {g.First().ToList()[0]}";
+            if (!string.IsNullOrEmpty(errorMessage))
+                throw new Exception(errorMessage);
+        }
 
+        private void CheckOvenHeaterRelationshipRule()
+        {
             // no heater can be in several oven areas
             var heaters = GetOven().Where(x => x.OvenArea > 0).GroupBy(x => x.HeatingElement);
+            var errorMessage = string.Empty;
             foreach (var heater in heaters.Where(x => x.Select(y => y.OvenArea).Distinct().Count() > 1))
-                CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Heater: {heater.Key.Name} occurred in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}");
+                errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"ERROR in IO.conf: Heater: {heater.Key.Name} occurred in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}";
+            if (!string.IsNullOrEmpty(errorMessage))
+                throw new Exception(errorMessage);
         }
 
         private IOconfLoopName GetLoopConfig() => GetEntries<IOconfLoopName>().SingleOrDefault() ?? IOconfLoopName.Default;

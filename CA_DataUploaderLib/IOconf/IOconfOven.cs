@@ -2,11 +2,13 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.Extensions;
+using static CA_DataUploaderLib.HeatingController;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfOven : IOconfDriver
+    public class IOconfOven : IOconfDriver, IIOconfRowWithDecision
     {
         public IOconfOven(string row, int lineNum) : base(row, lineNum, "Oven")
         {
@@ -51,6 +53,8 @@ namespace CA_DataUploaderLib.IOconf
                 throw new FormatException($"Failed to find sensor: {TemperatureSensorName} for oven: {Row}");
             BoardStateSensorNames = ioconf.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
         }
+
+        public LoopControlDecision CreateDecision(IIOconf ioconf) => new OvenAreaDecision(new($"ovenarea{OvenArea}", OvenArea, ioconf.GetEntries<IOconfOvenProportionalControlUpdates>().SingleOrDefault()));
 
         public override string UniqueKey()
         {

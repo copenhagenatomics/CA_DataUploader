@@ -6,7 +6,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfCurrent : IOconfInput
     {
-        private double _currentTransformerRatio;
+        private readonly double _currentTransformerRatio;
         public const string TypeName = "Current";
 
         static readonly string DefaultCalibration = $"CAL {string.Join(" ", Enumerable.Range(1, 3).Select(i => $"{i},60.000000,0"))}";

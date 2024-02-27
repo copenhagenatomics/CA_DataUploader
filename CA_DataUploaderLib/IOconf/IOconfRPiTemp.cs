@@ -5,7 +5,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfRPiTemp : IOconfRow
     {
-        public static IOconfRPiTemp Default { get; } = new IOconfRPiTemp("RPiTemp;RPiTemp", 0);
+        public static IOconfRPiTemp Default { get; } = new IOconfRPiTemp("RPiTemp; RPiTemp", 0);
         public readonly bool Disabled;
         public IOconfRPiTemp(string row, int lineNum) : base(row, lineNum, "RPiTemp")
         {
@@ -38,6 +38,13 @@ namespace CA_DataUploaderLib.IOconf
                 yield return NewPortInput($"{Name}_{nodeNameClean}Cpu", map, 2);
             }
         }
+
+        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        {
+            foreach (var input in GetDistributedExpandedInputConf(ioconf))
+                yield return input.Name;
+        }
+
         private IOconfInput NewPortInput(string name, IOconfMap map, int portNumber) => new(Row, LineNumber, Type, map, portNumber) { Name = name, Skip = true };
         public static bool IsLocalCpuSensor(IOconfInput input) => input.Map.IsLocalBoard == true && input.Name.EndsWith("Cpu");
         public static bool IsLocalGpuSensor(IOconfInput input) => input.Map.IsLocalBoard == true && input.Name.EndsWith("Gpu");

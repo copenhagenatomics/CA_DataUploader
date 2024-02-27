@@ -1,9 +1,11 @@
-﻿using CA_DataUploaderLib.Extensions;
+﻿using CA.LoopControlPluginBase;
 using System;
+using System.Linq;
+using static CA_DataUploaderLib.HeatingController;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfHeater : IOconfOut230Vac
+    public class IOconfHeater : IOconfOut230Vac, IIOconfRowWithDecision
     {
         public IOconfHeater(string row, int lineNum) : base(row, lineNum, "Heater")
         {
@@ -17,5 +19,7 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public readonly int MaxTemperature;
+
+        public LoopControlDecision CreateDecision(IIOconf ioconf) => new HeaterDecision(this, ioconf.GetOven().SingleOrDefault(x => x.HeatingElement.Name == Name));
     }
 }

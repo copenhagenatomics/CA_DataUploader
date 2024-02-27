@@ -22,17 +22,42 @@ namespace CA_DataUploaderLib.IOconf
                 throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
             }
 
-            IOconfNode.ResetNodeIndexCount();
             var list = File.ReadAllLines("IO.conf").ToList();
             return (list, ParseLines(list));
         }
 
         public static IEnumerable<IOconfRow> ParseLines(IEnumerable<string> lines)
         {
+            IOconfNode.ResetIndex();
+            IOconfCode.ResetIndex();
+
             var linesList = lines.Select(x => x.Trim()).ToList();
             // remove empty lines and commented out lines
             var lines2 = linesList.Where(x => !x.StartsWith("//") && x.Length > 2).ToList();
             return lines2.Select(x => CreateType(x, linesList.IndexOf(x)));
+        }
+
+        /// <summary>
+        /// Writes the supplied contents to a file IO.conf on disk.
+        /// Renames any existing configuration to IO.conf.backup1 (trailing number increasing).
+        /// </summary>
+        /// <param name="ioconf"></param>
+        public static void WriteToDisk(string ioconf)
+        {
+            var filename = "IO.conf";
+            if (File.Exists(filename))
+            {
+                var count = 1;
+                string newFilename;
+                do
+                {
+                    newFilename = filename + ".backup" + count++;
+                }
+                while (File.Exists(newFilename));
+
+                File.Move(filename, newFilename);
+            }
+            File.WriteAllText(filename, ioconf);
         }
 
         private static IOconfRow CreateType(string row, int lineNum)
