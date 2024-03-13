@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace CA.LoopControlPluginBase
@@ -8,6 +9,7 @@ namespace CA.LoopControlPluginBase
         public abstract string Name { get; }
         /// <summary>gets all fields defined by the plugin (called before <see cref="Initialize(VectorDescription)"/>)</summary>
         public abstract PluginField[] PluginFields { get; }
+        public virtual string[] ReferenceFields { get; } = Array.Empty<string>();
         public abstract string[] HandledEvents { get; } //note these are just the names of the events handled, there is no accompanying help text.
         /// <summary>uses the field names in <see cref="VectorDescription"/> to get the field indexes that will be used in <see cref="MakeDecision(DataVector, List{string})"/></summary>
         /// <param name="desc"></param>
