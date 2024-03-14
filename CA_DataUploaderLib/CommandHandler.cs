@@ -55,7 +55,7 @@ namespace CA_DataUploaderLib
         public bool IsRunning => !_exitCts.IsCancellationRequested;
         public CancellationToken StopToken => _exitCts.Token;
         public Task RunningTask => _runningTaskTcs.Task;
-        public List<LoopControlDecision> Decisions => _decisions;
+        public IReadOnlyList<LoopControlDecision> Decisions => _decisions;
 
         public CommandHandler(IIOconf ioconf, SerialNumberMapper? mapper = null, ICommandRunner? runner = null, bool runCommandLoop = true)
         {
