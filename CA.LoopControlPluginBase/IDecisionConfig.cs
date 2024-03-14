@@ -21,7 +21,7 @@ namespace CA.LoopControlPluginBase
                 return false;
 
             if (!double.TryParse(stringVal, NumberStyles.Float, CultureInfo.InvariantCulture, out val))
-                throw new FormatException($"failed to parse double field {fieldName} value {stringVal} for {Decision}");
+                throw new FormatException($"Failed to parse double field {fieldName} value {stringVal} for {Decision}");
 
             return true;
         }
@@ -35,7 +35,7 @@ namespace CA.LoopControlPluginBase
                 return false;
 
             if (!int.TryParse(stringVal, NumberStyles.Integer, CultureInfo.InvariantCulture, out val))
-                throw new FormatException($"failed to parse int field {fieldName} value {stringVal} for {Decision}");
+                throw new FormatException($"Failed to parse int field {fieldName} value {stringVal} for {Decision}");
 
             return true;
         }
@@ -54,7 +54,7 @@ namespace CA.LoopControlPluginBase
                     (unexpectedFields ??= new()).Add(field);
 
             if (unexpectedFields != null)
-                throw new NotSupportedException($"Detected config fields not supported for {Decision}: {string.Join(',', unexpectedFields)}. Allowed fields: {string.Join(',', allowedFields)}");
+                throw new NotSupportedException($"Detected config fields not supported for {Decision}: {string.Join(", ", unexpectedFields)}. Allowed fields: {string.Join(", ", allowedFields)}");
         }
     }
 }
