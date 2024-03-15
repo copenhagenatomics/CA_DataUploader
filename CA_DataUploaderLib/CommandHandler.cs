@@ -55,6 +55,7 @@ namespace CA_DataUploaderLib
         public bool IsRunning => !_exitCts.IsCancellationRequested;
         public CancellationToken StopToken => _exitCts.Token;
         public Task RunningTask => _runningTaskTcs.Task;
+        public IReadOnlyList<LoopControlDecision> Decisions => _decisions;
 
         public CommandHandler(IIOconf ioconf, SerialNumberMapper? mapper = null, ICommandRunner? runner = null, bool runCommandLoop = true)
         {
@@ -138,7 +139,7 @@ namespace CA_DataUploaderLib
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
         public IEnumerable<SensorSample> GetGlobalInputs() => _subsystems.SelectMany(s => s.GetGlobalInputValues());
-        public void MakeDecision(List<SensorSample> inputs, DateTime vectorTime, [NotNull]ref DataVector? vector, List<string> commands)
+        public void MakeDecision(List<SensorSample> inputs, DateTime vectorTime, [NotNull] ref DataVector? vector, List<string> commands)
         {
             var extendedDesc = _fullsystemFilterAndMath.Value;
             DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, vectorTime);
