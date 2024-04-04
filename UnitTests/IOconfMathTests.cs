@@ -75,5 +75,24 @@ namespace UnitTests
             var math = new IOconfMath("Math;MyName;2 / MyValue   // This is a comment", 0);
             Assert.AreEqual(0.5d, math.Calculate(new Dictionary<string, object> { { "MyValue", 4 } }));
         }
+
+        [DataRow("Math; MyName; Max()")]
+        [DataRow("Math; MyName; Max(val1)")]
+        [DataRow("Math; MyName; Max(val1, val2, val3)")]
+        [DataRow("Math; MyName; Max(123)")]
+        [DataRow("Math; MyName; Max(123, 234, 345)")]
+        [DataRow("Math; MyName; Min(123)")]
+        [DataRow("Math; MyName; Min(123, 234, 345)")]
+        [DataRow("Math; MyName; Abs(123, 234)")]
+        [DataRow("Math; MyName; Round(123, 234, 345)")]
+        [DataRow("Math; MyName; Sin(123, 234, 345)")]
+        [DataRow("Math; MyName; Sqrt()")]
+        [DataRow("Math; MyName; Sqrt(123, 234)")]
+        [DataTestMethod]
+        public void RejectsExpressionIfIncorrectNumberOfArgumentsGivenToBuiltInFunction(string row)
+        {
+            var ex = Assert.ThrowsException<Exception>(() => new IOconfMath(row, 0));
+            Assert.IsTrue(ex.Message.StartsWith("IOconfMath: wrong format - expression:"));
+        }
     }
 }

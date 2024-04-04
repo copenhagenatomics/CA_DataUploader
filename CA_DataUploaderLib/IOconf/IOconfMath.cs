@@ -3,6 +3,7 @@ using NCalc;
 using NCalc.Domain;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -20,14 +21,15 @@ namespace CA_DataUploaderLib.IOconf
 
             try
             {
-                compiledExpression = Expression.Compile(RowWithoutComment()[(Name.Length + 6)..], true);
+                compiledExpression = Expression.Compile(ToList()[2], true);
+                SourceNames = GetSources();
+                // Perform test calculation using default input values
+                Calculate(SourceNames.ToDictionary(s => s, s => (object)0));
             }
             catch (Exception ex)
             {
                 throw new Exception("IOconfMath: wrong format - expression: " + row, ex);
             }
-
-            SourceNames = GetSources();
         }
 
         public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
