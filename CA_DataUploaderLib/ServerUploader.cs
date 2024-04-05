@@ -37,6 +37,8 @@ namespace CA_DataUploaderLib
         private readonly IIOconf _ioconf;
         private readonly CommandHandler _cmd;
         private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new();
+        private readonly Stopwatch _timeSinceLastLowFrequencyEvent = new();
+        private int _lowFrequencyEventsSkipped = 0;
 
         public string Title => nameof(ServerUploader);
         public bool IsEnabled { get; }
@@ -71,6 +73,19 @@ namespace CA_DataUploaderLib
         public SubsystemDescriptionItems GetVectorDescriptionItems() => new(new());
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
         public void SendEvent(object? sender, EventFiredArgs e) => _eventsChannel.Writer.TryWrite(e);
+        public void SendLowFrequencyEvent(EventFiredArgs e)
+        {
+            if (_timeSinceLastLowFrequencyEvent.IsRunning && _timeSinceLastLowFrequencyEvent.ElapsedMilliseconds < 5 * 60000)
+            {
+                if (_lowFrequencyEventsSkipped++ == 0)
+                    CALog.LogData(LogID.B, $"{nameof(ServerUploader)} - skipping further low frequency events (max 1 message every 5 minutes)");
+                return;
+            }
+
+            _timeSinceLastLowFrequencyEvent.Restart();
+            _eventsChannel.Writer.TryWrite(e);
+            _lowFrequencyEventsSkipped = 0;
+        }
         private void SendVector(DataVector vector)
         {
             var (uploadMap, uploadDesc) = Desc;
@@ -94,19 +109,30 @@ namespace CA_DataUploaderLib
                 SendEvent(this, new EventFiredArgs(e.Data, e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
 
             //now queue vectors
-            _vectorsChannel.Writer.TryWrite(WithOnlyUploadFields(vector));
+            _vectorsChannel.Writer.TryWrite(FilterOnlyUploadFieldsAndCheckInvalidValues(vector, out var invalidValueMessage));
 
-            DataVector WithOnlyUploadFields(DataVector fullVector)
+            //Possibly send event due to invalid values detected in the vector
+            if (!string.IsNullOrWhiteSpace(invalidValueMessage))
+                SendLowFrequencyEvent(new EventFiredArgs("Warning - invalid values detected: " + invalidValueMessage[2..], EventType.Log, DateTime.UtcNow));
+
+            DataVector FilterOnlyUploadFieldsAndCheckInvalidValues(DataVector fullVector, out string invalidValueMessage)
             {
                 var fullVectorData = fullVector.Data;
                 var uploadData = new double[uploadDesc.Length];
                 int j = 0;
+                StringBuilder invalidValues = new();
                 for (int i = 0; i < fullVector.Data.Length; i++)
                 {
-                    if (uploadMap[i])
-                        uploadData[j++] = fullVectorData[i];
-                }
+                    if (!uploadMap[i]) continue;
 
+                    if (double.IsNaN(fullVectorData[i]))
+                        invalidValues.Append($", {uploadDesc._items[j].Descriptor}=NaN");
+                    if (double.IsInfinity(fullVectorData[i]))
+                        invalidValues.Append($", {uploadDesc._items[j].Descriptor}=Inf");
+
+                    uploadData[j++] = fullVectorData[i];
+                }
+                invalidValueMessage = invalidValues.ToString();
                 return new(uploadData, fullVector.Timestamp, Array.Empty<EventFiredArgs>());//emptyEvents as we already queued them
             }
         }
