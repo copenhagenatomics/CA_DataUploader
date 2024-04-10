@@ -37,8 +37,8 @@ namespace CA_DataUploaderLib
         private readonly IIOconf _ioconf;
         private readonly CommandHandler _cmd;
         private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new();
-        private readonly Stopwatch _timeSinceLastLowFrequencyEvent = new();
-        private int _lowFrequencyEventsSkipped = 0;
+        private readonly Stopwatch _timeSinceLastInvalidValueEvent = new();
+        private int _invalidValueEventsSkipped = 0;
 
         public string Title => nameof(ServerUploader);
         public bool IsEnabled { get; }
@@ -73,18 +73,18 @@ namespace CA_DataUploaderLib
         public SubsystemDescriptionItems GetVectorDescriptionItems() => new(new());
         public IEnumerable<SensorSample> GetInputValues() => Enumerable.Empty<SensorSample>();
         public void SendEvent(object? sender, EventFiredArgs e) => _eventsChannel.Writer.TryWrite(e);
-        public void SendLowFrequencyEvent(EventFiredArgs e)
+        public void SendInvalidValueEvent(EventFiredArgs e)
         {
-            if (_timeSinceLastLowFrequencyEvent.IsRunning && _timeSinceLastLowFrequencyEvent.ElapsedMilliseconds < 5 * 60000)
+            if (_timeSinceLastInvalidValueEvent.IsRunning && _timeSinceLastInvalidValueEvent.ElapsedMilliseconds < 5 * 60000)
             {
-                if (_lowFrequencyEventsSkipped++ == 0)
-                    CALog.LogData(LogID.B, $"{nameof(ServerUploader)} - skipping further low frequency events (max 1 message every 5 minutes)");
+                if (_invalidValueEventsSkipped++ == 0)
+                    CALog.LogData(LogID.B, $"{nameof(ServerUploader)} - skipping further invalid value events (max 1 message every 5 minutes)");
                 return;
             }
 
-            _timeSinceLastLowFrequencyEvent.Restart();
+            _timeSinceLastInvalidValueEvent.Restart();
             _eventsChannel.Writer.TryWrite(e);
-            _lowFrequencyEventsSkipped = 0;
+            _invalidValueEventsSkipped = 0;
         }
         private void SendVector(DataVector vector)
         {
@@ -113,7 +113,7 @@ namespace CA_DataUploaderLib
 
             //Possibly send event due to invalid values detected in the vector
             if (!string.IsNullOrWhiteSpace(invalidValueMessage))
-                SendLowFrequencyEvent(new EventFiredArgs("Warning - invalid values detected: " + invalidValueMessage[2..], EventType.Log, DateTime.UtcNow));
+                SendInvalidValueEvent(new EventFiredArgs("Invalid values detected: " + invalidValueMessage[2..], EventType.LogError, DateTime.UtcNow));
 
             DataVector FilterOnlyUploadFieldsAndCheckInvalidValues(DataVector fullVector, out string invalidValueMessage)
             {
