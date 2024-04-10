@@ -120,19 +120,19 @@ namespace CA_DataUploaderLib
                 var fullVectorData = fullVector.Data;
                 var uploadData = new double[uploadDesc.Length];
                 int j = 0;
-                StringBuilder invalidValues = new();
+                StringBuilder? invalidValues = null;
                 for (int i = 0; i < fullVector.Data.Length; i++)
                 {
                     if (!uploadMap[i]) continue;
 
                     if (double.IsNaN(fullVectorData[i]))
-                        invalidValues.Append($", {uploadDesc._items[j].Descriptor}=NaN");
+                        (invalidValues ??= new()).Append($", {uploadDesc._items[j].Descriptor}=NaN");
                     if (double.IsInfinity(fullVectorData[i]))
-                        invalidValues.Append($", {uploadDesc._items[j].Descriptor}=Inf");
+                        (invalidValues ??= new()).Append($", {uploadDesc._items[j].Descriptor}=Inf");
 
                     uploadData[j++] = fullVectorData[i];
                 }
-                invalidValueMessage = invalidValues.ToString();
+                invalidValueMessage = invalidValues?.ToString() ?? string.Empty;
                 return new(uploadData, fullVector.Timestamp, Array.Empty<EventFiredArgs>());//emptyEvents as we already queued them
             }
         }
