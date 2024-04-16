@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -541,7 +542,7 @@ namespace CA_DataUploaderLib
                     var connectionInfo = IOconfFile.GetConnectionInfo();
                     var client = NewClient(connectionInfo.Server);
                     var token = await GetLoginTokenWithRetries(client, connectionInfo, cancellationToken); // retries here are important as its the first connection so running after a restart can run into the connection not being initialized
-                    var (plotId, plotName) = await GetPlotIDAsync(loopName, client, token, publicKey, signedVectorDescription, cancellationToken);
+                    var (plotId, plotName) = await GetPlotIDAsyncWithRetries(loopName, client, token, publicKey, signedVectorDescription, cancellationToken);
                     var connection = new PlotConnection(client, plotId, plotName);
                     connectionEstablishedSource.TrySetResult(connection);
                     return connection;
@@ -558,6 +559,38 @@ namespace CA_DataUploaderLib
                 }
             }
 
+            private static async Task<(int plotId, string plotName)> GetPlotIDAsyncWithRetries(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription, CancellationToken cancellationToken)
+            {
+                int failureCount = 0;
+                while (true)
+                {
+                    try
+                    {
+                        var result = await GetPlotIDAsync(loopName, client, loginToken, publicKey, signedVectorDescription, cancellationToken);
+                        if (failureCount > 0)
+                            CALog.LogInfoAndConsoleLn(LogID.A, $"Reconnected after {failureCount} failed attempts.");
+                        return result;
+                    }
+                    catch (OperationCanceledException ex) when (ex.CancellationToken != cancellationToken && !cancellationToken.IsCancellationRequested)
+                    {//in some cases this could happen when hitting timeouts - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
+                        OnError("Failed to connect while getting plot id, attempting to reconnect in 5 seconds.", ex);
+                        await Task.Delay(5000, cancellationToken);
+                    }
+                    catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized || ex.StatusCode == HttpStatusCode.BadRequest)
+                    {
+                        OnError($"Uploading is stopping - {ex.StatusCode} response getting plot id.");
+                        throw; //these are not considered temporary failures but failures finding/validating the login and/or signing key
+                    }
+                    catch (Exception ex)
+                    {
+                        //based on documented behavior it should only be HttpRequestException, but doing retries for other exceptions due to info out there on Socket and IO exceptions
+                        //e.g. should be network or potentially a temporary error returned by the server, we continue retrying - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
+                        OnError("Failed to connect while getting plot id, attempting to reconnect in 5 seconds.", ex);
+                        await Task.Delay(5000, cancellationToken);
+                    }
+                }
+            }
+
             private static async Task<(int plotId, string plotName)> GetPlotIDAsync(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription, CancellationToken cancellationToken)
             {
                 HttpResponseMessage? response = null;
@@ -570,15 +603,12 @@ namespace CA_DataUploaderLib
                     var result = await response.Content.ReadFromJsonAsync<string>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("unexpected null result when getting plotid");
                     return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
                 }
-                catch (Exception ex)
+                catch
                 {
-                    if (ex.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'" || ex.InnerException?.InnerException?.Message == "The remote name could not be resolved: 'www.theng.dk'")
-                        throw new HttpRequestException("Check your internet connection", ex);
-
                     var contentTask = response?.Content?.ReadAsStringAsync(cancellationToken);
                     var error = contentTask != null ? await contentTask : null;
                     if (!string.IsNullOrEmpty(error))
-                        throw new Exception(error);
+                        OnError($"Failure getting plot id: {error}");
 
                     throw;
                 }
@@ -596,8 +626,16 @@ namespace CA_DataUploaderLib
                             CALog.LogInfoAndConsoleLn(LogID.A, $"Reconnected after {failureCount} failed attempts.");
                         return token;
                     }
-                    catch (HttpRequestException ex)
+                    catch (OperationCanceledException ex) when (ex.CancellationToken != cancellationToken && !cancellationToken.IsCancellationRequested)
+                    {//in some cases this could happen when hitting timeouts - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
+                        OnError("Failed to connect while starting, attempting to reconnect in 5 seconds.", ex);
+                        await Task.Delay(5000, cancellationToken);
+                    }
+                    catch (Exception ex)
                     {
+                        //based on documented behavior it should only be HttpRequestException, but doing retries for other exceptions due to info out there on Socket and IO exceptions
+                        //e.g. should be network or potentially a temporary error returned by the server, we continue retrying - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
+                        //however, it is also some error codes the server returns that can be shared by temporary and permanent rejection errors
                         OnError("Failed to connect while starting, attempting to reconnect in 5 seconds.", ex);
                         await Task.Delay(5000, cancellationToken);
                     }
@@ -628,7 +666,14 @@ namespace CA_DataUploaderLib
 
             private static HttpClient NewClient(string server)
             {
-                var client = new HttpClient();
+                var handler = new SocketsHttpHandler()
+                {
+                    //allows the system to notice dns changes as recommended at https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines#recommended-use
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+                    //workaround for connection hangs triggered by unstable connections (not needed in .net 7+) https://github.com/dotnet/runtime/issues/81989
+                    ConnectTimeout = TimeSpan.FromMinutes(1) 
+                };
+                var client = new HttpClient(handler);
                 client.BaseAddress = new Uri(server);
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
