@@ -22,15 +22,15 @@ namespace CA_DataUploaderLib
         private readonly CommandHandler _cmd;
         protected readonly List<SensorSample.InputBased> _values;
         protected readonly List<SensorSample.InputBased> _localValues;
-        private readonly (IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] _boards = Array.Empty<(IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)>();
-        protected readonly AllBoardsState _boardsState = new(Enumerable.Empty<IOconfMap>());
-        private readonly Dictionary<MCUBoard, SensorSample.InputBased[]> _boardSamplesLookup = new();
+        private readonly (IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] _boards = [];
+        protected readonly AllBoardsState _boardsState = new([]);
+        private readonly Dictionary<MCUBoard, SensorSample.InputBased[]> _boardSamplesLookup = [];
         private readonly string mainSubsystem;
-        private readonly Dictionary<MCUBoard, List<(Func<DataVector?, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
-        private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = new();
+        private readonly Dictionary<MCUBoard, List<(Func<DataVector?, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = [];
+        private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = [];
         private ChannelReader<DataVector>? _receivedVectors;
-        private static readonly Dictionary<CommandHandler, Dictionary<string, string>> _usedBoxNames = new(); //Dictionary of used board names tied to a specific CommandHandler-instance
-        private readonly Dictionary<string, TaskCompletionSource> _reconnectTasks = new();
+        private static readonly Dictionary<CommandHandler, Dictionary<string, string>> _usedBoxNames = []; //Dictionary of used board names tied to a specific CommandHandler-instance
+        private readonly Dictionary<string, TaskCompletionSource> _reconnectTasks = [];
         private uint _lastStatus = 0U;
 
         public BaseSensorBox(CommandHandler cmd, string commandName, IEnumerable<IOconfInput> values)
@@ -71,7 +71,7 @@ namespace CA_DataUploaderLib
             {
                 if (!_usedBoxNames.ContainsKey(cmd))
                 {
-                    _usedBoxNames[cmd] = new();
+                    _usedBoxNames[cmd] = [];
                     cmd.StopToken.Register(() => _usedBoxNames.Remove(cmd));
                 }
 
@@ -188,7 +188,7 @@ namespace CA_DataUploaderLib
         /// <remarks>must be called before <see cref="CommandHandler.FullVectorDescriptionCreated"/> and <see cref="Run"/> are called</remarks>
         public void AddBuildInWriteAction(MCUBoard board, Func<DataVector?, MCUBoard, CancellationToken, Task> writeAction, Func<MCUBoard, CancellationToken, Task> exitAction)
         {
-            if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = new() { (writeAction, exitAction) };
+            if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = [(writeAction, exitAction)];
             else actions.Add((writeAction, exitAction));
         }
 
@@ -480,7 +480,7 @@ namespace CA_DataUploaderLib
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
-                        LowFrequencyLogInfo((args, skipMessage) => LogInfo(args.board, $"Unexpected board response {args.line.Replace("\r", "\\r")}{skipMessage}"), (board, line));// we avoid \r as it makes the output hard to read
+                        LowFrequencyLogInfo((args, skipMessage) => LogInfo(args.board, $"Unexpected board response '{args.line.Replace("\r", "\\r")}'{skipMessage}"), (board, line));// we avoid \r as it makes the output hard to read
                         if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                             _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                     }

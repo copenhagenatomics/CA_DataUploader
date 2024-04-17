@@ -58,7 +58,7 @@ namespace CA_DataUploaderLib
         public delegate bool TryReadLineDelegate(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)]out string? line);
         private TryReadLineDelegate TryReadLine;
         public delegate (bool finishedDetection, BoardInfo? info) CustomProtocolDetectionDelegate(ReadOnlySequence<byte> buffer, string portName);
-        private static readonly List<CustomProtocolDetectionDelegate> customProtocolDetectors = new();
+        private static readonly List<CustomProtocolDetectionDelegate> customProtocolDetectors = [];
 
         private MCUBoard(SerialPort port) : base(port.PortName, null)
         {
@@ -208,7 +208,7 @@ namespace CA_DataUploaderLib
         public async static Task<MCUBoard?> OpenDeviceConnection(IIOconf? ioconf, string name)
         {
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
-            var map = ioconf is not null ? ioconf.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name) : null;
+            var map = ioconf?.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name);
             var initialBaudrate = map != null && map.BaudRate != 0 ? map.BaudRate : 115200;
             var isVport = IOconfMap.IsVirtualPortName(name);
             bool skipAutoDetection = isVport || (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;

@@ -23,16 +23,16 @@ namespace CA_DataUploaderLib
         private readonly ICommandRunner _commandRunner;
         private DateTime _start = DateTime.Now;
         private readonly StringBuilder inputCommand = new();
-        private readonly List<string> AcceptedCommands = new();
-        private readonly List<ISubsystemWithVectorData> _subsystems = new();
+        private readonly List<string> AcceptedCommands = [];
+        private readonly List<ISubsystemWithVectorData> _subsystems = [];
         private int AcceptedCommandsIndex = -1;
-        private readonly List<LoopControlDecision> _decisions = new();
-        private readonly List<LoopControlDecision> _safetydecisions = new();
+        private readonly List<LoopControlDecision> _decisions = [];
+        private readonly List<LoopControlDecision> _safetydecisions = [];
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
         private readonly CancellationTokenSource _exitCts = new();
         private readonly TaskCompletionSource _runningTaskTcs = new();
         private readonly bool _isMultipi;
-        private readonly List<ChannelWriter<DataVector>> _receivedVectorsWriters = new();
+        private readonly List<ChannelWriter<DataVector>> _receivedVectorsWriters = [];
         private readonly Queue<EventFiredArgs> _locallyFiredEvents = new();
 
         /// <remarks>
@@ -258,7 +258,7 @@ namespace CA_DataUploaderLib
         private List<IOconfNode> GetNodes()
         {
             var nodes = _ioconf.GetEntries<IOconfNode>().ToList();
-            return nodes.Count > 0 ? nodes : new() { IOconfNode.GetSingleNode(_ioconf.GetLoopName()) };
+            return nodes.Count > 0 ? nodes : [IOconfNode.GetSingleNode(_ioconf.GetLoopName())];
         }
 
         public void OnNewVectorReceived(DataVector args)
@@ -291,7 +291,7 @@ namespace CA_DataUploaderLib
             List<EventFiredArgs>? list = null; // delayed initialization to avoid creating lists when there is no data.
             lock (_locallyFiredEvents)
                 for (int i = 0; i < max && _locallyFiredEvents.TryDequeue(out var e); i++)
-                    (list ??= new List<EventFiredArgs>()).Add(e);
+                    (list ??= []).Add(e);
             return list;
         }
 
