@@ -1,10 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net6.0</TargetFramework>
+		<TargetFramework>net8.0</TargetFramework>
 		<ProjectGuid>{C74C4DFC-74A1-40D4-A8DB-A0546ED810FD}</ProjectGuid>
 		<TestProjectType>UnitTest</TestProjectType>
-		<LangVersion>10.0</LangVersion>
 		<Nullable>enable</Nullable>
 	</PropertyGroup>
 
