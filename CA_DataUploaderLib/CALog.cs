@@ -142,8 +142,8 @@ namespace CA_DataUploaderLib
                 ShowLocalConsoleOutputWhenEnabled();
                 EnableOnLocalUserCommands(
                     TimeSpan.FromSeconds(5),
-                    () => Console.WriteLine("enabling local output for 5 seconds"),
-                    () => Console.WriteLine("disabled local output, check the event log in plots for further command(s) output"));
+                    () => Console.WriteLine("Enabling local output for 5 seconds"),
+                    () => Console.WriteLine("Disabled local output, check the event log in plots for further command(s) output"));
 
                 void ShowLocalConsoleOutputWhenEnabled()
                 {
