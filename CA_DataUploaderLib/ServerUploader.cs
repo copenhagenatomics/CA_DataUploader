@@ -159,6 +159,10 @@ namespace CA_DataUploaderLib
 
                 await Task.WhenAll(stateTracker, vectorsSender, eventsSender);
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                OnError($"Uploading stopped: {ex.Message}{Environment.NewLine}Check the configuration, correct any issues and restart to resume uploads.", ex);
+            }
             catch (OperationCanceledException) when (cts.Token.IsCancellationRequested) { }
             catch (Exception ex)
             {//this will usually be a hard error to establish a plot connection 
@@ -561,74 +565,84 @@ namespace CA_DataUploaderLib
 
             private static async Task<(int plotId, string plotName)> GetPlotIDAsyncWithRetries(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription, CancellationToken cancellationToken)
             {
-                int failureCount = 0;
-                while (true)
+                return await RunWithRetries(GetPlotIDAsync, (loopName, client, loginToken, publicKey, signedVectorDescription), "obtain/create plot for the system", cancellationToken);
+
+                static async Task<(int plotId, string plotName)> GetPlotIDAsync((string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription) args, CancellationToken cancellationToken)
                 {
+                    var (loopName, client, loginToken, publicKey, signedVectorDescription) = args;
+                    HttpResponseMessage? response = null;
                     try
                     {
-                        var result = await GetPlotIDAsync(loopName, client, loginToken, publicKey, signedVectorDescription, cancellationToken);
-                        if (failureCount > 0)
-                            CALog.LogInfoAndConsoleLn(LogID.A, $"Reconnected after {failureCount} failed attempts.");
-                        return result;
+                        string query = $"/api/v1/Plotdata/GetPlotnameId?loopname={loopName}&ticks={DateTime.UtcNow.Ticks}&logintoken={loginToken}";
+                        var signedValue = publicKey.Concat(signedVectorDescription).ToArray(); // Note that it will only work if converted to array and not IEnummerable
+                        response = await client.PutAsJsonAsync(query, signedValue, cancellationToken);
+                        response.EnsureSuccessStatusCode();
+                        var result = await response.Content.ReadFromJsonAsync<string>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("unexpected null result when getting plotid");
+                        return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
                     }
-                    catch (OperationCanceledException ex) when (ex.CancellationToken != cancellationToken && !cancellationToken.IsCancellationRequested)
-                    {//in some cases this could happen when hitting timeouts - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
-                        OnError("Failed to connect while getting plot id, attempting to reconnect in 5 seconds.", ex);
-                        await Task.Delay(5000, cancellationToken);
-                    }
-                    catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized || ex.StatusCode == HttpStatusCode.BadRequest)
+                    catch(Exception ex)
                     {
-                        OnError($"Uploading is stopping - {ex.StatusCode} response getting plot id.");
-                        throw; //these are not considered temporary failures but failures finding/validating the login and/or signing key
-                    }
-                    catch (Exception ex)
-                    {
-                        //based on documented behavior it should only be HttpRequestException, but doing retries for other exceptions due to info out there on Socket and IO exceptions
-                        //e.g. should be network or potentially a temporary error returned by the server, we continue retrying - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
-                        OnError("Failed to connect while getting plot id, attempting to reconnect in 5 seconds.", ex);
-                        await Task.Delay(5000, cancellationToken);
+                        var contentTask = response?.Content?.ReadAsStringAsync(cancellationToken);
+                        var error = contentTask != null ? await contentTask : null;
+                        if (!string.IsNullOrEmpty(error))
+                            OnError($"Failure getting plot id: {error}");
+
+                        if (ex is HttpRequestException rex && (rex.StatusCode == HttpStatusCode.Unauthorized || rex.StatusCode == HttpStatusCode.BadRequest))
+                            throw new UnauthorizedAccessException($"System private key or verified account token was rejected ({rex.StatusCode}).", ex);//skips retries
+
+                        throw;
                     }
                 }
             }
 
-            private static async Task<(int plotId, string plotName)> GetPlotIDAsync(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription, CancellationToken cancellationToken)
+            private static Task<string> GetLoginTokenWithRetries(HttpClient client, ConnectionInfo info, CancellationToken cancellationToken)
             {
-                HttpResponseMessage? response = null;
-                try
-                {
-                    string query = $"/api/v1/Plotdata/GetPlotnameId?loopname={loopName}&ticks={DateTime.UtcNow.Ticks}&logintoken={loginToken}";
-                    var signedValue = publicKey.Concat(signedVectorDescription).ToArray(); // Note that it will only work if converted to array and not IEnummerable
-                    response = await client.PutAsJsonAsync(query, signedValue, cancellationToken);
-                    response.EnsureSuccessStatusCode();
-                    var result = await response.Content.ReadFromJsonAsync<string>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("unexpected null result when getting plotid");
-                    return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
-                }
-                catch
-                {
-                    var contentTask = response?.Content?.ReadAsStringAsync(cancellationToken);
-                    var error = contentTask != null ? await contentTask : null;
-                    if (!string.IsNullOrEmpty(error))
-                        OnError($"Failure getting plot id: {error}");
+                return RunWithRetries(GetLoginToken, (client, info), "verify system identity with the plot server", cancellationToken);
 
-                    throw;
+                static async Task<string> GetLoginToken((HttpClient client, ConnectionInfo accountInfo) args, CancellationToken cancellationToken)
+                {
+                    var (client, accountInfo) = args;
+                    string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}", cancellationToken);
+                    if (string.IsNullOrEmpty(token))
+                        token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.email}&password={accountInfo.password}&fullName={accountInfo.Fullname}", cancellationToken); // attempt to create account assuming it did not exist
+
+                    return !string.IsNullOrEmpty(token) ? 
+                        token : 
+                        throw new UnauthorizedAccessException("Unable to login with the configured account.");//skips retries
+                }
+
+                static async Task<string?> Post(HttpClient client, string requestUri, CancellationToken cancellationToken)
+                {
+                    var response = await client.PostAsync(requestUri, null, cancellationToken);
+                    if (response.StatusCode == HttpStatusCode.OK && response.Content != null)
+                        return (await response.Content.ReadAsStringAsync(cancellationToken)).Replace("\"", "");
+                    else if (response.StatusCode == HttpStatusCode.Unauthorized)
+                        return null;
+
+                    throw new Exception(response.ReasonPhrase);
                 }
             }
 
-            private static async Task<string> GetLoginTokenWithRetries(HttpClient client, ConnectionInfo info, CancellationToken cancellationToken)
+            private static async Task<T> RunWithRetries<TArgs, T>(Func<TArgs, CancellationToken, Task<T>> func, TArgs args, string actionMsg, CancellationToken cancellationToken)
             {
-                int failureCount = 0;
+                int connectionAttempts = 0;
                 while (true)
                 {
                     try
                     {
-                        var token = await GetLoginToken(client, info, cancellationToken);
-                        if (failureCount > 0)
-                            CALog.LogInfoAndConsoleLn(LogID.A, $"Reconnected after {failureCount} failed attempts.");
-                        return token;
+                        connectionAttempts++;
+                        var res = await func(args, cancellationToken);
+                        CALog.LogInfoAndConsoleLn(LogID.A, $"Succeeded to {actionMsg} after {connectionAttempts} attempt(s).");
+                        return res;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        OnError($"Failed to {actionMsg}.");
+                        throw;
                     }
                     catch (OperationCanceledException ex) when (ex.CancellationToken != cancellationToken && !cancellationToken.IsCancellationRequested)
                     {//in some cases this could happen when hitting timeouts - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
-                        OnError("Failed to connect while starting, attempting to reconnect in 5 seconds.", ex);
+                        OnError($"Failed to {actionMsg}, attempting to reconnect in 5 seconds.", ex);
                         await Task.Delay(5000, cancellationToken);
                     }
                     catch (Exception ex)
@@ -636,32 +650,10 @@ namespace CA_DataUploaderLib
                         //based on documented behavior it should only be HttpRequestException, but doing retries for other exceptions due to info out there on Socket and IO exceptions
                         //e.g. should be network or potentially a temporary error returned by the server, we continue retrying - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
                         //however, it is also some error codes the server returns that can be shared by temporary and permanent rejection errors
-                        OnError("Failed to connect while starting, attempting to reconnect in 5 seconds.", ex);
+                        OnError($"Failed to {actionMsg}, attempting to reconnect in 5 seconds.", ex);
                         await Task.Delay(5000, cancellationToken);
                     }
                 }
-            }
-
-            private static async Task<string> GetLoginToken(HttpClient client, ConnectionInfo accountInfo, CancellationToken cancellationToken)
-            {
-                string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}", cancellationToken);
-                if (string.IsNullOrEmpty(token))
-                    token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.email}&password={accountInfo.password}&fullName={accountInfo.Fullname}", cancellationToken); // attempt to create account assuming it did not exist
-                if (!string.IsNullOrEmpty(token))
-                    return token;
-
-                throw new Exception("Unable to login or create token");
-            }
-
-            private static async Task<string?> Post(HttpClient client, string requestUri, CancellationToken cancellationToken)
-            {
-                var response = await client.PostAsync(requestUri, null, cancellationToken);
-                if (response.StatusCode == System.Net.HttpStatusCode.OK && response.Content != null)
-                    return (await response.Content.ReadAsStringAsync(cancellationToken)).Replace("\"","");
-                else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                    return null;
-
-                throw new Exception(response.ReasonPhrase);
             }
 
             private static HttpClient NewClient(string server)
