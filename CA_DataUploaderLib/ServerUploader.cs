@@ -138,12 +138,6 @@ namespace CA_DataUploaderLib
             return await plot.PutAsync(requestUri, SignInfo.GetSignature(bytes).Concat(bytes).ToArray(), token);
         }
 
-        public async Task<string> GetPlotUrl(CancellationToken token)
-        {
-            var plot = await GetPlot(token);
-            return "https://www.copenhagenatomics.com/Plots/TemperaturePlot.php?" + plot.PlotName;
-        }
-
         public async Task Run(CancellationToken externalToken)
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken, _cmd.StopToken);
@@ -588,7 +582,7 @@ namespace CA_DataUploaderLib
                             OnError($"Failure getting plot id: {error}");
 
                         if (ex is HttpRequestException rex && (rex.StatusCode == HttpStatusCode.Unauthorized || rex.StatusCode == HttpStatusCode.BadRequest))
-                            throw new UnauthorizedAccessException($"System private key or verified account token was rejected ({rex.StatusCode}).", ex);//skips retries
+                            throw new UnauthorizedAccessException($"System private key or verified account token was rejected ({rex.StatusCode}).", ex);//UnauthorizedAccessException skips retries
 
                         throw;
                     }
@@ -608,7 +602,7 @@ namespace CA_DataUploaderLib
 
                     return !string.IsNullOrEmpty(token) ? 
                         token : 
-                        throw new UnauthorizedAccessException("Unable to login with the configured account.");//skips retries
+                        throw new UnauthorizedAccessException("Unable to login with the configured account.");//UnauthorizedAccessException skips retries
                 }
 
                 static async Task<string?> Post(HttpClient client, string requestUri, CancellationToken cancellationToken)

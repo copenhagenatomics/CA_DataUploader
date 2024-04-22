@@ -34,16 +34,21 @@ namespace CA_DataUploader
                     var cloud = new ServerUploader(cmd);
                     using var usb = new ThermocoupleBox(cmd);
                     cmd.Execute("help");
+                    _ = cmd.GetFullSystemVectorDescription(); //this ensures the vector description is initialized before running the subsystems.
                     _ = Task.Run(() => cmd.RunSubsystems());
 
-                    int i = 0;
-                    var uploadThrottle = new TimeThrottle(100);
-                    while (cmd.IsRunning)
+                    var plotIdTask = cloud.GetPlotId(cmd.StopToken);
+                    await Task.WhenAny(cmd.RunningTask, plotIdTask); //wait for a connection to be established
+                    if (plotIdTask.IsCompletedSuccessfully)
                     {
-                        cmd.RunNextSingleNodeVector();
-                        Console.Write($"\r data points recorded: {i++}"); // we don't want this in the log file. 
-                        uploadThrottle.Wait();
-                        if (i == 20) _ = Task.Run(async () => DULutil.OpenUrl(await cloud.GetPlotUrl(cmd.StopToken)));
+                        int i = 0;
+                        var uploadThrottle = new TimeThrottle(100);
+                        while (cmd.IsRunning)
+                        {
+                            cmd.RunNextSingleNodeVector();
+                            Console.Write($"\r data points recorded: {i++}"); // we don't want this in the log file. 
+                            uploadThrottle.Wait();
+                        }
                     }
                 }
                 CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
