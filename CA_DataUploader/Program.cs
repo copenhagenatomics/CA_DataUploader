@@ -3,6 +3,7 @@ using CA_DataUploaderLib.Helpers;
 using System;
 using System.Data;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CA_DataUploader
@@ -16,6 +17,7 @@ namespace CA_DataUploader
 
         static async Task MainAsync(string[] args)
         {
+            var autoStopped = false;
             try
             {
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
@@ -34,26 +36,39 @@ namespace CA_DataUploader
                     var cloud = new ServerUploader(cmd);
                     using var usb = new ThermocoupleBox(cmd);
                     cmd.Execute("help");
-                    _ = Task.Run(() => cmd.RunSubsystems());
+                    _ = cmd.GetFullSystemVectorDescription(); //this ensures the vector description is initialized before running the subsystems.
+                    var subsystemsTasks = Task.Run(() => cmd.RunSubsystems());
 
-                    int i = 0;
-                    var uploadThrottle = new TimeThrottle(100);
-                    while (cmd.IsRunning)
+                    var plotIdTask = cloud.GetPlotId(cmd.StopToken);
+                    await Task.WhenAny(cmd.RunningTask, plotIdTask); //wait for a connection to be established
+                    if (plotIdTask.IsCompletedSuccessfully)
                     {
-                        cmd.RunNextSingleNodeVector();
-                        Console.Write($"\r data points recorded: {i++}"); // we don't want this in the log file. 
-                        uploadThrottle.Wait();
-                        if (i == 20) _ = Task.Run(async () => DULutil.OpenUrl(await cloud.GetPlotUrl(cmd.StopToken)));
+                        int i = 0;
+                        var uploadThrottle = new TimeThrottle(100);
+                        while (cmd.IsRunning)
+                        {
+                            cmd.RunNextSingleNodeVector();
+                            Console.Write($"\r data points recorded: {i++}"); // we don't want this in the log file. 
+                            uploadThrottle.Wait();
+                        }
                     }
+                    else
+                    {
+                        cmd.Execute("escape"); //explicitely stop on connection failures (needed so all the subsystems explicitely stop so awaiting them below is safe)
+                        autoStopped = true;
+                    }
+
+                    await subsystemsTasks;
                 }
-                CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
             }
             catch (Exception ex)
             {
                 ShowHumanErrorMessages(ex);
             }
 
-            Console.ReadKey();
+            CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
+            if (!autoStopped) //when auto stopping the CommandHandler is still waiting for a last key press.
+                Console.ReadKey();
         }
 
         private static void ShowHumanErrorMessages(Exception ex)
