@@ -527,15 +527,20 @@ namespace CA_DataUploaderLib
         {
             var readLineTask = board.SafeReadLine(token);
             var noDataAvailableTask = Task.Delay(msBetweenReads, token);
+            Stopwatch sw = new();
             if (await Task.WhenAny(readLineTask, noDataAvailableTask) == noDataAvailableTask)
             {
-                LogData(board, "No data available");
+                LogData(board, $"No data available ({readLineTask.IsCompleted})");
+                sw.Start();
                 _boardsState.SetState(boxName, ConnectionState.NoDataAvailable); //report the state early before waiting up to 2 seconds for the data (readLineTask)
             }
 
             try
             {
-                return (true, await readLineTask); // waits up to 2 seconds for the read to complete, while we are here the state keeps being no data.
+                var task = await readLineTask; // waits up to 2 seconds for the read to complete, while we are here the state keeps being no data.
+                if (sw.IsRunning)
+                    LogData(board, $"Time from no data available to data available: {sw.Elapsed.TotalMilliseconds}ms");
+                return (true, task);
             }
             catch (ObjectDisposedException)
             {
