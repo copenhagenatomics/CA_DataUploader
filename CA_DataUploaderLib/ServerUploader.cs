@@ -682,7 +682,8 @@ namespace CA_DataUploaderLib
                     else if (response.StatusCode == HttpStatusCode.Unauthorized)
                         return null;
 
-                    throw new Exception(response.ReasonPhrase);
+                    response.EnsureSuccessStatusCode();
+                    throw new Exception($"Unexpected server response: {response.StatusCode}");
                 }
             }
 
