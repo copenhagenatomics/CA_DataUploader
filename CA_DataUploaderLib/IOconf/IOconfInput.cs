@@ -85,10 +85,26 @@ namespace CA_DataUploaderLib.IOconf
             return map;
         }
 
-        public class Expandable : IOconfInput
+        public class Expandable : IOconfRow, IIOconfRowWithBoardState
         {
-            public Expandable(string row, int lineNum, string type, bool parsePortRequired, BoardSettings boardSettings) : base(row, lineNum, type, parsePortRequired, boardSettings)
+            private readonly BoardSettings _boardSettings;
+            private IOconfMap? _map;
+
+            public Expandable(string row, int lineNum, string type, bool parsePortRequired, BoardSettings boardSettings) : base(row, lineNum, type)
             {
+                Format = $"{type};Name;BoxName;[port number]";
+                var list = ToList();
+                (_, var skip, PortNumber) = GetPort(row, type, parsePortRequired, list);
+                if (skip)
+                    throw new Exception($"{type}: unexpected skip: {row}");
+                BoxName = list[2];
+                BoardStateName = BaseSensorBox.GetBoxStateName(BoxName);
+                _boardSettings = boardSettings;
+            }
+
+            public override void ValidateDependencies(IIOconf ioconf)
+            {
+                Map = GetMap(ioconf, BoxName, _boardSettings, false);
             }
 
             public virtual IEnumerable<IOconfInput> GetExpandedConf() => Enumerable.Empty<IOconfInput>();
@@ -97,6 +113,17 @@ namespace CA_DataUploaderLib.IOconf
             {
                 foreach (var input in GetExpandedConf())
                     yield return input.Name;
+            }
+
+            public string BoxName { get; }
+            public string BoardStateName { get; }
+            /// <summary>the 1-based port number</summary>
+            public int PortNumber = 1;
+
+            public IOconfMap Map
+            {
+                get => _map ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
+                private set => _map = value;
             }
 
             protected IOconfInput NewInput(string name, int portNumber, string? subsystemOverride = null) => 
