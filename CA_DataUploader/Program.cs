@@ -1,10 +1,8 @@
 ﻿using CA_DataUploaderLib;
-using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Data;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace CA_DataUploader
@@ -18,7 +16,6 @@ namespace CA_DataUploader
 
         static async Task MainAsync(string[] args)
         {
-            var autoStopped = false;
             try
             {
                 var loglevel = IOconfFileLoader.FileExists() ? IOconfFile.Instance.GetOutputLevel() : IOconfLoopName.Default.LogLevel;
@@ -42,16 +39,7 @@ namespace CA_DataUploader
                 _ = new Redundancy(ioconf, cmd);
                 _ = new ThermocoupleBox(ioconf, cmd);
                 _ = cmd.GetFullSystemVectorDescription(); //this ensures the vector description is initialized before running the subsystems.
-                var runTask = SingleNodeRunner.Run(ioconf, cmd, cloud, cmd.StopToken);
-                var plotIdTask = cloud.GetPlotId(cmd.StopToken);
-                await Task.WhenAny(cmd.RunningTask, plotIdTask); //wait for a connection to be established
-                if (!plotIdTask.IsCompletedSuccessfully)
-                {
-                  cmd.Execute("escape"); //explicitely stop on connection failures (needed so all the subsystems explicitely stop so awaiting them below is safe)
-                  autoStopped = true;
-                }
-              
-                await runTask;  
+                await SingleNodeRunner.Run(ioconf, cmd, cloud, cmd.StopToken);
             }
             catch (Exception ex)
             {
@@ -59,8 +47,7 @@ namespace CA_DataUploader
             }
 
             CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
-            if (!autoStopped) //when auto stopping the CommandHandler is still waiting for a last key press.
-                Console.ReadKey();
+            Console.ReadKey();
         }
 
         private static void ShowHumanErrorMessages(Exception ex)
