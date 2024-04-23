@@ -38,7 +38,6 @@ namespace CA_DataUploader
                 var cloud = new ServerUploader(ioconf, cmd);
                 _ = new Redundancy(ioconf, cmd);
                 _ = new ThermocoupleBox(ioconf, cmd);
-                _ = cmd.GetFullSystemVectorDescription(); //this ensures the vector description is initialized before running the subsystems.
                 await SingleNodeRunner.Run(ioconf, cmd, cloud, cmd.StopToken);
             }
             catch (Exception ex)
