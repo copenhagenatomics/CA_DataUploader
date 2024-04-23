@@ -682,8 +682,7 @@ namespace CA_DataUploaderLib
                     else if (response.StatusCode == HttpStatusCode.Unauthorized)
                         return null;
 
-                    response.EnsureSuccessStatusCode();
-                    throw new Exception($"Unexpected server response: {response.StatusCode}");
+                    throw new HttpRequestException($"Failed server response: {response.StatusCode} - {response.ReasonPhrase}", null, response.StatusCode);
                 }
             }
 
@@ -711,8 +710,9 @@ namespace CA_DataUploaderLib
                     }
                     catch (Exception ex)
                     {
-                        //based on documented behavior it should only be HttpRequestException, but doing retries for other exceptions due to info out there on Socket and IO exceptions
-                        //e.g. should be network or potentially a temporary error returned by the server, we continue retrying - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
+                        //Based on documented behavior it should only be HttpRequestException, but doing retries for other exceptions due to info out there on Socket and IO exceptions.
+                        //Above is expected to be improved in .net 8, but it was unclear while writting this which exception set is guaranteed to really include all types of failures doing the request and fetching the corresponding response.
+                        //Failures should usually be a network or potentially a temporary error returned by the server, we continue retrying - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
                         //however, it is also some error codes the server returns that can be shared by temporary and permanent rejection errors
                         OnError($"Failed to {actionMsg}, attempting to reconnect in 5 seconds.", ex);
                         await Task.Delay(5000, cancellationToken);
