@@ -52,7 +52,7 @@ namespace CA_DataUploader
             if (plotname.Length > 50)
                 plotname = plotname[..50];
 
-            lines.Insert(0, $"LoopName;{plotname};Normal;https://www.theng.dk");
+            lines.Insert(0, $"LoopName;{plotname};Normal");
 
             if (lines.Any(x => x.StartsWith("Account")))
                 lines.Remove(lines.First(x => x.StartsWith("Account")));

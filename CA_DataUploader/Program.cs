@@ -1,5 +1,4 @@
 ﻿using CA_DataUploaderLib;
-using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Data;
@@ -39,18 +38,14 @@ namespace CA_DataUploader
                 var cloud = new ServerUploader(ioconf, cmd);
                 _ = new Redundancy(ioconf, cmd);
                 _ = new ThermocoupleBox(ioconf, cmd);
-                var runTask = SingleNodeRunner.Run(ioconf, cmd, cloud, cmd.StopToken);
-                await Task.Delay(2000);
-                _ = Task.Run(async () => DULutil.OpenUrl(await cloud.GetPlotUrl(cmd.StopToken)));
-                await runTask;
-                
-                CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
+                await SingleNodeRunner.Run(ioconf, cmd, cloud, cmd.StopToken);
             }
             catch (Exception ex)
             {
                 ShowHumanErrorMessages(ex);
             }
 
+            CALog.LogInfoAndConsoleLn(LogID.A, Environment.NewLine + "Bye..." + Environment.NewLine + "Press any key to exit");
             Console.ReadKey();
         }
 
