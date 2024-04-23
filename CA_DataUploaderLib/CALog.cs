@@ -1,8 +1,10 @@
-﻿using CA.LoopControlPluginBase;
+﻿#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
@@ -13,65 +15,48 @@ namespace CA_DataUploaderLib
 
     public static class CALog
     {
-        private static Dictionary<LogID, DateTime> _nextSizeCheck;
+        private static Dictionary<LogID, DateTime>? _nextSizeCheck;
         private static readonly string _logDir = Directory.GetCurrentDirectory();
-        public static int MaxLogSizeMB = 100;
+
         /// <remarks>any output before a custom logger is set is written to the console.</remarks>
         public static ISimpleLogger LoggerForUserOutput { get; set; } = new ConsoleLogger();
+        public static int MaxLogSizeMB { get; set; } = 100;
 
-        public static void LogData(LogID logID, string msg)
-        {
-            WriteToFile(logID, msg);            
-        }
-
+        public static void LogData(LogID logID, string msg) => WriteToFile(logID, msg);
         public static void LogException(LogID logID, Exception ex)
         {
-            var msg = $"{DateTime.Now:MM.dd HH:mm:ss} - {ex}{Environment.NewLine}";
-            LoggerForUserOutput.LogError(msg);
+            var msg = ex.ToString();
+            LoggerForUserOutput.LogError(ex);
             WriteToFile(logID, msg);
         }
 
         public static void LogInfoAndConsoleLn(LogID logID, string msg)
         {
             LoggerForUserOutput.LogInfo(msg);
-            WriteToFile(logID, msg + Environment.NewLine);
+            WriteToFile(logID, msg);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error)
         {
-            error = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + error;
             LoggerForUserOutput.LogError(error);
-            WriteToFile(logID, error + Environment.NewLine);
+            WriteToFile(logID, error);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error, Exception ex)
         {
-            error = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + error;
             LoggerForUserOutput.LogError(error);
-            WriteToFile(logID, error + Environment.NewLine + ex.ToString() + Environment.NewLine);
+            WriteToFile(logID, error + Environment.NewLine + ex.ToString());
         }
 
-        public static void LogError(LogID logID, string error, Exception ex)
-        {
-            error = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ") + error;
-            WriteToFile(logID, error + Environment.NewLine + ex.ToString() + Environment.NewLine);
-        }
-
+        public static void LogError(LogID logID, string error, Exception ex) => WriteToFile(logID, error + Environment.NewLine + ex.ToString());
         private static void WriteToFile(LogID logID, string msg)
         {
             try
             {
                 lock (_logDir)
                 {
-                    // allways add a NewLine
-                    if (!msg.EndsWith(Environment.NewLine))
-                        msg += Environment.NewLine;
-
-                    var time = DateTime.UtcNow.ToString("MM.dd HH:mm:ss.fff - ");
-                    if (!msg.StartsWith(time))
-                        msg = time + msg;
-
-                    // allways add timestamp. 
+                    // allways add timestamp and a NewLine
+                    msg = $"{DateTime.Now:MM.dd HH:mm:ss.fff} - {msg}{Environment.NewLine}";
                     File.AppendAllText(GetFilename(logID), msg);
                 }
             }
@@ -85,7 +70,7 @@ namespace CA_DataUploaderLib
         private static string GetFilename(LogID logID)
         {
             if (_nextSizeCheck == null)
-                InitDictionary();
+                InitDictionary(ref _nextSizeCheck);
 
             var filepath = Path.Combine(_logDir, logID.ToString() + ".log");
             if (DateTime.Now > _nextSizeCheck[logID] && File.Exists(filepath))
@@ -99,17 +84,21 @@ namespace CA_DataUploaderLib
             return filepath;
         }
 
-        private static void InitDictionary()
+        private static void InitDictionary([NotNull]ref Dictionary<LogID, DateTime>? dictionary)
         {
-            _nextSizeCheck = new Dictionary<LogID, DateTime>();
-            _nextSizeCheck.Add(LogID.A, DateTime.Now);
-            _nextSizeCheck.Add(LogID.B, DateTime.Now);
-            _nextSizeCheck.Add(LogID.C, DateTime.Now);
-            _nextSizeCheck.Add(LogID.D, DateTime.Now);
-            _nextSizeCheck.Add(LogID.E, DateTime.Now);
-            _nextSizeCheck.Add(LogID.F, DateTime.Now);
-            _nextSizeCheck.Add(LogID.G, DateTime.Now);
-            _nextSizeCheck.Add(LogID.H, DateTime.Now);
+            if (dictionary != null) return;
+
+            dictionary = new Dictionary<LogID, DateTime>
+            {
+                { LogID.A, DateTime.Now },
+                { LogID.B, DateTime.Now },
+                { LogID.C, DateTime.Now },
+                { LogID.D, DateTime.Now },
+                { LogID.E, DateTime.Now },
+                { LogID.F, DateTime.Now },
+                { LogID.G, DateTime.Now },
+                { LogID.H, DateTime.Now }
+            };
         }
 
         public class ConsoleLogger : ISimpleLogger
@@ -134,12 +123,10 @@ namespace CA_DataUploaderLib
         public class EventsLogger : ISimpleLogger
         {
             private readonly CommandHandler handler;
-            private readonly bool useLocalEventsForOutput;
 
-            public EventsLogger(CommandHandler handler, bool useLocalEventsForOutput = false) 
+            public EventsLogger(CommandHandler handler) 
             {
                 this.handler = handler;
-                this.useLocalEventsForOutput = useLocalEventsForOutput;
                 EnableTempClusterOutputOnLocalActions(handler);
             }
             public void LogData(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log);
@@ -151,24 +138,26 @@ namespace CA_DataUploaderLib
             void EnableTempClusterOutputOnLocalActions(CommandHandler cmd)
             {
                 var logger = new ConsoleLogger();
-                Action subscribeAction = useLocalEventsForOutput 
-                    ? () => cmd.EventFired += OnLocalEventFired 
-                    : () => cmd.NewVectorReceived += OnVectorReceivedFired;
-                Action unsubscribeAction = useLocalEventsForOutput
-                    ? () => cmd.EventFired -= OnLocalEventFired
-                    : () => cmd.NewVectorReceived -= OnVectorReceivedFired;
+                var enabled = 0;
+                ShowLocalConsoleOutputWhenEnabled();
                 EnableOnLocalUserCommands(
                     TimeSpan.FromSeconds(5),
-                    () => { Console.WriteLine("enabling local output for 5 seconds"); subscribeAction(); },
-                    () => { Console.WriteLine("disabled local output, check the event log in plots for further command(s) output"); unsubscribeAction(); });
+                    () => Console.WriteLine("enabling local output for 5 seconds"),
+                    () => Console.WriteLine("disabled local output, check the event log in plots for further command(s) output"));
 
-                void OnLocalEventFired(object _, EventFiredArgs e) => WriteLogEventTo(e.EventType, e.Data);
-                void OnVectorReceivedFired(object _, NewVectorWithEventsReceivedArgs args)
+                void ShowLocalConsoleOutputWhenEnabled()
                 {
-                    var vector = args.Vector;
-                    if (vector.Events == null) return;
-                    foreach (var e in vector.Events)
-                        WriteLogEventTo(e.EventType, e.Data);
+                    var reader = cmd.GetReceivedVectorsReader();
+                    _ = Task.Run(async () =>
+                    {
+                        await foreach (var vector in reader.ReadAllAsync())
+                        {
+                            if (Interlocked.CompareExchange(ref enabled, 0, 0) == 0)
+                                continue;
+                            foreach (var e in vector.Events)
+                                WriteLogEventTo(e.EventType, e.Data);
+                        }
+                    });
                 }
 
                 void WriteLogEventTo(byte type, string data)
@@ -181,33 +170,23 @@ namespace CA_DataUploaderLib
 
                 void EnableOnLocalUserCommands(TimeSpan duration, Action enabledCallback, Action disabledCallback)
                 {
-                    var enabled = false;
-                    var lockObj = new object();
                     var timer = new Timer(_ =>
                     {
-                        lock (lockObj)
-                            enabled = false;
-                        disabledCallback();
+                        if (Interlocked.CompareExchange(ref enabled, 0, 1) == 1)
+                            disabledCallback();
                     });
                     cmd.UserCommandReceived += OnUserCommandEnableOutput;
                     cmd.StopToken.Register(() =>
                     {//since we are not be able to deliver events after stopping, keep console output enabled
                         cmd.UserCommandReceived -= OnUserCommandEnableOutput;
                         timer.Change(Timeout.Infinite, Timeout.Infinite);//disable the timer
-                        lock (lockObj)
-                            enabled = true;
+                        Interlocked.CompareExchange(ref enabled, 0, 1);
                     });
 
-                    void OnUserCommandEnableOutput(object sender, EventFiredArgs _)
+                    void OnUserCommandEnableOutput(object? sender, EventFiredArgs _)
                     {
                         timer.Change(duration, Timeout.InfiniteTimeSpan); //triggers after duration (ignores a previous trigger if pending)
-                        bool justEnabled;
-                        lock (lockObj)
-                        {
-                            if (justEnabled = !enabled)
-                                enabled = true;
-                        }
-                        if (justEnabled)
+                        if (Interlocked.CompareExchange(ref enabled, 1, 0) == 0)
                             enabledCallback();
                     }
                 }

@@ -11,9 +11,9 @@ namespace CA_DataUploaderLib
             set { TimeStamp = DateTime.UtcNow; _value = value; } 
         }
 
-        public IOconfInput Input = null;
-        public string Other = null;
-        public string Name { get { return Input != null ? Input.Name : Other; } }
+        public IOconfInput? Input { get; } = null;
+        public string? Other { get; } = null;
+        public string Name { get { return Input?.Name ?? Other ?? throw new InvalidOperationException("failed to get the sensor name"); } }
 
         private DateTime _timeStamp;
         public DateTime TimeStamp 
@@ -36,15 +36,23 @@ namespace CA_DataUploaderLib
             Other = other;
         }
 
-        public SensorSample Clone()
+        public class InputBased : SensorSample
         {
-            return new SensorSample(Input, Value){
-                _timeStamp = TimeStamp,
-                Other = Other,
-                ReadSensor_LoopTime = ReadSensor_LoopTime
-            };
-        }
+            public InputBased(IOconfInput input, double value = 0) : base(input, value)
+            {
+            }
 
-        public bool HasSpecialDisconnectValue() => Input != null ? Input.IsSpecialDisconnectValue(Value) : false;
+            public new IOconfInput Input => base.Input!;
+
+            public bool HasSpecialDisconnectValue() => Input.IsSpecialDisconnectValue(Value);
+            public InputBased Clone()
+            {
+                return new InputBased(Input, Value)
+                {
+                    _timeStamp = TimeStamp,
+                    ReadSensor_LoopTime = ReadSensor_LoopTime
+                };
+            }
+        }
     }
 }

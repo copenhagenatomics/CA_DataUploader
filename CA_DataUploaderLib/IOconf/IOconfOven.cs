@@ -1,36 +1,27 @@
-﻿using System;
-using System.Collections.Generic;
+﻿#nullable enable
+using System;
+using System.Collections.ObjectModel;
 using System.Linq;
+using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.Extensions;
+using static CA_DataUploaderLib.HeatingController;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfOven : IOconfDriver
+    public class IOconfOven : IOconfDriver, IIOconfRowWithDecision
     {
         public IOconfOven(string row, int lineNum) : base(row, lineNum, "Oven")
         {
-            Format = "Oven;Area;HeatingElement;TypeK;[ProportionalGain];[ControlPeriod];[MaxOutputPercentage]";
+            Format = "Oven;Area;HeatingElement;TypeK/TypeJ;[ProportionalGain];[ControlPeriod];[MaxOutputPercentage]";
 
             var list = ToList();
             if (!int.TryParse(list[1], out OvenArea)) 
                 throw new Exception($"IOconfOven: wrong OvenArea number: {row} {Format}");
             if (OvenArea < 1)
                 throw new Exception("Oven area must be a number bigger or equal to 1");
-            
-            HeatingElement = IOconfFile.GetHeater().Single(x => x.Name == list[2]);
+
+            HeaterName = list[2];
             TemperatureSensorName = list[3];
-            var typeks = IOconfFile.GetTypeK().Where(t => t.Name == TemperatureSensorName).ToList();
-            var maths = IOconfFile.GetMath().Where(m => m.Name == TemperatureSensorName).ToList();
-            var filters = IOconfFile.GetFilters().Where(f => f.NameInVector == TemperatureSensorName).ToList();
-            var foundSensor = typeks.Count > 0 || maths.Count > 0 || filters.Count > 0;
-            if (!foundSensor)
-                throw new Exception($"Failed to find sensor: {TemperatureSensorName} for oven: {row}");
-            BoardStateSensorNames =
-                typeks.Select(p => p.BoardStateSensorName)
-                .Concat(GetBoardStateNamesForSensors(maths.SelectMany(p => p.GetSources())))
-                .Concat(GetBoardStateNamesForSensors(filters.SelectMany(f => f.SourceNames)))
-                .ToList()
-                .AsReadOnly();
 
             if (list.Count < 5) return;
             if (!list[4].TryToDouble(out var proportionalGain))
@@ -50,34 +41,48 @@ namespace CA_DataUploaderLib.IOconf
             MaxOutputPercentage = maxOutputPercentage / 100d;
         }
 
+        public override void ValidateDependencies(IIOconf ioconf)
+        {
+            var list = ToList();
+            HeatingElement = ioconf.GetHeater().SingleOrDefault(x => x.Name == HeaterName) ?? throw new FormatException($"Failed to find HeatingElement: {HeaterName} for oven: {Row}");
+            var isTemp = ioconf.GetTemp().Any(t => t.Name == TemperatureSensorName);
+            var isMath = ioconf.GetMath().Any(m => m.Name == TemperatureSensorName);
+            var isFilter = ioconf.GetFilters().Any(f => f.NameInVector == TemperatureSensorName);
+            var isRedundancy = ioconf.GetEntries<Redundancy.IOconfRedundant>().Any(f => f.Name == TemperatureSensorName);
+            if (!isTemp && !isMath && !isFilter && !isRedundancy)
+                throw new FormatException($"Failed to find sensor: {TemperatureSensorName} for oven: {Row}");
+            BoardStateSensorNames = ioconf.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
+        }
+
+        public LoopControlDecision CreateDecision(IIOconf ioconf) => new OvenAreaDecision(new($"ovenarea{OvenArea}", OvenArea, ioconf.GetEntries<IOconfOvenProportionalControlUpdates>().SingleOrDefault()));
+
+        public override string UniqueKey()
+        {
+            var list = ToList();
+            return list[0] + list[2] + list[3];  // you could argue that this should somehow include 1 too. 
+        }
+
+        private IOconfHeater? heatingElement;
+        private ReadOnlyCollection<string>? boardStateSensorNames;
+
         public readonly int OvenArea;
-        public readonly IOconfHeater HeatingElement;
+
+        public IOconfHeater HeatingElement
+        { 
+            get => heatingElement ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(HeatingElement)}."); 
+            private set => heatingElement = value; 
+        }
         public string TemperatureSensorName { get; }
-        public IReadOnlyCollection<string> BoardStateSensorNames {get;}
+        public string HeaterName { get; }
+        public ReadOnlyCollection<string> BoardStateSensorNames 
+        { 
+            get => boardStateSensorNames ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(BoardStateSensorNames)}.");
+            private set => boardStateSensorNames = value; 
+        }
         //with the current formula the gain pretty much means seconds to gain 1C
-        //by default we assume the HeatingElement can heat TypeK 5 degrees x second on. 
+        //by default we assume the HeatingElement can heat the temperature sensor 5 degrees x second on. 
         public double ProportionalGain { get; } = 0.2d; 
         public TimeSpan ControlPeriod { get; } = TimeSpan.FromSeconds(30);
         public double MaxOutputPercentage { get; } = 1d;
-
-        ///<remarks>
-        ///if the sensor is a filter, it returns the board state name of all sources of the filter.
-        ///</remarks>
-        private IEnumerable<string> GetBoardStateNamesForSensors(IEnumerable<string> sensors)
-        {
-            var targetSources = sensors.ToHashSet();
-            foreach (var input in IOconfFile.GetInputs())
-            {
-                if (targetSources.Contains(input.Name))
-                    yield return input.BoardStateSensorName;
-            }
-
-            foreach (var filter in IOconfFile.GetFilters())
-            {
-                if (!targetSources.Contains(filter.NameInVector)) continue;
-                foreach(var boardState in GetBoardStateNamesForSensors(filter.SourceNames))
-                    yield return boardState;
-            }
-        }
     }
 }

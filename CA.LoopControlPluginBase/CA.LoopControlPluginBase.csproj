@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Company>Copenhagen Atomics</Company>
     <Authors>Copenhagen Atomics</Authors>
@@ -13,8 +13,9 @@
     <Copyright>Copyright © $([System.DateTime]::UtcNow.Year) Copenhagen Atomics ($([System.DateTime]::UtcNow.ToString("dd-MMM-yyyy HH:mm")))</Copyright>
     <RepositoryUrl>https://github.com/copenhagenatomics/CA_DataUploader</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <LangVersion>8.0</LangVersion>
+    <LangVersion>10.0</LangVersion>
     <MinVerTagPrefix>plugins</MinVerTagPrefix>
+	<Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
     <None Include="MIT license.txt">

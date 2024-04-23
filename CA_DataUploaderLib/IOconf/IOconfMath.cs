@@ -1,21 +1,30 @@
-﻿using NCalc;
+﻿#nullable enable
+using NCalc;
+using NCalc.Domain;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfMath : IOconfInput
+    public class IOconfMath : IOconfRow
     {
-        public IOconfMath(string row, int lineNum) : base(row, lineNum, "Math", false, false, null)
+        /// <summary>gets the sources (other vector values) listed explicitely in the math expression</summary>
+        /// <remarks>
+        /// Note the sources may include the math expression itself, which is the expression refering to its value in the previous cycle.
+        /// Also note that the sources returned may also refer to the math expression.
+        /// </remarks>
+        public List<string> SourceNames { get; }
+        public IOconfMath(string row, int lineNum) : base(row, lineNum, "Math")
         {
             Format = "Math;Name;math expression";
 
-            var list = ToList();
-
             try
             {
-                var compiledExpression = Expression.Compile(row.Substring(Name.Length + 6), true);
-                expression = new Expression(compiledExpression);
+                compiledExpression = Expression.Compile(ToList()[2], true);
+                SourceNames = GetSources();
+                // Perform test calculation using default input values
+                Calculate(SourceNames.ToDictionary(s => s, s => (object)0));
             }
             catch (Exception ex)
             {
@@ -23,24 +32,31 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        private readonly Expression expression;
+        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        {
+            yield return Name;
+        }
+
+        private readonly LogicalExpression compiledExpression;
 
         // https://www.codeproject.com/Articles/18880/State-of-the-Art-Expression-Evaluation
         // uses NCalc 2 for .NET core. 
         // https://github.com/sklose/NCalc2
         // examples:
         // https://github.com/sklose/NCalc2/blob/master/test/NCalc.Tests/Fixtures.cs
-        public SensorSample Calculate(Dictionary<string, object> values)
+        public double Calculate(Dictionary<string, object> values)
         {
+            var expression = new Expression(compiledExpression);
             expression.Parameters = values;
             // Convert.ToDouble allows some expressions that return int, decimals or even boolean to work
             // note that some expression may even return different values depending on the branch hit i.e. when using if(...)
-            return new SensorSample(this, Convert.ToDouble(expression.Evaluate())) { TimeStamp = DateTime.UtcNow };
+            return Convert.ToDouble(expression.Evaluate());
         }
 
-        public List<string> GetSources() 
+        private List<string> GetSources() 
         {
-            HashSet<string> parameters = new HashSet<string>();
+            HashSet<string> sources = new();
+            var expression = new Expression(compiledExpression);
             expression.EvaluateFunction += EvalFunction; 
             expression.EvaluateParameter += EvalParameter;
             try
@@ -52,17 +68,17 @@ namespace CA_DataUploaderLib.IOconf
                 expression.EvaluateFunction -= EvalFunction; 
                 expression.EvaluateParameter -= EvalParameter;
             }
-            return new List<string>(parameters);
+            return new List<string>(sources);
 
-            void EvalFunction(string name, NCalc.FunctionArgs args) 
+            void EvalFunction(string name, FunctionArgs args) 
             {
                 args.EvaluateParameters();
                 args.Result = 1;
             };
 
-            void EvalParameter(string name, NCalc.ParameterArgs args) 
+            void EvalParameter(string name, ParameterArgs args) 
             {
-                parameters.Add(name);
+                sources.Add(name);
                 args.Result = 1;
             };
         }

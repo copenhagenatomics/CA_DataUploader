@@ -1,5 +1,6 @@
 ﻿using CA_DataUploaderLib;
 using CA_DataUploaderLib.Helpers;
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Data;
 using System.Linq;
@@ -20,46 +21,37 @@ namespace CA_DataUploader
             var autoStopped = false;
             try
             {
-                CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud"));
+                var loglevel = IOconfFileLoader.FileExists() ? IOconfFile.Instance.GetOutputLevel() : IOconfLoopName.Default.LogLevel;
+                CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud", loglevel));
                 Console.WriteLine("Initializing...");
-                using (var serial = await SerialNumberMapper.DetectDevices())
+                Redundancy.RegisterSystemExtensions(IOconfFileLoader.Loader);
+                var serial = new SerialNumberMapper(IOconfFileLoader.FileExists() ? IOconfFile.Instance : null);
+                await serial.DetectDevices();
+
+                if (args.Length > 0 && args[0] == "-listdevices")
+                    return; // SerialNumberMapper already lists devices, no need for further output.
+
+                // close all ports which are not Hub10
+                serial.McuBoards.OfType<MCUBoard>().Where(x => x.ProductType?.Contains("Temperature") != true && x.ProductType?.Contains("Hub10STM") != true).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
+
+                IOconfSetup.UpdateIOconf(serial);
+
+                var ioconf = IOconfFile.Instance;
+                using var cmd = new CommandHandler(ioconf, serial);
+                var cloud = new ServerUploader(ioconf, cmd);
+                _ = new Redundancy(ioconf, cmd);
+                _ = new ThermocoupleBox(ioconf, cmd);
+                _ = cmd.GetFullSystemVectorDescription(); //this ensures the vector description is initialized before running the subsystems.
+                var runTask = SingleNodeRunner.Run(ioconf, cmd, cloud, cmd.StopToken);
+                var plotIdTask = cloud.GetPlotId(cmd.StopToken);
+                await Task.WhenAny(cmd.RunningTask, plotIdTask); //wait for a connection to be established
+                if (!plotIdTask.IsCompletedSuccessfully)
                 {
-                    if (args.Length > 0 && args[0] == "-listdevices")
-                        return; // SerialNumberMapper already lists devices, no need for further output.
-
-                    // close all ports which are not Hub10
-                    serial.McuBoards.OfType<MCUBoard>().Where(x => x.ProductType?.Contains("Temperature") != true && x.ProductType?.Contains("Hub10STM") != true).ToList().ForEach(x => x.SafeClose(System.Threading.CancellationToken.None).Wait());
-
-                    var email = IOconfSetup.UpdateIOconf(serial);
-
-                    using var cmd = new CommandHandler(serial);
-                    var cloud = new ServerUploader(cmd);
-                    using var usb = new ThermocoupleBox(cmd);
-                    cmd.Execute("help");
-                    _ = cmd.GetFullSystemVectorDescription(); //this ensures the vector description is initialized before running the subsystems.
-                    var subsystemsTasks = Task.Run(() => cmd.RunSubsystems());
-
-                    var plotIdTask = cloud.GetPlotId(cmd.StopToken);
-                    await Task.WhenAny(cmd.RunningTask, plotIdTask); //wait for a connection to be established
-                    if (plotIdTask.IsCompletedSuccessfully)
-                    {
-                        int i = 0;
-                        var uploadThrottle = new TimeThrottle(100);
-                        while (cmd.IsRunning)
-                        {
-                            cmd.RunNextSingleNodeVector();
-                            Console.Write($"\r data points recorded: {i++}"); // we don't want this in the log file. 
-                            uploadThrottle.Wait();
-                        }
-                    }
-                    else
-                    {
-                        cmd.Execute("escape"); //explicitely stop on connection failures (needed so all the subsystems explicitely stop so awaiting them below is safe)
-                        autoStopped = true;
-                    }
-
-                    await subsystemsTasks;
+                  cmd.Execute("escape"); //explicitely stop on connection failures (needed so all the subsystems explicitely stop so awaiting them below is safe)
+                  autoStopped = true;
                 }
+              
+                await runTask;  
             }
             catch (Exception ex)
             {

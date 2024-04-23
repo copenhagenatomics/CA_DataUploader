@@ -15,7 +15,6 @@ namespace CA_DataUploaderLib.Helpers
         SumAvg = 4,
         DiffAvg = 5,
         Triangle = 6,
-
     }
 
     public class FilterSample

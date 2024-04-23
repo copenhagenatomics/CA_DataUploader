@@ -1,11 +1,4 @@
 ﻿namespace CA_DataUploaderLib.IOconf
 {
-    public class ConnectionInfo
-    {
-        public string LoopName;
-        public string Server;
-        public string Fullname;
-        public string email;
-        public string password;
-    }
+    public record class ConnectionInfo(string LoopName, string Server, string Fullname, string Email, string Password);
 }

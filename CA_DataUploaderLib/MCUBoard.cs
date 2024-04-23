@@ -1,18 +1,17 @@
 ﻿#nullable enable
 using CA_DataUploaderLib.Extensions;
-using System;
-using System.Threading;
-using System.IO.Ports;
-using CA_DataUploaderLib.IOconf;
-using System.Collections.Generic;
-using System.IO;
-using System.IO.Pipelines;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Buffers;
-using System.Text;
-using System.Diagnostics.CodeAnalysis;
 using CA_DataUploaderLib.Helpers;
+using CA_DataUploaderLib.IOconf;
+using System;
+using System.Buffers;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.IO.Pipelines;
+using System.IO.Ports;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib
 {
@@ -24,29 +23,29 @@ namespace CA_DataUploaderLib
     {
         public const string BoxNameHeader = "IOconf.Map BoxName: ";
 
-        public const string serialNumberHeader = "Serial Number: ";
+        public const string serialNumberHeader = "Serial Number:";
 
-        public const string boardFamilyHeader = "Board Family: ";
-        public const string productTypeHeader = "Product Type: ";
+        public const string boardFamilyHeader = "Board Family:";
+        public const string productTypeHeader = "Product Type:";
 
-        public const string subProductTypeHeader = "Sub Product Type: ";
+        public const string subProductTypeHeader = "Sub Product Type:";
 
-        public const string softwareVersionHeader = "Software Version: ";
-        public const string boardSoftwareHeader = "Board Software: ";
+        public const string softwareVersionHeader = "Software Version:";
+        public const string boardSoftwareHeader = "Board Software:";
 
-        public const string softwareCompileDateHeader = "Software Compile Date: ";
-        public const string compileDateHeader = "Compile Date: ";
+        public const string softwareCompileDateHeader = "Software Compile Date:";
+        public const string compileDateHeader = "Compile Date:";
 
-        public const string pcbVersionHeader = "PCB version: ";
-        public const string boardVersionHeader = "Board Version: ";
+        public const string pcbVersionHeader = "PCB version:";
+        public const string boardVersionHeader = "Board Version:";
 
-        public const string mcuFamilyHeader = "MCU Family: ";
+        public const string mcuFamilyHeader = "MCU Family:";
         public bool InitialConnectionSucceeded {get; private set;} = false;
 
-        public const string CalibrationHeader = "Calibration: ";
+        public const string CalibrationHeader = "Calibration:";
 
-        public const string GitShaHeader = "Git SHA: ";
-        public const string GitShaHeader2 = "Git SHA ";
+        public const string GitShaHeader = "Git SHA:";
+        public const string GitShaHeader2 = "Git SHA";
 
         private static int _detectedUnknownBoards;
         // the "writer" for this lock are operations that close/reopens the connection, while the readers are any other operation including SafeWriteLine.
@@ -67,7 +66,7 @@ namespace CA_DataUploaderLib
             TryReadLine = TryReadAsciiLine; //this is the default which can be changed in ReadSerial based on the ThirdPartyProtocolDetection
         }
 
-        private async static Task<MCUBoard?> Create(string name, int baudrate, bool skipBoardAutoDetection)
+        private async static Task<MCUBoard?> Create(IIOconf? ioconf, string name, int baudrate, bool skipBoardAutoDetection, bool enableDtrRts = true)
         {
             MCUBoard? board = null;
             try
@@ -75,10 +74,9 @@ namespace CA_DataUploaderLib
                 var port = new SerialPort(name);
                 board = new MCUBoard(port);
                 port.BaudRate = 1;
-                port.DtrEnable = true;
-                port.RtsEnable = true;
+                port.DtrEnable = enableDtrRts;
+                port.RtsEnable = enableDtrRts;
                 port.BaudRate = baudrate;
-                port.PortName = name;
                 port.ReadTimeout = 2000;
                 port.WriteTimeout = 2000;
                 port.Open();
@@ -87,9 +85,9 @@ namespace CA_DataUploaderLib
                 board.ProductType = "NA";
                 board.InitialConnectionSucceeded = skipBoardAutoDetection || await board.ReadSerialNumber(board.pipeReader);
 
-                if (File.Exists("IO.conf"))
+                if (ioconf is not null)
                 { // note that unlike the discovery at MCUBoard.OpenDeviceConnection that only considers the usb port, in here we can find the boards by the serial number too.
-                    foreach (var ioconfMap in IOconfFile.GetMap())
+                    foreach (var ioconfMap in ioconf.GetMap())
                     {
                         if (board.TrySetMap(ioconfMap))
                         {
@@ -111,9 +109,13 @@ namespace CA_DataUploaderLib
                 board.port.Close();
                 Thread.Sleep(100);
             }
-            else if (board != null && board.IsEmpty() && board.BoxName == null)
+            else if (board != null && board.BoxName == null && board.SerialNumber.IsNullOrEmpty())
             {//note we don't log this for devices without serial that were mapped by usb (last check above)
-                CALog.LogInfoAndConsoleLn(LogID.B, $"some data without serial detected for device at port {name} - {baudrate} / still connected");
+                CALog.LogInfoAndConsoleLn(LogID.B, $"Some data without serial detected for device at port {name} - {baudrate}");
+            }
+            else if (board != null && !board.SerialNumber.IsNullOrEmpty() && (board.ProductType.IsNullOrEmpty() || board.SoftwareVersion.IsNullOrEmpty() || board.PcbVersion.IsNullOrEmpty()))
+            {
+                CALog.LogInfoAndConsoleLn(LogID.B, $"Detected board with incomplete header {name} - {baudrate}");
             }
 
             return board;
@@ -124,47 +126,34 @@ namespace CA_DataUploaderLib
             string? newCalibration = configSettings.Calibration;
             if (newCalibration == default || Calibration == newCalibration)
                 return default; // ignore if there is no calibration in configuration or if the board already had the expected configuration
+            if (Calibration == default && configSettings.SkipCalibrationWhenHeaderIsMissing)
+            {
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Skipped detected board without calibration support - {ToShortDescription()}");
+                return default;
+            }
 
-            var calibrationMessage = $"replaced board calibration '{Calibration}' with '{newCalibration}";
+            var calibrationMessage = $"Replaced board calibration '{Calibration}' with '{newCalibration}";
             CALog.LogInfoAndConsoleLn(LogID.A, $"{calibrationMessage}' - {ToShortDescription()}");
             await SafeWriteLine(newCalibration, CancellationToken.None);
             UpdatedCalibration = newCalibration;
             return calibrationMessage;
         }
 
-        private bool IsEmpty()
-        {
-            // pcbVersion is included in this list because at the time of writting is the last value in the readEEPROM header, 
-            // which avoids the rest of the header being treated as "values".
-            return SerialNumber.IsNullOrEmpty() ||
-                    ProductType.IsNullOrEmpty() ||
-                    SoftwareVersion.IsNullOrEmpty() ||
-                    PcbVersion.IsNullOrEmpty();  
-        }
-        
         public async Task<string> SafeReadLine(CancellationToken token) => (await RunWaitingForAnyOngoingReconnect(ReadLine, token)) ?? string.Empty;
         public Task SafeWriteLine(string msg, CancellationToken token) => RunWaitingForAnyOngoingReconnect(() => port.WriteLine(msg), token);
 
         public async Task SafeClose(CancellationToken token)
         {
-            await _reconnectionLock.AcquireWriterLock(token);
-            try
-            {
-                if (pipeReader != null)
-                    await pipeReader.CompleteAsync();
-                if (port.IsOpen)
-                    port.Close();                
-            }
-            finally
-            {
-                _reconnectionLock.ReleaseWriterLock();
-            }
+            using var _ = await _reconnectionLock.AcquireWriterLock(token);
+            if (pipeReader != null)
+                await pipeReader.CompleteAsync();
+            if (port.IsOpen)
+                port.Close();                
         }
 
-        public string ToDebugString(string seperator) => 
-            $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {port.BaudRate}{seperator}{serialNumberHeader}{SerialNumber}{seperator}{productTypeHeader}{ProductType}{seperator}{pcbVersionHeader}{PcbVersion}{seperator}{softwareVersionHeader}{SoftwareVersion}{seperator}{CalibrationHeader}{Calibration}{seperator}";
-        public override string ToString() => $"{productTypeHeader}{ProductType,-20} {serialNumberHeader}{SerialNumber,-12} Port name: {PortName}";
-        public string ToShortDescription() => $"{BoxName} {ProductType} {SerialNumber} {PortName}";
+        public string ToDebugString(string seperator) =>
+            $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {port.BaudRate}{seperator}{serialNumberHeader} {SerialNumber}{seperator}{productTypeHeader} {ProductType}{seperator}{pcbVersionHeader}{PcbVersion}{seperator}{softwareVersionHeader} {SoftwareVersion}{seperator}{CalibrationHeader} {Calibration}{seperator}";
+        public override string ToString() => $"{productTypeHeader} {ProductType,-20} {serialNumberHeader} {SerialNumber,-12} Port name: {PortName}";
 
         /// <summary>
         /// Reopens the connection skipping the header.
@@ -182,9 +171,9 @@ namespace CA_DataUploaderLib
         {
             var lines = new List<string>();
             var bytesToRead500ms = 0;
-            await _reconnectionLock.AcquireWriterLock(token);
             try
             {
+                using var _ = await _reconnectionLock.AcquireWriterLock(token);
                 if (pipeReader != null)
                     await pipeReader.CompleteAsync();
                 if (port.IsOpen)
@@ -193,7 +182,7 @@ namespace CA_DataUploaderLib
                     port.Close();
                     await Task.Delay(500, token);
                 }
-                
+
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {ProductType} {SerialNumber}");
                 port.Open();
                 await Task.Delay(500, token);
@@ -206,31 +195,28 @@ namespace CA_DataUploaderLib
             catch (Exception ex)
             {
                 CALog.LogError(
-                    LogID.B, 
+                    LogID.B,
                     $"Failure reopening port {PortName} {ProductType} {SerialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
                     ex);
                 return false;
-            }
-            finally
-            {
-                _reconnectionLock.ReleaseWriterLock();
             }
 
             CALog.LogData(LogID.B, $"Reopened port {PortName} {ProductType} {SerialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§", lines)}'");
             return true;
         }
 
-        public async static Task<MCUBoard?> OpenDeviceConnection(string name)
+        public async static Task<MCUBoard?> OpenDeviceConnection(IIOconf? ioconf, string name)
         {
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
-            var map = File.Exists("IO.conf") ? IOconfFile.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name) : null;
+            var map = ioconf is not null ? ioconf.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name) : null;
             var initialBaudrate = map != null && map.BaudRate != 0 ? map.BaudRate : 115200;
-            bool skipAutoDetection = (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;
+            var isVport = IOconfMap.IsVirtualPortName(name);
+            bool skipAutoDetection = isVport || (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;
             if (skipAutoDetection)
-                CALog.LogInfoAndConsoleLn(LogID.A, $"device detection disabled for board {map}");
-            var mcu = await Create(name, initialBaudrate, skipAutoDetection);
+                CALog.LogInfoAndConsoleLn(LogID.A, $"device detection disabled for {name}({map})");
+            var mcu = await Create(ioconf, name, initialBaudrate, skipAutoDetection, !isVport);
             if (mcu == null || !mcu.InitialConnectionSucceeded)
-                mcu = await OpenWithAutoDetection(name, initialBaudrate);
+                mcu = await OpenWithAutoDetection(ioconf, name, initialBaudrate);
             if (mcu == null)
                 return null; //we normally only get here if the SerialPort(usbport) constructor failed, which might be due to a wrong port
             if (mcu.SerialNumber.IsNullOrEmpty())
@@ -242,6 +228,11 @@ namespace CA_DataUploaderLib
             mcu.ProductType ??= GetStringFromDmesg(mcu.PortName);
             return mcu;
         }
+
+        public static string[] GetUSBports() => Environment.OSVersion.Platform == PlatformID.Unix
+                //notice we check both /dev/USB and vports & we ignore missing when vports is missing (via the error redirect to /dev/null)
+                ? DULutil.ExecuteShellCommand("ls -1a vports/* /dev/USB* 2>/dev/null").Split("\n".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).Select(x => x.Replace("\r", "").Trim()).ToArray()
+                : SerialPort.GetPortNames();
 
         private static string? GetStringFromDmesg(string portName)
         {
@@ -266,15 +257,15 @@ namespace CA_DataUploaderLib
             return lines;
         }
 
-        private async static Task<MCUBoard?> OpenWithAutoDetection(string name, int previouslyAttemptedBaudRate)
-        { 
+        private async static Task<MCUBoard?> OpenWithAutoDetection(IIOconf? ioconf, string name, int previouslyAttemptedBaudRate)
+        {
             var skipAutoDetection = false;
             if (previouslyAttemptedBaudRate == 115200)
-                return await Create(name, 9600, skipAutoDetection);
+                return await Create(ioconf, name, 9600, skipAutoDetection);
             if (previouslyAttemptedBaudRate == 9600)
-                return await Create(name, 115200, skipAutoDetection);
-            var board = await Create(name, 115200, skipAutoDetection);
-            return board != null && board.InitialConnectionSucceeded ? board : await Create(name, 9600, skipAutoDetection);
+                return await Create(ioconf, name, 115200, skipAutoDetection);
+            var board = await Create(ioconf, name, 115200, skipAutoDetection);
+            return board != null && board.InitialConnectionSucceeded ? board : await Create(ioconf, name, 9600, skipAutoDetection);
         }
 
         /// <returns><c>true</c> if we were able to read</returns>
@@ -286,124 +277,18 @@ namespace CA_DataUploaderLib
                 SerialNumber = detectedInfo.SerialNumber;
                 ProductType = detectedInfo.ProductType;
                 TryReadLine = detectedInfo.LineParser;
-                return true; 
+                return true;
             }
 
             port.WriteLine("Serial");
-            bool sentSerialCommandTwice = false;
-            bool ableToRead = false;
-            var finishedReadingHeader = false;
-
-            // A cancellation token is made here rather than a simple timer since the ReadAsync function can hang
-            // if a device never sends a line for it to read.
-            int millisecondsTimeout = 5000;
-            using var cts = new CancellationTokenSource(millisecondsTimeout);
-            var token = cts.Token;
-
-            while (!finishedReadingHeader && !token.IsCancellationRequested)
-            {
-                try
-                {
-                    // we use the regular reads as only 1 thread uses the board during instance initialization
-                    var res = await pipeReader.ReadAsync(token);
-
-                    if (res.IsCanceled)
-                        return ableToRead;
-
-                    var buffer = res.Buffer;
-
-                    while (IsEmpty() && TryReadLine(ref buffer, out var input))
-                    {
-                        ableToRead |= input.Length >= 2;
-                        input = input.Trim();
-                        if (input.StartsWith(serialNumberHeader))
-                            SerialNumber = input[(input.IndexOf(serialNumberHeader) + serialNumberHeader.Length)..].Trim();
-                        else if (input.StartsWith(boardFamilyHeader))
-                            ProductType = input[(input.IndexOf(boardFamilyHeader) + boardFamilyHeader.Length)..].Trim();
-                        else if (input.StartsWith(productTypeHeader))
-                            ProductType = input[(input.IndexOf(productTypeHeader) + productTypeHeader.Length)..].Trim();
-                        else if (input.StartsWith(boardVersionHeader))
-                            PcbVersion = input[(input.IndexOf(boardVersionHeader) + boardVersionHeader.Length)..].Trim();
-                        else if (input.StartsWith(pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase))
-                            PcbVersion = input[(input.IndexOf(pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase) + pcbVersionHeader.Length)..].Trim();
-                        else if (input.StartsWith(boardSoftwareHeader))
-                            SoftwareCompileDate = input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim();
-                        else if (input.StartsWith(softwareCompileDateHeader))
-                            SoftwareCompileDate = input[(input.IndexOf(softwareCompileDateHeader) + softwareCompileDateHeader.Length)..].Trim();
-                        else if (input.StartsWith(compileDateHeader))
-                            SoftwareCompileDate = input[(input.IndexOf(compileDateHeader) + compileDateHeader.Length)..].Trim();
-                        else if (input.StartsWith(boardSoftwareHeader))
-                            SoftwareVersion = input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim();
-                        else if (input.StartsWith(softwareVersionHeader))
-                            SoftwareVersion = input[(input.IndexOf(softwareVersionHeader) + softwareVersionHeader.Length)..].Trim();
-                        else if (input.StartsWith(mcuFamilyHeader))
-                            McuFamily = input[(input.IndexOf(mcuFamilyHeader) + mcuFamilyHeader.Length)..].Trim();
-                        else if (input.StartsWith(subProductTypeHeader))
-                            SubProductType = input[(input.IndexOf(subProductTypeHeader) + subProductTypeHeader.Length)..].Trim();
-                        else if (input.StartsWith(GitShaHeader))
-                            GitSha = input[(input.IndexOf(GitShaHeader) + GitShaHeader.Length)..].Trim();
-                        else if (input.StartsWith(GitShaHeader2))
-                            GitSha = input[(input.IndexOf(GitShaHeader2) + GitShaHeader2.Length)..].Trim();
-
-                        else if (input.Contains("MISREAD") && !sentSerialCommandTwice && SerialNumber == null)
-                        {
-                            port.WriteLine("Serial");
-                            CALog.LogInfoAndConsoleLn(LogID.A, $"Received misread without any serial on port {PortName} - re-sending serial command");
-                            sentSerialCommandTwice = true;
-                        }
-                    }
-
-                    if (!IsEmpty() && TryReadOptionalCalibration(ref buffer, out var calibration))
-                    {
-                        finishedReadingHeader = true;
-                        Calibration = UpdatedCalibration = calibration;
-                    }
-
-                    // Tell the PipeReader how much of the buffer has been consumed.
-                    pipeReader.AdvanceTo(buffer.Start, buffer.End);
-
-                    if (res.IsCompleted)
-                    {
-                        CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {PortName} ({port.BaudRate}): pipe reader was closed");
-                        break; // typically means the connection was closed.
-                    }
-                }
-                catch (TimeoutException ex)
-                {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
-                    break;
-                }
-                catch (OperationCanceledException ex)
-                {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {PortName} ({port.BaudRate}): " + ex.Message);
-                }
-            }
-
+            var header = new Header();
+            var ableToRead = await header.DetectBoardHeader(pipeReader, TryReadLine, () => port.WriteLine("Serial"), $"{PortName} ({port.BaudRate})");
+            header.CopyTo(this);
             return ableToRead;
         }
 
-        ///<returns>true if it finished attempting to read the optional calibration, or false if more data is needed</returns>
-        private bool TryReadOptionalCalibration(ref ReadOnlySequence<byte> buffer, out string? calibration)
-        {
-            calibration = default;
-            var localBuffer = buffer; // take a copy to avoid unnecesarily throwing away data coming after the header
-            if (!TryReadLine(ref localBuffer, out var input))
-                return false; //we did not get a line, more data is needed
-            if (input.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase))
-            {
-                calibration = input[(input.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
-                buffer = localBuffer; //avoids the calibration line being treated as data
-            }
-            return true;
-        }
-
         /// <summary>detects if we are talking with a supported third party device</summary>
-        private Task<BoardInfo?> DetectThirdPartyProtocol(PipeReader pipeReader) => 
+        private Task<BoardInfo?> DetectThirdPartyProtocol(PipeReader pipeReader) =>
             DetectThirdPartyProtocol(port.BaudRate, PortName, pipeReader);
 
         public static void AddCustomProtocol(CustomProtocolDetectionDelegate detector) => customProtocolDetectors.Add(detector ?? throw new ArgumentNullException(nameof(detector)));
@@ -412,7 +297,7 @@ namespace CA_DataUploaderLib
         public static async Task<BoardInfo?> DetectThirdPartyProtocol(
             int baudRate, string portName, PipeReader pipeReader)
         {
-            if (baudRate != 9600) 
+            if (baudRate != 9600)
                 return default; //all the third party devices currently supported are running at 9600<
 
             // A cancellation token is made here rather than a simple timer since the ReadAsync function can hang
@@ -424,10 +309,10 @@ namespace CA_DataUploaderLib
             {
                 while (!token.IsCancellationRequested) //only allow up to 3 seconds to detect a third party device
                 {
-                    try 
-                    { 
-                        var result = await pipeReader.ReadAsync(token); 
-                    
+                    try
+                    {
+                        var result = await pipeReader.ReadAsync(token);
+
                         var buffer = result.Buffer;
 
                         var (finishedDetection, detectedInfo) = detector(buffer, portName);
@@ -441,7 +326,7 @@ namespace CA_DataUploaderLib
 
                         if (result.IsCompleted)
                             return default; //should only happen if the connection was closed
-                    } 
+                    }
                     catch (OperationCanceledException ex)
                     {
                         if (ex.CancellationToken == token)
@@ -454,7 +339,7 @@ namespace CA_DataUploaderLib
             return default;
         }
 
-        private Task<string> ReadLine() => 
+        private Task<string> ReadLine() =>
             ReadLine(pipeReader ?? throw new ObjectDisposedException("closed connection detected (null pipeReader)"), PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine);
         //exposing this one for testing purposes
         public static async Task<string> ReadLine(
@@ -497,7 +382,7 @@ namespace CA_DataUploaderLib
                     }
                     finally
                     {
-                        pipeReader.AdvanceTo(consumed, examined);  
+                        pipeReader.AdvanceTo(consumed, examined);
                     }
                 }
             }
@@ -512,7 +397,7 @@ namespace CA_DataUploaderLib
         }
 
         private bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line) => TryReadAsciiLine(ref buffer, out line, ConfigSettings.ValuesEndOfLineChar);
-        public static bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line, char endOfLineChar) 
+        public static bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line, char endOfLineChar)
         {
             // Look for a EOL in the buffer.
             SequencePosition? position = buffer.PositionOf((byte)endOfLineChar);
@@ -530,31 +415,17 @@ namespace CA_DataUploaderLib
 
         private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<TResult> action, CancellationToken token)
         {
-            await _reconnectionLock.AcquireReaderLock(token);
-            try
-            {
-                return action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.                
-            }
-            finally
-            {
-                _reconnectionLock.ReleaseReaderLock();
-            }
+            using var _ = await _reconnectionLock.AcquireReaderLock(token);
+            return action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.
         }
 
         private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<Task<TResult>> action, CancellationToken token)
         {
-            await _reconnectionLock.AcquireReaderLock(token);
-            try
-            {
-                return await action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.                
-            }
-            finally
-            {
-                _reconnectionLock.ReleaseReaderLock();
-            }
+            using var _ = await _reconnectionLock.AcquireReaderLock(token);
+            return await action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.
         }
 
-        private Task RunWaitingForAnyOngoingReconnect(Action action, CancellationToken token) => 
+        private Task RunWaitingForAnyOngoingReconnect(Action action, CancellationToken token) =>
             RunWaitingForAnyOngoingReconnect(() => { action(); return true; }, token);
 
         public class BoardInfo
@@ -569,6 +440,156 @@ namespace CA_DataUploaderLib
             public string SerialNumber { get; }
             public string ProductType { get; }
             public TryReadLineDelegate LineParser { get; }
+        }
+
+        public class Header
+        {
+            public string? SerialNumber { get; private set; }
+            public string? ProductType { get; private set; }
+            public string? PcbVersion { get; private set; }
+            public string? SoftwareCompileDate { get; private set; }
+            public string? SoftwareVersion { get; private set; }
+            public string? McuFamily { get; private set; }
+            public string? SubProductType { get; private set; }
+            public string? GitSha { get; private set; }
+            public string? Calibration { get; private set; }
+            public string? UpdatedCalibration { get; private set; }
+
+            public async Task<bool> DetectBoardHeader(PipeReader pipeReader, TryReadLineDelegate tryReadLine, Action resendSerial, string port)
+            {
+                var (sentSerialCommandTwice, ableToRead, finishedReadingHeader) = (false, false, false);
+                var (readSerialNumber, readProductType, readSoftwareVersion, readPcbVersion) = (false, false, false, false);
+                int millisecondsTimeout = 5000;
+                using var cts = new CancellationTokenSource(millisecondsTimeout); // we use a cancellation token for the timeout as ReadAsync can otherwise hang if a device never sends a line
+                var token = cts.Token;
+
+                while (!finishedReadingHeader && !token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        // we use the regular reads as only 1 thread uses the board during instance initialization
+                        var res = await pipeReader.ReadAsync(token);
+
+                        if (res.IsCanceled)
+                            return ableToRead;
+
+                        var buffer = res.Buffer;
+
+                        while (!ReadFullHeader() && tryReadLine(ref buffer, out var input))
+                        {
+                            ableToRead |= input.Length >= 2;
+                            input = input.Trim();
+                            if (input.StartsWith(serialNumberHeader))
+                                (readSerialNumber, SerialNumber) = (true, input[(input.IndexOf(serialNumberHeader) + serialNumberHeader.Length)..].Trim());
+                            else if (input.StartsWith(boardFamilyHeader))
+                                (readProductType, ProductType) = (true, input[(input.IndexOf(boardFamilyHeader) + boardFamilyHeader.Length)..].Trim());
+                            else if (input.StartsWith(productTypeHeader))
+                                (readProductType, ProductType) = (true, input[(input.IndexOf(productTypeHeader) + productTypeHeader.Length)..].Trim());
+                            else if (input.StartsWith(boardVersionHeader))
+                                (readPcbVersion, PcbVersion) = (true, input[(input.IndexOf(boardVersionHeader) + boardVersionHeader.Length)..].Trim());
+                            else if (input.StartsWith(pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase))
+                                (readPcbVersion, PcbVersion) = (true, input[(input.IndexOf(pcbVersionHeader, StringComparison.InvariantCultureIgnoreCase) + pcbVersionHeader.Length)..].Trim());
+                            else if (input.StartsWith(boardSoftwareHeader))
+                                SoftwareCompileDate = input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim();
+                            else if (input.StartsWith(softwareCompileDateHeader))
+                                SoftwareCompileDate = input[(input.IndexOf(softwareCompileDateHeader) + softwareCompileDateHeader.Length)..].Trim();
+                            else if (input.StartsWith(compileDateHeader))
+                                SoftwareCompileDate = input[(input.IndexOf(compileDateHeader) + compileDateHeader.Length)..].Trim();
+                            else if (input.StartsWith(boardSoftwareHeader))
+                                (readSoftwareVersion, SoftwareVersion) = (true, input[(input.IndexOf(boardSoftwareHeader) + boardSoftwareHeader.Length)..].Trim());
+                            else if (input.StartsWith(softwareVersionHeader))
+                                (readSoftwareVersion, SoftwareVersion) = (true, input[(input.IndexOf(softwareVersionHeader) + softwareVersionHeader.Length)..].Trim());
+                            else if (input.StartsWith(mcuFamilyHeader))
+                                McuFamily = input[(input.IndexOf(mcuFamilyHeader) + mcuFamilyHeader.Length)..].Trim();
+                            else if (input.StartsWith(subProductTypeHeader))
+                                SubProductType = input[(input.IndexOf(subProductTypeHeader) + subProductTypeHeader.Length)..].Trim();
+                            else if (input.StartsWith(GitShaHeader))
+                                GitSha = input[(input.IndexOf(GitShaHeader) + GitShaHeader.Length)..].Trim();
+                            else if (input.StartsWith(GitShaHeader2))
+                                GitSha = input[(input.IndexOf(GitShaHeader2) + GitShaHeader2.Length)..].Trim();
+
+                            else if (input.Contains("MISREAD") && !sentSerialCommandTwice && SerialNumber == null)
+                            {
+                                resendSerial();
+                                CALog.LogInfoAndConsoleLn(LogID.A, $"Received misread without any serial on port {port} - re-sending serial command");
+                                sentSerialCommandTwice = true;
+                            }
+                        }
+
+                        if (ReadFullHeader() && TryReadOptionalCalibration(ref buffer, out var calibration))
+                        {
+                            finishedReadingHeader = true;
+                            Calibration = UpdatedCalibration = calibration;
+                        }
+
+                        // Tell the PipeReader how much of the buffer has been consumed.
+                        pipeReader.AdvanceTo(buffer.Start, buffer.End);
+
+                        if (res.IsCompleted)
+                        {
+                            CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {port}: pipe reader was closed");
+                            break; // typically means the connection was closed.
+                        }
+                    }
+                    catch (TimeoutException ex)
+                    {
+                        CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {port}: " + ex.Message);
+                        break;
+                    }
+                    catch (OperationCanceledException ex)
+                    {
+                        CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {port}: " + ex.Message);
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {port}: " + ex.Message);
+                    }
+                }
+
+                return ableToRead;
+
+                // pcbVersion is included in this list because at the time of writting is the last value in the readEEPROM header, which avoids the rest of the header being treated as "values".
+                bool ReadFullHeader() => readSerialNumber && readProductType && readSoftwareVersion && readPcbVersion;
+                ///<returns>true if it finished attempting to read the optional calibration, or false if more data is needed</returns>
+                bool TryReadOptionalCalibration(ref ReadOnlySequence<byte> buffer, out string? calibration)
+                {
+                    calibration = default;
+                    var localBuffer = buffer; // take a copy to avoid unnecesarily throwing away data coming after the header
+                    bool readLine = tryReadLine(ref localBuffer, out var input);
+                    while (readLine && (input == null || input.Trim() == string.Empty)) 
+                    {
+                        readLine = tryReadLine(ref localBuffer, out input);
+                        buffer = localBuffer;//advance the caller's buffer so that the caller does not read these again.
+                    }
+                    if (!readLine || input == null)
+                    {
+                        //we did not get a line, more data is needed
+                        buffer = localBuffer;//advance the buffer to ensure the caller fetches more data
+                        return false;
+                    }                   
+                    if (input.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        calibration = input[(input.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
+                        buffer = localBuffer; //avoids the calibration line being treated as data
+                    }
+                    return true;
+                }
+            }
+
+            internal void CopyTo(MCUBoard mcuBoard)
+            {
+                mcuBoard.SerialNumber = SerialNumber;
+                mcuBoard.ProductType = ProductType;
+                mcuBoard.SubProductType = SubProductType;
+                mcuBoard.McuFamily = McuFamily;
+                mcuBoard.SoftwareVersion = SoftwareVersion;
+                mcuBoard.SoftwareCompileDate = SoftwareCompileDate;
+                mcuBoard.GitSha = GitSha;
+                mcuBoard.PcbVersion = PcbVersion;
+                mcuBoard.Calibration = Calibration;
+                mcuBoard.UpdatedCalibration = UpdatedCalibration;
+            }
         }
     }
 }

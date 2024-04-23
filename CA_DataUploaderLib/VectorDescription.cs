@@ -14,12 +14,18 @@ namespace CA_DataUploaderLib
         public string IOconf;
         public int Length { get { return _items.Count; } }
 
-        public VectorDescription() { }
+        public VectorDescription() 
+        {
+            //these avoids nullable warnings in this deserialization constructor 
+            Hardware = Software = IOconf = string.Empty;
+            _items = new();
+        }
         public VectorDescription(List<VectorDescriptionItem> items, string hardware, string software) 
         { 
             _items = items; 
             Hardware = hardware; 
             Software = software;
+            IOconf = string.Empty; //this field is only used in the serialization sent by the ServerUploader, which sets it during initialization
         }
 
         public string GetVectorItemDescriptions() { return string.Join(Environment.NewLine, _items.Select(x => x.Descriptor)); }
@@ -34,13 +40,15 @@ namespace CA_DataUploaderLib
 
             return msg;
         }
-
     }
 
     [Serializable]
     public class VectorDescriptionItem
     {
-        public VectorDescriptionItem() { }
+        public VectorDescriptionItem() 
+        { 
+            Descriptor = DataType = string.Empty; //this avoids nullable warnings in this deserialization constructor 
+        }
         public VectorDescriptionItem(string datatype, string descriptor, DataTypeEnum direction) { Descriptor = descriptor; DataType = datatype; DirectionType = direction; }
         public string Descriptor { get; set; }  // Name of data line in webchart. 
         public DataTypeEnum DirectionType { get; set; }

@@ -1,12 +1,13 @@
+#nullable enable
 using System.Collections.Generic;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfSwitchboardSensor : IOconfInput
+    public class IOconfSwitchboardSensor : IOconfInput.Expandable
     {
         private readonly string Subsystem;
 
-        public IOconfSwitchboardSensor(string row, int lineNum) : base(row, lineNum, "SwitchboardSensor", false, true, IOconfOut230Vac.GetNewSwitchboardBoardSettings(row))
+        public IOconfSwitchboardSensor(string row, int lineNum) : base(row, lineNum, "SwitchboardSensor", false, IOconfOut230Vac.GetNewSwitchboardBoardSettings(row))
         {
             Format = "SwitchboardSensor;Name;BoxName;[SubsystemName]";
             var list = ToList();
@@ -15,12 +16,9 @@ namespace CA_DataUploaderLib.IOconf
 
         /// <summary>get expanded conf entries that include both the rms and max within the 100 milliseconds read cycle</summary>
         /// <remarks>the returned entries have port numbers that correspond to the ones returned by the dc switchboard as parsed by the IOconfOut230Vac.SwitchBoardResponseParser</remarks>
-        public IEnumerable<IOconfInput> GetExpandedConf() => new [] {
-            NewPortInput($"{Name}_rms", 6),
-            NewPortInput($"{Name}_maxIn100ms", 7),
+        public override IEnumerable<IOconfInput> GetExpandedConf() => new [] {
+            NewInput($"{Name}_rms", 6, Subsystem),
+            NewInput($"{Name}_maxIn100ms", 7, Subsystem),
             };
-
-        private IOconfInput NewPortInput(string name, int portNumber) => new IOconfInput(Row, LineNumber, Type, false, false, null)
-            { Name = name, BoxName = BoxName, Map = Map, PortNumber = portNumber, SubsystemOverride = Subsystem };
     }
 }

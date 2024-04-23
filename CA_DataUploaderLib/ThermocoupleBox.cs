@@ -11,15 +11,15 @@ namespace CA_DataUploaderLib
 {
     public class ThermocoupleBox : BaseSensorBox
     {
-        private readonly SensorSample _rpiGpuSample;
-        private readonly SensorSample _rpiCpuSample;
-        public ThermocoupleBox(CommandHandler cmd) : base(cmd, "Temperatures", string.Empty, "show all temperatures in input queue", GetSensors()) 
+        private readonly SensorSample? _rpiGpuSample;
+        private readonly SensorSample? _rpiCpuSample;
+        public ThermocoupleBox(IIOconf ioconf, CommandHandler cmd) : base(cmd, "Temperatures", GetSensors(ioconf)) 
         { // these are disabled / null when RpiTemp is disabled
             _rpiGpuSample = _values.FirstOrDefault(x => IOconfRPiTemp.IsLocalGpuSensor(x.Input));
             _rpiCpuSample = _values.FirstOrDefault(x => IOconfRPiTemp.IsLocalCpuSensor(x.Input));
         }
 
-        protected override List<Task> StartLoops((IOconfMap map, SensorSample[] values)[] boards, CancellationToken token)
+        protected override List<Task> StartLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             var loops = base.StartLoops(boards, token);
             if (_rpiGpuSample != null && _rpiCpuSample != null && !OperatingSystem.IsWindows()) 
@@ -51,11 +51,11 @@ namespace CA_DataUploaderLib
             
         }
 
-        private static IEnumerable<IOconfInput> GetSensors()
+        private static IEnumerable<IOconfInput> GetSensors(IIOconf ioconf)
         {
-            var values = IOconfFile.GetTypeK();
-            var rpiTemp = IOconfFile.GetRPiTemp();
-            var expandedSensors = rpiTemp.GetDistributedExpandedInputConf();
+            var values = ioconf.GetTemp();
+            var rpiTemp = ioconf.GetRPiTemp();
+            var expandedSensors = rpiTemp.GetDistributedExpandedInputConf(ioconf);
             return values.Concat(expandedSensors);
         }
     }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿#nullable enable
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using CA_DataUploaderLib.Extensions;
 
@@ -6,29 +7,31 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfOut230Vac : IOconfOutput
     {
-        public IOconfOut230Vac(string row, int lineNum, string type, bool isSwitchboardControllerOutput = true) : base(row, lineNum, type, true, GetNewSwitchboardBoardSettings(row)) 
+        public IOconfOut230Vac(string row, int lineNum, string type) : base(row, lineNum, type, true, GetNewSwitchboardBoardSettings(row)) 
         {
             CurrentSensorName = Name + "_current";
             BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
-            IsSwitchboardControllerOutput = isSwitchboardControllerOutput;
         }
 
         public string CurrentSensorName { get; }
         public string BoardStateSensorName { get; } 
-        public bool HasOnSafeState { get; } = false;
         public bool IsSwitchboardControllerOutput { get; }
-        public IEnumerable<IOconfInput> GetExpandedInputConf()
-        { // note "_On/Off" is not included as its not an input but the current expected on/off state as seen by the control loop.
+        public override IEnumerable<IOconfInput> GetExpandedInputConf()
+        { // note "_onoff" is not included as its not an input but the current expected on/off state as seen by the control loop.
             yield return NewPortInput(CurrentSensorName, 0 + PortNumber);
+        }
+
+        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        {
+            yield return Name;
+            foreach (var name in base.GetExpandedNames(ioconf))
+                yield return name;
         }
 
         /// <remarks>This config is general for the board, so caller must make sure to use a single instance x board</remarks>
         public IOconfInput GetBoardTemperatureInputConf() => NewPortInput(Map.BoxName + "_temperature", 5);
         public static BoardSettings GetNewSwitchboardBoardSettings(string row) => 
-            new BoardSettings() { Parser = new SwitchBoardResponseParser(!row.Contains("showConfirmations")), ValuesEndOfLineChar = '\r' };
-        private IOconfInput NewPortInput(string name, int portNumber) => new IOconfInput(Row, LineNumber, Type, false, false, null) 
-            { Name = name, BoxName = BoxName, Map = Map, PortNumber = portNumber };
-
+            new() { Parser = new SwitchBoardResponseParser(!row.Contains("showConfirmations")), ValuesEndOfLineChar = '\r' };
         public class SwitchBoardResponseParser : BoardSettings.LineParser
         {
             // old response format "P1=0.06A P2=0.05A P3=0.05A P4=0.06A 0, 1, 0, 1, 25.87"
@@ -36,9 +39,9 @@ namespace CA_DataUploaderLib.IOconf
             // some versions of the old switchboards did not return the last 5 values
             // the 4 switchboard on/off values will be ignored (non capturing groups) as we don't plan to use those moving forward
             private const string _oldSwitchBoxPattern = @"P1=(-?\d\.\d\d)A P2=(-?\d\.\d\d)A P3=(-?\d\.\d\d)A P4=(-?\d\.\d\d)A(?: [01], [01], [01], [01](?:, (-?\d+.\d\d))?)?";
-            private static readonly Regex _oldswitchBoxCurrentsRegex = new Regex(_oldSwitchBoxPattern);
+            private static readonly Regex _oldswitchBoxCurrentsRegex = new(_oldSwitchBoxPattern);
             private const string _commandConfirmationPattern = @"^\s*p[1-4] (?:(?:auto off)|(?:off)|(?:on(?: \d+)?))\s*$";
-            private static readonly Regex _commandConfirmationRegex = new Regex(_commandConfirmationPattern);
+            private static readonly Regex _commandConfirmationRegex = new(_commandConfirmationPattern);
             private readonly bool _expectCommandConfirmations;
 
             public new static SwitchBoardResponseParser Default { get; } = new SwitchBoardResponseParser(true);
@@ -50,28 +53,29 @@ namespace CA_DataUploaderLib.IOconf
             }
 
             // returns currents 0-3, board temperature (, sensorport_rms, sensorport_max)
-            public override List<double> TryParseAsDoubleList(string line)
+            public override (List<double>?, uint) TryParseAsDoubleList(string line)
             {
                 var match = _oldswitchBoxCurrentsRegex.Match(line);
                 if (!match.Success) 
                     return TryParseOnlyNumbersAsDoubleList(line);
-                return GetValuesFromGroups(match.Groups);
+                return (GetValuesFromGroups(match.Groups), 0);
             }
 
             // returns currents 0-3, board temperature (, sensorport_rms, sensorport_max)
-            public List<double> TryParseOnlyNumbersAsDoubleList(string line)
+            public (List<double>?, uint) TryParseOnlyNumbersAsDoubleList(string line)
             {
-                var numbers = base.TryParseAsDoubleList(line); //the base implementation deals with any amount of simple numbers separated by commas.
+                var (numbers, status) = base.TryParseAsDoubleList(line); //the base implementation deals with any amount of simple numbers separated by commas.
                 if (numbers == null)
-                    return null;
+                    return (null, 0);
                 if (numbers.Count < 4)
-                    return null; //invalid line, must have at least 4 currents
+                    return (null, 0); //invalid line, must have at least 4 currents
                 if (numbers.Count == 4)
                     numbers.Add(10000);//some versions did not report temperature
-                return numbers;
+                return (numbers, status);
             }
 
-            public override bool MatchesValuesFormat(string line) => _oldswitchBoxCurrentsRegex.IsMatch(line);
+            public override bool MatchesValuesFormat(string line) => _oldswitchBoxCurrentsRegex.IsMatch(line) || base.MatchesValuesFormat(line);
+
             // returns currents 0-3, board temperature
             private static List<double> GetValuesFromGroups(GroupCollection groups)
             {

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,31 +8,16 @@ namespace CA_DataUploaderLib.IOconf
 {
     public static class IOconfFileLoader
     {
-        private readonly static List<(string rowType, Func<string, int, IOconfRow> loader)> Loaders = new List<(string rowType, Func<string, int, IOconfRow> ctor)>
+        public static IIOconfLoader Loader { get; } = new IOconfLoader();
+
+        public static bool FileExists()
         {
-            ("LoopName", (r, l) => new IOconfLoopName(r, l)),
-            ("Account", (r, l) => new IOconfAccount(r, l)),
-            ("SampleRates", (r, l) => new IOconfSamplingRates(r, l)),
-            ("Map", (r, l) => new IOconfMap(r, l)),
-            ("Math", (r, l) => new IOconfMath(r, l)),
-            ("Alert", (r, l) => new IOconfAlert(r, l)),
-            ("TypeK", (r, l) => new IOconfTypeK(r, l)),
-            ("AirFlow", (r, l) => new IOconfAirFlow(r, l)),
-            ("Heater", (r, l) => new IOconfHeater(r, l)),
-            ("Light", (r, l) => new IOconfLight(r, l)),
-            ("Oven", (r, l) => new IOconfOven(r, l)),
-            ("Geiger", (r, l) => new IOconfGeiger(r, l)),
-            ("Filter", (r, l) => new IOconfFilter(r, l)),
-            ("RPiTemp", (r, l) => new IOconfRPiTemp(r, l)),
-            ("VacuumPump", (r, l) => new IOconfVacuumPump(r, l)),
-            ("GenericSensor", (r, l) => new IOconfGeneric(r, l)),
-            ("SwitchboardSensor", (r, l) => new IOconfSwitchboardSensor(r, l)),
-            ("Node", (r, l) => new IOconfNode(r, l)),
-        };
+            return File.Exists("IO.conf");
+        }
 
         public static (List<string>, IEnumerable<IOconfRow>) Load()
         {
-            if (!File.Exists("IO.conf"))
+            if (!FileExists())
             {
                 throw new Exception($"Could not find the file {Directory.GetCurrentDirectory()}\\IO.conf");
             }
@@ -42,18 +28,36 @@ namespace CA_DataUploaderLib.IOconf
 
         public static IEnumerable<IOconfRow> ParseLines(IEnumerable<string> lines)
         {
-            var linesList = lines.ToList();
+            IOconfNode.ResetIndex();
+            IOconfCode.ResetIndex();
+
+            var linesList = lines.Select(x => x.Trim()).ToList();
             // remove empty lines and commented out lines
-            var lines2 = linesList.Where(x => !x.Trim().StartsWith("//") && x.Trim().Length > 2).Select(x => x.Trim()).ToList();
+            var lines2 = linesList.Where(x => !x.StartsWith("//") && x.Length > 2).ToList();
             return lines2.Select(x => CreateType(x, linesList.IndexOf(x)));
         }
 
-        public static void AddLoader(string rowType, Func<string, int, IOconfRow> loader)
+        /// <summary>
+        /// Writes the supplied contents to a file IO.conf on disk.
+        /// Renames any existing configuration to IO.conf.backup1 (trailing number increasing).
+        /// </summary>
+        /// <param name="ioconf"></param>
+        public static void WriteToDisk(string ioconf)
         {
-            if (GetLoader(rowType) != null)
-                throw new ArgumentException($"the specified loader rowType is already in use: {rowType}", nameof(rowType));
+            var filename = "IO.conf";
+            if (File.Exists(filename))
+            {
+                var count = 1;
+                string newFilename;
+                do
+                {
+                    newFilename = filename + ".backup" + count++;
+                }
+                while (File.Exists(newFilename));
 
-            Loaders.Add((rowType, loader));
+                File.Move(filename, newFilename);
+            }
+            File.WriteAllText(filename, ioconf);
         }
 
         private static IOconfRow CreateType(string row, int lineNum)
@@ -62,7 +66,7 @@ namespace CA_DataUploaderLib.IOconf
             {
                 var separatorIndex = row.IndexOf(';');
                 var rowType = separatorIndex > -1 ? row.AsSpan()[..separatorIndex].Trim() : row;
-                var loader = GetLoader(rowType) ?? ((r, l) => new IOconfRow(r, l, "Unknown"));
+                var loader = Loader.GetLoader(rowType) ?? ((r, l) => new IOconfRow(r, l, "Unknown", true));
                 return loader(row, lineNum);
             }
             catch (Exception ex)
@@ -70,15 +74,6 @@ namespace CA_DataUploaderLib.IOconf
                 CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in line {lineNum} of {Directory.GetCurrentDirectory()}\\IO.conf {Environment.NewLine}{row}{Environment.NewLine}" + ex.ToString());
                 throw;
             }
-        }
-
-        private static Func<string, int, IOconfRow> GetLoader(ReadOnlySpan<char> rowType)
-        {
-            foreach (var loader in Loaders)
-                if (rowType.Equals(loader.rowType, StringComparison.InvariantCultureIgnoreCase))
-                    return loader.loader;
-
-            return null;
         }
     }
 }

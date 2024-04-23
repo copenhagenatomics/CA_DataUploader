@@ -1,11 +1,10 @@
-﻿#nullable enable
-using CA_DataUploaderLib.IOconf;
+﻿using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
 {
     public class Board
     {
-        public Board(string portname, IOconfMap? map)
+        public Board(string portname, IOconfMap? map, string? productType = null)
         {
             PortName = portname;
             Map = map;
@@ -14,6 +13,7 @@ namespace CA_DataUploaderLib
                 map.Setboard(this);
                 BoxName = map.BoxName;
             }
+            ProductType = productType;
         }
 
         public string PortName { get; }
@@ -39,5 +39,6 @@ namespace CA_DataUploaderLib
         }
 
         public override string ToString() => $"Product Type: {ProductType,-20} Serial Number: {SerialNumber,-12} Port name: {PortName}";
+        public string ToShortDescription() => $"{BoxName} {ProductType} {SerialNumber} {PortName}";
     }
 }

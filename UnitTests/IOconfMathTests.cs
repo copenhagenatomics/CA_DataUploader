@@ -1,6 +1,5 @@
 ﻿using CA_DataUploaderLib.IOconf;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NCalc;
 using System;
 using System.Collections.Generic;
 
@@ -33,7 +32,7 @@ namespace UnitTests
         public void CalculatesExpectedValue(string row, double value, double expectedResult) 
         {
             var math = new IOconfMath(row, 0);
-            Assert.AreEqual(expectedResult, math.Calculate(new Dictionary<string, object> { { "MyValue", value }, { "PI", Math.PI} }).Value);
+            Assert.AreEqual(expectedResult, math.Calculate(new Dictionary<string, object> { { "MyValue", value }, { "PI", Math.PI} }));
         }
 
         [DataRow("Math;MyName;MyValue > 2", 5d, 1d)]
@@ -42,7 +41,7 @@ namespace UnitTests
         public void CanUseComparisons(string row, double value, double expectedResult)
         {
             var math = new IOconfMath(row, 0);
-            Assert.AreEqual(expectedResult, math.Calculate(new Dictionary<string, object> { { "MyValue", value }}).Value);
+            Assert.AreEqual(expectedResult, math.Calculate(new Dictionary<string, object> { { "MyValue", value }}));
         }
 
         [TestMethod]
@@ -67,7 +66,33 @@ namespace UnitTests
         public void CanParseSources(string row, string expectedSources) 
         {
             var math = new IOconfMath(row, 0);
-            Assert.AreEqual(expectedSources, string.Join(',', math.GetSources()));
+            Assert.AreEqual(expectedSources, string.Join(',', math.SourceNames));
+        }
+
+        [TestMethod]
+        public void CanParseLinesWithComments()
+        {
+            var math = new IOconfMath("Math;MyName;2 / MyValue   // This is a comment", 0);
+            Assert.AreEqual(0.5d, math.Calculate(new Dictionary<string, object> { { "MyValue", 4 } }));
+        }
+
+        [DataRow("Math; MyName; Max()")]
+        [DataRow("Math; MyName; Max(val1)")]
+        [DataRow("Math; MyName; Max(val1, val2, val3)")]
+        [DataRow("Math; MyName; Max(123)")]
+        [DataRow("Math; MyName; Max(123, 234, 345)")]
+        [DataRow("Math; MyName; Min(123)")]
+        [DataRow("Math; MyName; Min(123, 234, 345)")]
+        [DataRow("Math; MyName; Abs(123, 234)")]
+        [DataRow("Math; MyName; Round(123, 234, 345)")]
+        [DataRow("Math; MyName; Sin(123, 234, 345)")]
+        [DataRow("Math; MyName; Sqrt()")]
+        [DataRow("Math; MyName; Sqrt(123, 234)")]
+        [DataTestMethod]
+        public void RejectsExpressionIfIncorrectNumberOfArgumentsGivenToBuiltInFunction(string row)
+        {
+            var ex = Assert.ThrowsException<Exception>(() => new IOconfMath(row, 0));
+            Assert.IsTrue(ex.Message.StartsWith("IOconfMath: wrong format - expression:"));
         }
     }
 }

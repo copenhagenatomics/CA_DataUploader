@@ -1,4 +1,5 @@
-﻿using CA_DataUploaderLib.IOconf;
+﻿#nullable enable
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -13,35 +14,44 @@ namespace CA_DataUploaderLib.Helpers
         private readonly List<FilterSample> _values;
         private readonly MathVectorExpansion _mathVectorExpansion;
         private readonly int _outputCount;
+        private readonly IIOconf _ioconf;
+
         public VectorDescription VectorDescription { get; }
+        public int InputsAndFiltersCount { get; }
         /// <summary>
         /// list of inputs descriptions per node in the same order that <see cref="CommandHandler.GetNodeInputs"/> uses.
         /// </summary>
         public IReadOnlyList<(IOconfNode, IReadOnlyList<VectorDescriptionItem>)> InputsPerNode { get; set; }
 
-        public ExtendedVectorDescription(List<(IOconfNode, IReadOnlyList<VectorDescriptionItem> values)> inputsPerNode, List<VectorDescriptionItem> outputs)
+        public ExtendedVectorDescription(IIOconf ioconf, List<(IOconfNode, IReadOnlyList<VectorDescriptionItem> values)> inputsPerNode, List<VectorDescriptionItem> globalInputs, List<VectorDescriptionItem> outputs)
         {
-            _logLevel = IOconfFile.GetOutputLevel();
+            _ioconf = ioconf;
+            _logLevel = ioconf.GetOutputLevel();
             InputsPerNode = inputsPerNode;
-            List<VectorDescriptionItem> allItems = inputsPerNode.SelectMany(n => n.values).ToList();
+            List<VectorDescriptionItem> allItems = inputsPerNode.SelectMany(n => n.values).Concat(globalInputs).ToList();
             _values = GetFilters(allItems);
             allItems.AddRange(_values.Select(m => new VectorDescriptionItem("double", m.Output.Name, DataTypeEnum.Input)));
             RemoveHiddenSources(allItems, i => i.Descriptor);
-            _mathVectorExpansion = new MathVectorExpansion();
+            InputsAndFiltersCount = allItems.Count;
+            _outputCount = outputs.Count;
+
+            _mathVectorExpansion = new MathVectorExpansion(ioconf.GetMath);
             allItems.AddRange(_mathVectorExpansion.GetVectorDescriptionEntries());
             allItems.AddRange(outputs);
-            _outputCount = outputs.Count;
-            var duplicates = allItems.GroupBy(x => x.Descriptor).Where(x => x.Count() > 1).Select(x => x.Key);
+            
+            var duplicates = allItems.GroupBy(x => x.Descriptor, StringComparer.InvariantCultureIgnoreCase).Where(x => x.Count() > 1).Select(x => x.Key);
             if (duplicates.Any())
-                throw new Exception("Title of datapoint in vector was listed twice: " + string.Join(", ", duplicates));
+                throw new Exception("Different fields cannot use the same name (even if the casing is different). Please rename: " + string.Join(", ", duplicates));
+            
+            _mathVectorExpansion.Initialize(allItems.Select(i => i.Descriptor));
             VectorDescription = new VectorDescription(allItems, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
         }
 
         public int GetIndex(VectorDescriptionItem item) { return VectorDescription._items.IndexOf(item); }
 
-        private static List<FilterSample> GetFilters(List<VectorDescriptionItem> inputs)
+        private List<FilterSample> GetFilters(List<VectorDescriptionItem> inputs)
         {
-            var filters = IOconfFile.GetFilters().ToList();
+            var filters = _ioconf.GetFilters().ToList();
             var filtersWithoutItem = filters.SelectMany(f => f.SourceNames.Select(s => new { Filter = f, Source = s })).Where(f => !inputs.Any(i => i.Descriptor == f.Source)).ToList();
             foreach (var filter in filtersWithoutItem)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Filter: {filter.Filter.Name} points to missing sensor: {filter.Source}");
@@ -62,24 +72,26 @@ namespace CA_DataUploaderLib.Helpers
             }
         }
 
-        /// <remarks>the input vector is expected to contains all input + state initially sent in the vector description passed to the constructor.</remarks>
-        public List<SensorSample> Apply(List<SensorSample> inputVector)
+        /// <summary>applies math to the vector, assuming the inputs and filters were already applied using <see cref="ApplyInputsAndFilters(List{SensorSample}, DataVector)"/></summary>
+        public void ApplyMath(DataVector vector) => _mathVectorExpansion.Apply(vector.Data);
+        /// <summary>applies the inputs to the vector, transforming them first with the configured filters</summary>
+        public void ApplyInputsAndFilters(List<SensorSample> inputs, DataVector vector)
         {
+            //removing allocations here is tricky, but we should consider keeping the original inputs in the full vector and when hiding sources we set those inputs as not uploadable.
+            //note that it also helps cross checking full vectors, if one also has: the previous vector, the state of filters (they have a queue of values within filter length), events in the cycle.
             foreach (var filter in _values)
             {
-                filter.Input(inputVector);
-                inputVector.Add(filter.Output);
+                filter.Input(inputs);
+                inputs.Add(filter.Output);
             }
 
-            RemoveHiddenSources(inputVector, i => i.Name);
-            _mathVectorExpansion.Expand(inputVector);
-            if (inputVector.Count + _outputCount != VectorDescription.Length)
-                throw new ArgumentException($"wrong input vector length (input, expected): {inputVector.Count} <> {VectorDescription.Length - _outputCount}");
-            return inputVector;
+            RemoveHiddenSources(inputs, i => i.Name);
+            var expectedInputsCount = VectorDescription.Length - _mathVectorExpansion.Count - _outputCount;
+            if (inputs.Count != expectedInputsCount)
+                throw new ArgumentException($"wrong input vector length (input, expected): {inputs.Count} <> {expectedInputsCount}");
+            var data = vector.Data;
+            for (int i = 0; i < inputs.Count; i++)
+                data[i] = inputs[i].Value;
         }
-
-        /// <summary>appends the specified outputs to the end of the input vector</summary>
-        /// <remarks>the input vector is expected to be the expanded version returned by the <see cref="Apply" /> method</remarks>
-        public void AddOutputsToInputVector(List<SensorSample> expandedInputVector, IEnumerable<SensorSample> outputs) => expandedInputVector.AddRange(outputs);
     }
 }

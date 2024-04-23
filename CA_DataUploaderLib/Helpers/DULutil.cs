@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace CA_DataUploaderLib.Helpers
@@ -47,9 +48,9 @@ namespace CA_DataUploaderLib.Helpers
                 RedirectStandardError = true
             };
 
-            using (var p = Process.Start(info))
+            using (var p = Process.Start(info) ?? throw new InvalidOperationException($"failed to start process {command}"))
             {
-                string err = null;
+                string? err = null;
                 p.ErrorDataReceived += (sender, e) => err += e.Data;
                 string output = p.StandardOutput.ReadToEnd();
                 if (!p.WaitForExit(waitForExit))

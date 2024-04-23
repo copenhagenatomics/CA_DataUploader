@@ -1,147 +1,107 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.Threading.Channels;
 using System.Threading.Tasks;
-using CA.LoopControlPluginBase;
-using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
 {
-    public class Alerts : LoopControlCommand
+    /// <remarks>
+    /// Fired alerts are currently included in the next cycle after they triggered (they are reacting to <see cref="CommandHandler.NewVectorReceived"/> which is only available after the decision is made).
+    /// 
+    /// Any commands triggered by the alert are executed as an user command, which also means they trigger on the next decision cycle (instead of triggering locally outside a decision cycle).
+    /// This also means the alert's commands will show in the event log.
+    /// 
+    /// A host that executes the decisions in a leader node, can use the <see cref="Disabled"/> to avoid the alerts triggering in non leader nodes when <see cref="CommandHandler.NewVectorReceived"/> runs.
+    /// On the other hand, a host that cross checks decisions by running them in multiple nodes, needs to consider the alert events and related commands will trigger in all nodes.
+    /// </remarks>
+    public class Alerts
     {
         public bool Disabled
         {
-            get => disabled; 
+            get => disabled;
             set
             {
                 disabled = value;
                 if (!value)
-                    ResetAlertsState();
+                {
+                    foreach (var (alert, _) in _alerts)
+                        alert.ResetState();
+                }
             }
         }
 
-        public override string Name => "addalert";
-        public override string Description => string.Empty;
-        public override bool IsHiddenCommand => true;
-        private readonly List<IOconfAlert> _alerts;
+        private readonly (IOconfAlert alert, int sensorIndex)[] _alerts;
         private readonly CommandHandler _cmd;
         private bool disabled;
 
-        public Alerts(VectorDescription vectorDescription, CommandHandler cmd) : base()
+        public Alerts(IIOconf ioconf, CommandHandler cmd) : base()
         {
             _cmd = cmd;
-            var cmdPlugins = new PluginsCommandHandler(cmd);
-            Initialize(cmdPlugins, new PluginsLogger("Alerts"));
-            cmdPlugins.AddCommand("removealert", RemoveAlert);
-            _alerts = GetAlerts(vectorDescription, cmd);
+            _alerts = GetAlerts(cmd.GetFullSystemVectorDescription(), ioconf, cmd).ToArray();
+            var reader = _cmd.GetReceivedVectorsReader();
+            _ = Task.Run(() => CheckAlertsOnReceivedVectors(reader));
         }
 
-        private List<IOconfAlert> GetAlerts(VectorDescription vectorDesc, CommandHandler cmd)
+        private async void CheckAlertsOnReceivedVectors(ChannelReader<DataVector> reader)
         {
-            var alerts = IOconfFile.GetAlerts().ToList();
-            var alertsWithoutItem = alerts.Where(a => !vectorDesc.HasItem(a.Sensor)).ToList();
-            foreach (var alert in alertsWithoutItem)
-                logger.LogError($"ERROR in {Directory.GetCurrentDirectory()}\\IO.conf:{Environment.NewLine} Alert: {alert.Name} points to missing sensor: {alert.Sensor}");
-            if (alertsWithoutItem.Count > 0)
-                throw new InvalidOperationException("Misconfigured alerts detected");
-            if (alerts.Any(a => a.Command != default) && cmd == null)
-                throw new InvalidOperationException("Alert with command is configured, but command handler is not available to trigger it");
-            return alerts;
-        }
-
-        private bool RemoveAlert(List<string> args)
-        {
-            if (args.Count < 2)
+            try
             {
-                logger.LogError($"Unexpected format for Removing dynamic alert: {string.Join(',', args)}. Format: removealert AlertName");
-                return true;
-            }
-
-            lock (_alerts)
-                _alerts.RemoveAll(a => a.Name == args[1]);
-            return true;
-        }
-
-        protected override Task Command(List<string> args)
-        {
-            if (args.Count < 3)
-            {
-                logger.LogError($"Unexpected format for Dynamic alert: {string.Join(',', args)}. Format: addalert AlertName SensorName comparison value [rateMinutes] [command]");
-                return Task.CompletedTask;
-            }
-
-            var alert = new IOconfAlert(args[1], string.Join(' ', args.Skip(2)));
-            lock (_alerts)
-            {
-                _alerts.RemoveAll(a => a.Name == args[1]);
-                _alerts.Add(alert);
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public override void OnNewVectorReceived(object sender, NewVectorReceivedArgs e)
-        {
-            if (Disabled) return;
-
-            var timestamp = e.GetVectorTime();
-            var (alertsToTrigger, noSensorAlerts) = GetAlertsToTrigger(e); // we gather alerts separately from triggering, to reduce time locking the _alerts list
-
-            foreach (var a in alertsToTrigger ?? Enumerable.Empty<IOconfAlert>())
-                TriggerAlert(a, timestamp, a.Message);
-
-            foreach (var a in noSensorAlerts)
-            {
-                _alerts.Remove(a); // avoid missing sensors alert triggerring repeatedly on every vector received
-                TriggerAlert(a, timestamp, $"Failed to find sensor {a.Sensor} for alert {a.Name}");
-            }
-        }
-
-        private (IEnumerable<IOconfAlert> alertsToTrigger, IEnumerable<IOconfAlert> noSensorAlerts) GetAlertsToTrigger(NewVectorReceivedArgs e)
-        {
-            // we only create the lists later to avoid unused lists on every call
-            List<IOconfAlert> alertsToTrigger = null;
-            List<IOconfAlert> noSensorAlerts = null;
-            lock (_alerts)
-                foreach (var a in _alerts)
+                await foreach (var vector in reader.ReadAllAsync(_cmd.StopToken))
                 {
-                    if (!e.TryGetValue(a.Sensor, out var val))
-                        EnsureInitialized(ref noSensorAlerts).Add(a);
-                    else if (a.CheckValue(val, e.GetVectorTime()))
-                        EnsureInitialized(ref alertsToTrigger).Add(a);
-                }
+                    if (Disabled) continue;
 
-            return (
-                alertsToTrigger ?? Enumerable.Empty<IOconfAlert>(),
-                noSensorAlerts ?? Enumerable.Empty<IOconfAlert>());
-        }
-
-        private void TriggerAlert(IOconfAlert a, DateTime timestamp, string message)
-        {
-            _cmd.FireAlert(message, timestamp);
-            if (a.Command != default)
-            {
-                foreach (var commands in a.Command.Split('|'))
-                {
-                    try
+                    var timestamp = vector.Timestamp;
+                    foreach (var (alert, sensorIndex) in _alerts)
                     {
-                        ExecuteCommand(commands);
-                    }
-                    catch (Exception ex)
-                    {//note that a distributed host might postpone the execution of the command above, but it would then be responsible of logging information about any error.
-                        CALog.LogError(LogID.A, $"unexpected error running command for alert {a.Name}", ex);
+                        if (!alert.CheckValue(vector[sensorIndex], timestamp))
+                            continue;
+
+                        if (alert.EventType == EventType.Alert)
+                            _cmd.FireAlert(alert.Message, timestamp);
+                        else
+                            CALog.LogErrorAndConsoleLn(LogID.A, alert.Message);
+
+                        if (alert.Command == default)
+                            continue;
+
+                        foreach (var commands in alert.Command.Split('|'))
+                        {
+                            try
+                            {
+                                _cmd.Execute(commands, true);
+                            }
+                            catch (Exception ex)
+                            {//note that a distributed host might postpone the execution of the command above, but it would then be responsible of logging information about any error.
+                                CALog.LogError(LogID.A, $"unexpected error running command for alert {alert.Name}", ex);
+                            }
+                        }
                     }
                 }
             }
+            catch (ChannelClosedException) { }
+            catch (OperationCanceledException) { }
         }
 
-        private static List<T> EnsureInitialized<T>(ref List<T> list) => list = list ?? new List<T>();
-        private void ResetAlertsState()
+        private static List<(IOconfAlert alert, int sensorIndex)> GetAlerts(VectorDescription vectorDesc, IIOconf ioconf, CommandHandler cmd)
         {
-            foreach (var a in _alerts)
-                a.ResetState();
+            var indexes = vectorDesc._items.Select((f, i) => (f, i)).ToDictionary(f => f.f.Descriptor, f => f.i);
+            var alerts = new List<(IOconfAlert alert, int sensorIndex)>();
+            var alertsDefinitions = ioconf.GetAlerts()
+                .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_alert")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.Alert)))
+                .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_error")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.LogError)));
+            foreach (var alert in alertsDefinitions)
+            {
+                if (!indexes.TryGetValue(alert.Sensor, out var index))
+                    throw new FormatException($"Alert: {alert.Name} points to missing vector field: {alert.Sensor}");
+                if (alert.Command != default && cmd == null)
+                    throw new FormatException($"Alert: {alert.Name} has command configured, but command handler is not available to trigger it");
+                alerts.Add((alert, index));
+            }
+
+            return alerts;
         }
     }
 }
