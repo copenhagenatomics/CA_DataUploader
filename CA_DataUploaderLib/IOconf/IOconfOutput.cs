@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfOutput : IOconfRow
+    public class IOconfOutput : IOconfRow, IIOconfRowWithBoardState
     {
         private readonly BoardSettings _boardSettings;
         private IOconfMap? _map;
@@ -14,6 +14,7 @@ namespace CA_DataUploaderLib.IOconf
             Format = $"{type};Name;BoxName;[port number]";
             var list = ToList();
             BoxName = list[2];
+            BoardStateName = BaseSensorBox.GetBoxStateName(BoxName);
             _boardSettings = settings;
             if (parsePort && !int.TryParse(list[3], out PortNumber)) throw new Exception($"{type}: wrong port number: {row}");
             if (PortNumber < 1) throw new Exception($"{type}: port numbers must start at 1 {row}");
@@ -33,6 +34,8 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public string BoxName { get; }
+        public string BoardStateName { get; }
+
         public readonly int PortNumber = 1;
         public IOconfMap Map
         {

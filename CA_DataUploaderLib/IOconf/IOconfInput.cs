@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfInput : IOconfRow
+    public class IOconfInput : IOconfRow, IIOconfRowWithBoardState
     {
         private readonly BoardSettings _boardSettings = BoardSettings.Default;
         private IOconfMap? _map;
@@ -16,7 +16,7 @@ namespace CA_DataUploaderLib.IOconf
             var list = ToList();
             (HasPort, Skip, PortNumber) = GetPort(row, type, parsePortRequired, list);
             BoxName = list[2];
-            BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
+            BoardStateName = BaseSensorBox.GetBoxStateName(BoxName);
             _boardSettings = boardSettings;
         }
 
@@ -26,7 +26,7 @@ namespace CA_DataUploaderLib.IOconf
             PortNumber = portNumber;
             BoxName = map.BoxName;
             Map = map;
-            BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
+            BoardStateName = BaseSensorBox.GetBoxStateName(BoxName);
         }
 
         public override void ValidateDependencies(IIOconf ioconf)
@@ -44,7 +44,7 @@ namespace CA_DataUploaderLib.IOconf
         public virtual bool IsSpecialDisconnectValue(double value) => false;
 
         public string BoxName { get; init; }
-        public string BoardStateSensorName { get; }
+        public string BoardStateName { get; }
         /// <summary>the 1-based port number</summary>
         public int PortNumber = 1;
 

@@ -144,7 +144,7 @@ namespace CA_DataUploaderLib
             for (int i = 0; i < _boards.Length; i++)
             {
                 var (map, values, _) = _boards[i];
-                string name = map.BoxName + "_state";
+                string name = GetBoxStateName(map.BoxName);
                 if (!indexes.TryGetValue(name, out var index)) throw new ArgumentException($"Failed to find box state in full vector: {name}");
                 _boards[i] = (map, values, index);
                 hasBoardWithBuildInActions |= map.McuBoard != null && _buildInWriteActions.TryGetValue(map.McuBoard, out var _);
@@ -179,11 +179,13 @@ namespace CA_DataUploaderLib
 
             static List<VectorDescriptionItem> GetNodeDescItems(IEnumerable<SensorSample.InputBased> values) =>
                 values.Select(v => new VectorDescriptionItem("double", v.Input.Name, DataTypeEnum.Input) { Upload = v.Input.Upload })
-                 .Concat(GetBoards(values).Select(b => new VectorDescriptionItem("double", b.BoxName + "_state", DataTypeEnum.State)))
+                 .Concat(GetBoards(values).Select(b => new VectorDescriptionItem("double", GetBoxStateName(b.BoxName), DataTypeEnum.State)))
                  .ToList();
             static IEnumerable<IOconfMap> GetBoards(IEnumerable<SensorSample.InputBased> n) =>
                 n.Where(v => !v.Input.Skip).GroupBy(v => v.Input.Map).Select(b => b.Key);
         }
+
+        public static string GetBoxStateName(string boxName) => boxName + "_state";
 
         /// <remarks>must be called before <see cref="CommandHandler.FullVectorDescriptionCreated"/> and <see cref="Run"/> are called</remarks>
         public void AddBuildInWriteAction(MCUBoard board, Func<DataVector?, MCUBoard, CancellationToken, Task> writeAction, Func<MCUBoard, CancellationToken, Task> exitAction)
@@ -687,7 +689,7 @@ namespace CA_DataUploaderLib
                 _boardsIndexes = new Dictionary<string, int>(_boardList.Count);
                 for (int i = 0; i < _boardList.Count; i++)
                 {
-                    _sensorNames[i] = _boardList[i].BoxName + "_state";
+                    _sensorNames[i] = GetBoxStateName(_boardList[i].BoxName);
                     _boardsIndexes[_boardList[i].BoxName] = i;
                     _states[i] = _boardList[i].McuBoard?.InitialConnectionSucceeded == true ? ConnectionState.Connected : ConnectionState.Disconnected;
                 }
