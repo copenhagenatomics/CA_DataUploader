@@ -36,18 +36,16 @@ namespace CA_DataUploaderLib.IOconf
             Map = GetMap(ioconf, BoxName, _boardSettings, Skip);
         }
 
-        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
         {
             yield return Name;
-            foreach (var name in base.GetExpandedNames(ioconf))
-                yield return name;
         }
 
         public virtual bool IsSpecialDisconnectValue(double value) => false;
 
         public string BoxName { get; init; }
-        /// <summary>the 1-based port number</summary>
         public string BoardStateSensorName { get; }
+        /// <summary>the 1-based port number</summary>
         public int PortNumber = 1;
 
         public bool Skip { get; init; }
@@ -110,7 +108,7 @@ namespace CA_DataUploaderLib.IOconf
 
             public virtual IEnumerable<IOconfInput> GetExpandedConf() => Enumerable.Empty<IOconfInput>();
 
-            public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+            public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
             {
                 foreach (var input in GetExpandedConf())
                     yield return input.Name;

@@ -20,6 +20,6 @@ namespace CA_DataUploaderLib.IOconf
 
         public readonly int MaxTemperature;
 
-        public LoopControlDecision CreateDecision(IIOconf ioconf) => new HeaterDecision(this, ioconf.GetOven().SingleOrDefault(x => x.HeatingElement.Name == Name));
+        public LoopControlDecision CreateDecision(IIOconf ioconf) => new HeaterDecision(this, ioconf.GetOven().SingleOrDefault(x => x.HeatingElement.Name == Name), ioconf);
     }
 }

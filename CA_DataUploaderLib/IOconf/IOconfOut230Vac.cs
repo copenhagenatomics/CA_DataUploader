@@ -21,10 +21,10 @@ namespace CA_DataUploaderLib.IOconf
             yield return NewPortInput(CurrentSensorName, 0 + PortNumber);
         }
 
-        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
         {
             yield return Name;
-            foreach (var name in base.GetExpandedNames(ioconf))
+            foreach (var name in base.GetExpandedSensorNames(ioconf))
                 yield return name;
         }
 

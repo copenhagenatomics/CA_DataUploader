@@ -72,10 +72,20 @@ namespace CA_DataUploaderLib.IOconf
         protected static readonly Regex ValidateNameRegex = new(@"^[a-zA-Z_]+[a-zA-Z0-9_]*$");
 
         /// <summary>
+        /// Returns the list of expanded vector field names from this class.
+        /// </summary>
+        public virtual IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
+        {
+            return Enumerable.Empty<string>();
+        }
+
+        /// <summary>
         /// Returns the full list of expanded vector field names from this class and it's associated decisions.
         /// </summary>
         public virtual IEnumerable<string> GetExpandedNames(IIOconf ioconf) 
-        { 
+        {
+            foreach (var name in GetExpandedSensorNames(ioconf))
+                yield return name;
             if (this is IIOconfRowWithDecision entryWithDecision)
             {
                 foreach (var pluginField in entryWithDecision.CreateDecision(ioconf).PluginFields)

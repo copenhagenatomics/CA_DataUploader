@@ -32,7 +32,7 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
         {
             yield return Name;
         }
