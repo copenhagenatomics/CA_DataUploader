@@ -665,9 +665,9 @@ namespace CA_DataUploaderLib
                 static async Task<string> GetLoginToken((HttpClient client, ConnectionInfo accountInfo) args, CancellationToken cancellationToken)
                 {
                     var (client, accountInfo) = args;
-                    string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.email}&password={accountInfo.password}", cancellationToken);
+                    string? token = await Post(client, $"/api/v1/user/login?user={accountInfo.Email}&password={accountInfo.Password}", cancellationToken);
                     if (string.IsNullOrEmpty(token))
-                        token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.email}&password={accountInfo.password}&fullName={accountInfo.Fullname}", cancellationToken); // attempt to create account assuming it did not exist
+                        token = await Post(client, $"/api/v1/user/CreateAccount?user={accountInfo.Email}&password={accountInfo.Password}&fullName={accountInfo.Fullname}", cancellationToken); // attempt to create account assuming it did not exist
 
                     return !string.IsNullOrEmpty(token) ? 
                         token : 
