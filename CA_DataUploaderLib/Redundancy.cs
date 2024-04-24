@@ -11,7 +11,7 @@ namespace CA_DataUploaderLib
     {
         public Redundancy(IIOconf ioconf, CommandHandler cmd)
         {
-            var configs = IOconfRedundant.ToDecisionConfigs(ioconf.GetEntries<IOconfRedundant>());
+            var configs = IOconfRedundant.ToDecisionConfigs(ioconf.GetEntries<IOconfRedundant>(), ioconf);
             cmd.AddDecisions(configs.Select(r => new Decision(r)).ToList());
             SwitchBoardController.Initialize(ioconf, cmd);
         }
@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib
         {
             protected IOconfRedundant(string row, int lineNum, string type) : base(row, lineNum, type) { }
             
-            public static IEnumerable<Decision.Config> ToDecisionConfigs(IEnumerable<IOconfRedundant> redundants)
+            public static IEnumerable<Decision.Config> ToDecisionConfigs(IEnumerable<IOconfRedundant> redundants, IIOconf ioconf)
             {
                 var grouped = redundants.GroupBy(r => r.Name).ToList();
                 foreach (var group in grouped)
@@ -40,7 +40,7 @@ namespace CA_DataUploaderLib
                     var validRange = configs.OfType<IOconfRedundantValidRange>().SingleOrDefault()?.ValidRange ?? (double.MinValue, double.MaxValue);
                     var invalidDefault = configs.OfType<IOconfRedundantInvalidDefault>().SingleOrDefault()?.InvalidDefault ?? 10000;
                     var strategy = configs.OfType<IOconfRedundantStrategy>().SingleOrDefault()?.Strategy ?? RedundancyStrategy.Median;
-                    yield return new(sensorsConfig.Name, sensorsConfig.Sensors, sensorsConfig.SensorBoardStates, validRange, invalidDefault, strategy);
+                    yield return new(sensorsConfig.Name, sensorsConfig.Sensors, sensorsConfig.GetBoardStateNames(ioconf), validRange, invalidDefault, strategy);
                 }
             }
         }
@@ -50,20 +50,27 @@ namespace CA_DataUploaderLib
             public const string RowType = "RedundantSensors";
 
             public List<string> Sensors { get; }
-            public List<List<string>> SensorBoardStates { get; }
 
             public IOconfRedundantSensors(string row, int lineNum) : base(row, lineNum, RowType)
             {
                 Sensors = ToList().Skip(2).ToList();
-                SensorBoardStates = Sensors.Select(s => new List<string>()).ToList();
                 if (Sensors.Count < 1)
                     throw new FormatException($"Missing sensors. Format: {RowType};Name;Sensor1;Sensor2...;Sensorn. Line: {Row}");
             }
 
             public override void ValidateDependencies(IIOconf ioconf)
             {
+                foreach (var sensor in Sensors)
+                    if (!ioconf.GetEntries<IOconfRow>().Any(e => e.GetExpandedSensorNames(ioconf).Contains(sensor)))
+                        throw new FormatException($"Failed to find {sensor} for {RowType}: {Row}");
+            }
+
+            public List<List<string>> GetBoardStateNames(IIOconf ioconf)
+            {
+                var boardStateNames = new List<List<string>>();
                 for (int i = 0; i < Sensors.Count; i++)
-                    SensorBoardStates[i].AddRange(ioconf.GetBoardStateNames(Sensors[i]));
+                    boardStateNames.Add(new List<string>(ioconf.GetBoardStateNames(Sensors[i])));
+                return boardStateNames;
             }
         }
 

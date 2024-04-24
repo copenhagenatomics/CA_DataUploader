@@ -10,21 +10,19 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfOut230Vac(string row, int lineNum, string type) : base(row, lineNum, type, true, GetNewSwitchboardBoardSettings(row)) 
         {
             CurrentSensorName = Name + "_current";
-            BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
         }
 
         public string CurrentSensorName { get; }
-        public string BoardStateSensorName { get; } 
         public bool IsSwitchboardControllerOutput { get; }
         public override IEnumerable<IOconfInput> GetExpandedInputConf()
         { // note "_onoff" is not included as its not an input but the current expected on/off state as seen by the control loop.
             yield return NewPortInput(CurrentSensorName, 0 + PortNumber);
         }
 
-        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
         {
             yield return Name;
-            foreach (var name in base.GetExpandedNames(ioconf))
+            foreach (var name in base.GetExpandedSensorNames(ioconf))
                 yield return name;
         }
 

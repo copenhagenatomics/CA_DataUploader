@@ -51,8 +51,9 @@ namespace CA_DataUploaderLib.IOconf
             var isRedundancy = ioconf.GetEntries<Redundancy.IOconfRedundant>().Any(f => f.Name == TemperatureSensorName);
             if (!isTemp && !isMath && !isFilter && !isRedundancy)
                 throw new FormatException($"Failed to find sensor: {TemperatureSensorName} for oven: {Row}");
-            BoardStateSensorNames = ioconf.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
         }
+
+        public ReadOnlyCollection<string> GetBoardStateNames(IIOconf ioconf) => ioconf.GetBoardStateNames(TemperatureSensorName).ToList().AsReadOnly();
 
         public LoopControlDecision CreateDecision(IIOconf ioconf) => new OvenAreaDecision(new($"ovenarea{OvenArea}", OvenArea, ioconf.GetEntries<IOconfOvenProportionalControlUpdates>().SingleOrDefault()));
 
@@ -63,7 +64,6 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         private IOconfHeater? heatingElement;
-        private ReadOnlyCollection<string>? boardStateSensorNames;
 
         public readonly int OvenArea;
 
@@ -74,11 +74,7 @@ namespace CA_DataUploaderLib.IOconf
         }
         public string TemperatureSensorName { get; }
         public string HeaterName { get; }
-        public ReadOnlyCollection<string> BoardStateSensorNames 
-        { 
-            get => boardStateSensorNames ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(BoardStateSensorNames)}.");
-            private set => boardStateSensorNames = value; 
-        }
+
         //with the current formula the gain pretty much means seconds to gain 1C
         //by default we assume the HeatingElement can heat the temperature sensor 5 degrees x second on. 
         public double ProportionalGain { get; } = 0.2d; 

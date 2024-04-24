@@ -36,7 +36,7 @@ namespace CA_DataUploaderLib
             public override PluginField[] PluginFields => new PluginField[] { 
                 $"{Name}_state", ($"{Name}_onoff", FieldType.Output), new($"{Name}_nextcontrolperiod") { Upload = false }, new($"{Name}_controlperiodtimeoff") { Upload = false} };
             public override string[] HandledEvents => new List<string>(_eventsMap.Keys).ToArray();
-            public HeaterDecision(IOconfHeater heater, IOconfOven? oven) : this(ToConfig(heater, oven)) { }
+            public HeaterDecision(IOconfHeater heater, IOconfOven? oven, IIOconf ioconf) : this(ToConfig(heater, oven, ioconf)) { }
             public HeaterDecision(Config config)
             {
                 _config = config;
@@ -58,7 +58,7 @@ namespace CA_DataUploaderLib
                 model.MakeDecision(Events.vector);
             }
 
-            private static Config ToConfig(IOconfHeater heater, IOconfOven? oven)
+            private static Config ToConfig(IOconfHeater heater, IOconfOven? oven, IIOconf ioconf)
             {
                 if (oven == null)
                 {
@@ -66,7 +66,7 @@ namespace CA_DataUploaderLib
                     return new(heater.Name, new List<string>().AsReadOnly());//notice we don't set the maxtemperature configured at the heater level, as there is no way to enforce as the oven config owns the temperature sensor
                 }
 
-                return new(heater.Name, oven.BoardStateSensorNames)
+                return new(heater.Name, oven.GetBoardStateNames(ioconf))
                 {
                     MaxTemperature = heater.MaxTemperature,
                     Area = oven.OvenArea,

@@ -113,7 +113,11 @@ namespace CA_DataUploaderLib.IOconf
         public IEnumerable<IOconfInput> GetInputs() => GetEntries<IOconfInput>();
         public IEnumerable<T> GetEntries<T>() => Table.OfType<T>();
         public string GetRawFile() => string.Join(Environment.NewLine, RawLines);
-        ///<remarks> filters and math it returns the board state of all their sources.</remarks>
+
+        ///<remarks> 
+        ///Filter and math returns the board state of all their sources.
+        ///Only to be called after ValidateDependencies has been called on all rows.
+        ///</remarks>
         public IEnumerable<string> GetBoardStateNames(string sensor)
         {
             var sensorsChecked = new HashSet<string>();
@@ -124,10 +128,10 @@ namespace CA_DataUploaderLib.IOconf
                 var newSensors = sensors.ToHashSet();
                 newSensors.ExceptWith(sensorsChecked);
                 sensorsChecked.UnionWith(sensors);
-                foreach (var input in GetInputs())
+                foreach (var input in GetEntries<IOconfRow>().Where(e => e is IIOconfRowWithBoardState))
                 {
-                    if (newSensors.Contains(input.Name))
-                        yield return input.BoardStateSensorName;
+                    if (newSensors.Intersect(input.GetExpandedSensorNames(this)).Any())
+                        yield return ((IIOconfRowWithBoardState)input).BoardStateName;
                 }
 
                 foreach (var filter in GetFilters())

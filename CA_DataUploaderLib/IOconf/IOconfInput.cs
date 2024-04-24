@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class IOconfInput : IOconfRow
+    public class IOconfInput : IOconfRow, IIOconfRowWithBoardState
     {
         private readonly BoardSettings _boardSettings = BoardSettings.Default;
         private IOconfMap? _map;
@@ -16,7 +16,7 @@ namespace CA_DataUploaderLib.IOconf
             var list = ToList();
             (HasPort, Skip, PortNumber) = GetPort(row, type, parsePortRequired, list);
             BoxName = list[2];
-            BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
+            BoardStateName = BaseSensorBox.GetBoxStateName(BoxName);
             _boardSettings = boardSettings;
         }
 
@@ -26,7 +26,7 @@ namespace CA_DataUploaderLib.IOconf
             PortNumber = portNumber;
             BoxName = map.BoxName;
             Map = map;
-            BoardStateSensorName = BoxName + "_state"; // this must match the state sensor names returned by BaseSensorBox
+            BoardStateName = BaseSensorBox.GetBoxStateName(BoxName);
         }
 
         public override void ValidateDependencies(IIOconf ioconf)
@@ -36,18 +36,16 @@ namespace CA_DataUploaderLib.IOconf
             Map = GetMap(ioconf, BoxName, _boardSettings, Skip);
         }
 
-        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+        public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
         {
             yield return Name;
-            foreach (var name in base.GetExpandedNames(ioconf))
-                yield return name;
         }
 
         public virtual bool IsSpecialDisconnectValue(double value) => false;
 
         public string BoxName { get; init; }
+        public string BoardStateName { get; }
         /// <summary>the 1-based port number</summary>
-        public string BoardStateSensorName { get; }
         public int PortNumber = 1;
 
         public bool Skip { get; init; }
@@ -87,11 +85,11 @@ namespace CA_DataUploaderLib.IOconf
             return map;
         }
 
-        public class Expandable : IOconfRow
+        public class Expandable : IOconfRow, IIOconfRowWithBoardState
         {
             private readonly BoardSettings _boardSettings;
             private IOconfMap? _map;
-            
+
             public Expandable(string row, int lineNum, string type, bool parsePortRequired, BoardSettings boardSettings) : base(row, lineNum, type)
             {
                 Format = $"{type};Name;BoxName;[port number]";
@@ -100,6 +98,7 @@ namespace CA_DataUploaderLib.IOconf
                 if (skip)
                     throw new Exception($"{type}: unexpected skip: {row}");
                 BoxName = list[2];
+                BoardStateName = BaseSensorBox.GetBoxStateName(BoxName);
                 _boardSettings = boardSettings;
             }
 
@@ -110,18 +109,17 @@ namespace CA_DataUploaderLib.IOconf
 
             public virtual IEnumerable<IOconfInput> GetExpandedConf() => Enumerable.Empty<IOconfInput>();
 
-            public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
+            public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
             {
                 foreach (var input in GetExpandedConf())
                     yield return input.Name;
-                foreach (var name in base.GetExpandedNames(ioconf))
-                    yield return name;
             }
 
             public string BoxName { get; }
+            public string BoardStateName { get; }
             /// <summary>the 1-based port number</summary>
             public int PortNumber = 1;
-            
+
             public IOconfMap Map
             {
                 get => _map ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
