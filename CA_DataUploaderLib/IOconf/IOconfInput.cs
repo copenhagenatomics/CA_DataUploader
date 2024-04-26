@@ -108,7 +108,7 @@ namespace CA_DataUploaderLib.IOconf
                 Map = GetMap(ioconf, BoxName, _boardSettings, false);
             }
 
-            public virtual IEnumerable<IOconfInput> GetExpandedConf() => Enumerable.Empty<IOconfInput>();
+            public virtual IEnumerable<IOconfInput> GetExpandedConf() => [];
 
             public override IEnumerable<string> GetExpandedNames(IIOconf ioconf)
             {
