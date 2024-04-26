@@ -26,7 +26,7 @@ namespace CA_DataUploaderLib
             var bytes = new byte[1 + 1 + sizeof(long) + dataBytesCount]; //version + event type + time ticks + data bytes
             bytes[0] = 0;
             bytes[1] = EventType;
-            MemoryMarshal.Write(bytes.AsSpan()[2..], ref timeTicks);
+            MemoryMarshal.Write(bytes.AsSpan()[2..], in timeTicks);
             var startOfDataIndex = 1 + 1 + sizeof(long);
             if (dataBytesCount != encoding.GetBytes(Data, 0, Data.Length, bytes, startOfDataIndex))
                 throw new InvalidOperationException($"unexpected error getting utf8 bytes for event: {Data}");

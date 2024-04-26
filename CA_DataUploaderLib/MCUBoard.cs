@@ -58,7 +58,7 @@ namespace CA_DataUploaderLib
         public delegate bool TryReadLineDelegate(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)]out string? line);
         private TryReadLineDelegate TryReadLine;
         public delegate (bool finishedDetection, BoardInfo? info) CustomProtocolDetectionDelegate(ReadOnlySequence<byte> buffer, string portName);
-        private static readonly List<CustomProtocolDetectionDelegate> customProtocolDetectors = new();
+        private static readonly List<CustomProtocolDetectionDelegate> customProtocolDetectors = [];
 
         private MCUBoard(SerialPort port) : base(port.PortName, null)
         {
@@ -208,12 +208,12 @@ namespace CA_DataUploaderLib
         public async static Task<MCUBoard?> OpenDeviceConnection(IIOconf? ioconf, string name)
         {
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
-            var map = ioconf is not null ? ioconf.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name) : null;
+            var map = ioconf?.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name);
             var initialBaudrate = map != null && map.BaudRate != 0 ? map.BaudRate : 115200;
             var isVport = IOconfMap.IsVirtualPortName(name);
             bool skipAutoDetection = isVport || (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;
             if (skipAutoDetection)
-                CALog.LogInfoAndConsoleLn(LogID.A, $"device detection disabled for {name}({map})");
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Device detection disabled for {name}({map})");
             var mcu = await Create(ioconf, name, initialBaudrate, skipAutoDetection, !isVport);
             if (mcu == null || !mcu.InitialConnectionSucceeded)
                 mcu = await OpenWithAutoDetection(ioconf, name, initialBaudrate);
@@ -340,7 +340,7 @@ namespace CA_DataUploaderLib
         }
 
         private Task<string> ReadLine() =>
-            ReadLine(pipeReader ?? throw new ObjectDisposedException("closed connection detected (null pipeReader)"), PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine);
+            ReadLine(pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine);
         //exposing this one for testing purposes
         public static async Task<string> ReadLine(
             PipeReader pipeReader, string portName, int millisecondsTimeout, TryReadLineDelegate tryReadLine)
@@ -353,7 +353,7 @@ namespace CA_DataUploaderLib
                 {
                     var res = await pipeReader.ReadAsync(token);
                     if (res.IsCanceled)
-                        throw new TimeoutException("timed out (soft)");
+                        throw new TimeoutException("Timed out (soft)");
                     var buffer = res.Buffer;
 
                     //In the event that no message is parsed successfully, mark consumed as nothing and examined as the entire buffer. 
@@ -374,11 +374,11 @@ namespace CA_DataUploaderLib
                             //so the first ReadAsync in the next ReadLine call does not wait for more data but returns inmediately.
                             //not doing this would be a memory leak if we already had a full line in the buffer (as we keep waiting for an extra line and over time the buffer keeps accumulating extra lines).
                             examined = buffer.Start;
-                            return line ?? throw new InvalidOperationException("unexpected null line returned by TryReadLineDelegate (probably from a custom read implementation)"); //we return a single line for now to keep a similar API before introducing the pipe reader, but would be fine to explore changing the API shape in the future
+                            return line ?? throw new InvalidOperationException("Unexpected null line returned by TryReadLineDelegate (probably from a custom read implementation)"); //we return a single line for now to keep a similar API before introducing the pipe reader, but would be fine to explore changing the API shape in the future
                         }
 
                         if (res.IsCompleted)
-                            throw new ObjectDisposedException(portName, "closed connection detected");
+                            throw new ObjectDisposedException(portName, "Closed connection detected");
                     }
                     finally
                     {
@@ -389,11 +389,11 @@ namespace CA_DataUploaderLib
             catch (OperationCanceledException ex)
             {
                 if (ex.CancellationToken == token)
-                    throw new TimeoutException("timed out (while reading)");
+                    throw new TimeoutException("Timed out (while reading)");
                 throw;
             }
 
-            throw new TimeoutException("timed out (idle)");
+            throw new TimeoutException("Timed out (idle)");
         }
 
         private bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line) => TryReadAsciiLine(ref buffer, out line, ConfigSettings.ValuesEndOfLineChar);

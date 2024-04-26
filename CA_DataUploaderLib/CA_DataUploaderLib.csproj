@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Company>Copenhagen Atomics</Company>
     <Authors>Thomas Jam Pedersen + others</Authors>
@@ -13,7 +13,6 @@
     <Copyright>Copyright © $([System.DateTime]::UtcNow.Year) Copenhagen Atomics ($([System.DateTime]::UtcNow.ToString("dd-MMM-yyyy HH:mm")))</Copyright>
     <RepositoryUrl>https://github.com/copenhagenatomics/CA_DataUploader</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <LangVersion>10.0</LangVersion>
 	<Nullable>enable</Nullable>
   </PropertyGroup>
 
@@ -44,9 +43,9 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="System.IO.Ports" Version="6.0.0" />
-	  <PackageReference Include="CA.LoopControlPluginBase" Version="1.1.0" />
+	  <PackageReference Include="CA.LoopControlPluginBase" Version="1.2.0" />
 	  <PackageReference Include="System.IO.Pipelines" Version="6.0.2" />
-	<PackageReference Include="Microsoft.Bcl.TimeProvider" Version="8.0.0-rc.2.23479.6" />
+
   </ItemGroup>
 
   <ItemGroup>

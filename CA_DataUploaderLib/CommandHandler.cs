@@ -19,20 +19,20 @@ namespace CA_DataUploaderLib
     {
         private readonly IIOconf _ioconf;
         private readonly SerialNumberMapper? _mapper;
-        private SerialNumberMapper Mapper => _mapper ?? throw new NotSupportedException("usage of SerialNumberMapper detected on an unsupported context");
+        private SerialNumberMapper Mapper => _mapper ?? throw new NotSupportedException("Usage of SerialNumberMapper detected on an unsupported context");
         private readonly ICommandRunner _commandRunner;
         private DateTime _start = DateTime.Now;
         private readonly StringBuilder inputCommand = new();
-        private readonly List<string> AcceptedCommands = new();
-        private readonly List<ISubsystemWithVectorData> _subsystems = new();
+        private readonly List<string> AcceptedCommands = [];
+        private readonly List<ISubsystemWithVectorData> _subsystems = [];
         private int AcceptedCommandsIndex = -1;
-        private readonly List<LoopControlDecision> _decisions = new();
-        private readonly List<LoopControlDecision> _safetydecisions = new();
+        private readonly List<LoopControlDecision> _decisions = [];
+        private readonly List<LoopControlDecision> _safetydecisions = [];
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
         private readonly CancellationTokenSource _exitCts = new();
         private readonly TaskCompletionSource _runningTaskTcs = new();
         private readonly bool _isMultipi;
-        private readonly List<ChannelWriter<DataVector>> _receivedVectorsWriters = new();
+        private readonly List<ChannelWriter<DataVector>> _receivedVectorsWriters = [];
         private readonly Queue<EventFiredArgs> _locallyFiredEvents = new();
 
         /// <remarks>
@@ -113,7 +113,7 @@ namespace CA_DataUploaderLib
                     }
                     catch (Exception ex)
                     {
-                        CALog.LogErrorAndConsoleLn(LogID.A, $"error running command: {e.Data}", ex);
+                        CALog.LogErrorAndConsoleLn(LogID.A, $"Error running command: {e.Data}", ex);
                     }
                 }
             });
@@ -208,7 +208,7 @@ namespace CA_DataUploaderLib
             OrderDecisionsBasedOnIOconf(_decisions);
             var decisions = _decisions.Concat(_safetydecisions);
             SetConfigBasedOnIOconf(decisions);
-            CALog.LogData(LogID.A, $"decisions order: {string.Join(',', decisions.Select(d => d.Name))}");
+            CALog.LogData(LogID.A, $"Decisions order: {string.Join(',', decisions.Select(d => d.Name))}");
             var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type) { Upload = f.Upload })).ToList();
             var desc = new ExtendedVectorDescription(_ioconf, inputsPerNode, globalInputs, outputs);
             CA.LoopControlPluginBase.VectorDescription inmutableVectorDesc = new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray());
@@ -229,11 +229,11 @@ namespace CA_DataUploaderLib
                 foreach (var conf in confDecisions)
                 {
                     if (!decisionsIndexes.TryGetValue(conf.Name, out var decisionAndIndex)) 
-                        throw new FormatException($"decision listed in IO.conf (line {conf.LineNumber + 1}) was not found: '{conf.Row}'");
+                        throw new FormatException($"Decision listed in IO.conf (line {conf.LineNumber + 1}) was not found: '{conf.Row}'");
                     var decisionVersion = decisionAndIndex.decision.GetType().Assembly.GetName().Version ?? throw new FormatException($"Failed to retrieve assembly version for decision '{conf.Row}' (line {conf.LineNumber + 1})");
                     if (decisionVersion.Major != conf.Version.Major || decisionVersion.Minor != conf.Version.Minor || decisionVersion.Build != conf.Version.Build )
                         //the 3 digits the user sees/configures does not match the 4 digits the scxmltocode tool produces, so we compare the 3 digits explicitly above i.e. 1.0.2.0 vs. 1.0.2
-                        throw new FormatException($"decision listed in IO.conf (line {conf.LineNumber + 1}) did not match expected version: {conf.Version} - Actual: {decisionVersion} - '{conf.Row}'");
+                        throw new FormatException($"Decision listed in IO.conf (line {conf.LineNumber + 1}) did not match expected version: {conf.Version} - Actual: {decisionVersion} - '{conf.Row}'");
                     decisionsIndexes[conf.Name] = (decisionAndIndex.decision, decisions.Count + conf.Index); 
                 }
 
@@ -246,7 +246,7 @@ namespace CA_DataUploaderLib
                 var configEntries = _ioconf.GetEntries<IOconfRow>();
                 var unknownEntriesWithoutDecisions = configEntries.Where(e => e.IsUnknown && !decisionsNames.Contains(e.Type)).Select(r => r.Row).ToList();
                 if (unknownEntriesWithoutDecisions.Count > 0)
-                    throw new NotSupportedException($"invalid config lines detected: {Environment.NewLine + string.Join(Environment.NewLine, unknownEntriesWithoutDecisions)}");
+                    throw new NotSupportedException($"Invalid config lines detected: {Environment.NewLine + string.Join(Environment.NewLine, unknownEntriesWithoutDecisions)}");
                 var configEntriesLookup = configEntries.ToLookup(l => l.Type);
                 foreach (var decision in decisions)
                     if (configEntriesLookup.Contains(decision.Name))
@@ -258,7 +258,7 @@ namespace CA_DataUploaderLib
         private List<IOconfNode> GetNodes()
         {
             var nodes = _ioconf.GetEntries<IOconfNode>().ToList();
-            return nodes.Count > 0 ? nodes : new() { IOconfNode.GetSingleNode(_ioconf.GetLoopName()) };
+            return nodes.Count > 0 ? nodes : [IOconfNode.GetSingleNode(_ioconf.GetLoopName())];
         }
 
         public void OnNewVectorReceived(DataVector args)
@@ -268,7 +268,7 @@ namespace CA_DataUploaderLib
                 if (!writer.TryWrite(args) && IsRunning)
                     //at the time of writing the channel was unbounded, so it is not supposed to fail to add vectors to the channel
                     //note one case TryWrite may return false is when the channel is flagged as completed when we are stopping, thus the check for IsRunning above
-                    throw new InvalidOperationException("unexpected failure to write to the received vectors channel");
+                    throw new InvalidOperationException("Unexpected failure to write to the received vectors channel");
             }
         }
 
@@ -291,7 +291,7 @@ namespace CA_DataUploaderLib
             List<EventFiredArgs>? list = null; // delayed initialization to avoid creating lists when there is no data.
             lock (_locallyFiredEvents)
                 for (int i = 0; i < max && _locallyFiredEvents.TryDequeue(out var e); i++)
-                    (list ??= new List<EventFiredArgs>()).Add(e);
+                    (list ??= []).Add(e);
             return list;
         }
 
