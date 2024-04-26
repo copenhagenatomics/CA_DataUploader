@@ -30,7 +30,7 @@ namespace CA_DataUploaderLib
         private readonly List<LoopControlDecision> _safetydecisions = [];
         private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
         private readonly CancellationTokenSource _exitCts = new();
-        private readonly TaskCompletionSource _runningTaskTcs = new();
+        private readonly TaskCompletionSource _runningTaskTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly bool _isMultipi;
         private readonly List<ChannelWriter<DataVector>> _receivedVectorsWriters = [];
         private readonly Queue<EventFiredArgs> _locallyFiredEvents = new();

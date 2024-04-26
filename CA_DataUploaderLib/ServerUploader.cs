@@ -37,7 +37,7 @@ namespace CA_DataUploaderLib
         private readonly Channel<EventFiredArgs> _eventsChannel = Channel.CreateBounded<EventFiredArgs>(BoundedOptions);
         private readonly IIOconf _ioconf;
         private readonly CommandHandler _cmd;
-        private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new();
+        private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly Stopwatch _timeSinceLastInvalidValueEvent = new();
         private int _invalidValueEventsSkipped = 0;
 
@@ -151,7 +151,7 @@ namespace CA_DataUploaderLib
         {
             if (!IsEnabled) throw new NotSupportedException("The uploader is not enabled in this node");
             var task = _connectionEstablishedSource.Task;
-            var cancellationSource = new TaskCompletionSource();
+            var cancellationSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             using var cancellationRegistration = token.Register(() => cancellationSource.TrySetCanceled(token));
             await Task.WhenAny(task, cancellationSource.Task);
             token.ThrowIfCancellationRequested();

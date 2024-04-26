@@ -122,7 +122,7 @@ namespace CA_DataUploaderLib
                     return;
                 }
 
-                reconnectTasks[map.BoxName] = new TaskCompletionSource();
+                reconnectTasks[map.BoxName] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 cmd.AddMultinodeCommand(
                     "reconnect",
                     a => a.Count == 2 && a[1] == map.BoxName,
@@ -131,7 +131,7 @@ namespace CA_DataUploaderLib
                         lock (reconnectTasks)
                         {
                             var currentTCS = reconnectTasks[map.BoxName];
-                            reconnectTasks[map.BoxName] = new TaskCompletionSource();
+                            reconnectTasks[map.BoxName] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                             currentTCS.TrySetResult(); //Completes the task signaling to ReconnectBoard to try again (if currently waiting)
                         }
                     });
