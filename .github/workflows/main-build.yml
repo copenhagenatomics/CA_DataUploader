@@ -53,8 +53,6 @@ jobs:
       run: dotnet publish CA_DataUploader -c Release -o out/linux-arm/uploader -r linux-arm -p:PublishSingleFile=true
     - name: Generate DataUploader - osx-x64
       run: dotnet publish CA_DataUploader -c Release -o out/osx-x64/uploader -r osx-x64 -p:PublishSingleFile=true
-    - name: Generate DataUploader - win-arm
-      run: dotnet publish CA_DataUploader -c Release -o out/win-arm/uploader -r win-arm -p:PublishSingleFile=true
     - name: Generate DataUploader - win-x64
       run: dotnet publish CA_DataUploader -c Release -o out/win-x64/uploader -r win-x64 -p:PublishSingleFile=true
     - name: Generate DataUploader - win-x86
@@ -70,9 +68,6 @@ jobs:
     - name: Zip - osx-x64
       run: zip -qq -r CA_DataUploader-osx-x64.zip uploader
       working-directory: out/osx-x64
-    - name: Zip - win-arm
-      run: zip -qq -r CA_DataUploader-win-arm.zip uploader
-      working-directory: out/win-arm
     - name: Zip - win-x64
       run: zip -qq -r CA_DataUploader-win-x64.zip uploader
       working-directory: out/win-x64
