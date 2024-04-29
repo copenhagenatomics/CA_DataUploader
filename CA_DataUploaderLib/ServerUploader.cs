@@ -203,6 +203,10 @@ namespace CA_DataUploaderLib
             {
                 OnError($"Uploading stopped: {ex.Message}{Environment.NewLine}Check the configuration, correct any issues and restart to resume uploads.", ex);
             }
+            catch (HttpRequestException ex)
+            {
+                OnError($"ServerUploader: an error occurred (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}).", ex);
+            }
             catch (OperationCanceledException ex) when (ex.CancellationToken == token) { }
             catch (Exception ex)
             {//this will usually be a hard error to establish a plot connection 
@@ -439,6 +443,11 @@ namespace CA_DataUploaderLib
                     stateWriter.TryWrite(UploadState.UploadedVector);
                     return success;
                 }
+                catch (HttpRequestException ex)
+                {
+                    OnError($"Failed posting vector (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}).", ex);
+                    return false;
+                }
                 catch (Exception ex)
                 {
                     OnError("Failed posting vector", ex);
@@ -497,6 +506,11 @@ namespace CA_DataUploaderLib
                     return await PostSystemChangeNotificationAsync(args);//this special event turns into reported boards serial info + still an event with a shorter description
                 else
                     return await Post(args);
+            }
+            catch (HttpRequestException ex)
+            {
+                OnError($"Failed posting event (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}): {args.EventType} - {args.Data} - {args.TimeSpan}", ex);
+                return false;
             }
             catch (Exception ex)
             {
@@ -640,18 +654,20 @@ namespace CA_DataUploaderLib
                         var signedValue = publicKey.Concat(signedVectorDescription).ToArray(); // Note that it will only work if converted to array and not IEnummerable
                         response = await client.PutAsJsonAsync(query, signedValue, cancellationToken);
                         response.EnsureSuccessStatusCode();
-                        var result = await response.Content.ReadFromJsonAsync<string>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("unexpected null result when getting plotid");
+                        var result = await response.Content.ReadFromJsonAsync<string>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("Unexpected null result when getting plotid");
                         return (result.StringBefore(" ").ToInt(), result.StringAfter(" "));
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         var contentTask = response?.Content?.ReadAsStringAsync(cancellationToken);
                         var error = contentTask != null ? await contentTask : null;
                         if (!string.IsNullOrEmpty(error))
-                            OnError($"Failure getting plot id: {error}");
+                            OnError($"Failure getting plot id: {error} {(ex is HttpRequestException rex && rex.HttpRequestError != HttpRequestError.Unknown ? "$(HttpStatusCode={rex.StatusCode}, HttpRequestError={rex.HttpRequestError})" : "")}");
+                        else if (ex is HttpRequestException rex2 && rex2.HttpRequestError != HttpRequestError.Unknown)
+                            OnError($"Failure getting plot id (HttpStatusCode={rex2.StatusCode}, HttpRequestError={rex2.HttpRequestError})");
 
-                        if (ex is HttpRequestException rex && (rex.StatusCode == HttpStatusCode.Unauthorized || rex.StatusCode == HttpStatusCode.BadRequest))
-                            throw new UnauthorizedAccessException($"System private key or verified account token was rejected ({rex.StatusCode}).", ex);//UnauthorizedAccessException skips retries
+                        if (ex is HttpRequestException rex3 && (rex3.StatusCode == HttpStatusCode.Unauthorized || rex3.StatusCode == HttpStatusCode.BadRequest))
+                            throw new UnauthorizedAccessException($"System private key or verified account token was rejected ({rex3.StatusCode}).", ex);//UnauthorizedAccessException skips retries
 
                         throw;
                     }
@@ -708,6 +724,11 @@ namespace CA_DataUploaderLib
                         OnError($"Failed to {actionMsg}, attempting to reconnect in 5 seconds.", ex);
                         await Task.Delay(5000, cancellationToken);
                     }
+                    catch (HttpRequestException ex)
+                    {
+                        OnError($"Failed to {actionMsg} (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}), attempting to reconnect in 5 seconds.", ex);
+                        await Task.Delay(5000, cancellationToken);
+                    }
                     catch (Exception ex)
                     {
                         //Based on documented behavior it should only be HttpRequestException, but doing retries for other exceptions due to info out there on Socket and IO exceptions.
@@ -726,8 +747,6 @@ namespace CA_DataUploaderLib
                 {
                     //allows the system to notice dns changes as recommended at https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines#recommended-use
                     PooledConnectionLifetime = TimeSpan.FromMinutes(15),
-                    //workaround for connection hangs triggered by unstable connections (not needed in .net 7+) https://github.com/dotnet/runtime/issues/81989
-                    ConnectTimeout = TimeSpan.FromMinutes(1) 
                 };
                 var client = new HttpClient(handler);
                 client.BaseAddress = new Uri(server);
