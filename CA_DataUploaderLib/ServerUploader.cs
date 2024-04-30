@@ -662,12 +662,10 @@ namespace CA_DataUploaderLib
                         var contentTask = response?.Content?.ReadAsStringAsync(cancellationToken);
                         var error = contentTask != null ? await contentTask : null;
                         if (!string.IsNullOrEmpty(error))
-                            OnError($"Failure getting plot id: {error} {(ex is HttpRequestException rex && rex.HttpRequestError != HttpRequestError.Unknown ? "$(HttpStatusCode={rex.StatusCode}, HttpRequestError={rex.HttpRequestError})" : "")}");
-                        else if (ex is HttpRequestException rex2 && rex2.HttpRequestError != HttpRequestError.Unknown)
-                            OnError($"Failure getting plot id (HttpStatusCode={rex2.StatusCode}, HttpRequestError={rex2.HttpRequestError})");
+                            OnError($"Failure getting plot id: {error}");
 
-                        if (ex is HttpRequestException rex3 && (rex3.StatusCode == HttpStatusCode.Unauthorized || rex3.StatusCode == HttpStatusCode.BadRequest))
-                            throw new UnauthorizedAccessException($"System private key or verified account token was rejected ({rex3.StatusCode}).", ex);//UnauthorizedAccessException skips retries
+                        if (ex is HttpRequestException rex && (rex.StatusCode == HttpStatusCode.Unauthorized || rex.StatusCode == HttpStatusCode.BadRequest))
+                            throw new UnauthorizedAccessException($"System private key or verified account token was rejected ({rex.StatusCode}).", ex);//UnauthorizedAccessException skips retries
 
                         throw;
                     }
