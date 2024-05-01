@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 
 namespace CA_DataUploaderLib.Extensions
 {
@@ -33,5 +34,22 @@ namespace CA_DataUploaderLib.Extensions
         public static bool TryToDouble(this ReadOnlySpan<char> s, out double val) => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out val);
         public static List<string> SplitNewLine(this string s, StringSplitOptions options = StringSplitOptions.RemoveEmptyEntries) => s.Split(new[] { Environment.NewLine }, options).ToList();
         private static bool TryGetIndex(string s, string match, out int pos) => (pos = s.IndexOf(match)) >= 0;
+
+        /// <summary>
+        /// Escapes fixed set of hidden characters in a string to be able to see them when printing to log/console.
+        /// </summary>
+        public static string ToLiteral(this string s)
+        {
+            return new StringBuilder(s)
+                .Replace("\0", @"\0") // Null character
+                .Replace("\a", @"\a") // Alert
+                .Replace("\b", @"\b") // Backspace
+                .Replace("\f", @"\f") // Form feed
+                .Replace("\n", @"\n") // New line
+                .Replace("\r", @"\r") // Carriage return
+                .Replace("\t", @"\t") // Horizontal tab
+                .Replace("\v", @"\v") // Vertical tab
+                .ToString();
+        }
     }
 }

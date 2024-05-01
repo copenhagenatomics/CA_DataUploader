@@ -482,7 +482,7 @@ namespace CA_DataUploaderLib
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
-                        LowFrequencyLogInfo((args, skipMessage) => LogInfo(args.board, $"Unexpected board response '{args.line.Replace("\r", "\\r")}'{skipMessage}"), (board, line));// we avoid \r as it makes the output hard to read
+                        LowFrequencyLogInfo((args, skipMessage) => LogInfo(args.board, $"Unexpected board response '{args.line.ToLiteral()}'{skipMessage}"), (board, line));
                         if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                             _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                     }
@@ -493,7 +493,7 @@ namespace CA_DataUploaderLib
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in msBetweenReads
-                    LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Failed handling board response {args.line.Replace("\r", "\\r")}{skipMessage}", args.ex), (board, line, ex)); // we avoid \r as it makes the output hard to read
+                    LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Failed handling board response '{args.line.ToLiteral()}'{skipMessage}", args.ex), (board, line, ex));
                     if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                         _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                 }
