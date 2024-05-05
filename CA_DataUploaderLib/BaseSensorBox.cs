@@ -260,13 +260,13 @@ namespace CA_DataUploaderLib
         private double GetAvgLoopTime() => _values.Average(x => x.ReadSensor_LoopTime);
         private async Task RunBoardLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
-            DateTime start = DateTime.Now;
+            DateTime start = DateTime.UtcNow;
             try
             {
                 var loops = StartLoops(boards, token);
                 await Task.WhenAll(loops);
                 if (loops.Count > 0) //we only report the exit when we actually ran loops with detected boards. If a board was not detected StartReadLoops already reports the missing boards.
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardLoops() " + DateTime.Now.Subtract(start));
+                    CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardLoops() " + DateTime.UtcNow.Subtract(start));
             }
             catch (Exception ex)
             {
