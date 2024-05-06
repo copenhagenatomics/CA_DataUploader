@@ -21,7 +21,7 @@ namespace CA_DataUploaderLib
         private readonly SerialNumberMapper? _mapper;
         private SerialNumberMapper Mapper => _mapper ?? throw new NotSupportedException("Usage of SerialNumberMapper detected on an unsupported context");
         private readonly ICommandRunner _commandRunner;
-        private DateTime _start = DateTime.Now;
+        private DateTime _start = DateTime.UtcNow;
         private readonly StringBuilder inputCommand = new();
         private readonly List<string> AcceptedCommands = [];
         private readonly List<ISubsystemWithVectorData> _subsystems = [];
@@ -303,7 +303,7 @@ namespace CA_DataUploaderLib
 
         private void LoopForever()
         {
-            _start = DateTime.Now;
+            _start = DateTime.UtcNow;
             while (IsRunning)
             {
                 try
@@ -318,7 +318,7 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.Now.Subtract(_start));
+            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.UtcNow.Subtract(_start));
         }
 
         private void HandleCommand(string cmdString, bool isUserCommand)
@@ -418,7 +418,7 @@ namespace CA_DataUploaderLib
         }
 
         public void Uptime(List<string> _) => 
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{GetCurrentNode().Name} - {DateTime.Now.Subtract(_start)}");
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{GetCurrentNode().Name} - {DateTime.UtcNow.Subtract(_start)}");
 
         public void GetVersion(List<string> _)
         {

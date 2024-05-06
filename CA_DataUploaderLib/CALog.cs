@@ -56,7 +56,7 @@ namespace CA_DataUploaderLib
                 lock (_logDir)
                 {
                     // allways add timestamp and a NewLine
-                    msg = $"{DateTime.Now:MM.dd HH:mm:ss.fff} - {msg}{Environment.NewLine}";
+                    msg = $"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} - {msg}{Environment.NewLine}";
                     File.AppendAllText(GetFilename(logID), msg);
                 }
             }
@@ -73,12 +73,12 @@ namespace CA_DataUploaderLib
                 InitDictionary(ref _nextSizeCheck);
 
             var filepath = Path.Combine(_logDir, logID.ToString() + ".log");
-            if (DateTime.Now > _nextSizeCheck[logID] && File.Exists(filepath))
+            if (DateTime.UtcNow > _nextSizeCheck[logID] && File.Exists(filepath))
             {
                 if (new FileInfo(filepath).Length > MaxLogSizeMB * 1024 * 1024)
                     File.Delete(filepath);
 
-                _nextSizeCheck[logID] = DateTime.Now.AddMinutes(1);
+                _nextSizeCheck[logID] = DateTime.UtcNow.AddMinutes(1);
             }
 
             return filepath;
@@ -90,14 +90,14 @@ namespace CA_DataUploaderLib
 
             dictionary = new Dictionary<LogID, DateTime>
             {
-                { LogID.A, DateTime.Now },
-                { LogID.B, DateTime.Now },
-                { LogID.C, DateTime.Now },
-                { LogID.D, DateTime.Now },
-                { LogID.E, DateTime.Now },
-                { LogID.F, DateTime.Now },
-                { LogID.G, DateTime.Now },
-                { LogID.H, DateTime.Now }
+                { LogID.A, DateTime.UtcNow },
+                { LogID.B, DateTime.UtcNow },
+                { LogID.C, DateTime.UtcNow },
+                { LogID.D, DateTime.UtcNow },
+                { LogID.E, DateTime.UtcNow },
+                { LogID.F, DateTime.UtcNow },
+                { LogID.G, DateTime.UtcNow },
+                { LogID.H, DateTime.UtcNow }
             };
         }
 

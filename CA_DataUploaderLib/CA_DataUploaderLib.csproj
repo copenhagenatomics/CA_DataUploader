@@ -49,6 +49,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CA.LoopControlPluginBase\CA.LoopControlPluginBase.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Update="MCUBoard.cs" />
   </ItemGroup>
 
