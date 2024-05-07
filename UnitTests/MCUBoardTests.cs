@@ -6,6 +6,7 @@ using System.IO.Pipelines;
 using System.Text;
 using System.Threading.Tasks;
 using CA_DataUploaderLib;
+using Microsoft.Extensions.Time.Testing;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace UnitTests
@@ -202,6 +203,47 @@ namespace UnitTests
             Assert.AreEqual("", header.SoftwareCompileDate);
             Assert.AreEqual("", header.GitSha);
             Assert.AreEqual("", header.PcbVersion);
+        }
+
+        [TestMethod]
+        public async Task ReadSerialLogsReadLinesOnMissingHeader()
+        {
+            var pipe = new Pipe();
+            var (reader, writer) = (pipe.Reader, pipe.Writer);
+            await Write(writer, "Reconnected Reason: watchdog\n");
+            await Write(writer, "1\n");
+            var time = new FakeTimeProvider();
+            var log = string.Empty;
+            var header = new MCUBoard.Header(new(
+                time, 
+                (_, msg) => Assert.Fail($"unexpected log info received: {msg}"), 
+                (_, msg) => log += msg + Environment.NewLine,
+                (_, msg, ex) => Assert.Fail($"unexpected log exception received: {msg}{Environment.NewLine}{ex}")));
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
+            await Write(writer, "2\n");
+            await Write(writer, "3\n");
+            await Write(writer, "Serial Number: 123\n");
+            await Write(writer, "Some unexpected failure\n");
+            await Write(writer, "4:\n");
+            Assert.IsFalse(res.IsCompleted, "unexpected early completion");
+            await Task.Yield();
+            time.Advance(TimeSpan.FromSeconds(5000));
+            Assert.IsTrue(await res, "unexpected not able to read response when the board is returning data");
+            Assert.AreEqual("123", header.SerialNumber);
+            var expectedLog =
+@"Unable to read from myport: timed out
+Partial board header detected from myport
+Reconnected Reason: watchdog
+1
+2
+3
+Serial Number: 123
+Some unexpected failure
+4:
+
+";
+            Assert.AreEqual(expectedLog, log);
+            
         }
 
 
