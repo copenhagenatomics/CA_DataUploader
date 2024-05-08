@@ -169,8 +169,6 @@ namespace CA_DataUploaderLib
         /// </remarks>
         public async Task<bool> SafeReopen(CancellationToken token)
         {
-            var lines = new List<string>();
-            var bytesToRead500ms = 0;
             try
             {
                 using var _ = await _reconnectionLock.AcquireWriterLock(token);
@@ -185,23 +183,15 @@ namespace CA_DataUploaderLib
 
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {ProductType} {SerialNumber}");
                 port.Open();
-                await Task.Delay(500, token);
-
-                bytesToRead500ms = port.BytesToRead;
                 pipeReader = PipeReader.Create(port.BaseStream);
-                CALog.LogData(LogID.B, $"(Reopen) skipping {ConfigSettings.ExpectedHeaderLines} header lines for port {PortName} {ProductType} {SerialNumber} ");
-                lines = await SkipExtraHeaders(ConfigSettings.ExpectedHeaderLines);
             }
             catch (Exception ex)
             {
-                CALog.LogError(
-                    LogID.B,
-                    $"Failure reopening port {PortName} {ProductType} {SerialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
-                    ex);
+                CALog.LogError(LogID.B,$"Failure reopening port {PortName} {ProductType} {SerialNumber}.",ex);
                 return false;
             }
 
-            CALog.LogData(LogID.B, $"Reopened port {PortName} {ProductType} {SerialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§", lines)}'");
+            CALog.LogData(LogID.B, $"Reopened port {PortName} {ProductType} {SerialNumber}.");
             return true;
         }
 
@@ -455,10 +445,10 @@ namespace CA_DataUploaderLib
             public string? Calibration { get; private set; }
             public string? UpdatedCalibration { get; private set; }
 
-            private readonly HeaderDepedendencies Dependencies;
+            private readonly HeaderDependencies Dependencies;
 
-            public Header() : this(HeaderDepedendencies.Default) { }
-            public Header(HeaderDepedendencies dependencies)
+            public Header() : this(HeaderDependencies.Default) { }
+            public Header(HeaderDependencies dependencies)
             {
                 Dependencies = dependencies;
             }
@@ -604,9 +594,9 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public class HeaderDepedendencies(TimeProvider timeProvider, Action<LogID, string> logInfo, Action<LogID, string> logError, Action<LogID, string, Exception> logException)
+        public class HeaderDependencies(TimeProvider timeProvider, Action<LogID, string> logInfo, Action<LogID, string> logError, Action<LogID, string, Exception> logException)
         {
-            internal static readonly HeaderDepedendencies Default = new(TimeProvider.System, CALog.LogInfoAndConsoleLn, CALog.LogErrorAndConsoleLn, CALog.LogErrorAndConsoleLn);
+            internal static readonly HeaderDependencies Default = new(TimeProvider.System, CALog.LogInfoAndConsoleLn, CALog.LogErrorAndConsoleLn, CALog.LogErrorAndConsoleLn);
 
             public TimeProvider TimeProvider { get; } = timeProvider;
 
