@@ -169,8 +169,6 @@ namespace CA_DataUploaderLib
         /// </remarks>
         public async Task<bool> SafeReopen(CancellationToken token)
         {
-            var lines = new List<string>();
-            var bytesToRead500ms = 0;
             try
             {
                 using var _ = await _reconnectionLock.AcquireWriterLock(token);
@@ -185,23 +183,15 @@ namespace CA_DataUploaderLib
 
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {ProductType} {SerialNumber}");
                 port.Open();
-                await Task.Delay(500, token);
-
-                bytesToRead500ms = port.BytesToRead;
                 pipeReader = PipeReader.Create(port.BaseStream);
-                CALog.LogData(LogID.B, $"(Reopen) skipping {ConfigSettings.ExpectedHeaderLines} header lines for port {PortName} {ProductType} {SerialNumber} ");
-                lines = await SkipExtraHeaders(ConfigSettings.ExpectedHeaderLines);
             }
             catch (Exception ex)
             {
-                CALog.LogError(
-                    LogID.B,
-                    $"Failure reopening port {PortName} {ProductType} {SerialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§",lines)}'",
-                    ex);
+                CALog.LogError(LogID.B,$"Failure reopening port {PortName} {ProductType} {SerialNumber}.",ex);
                 return false;
             }
 
-            CALog.LogData(LogID.B, $"Reopened port {PortName} {ProductType} {SerialNumber} - {bytesToRead500ms} bytes in read buffer.{Environment.NewLine}Skipped header lines '{string.Join("§", lines)}'");
+            CALog.LogData(LogID.B, $"Reopened port {PortName} {ProductType} {SerialNumber}.");
             return true;
         }
 
@@ -455,15 +445,23 @@ namespace CA_DataUploaderLib
             public string? Calibration { get; private set; }
             public string? UpdatedCalibration { get; private set; }
 
+            private readonly HeaderDependencies Dependencies;
+
+            public Header() : this(HeaderDependencies.Default) { }
+            public Header(HeaderDependencies dependencies)
+            {
+                Dependencies = dependencies;
+            }
+
             public async Task<bool> DetectBoardHeader(PipeReader pipeReader, TryReadLineDelegate tryReadLine, Action resendSerial, string port)
             {
                 var (sentSerialCommandTwice, ableToRead, finishedReadingHeader) = (false, false, false);
                 var (readSerialNumber, readProductType, readSoftwareVersion, readPcbVersion) = (false, false, false, false);
-                int millisecondsTimeout = 5000;
-                using var cts = new CancellationTokenSource(millisecondsTimeout); // we use a cancellation token for the timeout as ReadAsync can otherwise hang if a device never sends a line
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(5000), Dependencies.TimeProvider); // we use a cancellation token for the timeout as ReadAsync can otherwise hang if a device never sends a line
                 var token = cts.Token;
+                var linesRead = new StringBuilder(200);
 
-                while (!finishedReadingHeader && !token.IsCancellationRequested)
+                while (!finishedReadingHeader)
                 {
                     try
                     {
@@ -477,6 +475,7 @@ namespace CA_DataUploaderLib
 
                         while (!ReadFullHeader() && tryReadLine(ref buffer, out var input))
                         {
+                            linesRead.AppendLine(input);
                             ableToRead |= input.Length >= 2;
                             input = input.Trim();
                             if (input.StartsWith(serialNumberHeader))
@@ -511,7 +510,7 @@ namespace CA_DataUploaderLib
                             else if (input.Contains("MISREAD") && !sentSerialCommandTwice && SerialNumber == null)
                             {
                                 resendSerial();
-                                CALog.LogInfoAndConsoleLn(LogID.A, $"Received misread without any serial on port {port} - re-sending serial command");
+                                Dependencies.LogInfo(LogID.A, $"Received misread without any serial on port {port} - re-sending serial command");
                                 sentSerialCommandTwice = true;
                             }
                         }
@@ -527,25 +526,28 @@ namespace CA_DataUploaderLib
 
                         if (res.IsCompleted)
                         {
-                            CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {port}: pipe reader was closed");
+                            Dependencies.LogError(LogID.A, $"Unable to read from {port}: pipe reader was closed");
                             break; // typically means the connection was closed.
                         }
                     }
                     catch (TimeoutException ex)
                     {
-                        CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {port}: " + ex.Message);
+                        Dependencies.LogException(LogID.A, $"Unable to read from {port}: " + ex.Message, ex);
                         break;
                     }
-                    catch (OperationCanceledException ex)
+                    catch (OperationCanceledException ex) when (ex.CancellationToken == token)
                     {
-                        CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {port}: " + ex.Message);
+                        Dependencies.LogError(LogID.A, $"Unable to read from {port}: timed out");
                         break;
                     }
                     catch (Exception ex)
                     {
-                        CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to read from {port}: " + ex.Message);
+                        Dependencies.LogException(LogID.A, $"Unable to read from {port}: " + ex.Message, ex);
                     }
                 }
+
+                if (!finishedReadingHeader && linesRead.Length > 0)
+                    Dependencies.LogError(LogID.A, $"Partial board header detected from {port}{Environment.NewLine}{linesRead}");
 
                 return ableToRead;
 
@@ -590,6 +592,17 @@ namespace CA_DataUploaderLib
                 mcuBoard.Calibration = Calibration;
                 mcuBoard.UpdatedCalibration = UpdatedCalibration;
             }
+        }
+
+        public class HeaderDependencies(TimeProvider timeProvider, Action<LogID, string> logInfo, Action<LogID, string> logError, Action<LogID, string, Exception> logException)
+        {
+            internal static readonly HeaderDependencies Default = new(TimeProvider.System, CALog.LogInfoAndConsoleLn, CALog.LogErrorAndConsoleLn, CALog.LogErrorAndConsoleLn);
+
+            public TimeProvider TimeProvider { get; } = timeProvider;
+
+            internal void LogError(LogID logId, string message) => logError(logId, message);
+            internal void LogException(LogID logId, string message, Exception exception) => logException(logId, message, exception);
+            internal void LogInfo(LogID logId, string message) => logInfo(logId, message);
         }
     }
 }
