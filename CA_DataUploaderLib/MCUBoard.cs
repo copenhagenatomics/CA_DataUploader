@@ -415,7 +415,7 @@ namespace CA_DataUploaderLib
         static bool TryPeekNextNonEmptyLine(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> bufferAfterLine, out string? nonEmptyLine, TryReadLineDelegate tryReadLine)
         {
             nonEmptyLine = null;
-            bufferAfterLine = buffer; // take a copy to avoid unnecesarily throwing away data coming after the header
+            bufferAfterLine = buffer;
             bool readLine = tryReadLine(ref bufferAfterLine, out var line);
 
             //skip empty lines advancing the caller's buffer so it does not read the empty line again.
@@ -432,7 +432,6 @@ namespace CA_DataUploaderLib
             buffer = bufferAfterLine;
             return false;
         }
-
 
         private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<TResult> action, CancellationToken token)
         {
