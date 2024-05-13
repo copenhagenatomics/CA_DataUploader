@@ -196,9 +196,9 @@ namespace CA_DataUploaderLib
             return true;
 
             bool TrySkipEmptyLines(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line)
-            {
+            {//TryPeekNextNonEmptyLine updates the ref buffer to skip any empty line it finds before the next non empty line
                 var readLine = TryPeekNextNonEmptyLine(ref buffer, out _, out _, TryReadLine);
-                line = readLine ? string.Empty : null;
+                line = string.Empty; //we don't really read the returned line, so just return string.Empty to meet the not null requirement of ReadLine
                 return readLine;
             }
         }
