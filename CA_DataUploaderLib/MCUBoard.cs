@@ -184,7 +184,7 @@ namespace CA_DataUploaderLib
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {ProductType} {SerialNumber}");
                 port.Open();
                 pipeReader = PipeReader.Create(port.BaseStream);
-                await SkipOptionalEmptyLines(pipeReader, PortName, 5000, TryReadLine);
+                await ReadLine(pipeReader, PortName, 5000, TrySkipEmptyLines);
             }
             catch (Exception ex)
             {
@@ -194,6 +194,13 @@ namespace CA_DataUploaderLib
 
             CALog.LogData(LogID.B, $"Reopened port {PortName} {ProductType} {SerialNumber}.");
             return true;
+
+            bool TrySkipEmptyLines(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line)
+            {
+                var readLine = TryPeekNextNonEmptyLine(ref buffer, out _, out _, TryReadLine);
+                line = readLine ? string.Empty : null;
+                return readLine;
+            }
         }
 
         public async static Task<MCUBoard?> OpenDeviceConnection(IIOconf? ioconf, string name)
@@ -386,60 +393,6 @@ namespace CA_DataUploaderLib
 
             throw new TimeoutException("Timed out (idle)");
         }
-        private static async Task SkipOptionalEmptyLines(
-            PipeReader pipeReader, string portName, int millisecondsTimeout, TryReadLineDelegate tryReadLine)
-        {
-            using var cts = new CancellationTokenSource(millisecondsTimeout);
-            var token = cts.Token;
-            try
-            {
-                while (!token.IsCancellationRequested)
-                {
-                    var res = await pipeReader.ReadAsync(token);
-                    if (res.IsCanceled)
-                        throw new TimeoutException("Timed out (soft)");
-                    var buffer = res.Buffer;
-
-                    //In the event that no message is parsed successfully, mark consumed as nothing and examined as the entire buffer. 
-                    //This means the next call to ReadAsync will wait for more data to arrive.
-                    //Note this still means the buffer keeps growing as we get more data until we get a message we can process,
-                    //but normally a timeout would be hit and board reconnection would be initiated by the caller.
-                    var consumed = buffer.Start;
-                    var examined = buffer.End;
-
-                    try
-                    {
-                        var readLine = TryPeekNextNonEmptyLine(ref buffer, out _, out _, tryReadLine);
-                        consumed = buffer.Start; //we update consumed regardless of peeking at a non empty line, as we skip empty lines + TryReadLineDelegate can decide to skip broken data / frames.
-                        if (readLine)
-                        {
-                            //after reading a line, the call to tryReadLine above updates the buffer reference to start at the next line
-                            //by pointing examined to it, we are signaling we have not yet processed the rest of the data in the buffer and can immediately use it,
-                            //so that the first ReadAsync in the next ReadLine call does not wait for more data but returns inmediately.
-                            //not doing this would be a memory leak if we already had a full line in the buffer (as we keep waiting for an extra line and over time the buffer keeps accumulating extra lines).
-                            examined = buffer.Start;
-                            return;
-                        }
-
-                        if (res.IsCompleted)
-                            throw new ObjectDisposedException(portName, "Closed connection detected");
-                    }
-                    finally
-                    {
-                        pipeReader.AdvanceTo(consumed, examined);
-                    }
-                }
-            }
-            catch (OperationCanceledException ex)
-            {
-                if (ex.CancellationToken == token)
-                    throw new TimeoutException("Timed out (while reading)");
-                throw;
-            }
-
-            throw new TimeoutException("Timed out (idle)");
-        }
-
 
         private bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line) => TryReadAsciiLine(ref buffer, out line, ConfigSettings.ValuesEndOfLineChar);
         public static bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line, char endOfLineChar)
