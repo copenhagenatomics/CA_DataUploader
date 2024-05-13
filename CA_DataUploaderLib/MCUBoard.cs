@@ -184,6 +184,7 @@ namespace CA_DataUploaderLib
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {ProductType} {SerialNumber}");
                 port.Open();
                 pipeReader = PipeReader.Create(port.BaseStream);
+                await SkipOptionalEmptyLines(pipeReader, PortName, 5000, TryReadLine);
             }
             catch (Exception ex)
             {
@@ -385,6 +386,60 @@ namespace CA_DataUploaderLib
 
             throw new TimeoutException("Timed out (idle)");
         }
+        private static async Task SkipOptionalEmptyLines(
+            PipeReader pipeReader, string portName, int millisecondsTimeout, TryReadLineDelegate tryReadLine)
+        {
+            using var cts = new CancellationTokenSource(millisecondsTimeout);
+            var token = cts.Token;
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    var res = await pipeReader.ReadAsync(token);
+                    if (res.IsCanceled)
+                        throw new TimeoutException("Timed out (soft)");
+                    var buffer = res.Buffer;
+
+                    //In the event that no message is parsed successfully, mark consumed as nothing and examined as the entire buffer. 
+                    //This means the next call to ReadAsync will wait for more data to arrive.
+                    //Note this still means the buffer keeps growing as we get more data until we get a message we can process,
+                    //but normally a timeout would be hit and board reconnection would be initiated by the caller.
+                    var consumed = buffer.Start;
+                    var examined = buffer.End;
+
+                    try
+                    {
+                        var readLine = TryPeekNextNonEmptyLine(ref buffer, out _, out _, tryReadLine);
+                        consumed = buffer.Start; //we update consumed regardless of peeking at a non empty line, as we skip empty lines + TryReadLineDelegate can decide to skip broken data / frames.
+                        if (readLine)
+                        {
+                            //after reading a line, the call to tryReadLine above updates the buffer reference to start at the next line
+                            //by pointing examined to it, we are signaling we have not yet processed the rest of the data in the buffer and can immediately use it,
+                            //so that the first ReadAsync in the next ReadLine call does not wait for more data but returns inmediately.
+                            //not doing this would be a memory leak if we already had a full line in the buffer (as we keep waiting for an extra line and over time the buffer keeps accumulating extra lines).
+                            examined = buffer.Start;
+                            return;
+                        }
+
+                        if (res.IsCompleted)
+                            throw new ObjectDisposedException(portName, "Closed connection detected");
+                    }
+                    finally
+                    {
+                        pipeReader.AdvanceTo(consumed, examined);
+                    }
+                }
+            }
+            catch (OperationCanceledException ex)
+            {
+                if (ex.CancellationToken == token)
+                    throw new TimeoutException("Timed out (while reading)");
+                throw;
+            }
+
+            throw new TimeoutException("Timed out (idle)");
+        }
+
 
         private bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line) => TryReadAsciiLine(ref buffer, out line, ConfigSettings.ValuesEndOfLineChar);
         public static bool TryReadAsciiLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line, char endOfLineChar)
@@ -402,6 +457,29 @@ namespace CA_DataUploaderLib
             buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
             return true;
         }
+
+        ///<returns>true if a non empty line was found, or false if more data is needed</returns>
+        static bool TryPeekNextNonEmptyLine(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> bufferAfterReads, out string? nonEmptyLine, TryReadLineDelegate tryReadLine)
+        {
+            nonEmptyLine = null;
+            bufferAfterReads = buffer; // take a copy to avoid unnecesarily throwing away data coming after the header
+            bool readLine = tryReadLine(ref bufferAfterReads, out var line);
+
+            //skip empty lines advancing the caller's buffer so it does not read the empty line again.
+            while (readLine && string.IsNullOrWhiteSpace(line))
+            {
+                buffer = bufferAfterReads;
+                readLine = tryReadLine(ref bufferAfterReads, out line);
+            }
+
+            if (readLine && line != null)
+                return true;
+
+            //we did not get a line, more data is needed, advance the buffer to ensure the caller fetches more data
+            buffer = bufferAfterReads;
+            return false;
+        }
+
 
         private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<TResult> action, CancellationToken token)
         {
@@ -557,24 +635,13 @@ namespace CA_DataUploaderLib
                 bool TryReadOptionalCalibration(ref ReadOnlySequence<byte> buffer, out string? calibration)
                 {
                     calibration = default;
-                    var localBuffer = buffer; // take a copy to avoid unnecesarily throwing away data coming after the header
-                    bool readLine = tryReadLine(ref localBuffer, out var input);
-                    while (readLine && (input == null || input.Trim() == string.Empty)) 
-                    {
-                        readLine = tryReadLine(ref localBuffer, out input);
-                        buffer = localBuffer;//advance the caller's buffer so that the caller does not read these again.
-                    }
-                    if (!readLine || input == null)
-                    {
-                        //we did not get a line, more data is needed
-                        buffer = localBuffer;//advance the buffer to ensure the caller fetches more data
-                        return false;
-                    }                   
-                    if (input.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        calibration = input[(input.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
-                        buffer = localBuffer; //avoids the calibration line being treated as data
-                    }
+                    var readLine = TryPeekNextNonEmptyLine(ref buffer, out var bufferAfterLine, out var line, tryReadLine);
+                    if (!readLine || line == null) return false;
+                    if (!line.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase))
+                        return readLine; //note this returns true if we peeked at a non empty non calibration line.
+
+                    buffer = bufferAfterLine;//advance the caller's buffer to avoid the calibration line from being read again.
+                    calibration = line[(line.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
                     return true;
                 }
             }
