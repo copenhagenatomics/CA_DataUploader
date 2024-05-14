@@ -412,11 +412,10 @@ namespace CA_DataUploaderLib
         }
 
         ///<returns>true if a non empty line was found, or false if more data is needed</returns>
-        static bool TryPeekNextNonEmptyLine(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> bufferAfterLine, out string? nonEmptyLine, TryReadLineDelegate tryReadLine)
+        static bool TryPeekNextNonEmptyLine(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> bufferAfterLine, out string? line, TryReadLineDelegate tryReadLine)
         {
-            nonEmptyLine = null;
             bufferAfterLine = buffer;
-            bool readLine = tryReadLine(ref bufferAfterLine, out var line);
+            bool readLine = tryReadLine(ref bufferAfterLine, out line);
 
             //skip empty lines advancing the caller's buffer so it does not read the empty line again.
             while (readLine && string.IsNullOrWhiteSpace(line))
@@ -425,7 +424,7 @@ namespace CA_DataUploaderLib
                 readLine = tryReadLine(ref bufferAfterLine, out line);
             }
 
-            if (readLine && line != null)
+            if (readLine)
                 return true;
 
             //we did not get a line, more data is needed, advance the buffer to ensure the caller fetches more data
