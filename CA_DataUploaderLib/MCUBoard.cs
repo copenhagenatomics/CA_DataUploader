@@ -532,6 +532,7 @@ namespace CA_DataUploaderLib
                         {
                             finishedReadingHeader = true;
                             Calibration = UpdatedCalibration = calibration;
+                            buffer = buffer.Slice(0, 0);//don't advance the reader beyond the optional calibration line, so the next read does not unnecesarily fetches more data
                         }
 
                         // Tell the PipeReader how much of the buffer has been consumed.
