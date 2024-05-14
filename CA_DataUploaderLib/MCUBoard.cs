@@ -94,6 +94,7 @@ namespace CA_DataUploaderLib
                             board.ConfigSettings = ioconfMap.BoardSettings;
                             port.ReadTimeout = ioconfMap.BoardSettings.MaxMillisecondsWithoutNewValues;
                             await board.UpdateCalibration(board.ConfigSettings);
+                            await board.SkipEmptyLines(ioconfMap.BoardSettings.MaxMillisecondsWithoutNewValues);//avoid any extra empty lines from getting read by callers on the connected + mapped board
                         }
                     }
                 }
@@ -182,7 +183,7 @@ namespace CA_DataUploaderLib
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {ProductType} {SerialNumber}");
                 port.Open();
                 pipeReader = PipeReader.Create(port.BaseStream);
-                await ReadLine(pipeReader, PortName, 5000, TrySkipEmptyLines);
+                await SkipEmptyLines(ConfigSettings.MaxMillisecondsWithoutNewValues);
             }
             catch (Exception ex)
             {
@@ -192,13 +193,6 @@ namespace CA_DataUploaderLib
 
             CALog.LogData(LogID.B, $"Reopened port {PortName} {ProductType} {SerialNumber}.");
             return true;
-
-            bool TrySkipEmptyLines(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line)
-            {//TryPeekNextNonEmptyLine updates the ref buffer to skip any empty line it finds before the next non empty line
-                var readLine = TryPeekNextNonEmptyLine(ref buffer, out _, out _, TryReadLine);
-                line = string.Empty; //we don't really read the returned line, so just return string.Empty to meet the not null requirement of ReadLine
-                return readLine;
-            }
         }
 
         public async static Task<MCUBoard?> OpenDeviceConnection(IIOconf? ioconf, string name)
@@ -392,6 +386,18 @@ namespace CA_DataUploaderLib
             line = EncodingExtensions.GetString(Encoding.ASCII, buffer.Slice(0, position.Value));
             buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
             return true;
+        }
+
+        Task<string> SkipEmptyLines(int timeoutMilliseconds)
+        {
+            return ReadLine(pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), PortName, timeoutMilliseconds, TrySkipEmptyLines);
+
+            bool TrySkipEmptyLines(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line)
+            {//TryPeekNextNonEmptyLine updates the ref buffer to skip any empty line it finds before the next non empty line
+                var readLine = TryPeekNextNonEmptyLine(ref buffer, out _, out _, TryReadLine);
+                line = string.Empty; //we don't really read/advance the returned line, so just return string.Empty to meet the not null requirement of ReadLine
+                return readLine;
+            }
         }
 
         ///<returns>true if a non empty line was found, or false if more data is needed</returns>
