@@ -161,7 +161,7 @@ namespace CA_DataUploaderLib
         /// </summary>
         /// <returns><c>false</c> if the reconnect attempt failed.</returns>
         /// <remarks>
-        /// The reconnection is only considered succesfull after the board returns the first non empty line within 5 seconds.
+        /// The reconnection is only considered succesfull after the board returns the first non empty line within <see cref="BoardSettings.MaxMillisecondsWithoutNewValues"/>.
         /// Any initial empty lines returned by the board are skipped.
         /// 
         /// Log entries about te attempt to reopen the connection are added to <see cref="LogID.B"/>, but not to the console / event log.
