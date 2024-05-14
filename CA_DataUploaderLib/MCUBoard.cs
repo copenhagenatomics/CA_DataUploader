@@ -94,7 +94,6 @@ namespace CA_DataUploaderLib
                             board.ConfigSettings = ioconfMap.BoardSettings;
                             port.ReadTimeout = ioconfMap.BoardSettings.MaxMillisecondsWithoutNewValues;
                             await board.UpdateCalibration(board.ConfigSettings);
-                            await board.SkipEmptyLines(ioconfMap.BoardSettings.MaxMillisecondsWithoutNewValues);//avoid any extra empty lines from getting read by callers on the connected + mapped board
                         }
                     }
                 }
@@ -109,14 +108,6 @@ namespace CA_DataUploaderLib
                 board.pipeReader?.Complete();
                 board.port.Close();
                 Thread.Sleep(100);
-            }
-            else if (board != null && board.BoxName == null && board.SerialNumber.IsNullOrEmpty())
-            {//note we don't log this for devices without serial that were mapped by usb (last check above)
-                CALog.LogInfoAndConsoleLn(LogID.B, $"Some data without serial detected for device at port {name} - {baudrate}");
-            }
-            else if (board != null && !board.SerialNumber.IsNullOrEmpty() && (board.ProductType.IsNullOrEmpty() || board.SoftwareVersion.IsNullOrEmpty() || board.PcbVersion.IsNullOrEmpty()))
-            {
-                CALog.LogInfoAndConsoleLn(LogID.B, $"Detected board with incomplete header {name} - {baudrate}");
             }
 
             return board;
@@ -388,13 +379,14 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        Task<string> SkipEmptyLines(int timeoutMilliseconds)
+        Task<string> SkipEmptyLines(int timeoutMilliseconds) => SkipEmptyLines(pipeReader, PortName, timeoutMilliseconds, TryReadLine);
+        static Task<string> SkipEmptyLines(PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine)
         {
-            return ReadLine(pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), PortName, timeoutMilliseconds, TrySkipEmptyLines);
+            return ReadLine(pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), portName, timeoutMilliseconds, TrySkipEmptyLines);
 
             bool TrySkipEmptyLines(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line)
             {//TryPeekNextNonEmptyLine updates the ref buffer to skip any empty line it finds before the next non empty line
-                var readLine = TryPeekNextNonEmptyLine(ref buffer, out _, out _, TryReadLine);
+                var readLine = TryPeekNextNonEmptyLine(ref buffer, out _, out _, tryReadLine);
                 line = string.Empty; //we don't really read/advance the returned line, so just return string.Empty to meet the not null requirement of ReadLine
                 return readLine;
             }
@@ -487,7 +479,10 @@ namespace CA_DataUploaderLib
                         var res = await pipeReader.ReadAsync(token);
 
                         if (res.IsCanceled)
+                        {
+                            LogMissingHeader("pipe canceled");
                             return ableToRead;
+                        }
 
                         var buffer = res.Buffer;
 
@@ -543,20 +538,15 @@ namespace CA_DataUploaderLib
                         pipeReader.AdvanceTo(buffer.Start, buffer.End);
 
                         if (res.IsCompleted)
-                        {
-                            Dependencies.LogError(LogID.A, $"Unable to read from {port}: pipe reader was closed");
-                            break; // typically means the connection was closed.
+                        { // typically means the connection was closed.
+                            LogMissingHeader("pipe closed");
+                            return ableToRead;
                         }
-                    }
-                    catch (TimeoutException ex)
-                    {
-                        Dependencies.LogException(LogID.A, $"Unable to read from {port}: " + ex.Message, ex);
-                        break;
                     }
                     catch (OperationCanceledException ex) when (ex.CancellationToken == token)
                     {
-                        Dependencies.LogError(LogID.A, $"Unable to read from {port}: timed out");
-                        break;
+                        LogMissingHeader("timed out");
+                        return ableToRead;
                     }
                     catch (Exception ex)
                     {
@@ -564,11 +554,11 @@ namespace CA_DataUploaderLib
                     }
                 }
 
-                if (!finishedReadingHeader && linesRead.Length > 0)
-                    Dependencies.LogError(LogID.A, $"Partial board header detected from {port}{Environment.NewLine}{linesRead}");
+                await SkipEmptyLines(pipeReader, port, 2000, tryReadLine);//avoid any extra empty lines just after the full header from getting read by callers
+                return true;
 
-                return ableToRead;
-
+                void LogMissingHeader(string reason) => 
+                    Dependencies.LogError(LogID.A, linesRead.Length > 0 ? $"Partial board header detected from {port}: {reason}{Environment.NewLine}{linesRead}" : $"Unable to read from {port}: {reason}");
                 // pcbVersion is included in this list because at the time of writting is the last value in the readEEPROM header, which avoids the rest of the header being treated as "values".
                 bool ReadFullHeader() => readSerialNumber && readProductType && readSoftwareVersion && readPcbVersion;
                 ///<returns>true if it finished attempting to read the optional calibration, or false if more data is needed</returns>
