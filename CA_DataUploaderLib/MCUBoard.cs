@@ -156,16 +156,14 @@ namespace CA_DataUploaderLib
         public override string ToString() => $"{productTypeHeader} {ProductType,-20} {serialNumberHeader} {SerialNumber,-12} Port name: {PortName}";
 
         /// <summary>
-        /// Reopens the connection skipping the header.
+        /// Reopens the connection.
         /// </summary>
-        /// <param name="expectedHeaderLines">The amount of header lines expected.</param>
         /// <returns><c>false</c> if the reconnect attempt failed.</returns>
         /// <remarks>
-        /// This method assumes only value lines start with numbers, 
-        /// so it considers such a line to be past the header.
+        /// The reconnection is only considered succesfull after the board returns the first non empty line within 5 seconds.
+        /// Any initial empty lines returned by the board are skipped.
         /// 
-        /// A log entry to <see cref="LogID.B"/> is added with the skipped header 
-        /// and the bytes in the receive buffer 500ms after the port was opened again.
+        /// Log entries about te attempt to reopen the connection are added to <see cref="LogID.B"/>, but not to the console / event log.
         /// </remarks>
         public async Task<bool> SafeReopen(CancellationToken token)
         {
@@ -221,8 +219,6 @@ namespace CA_DataUploaderLib
                 mcu.SerialNumber = "unknown" + Interlocked.Increment(ref _detectedUnknownBoards);
             if (mcu.InitialConnectionSucceeded && map != null && map.BaudRate != 0 && mcu.port.BaudRate != map.BaudRate)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected baud rate for {map}. Board info {mcu}");
-            if (mcu.InitialConnectionSucceeded && mcu.ConfigSettings.ExpectedHeaderLines > 8)
-                await mcu.SkipExtraHeaders(mcu.ConfigSettings.ExpectedHeaderLines - 8);
             mcu.ProductType ??= GetStringFromDmesg(mcu.PortName);
             return mcu;
         }
@@ -240,19 +236,6 @@ namespace CA_DataUploaderLib
             portName = portName[(portName.LastIndexOf('/') + 1)..];
             var result = DULutil.ExecuteShellCommand($"dmesg | grep {portName}").Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
             return result.FirstOrDefault(x => x.EndsWith(portName))?.StringBetween(": ", " to ttyUSB");
-        }
-        private async Task<List<string>> SkipExtraHeaders(int extraHeaderLinesToSkip)
-        {
-            var lines = new List<string>(extraHeaderLinesToSkip);
-            for (int i = 0; i < ConfigSettings.ExpectedHeaderLines; i++)
-            {
-                var line = await ReadLine();
-                lines.Add(line);
-                if (ConfigSettings.Parser.MatchesValuesFormat(line))
-                    break; // we are past the header.
-            }
-
-            return lines;
         }
 
         private async static Task<MCUBoard?> OpenWithAutoDetection(IIOconf? ioconf, string name, int previouslyAttemptedBaudRate)

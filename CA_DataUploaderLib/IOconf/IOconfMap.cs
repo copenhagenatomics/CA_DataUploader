@@ -123,7 +123,6 @@ namespace CA_DataUploaderLib.IOconf
         internal static bool IsVirtualPortName(string portName) => portName.StartsWith("vports/");
         public static readonly BoardSettings DefaultVirtualBoardSettings = new()
         {
-            ExpectedHeaderLines = 0, //no headers expected, just value lines right away
             SkipBoardAutoDetection = true, //everything about how we detect board data is specific to our units, so this must be skipped for vports
             //reconnect does not play well with socat based ports, so we let it go a full hour without data
             //we should greatly reduce it if we find a way of running socat that plays well with the way reconnects run
