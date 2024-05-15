@@ -231,8 +231,7 @@ namespace UnitTests
             Assert.IsTrue(await res, "unexpected not able to read response when the board is returning data");
             Assert.AreEqual("123", header.SerialNumber);
             var expectedLog =
-@"Unable to read from myport: timed out
-Partial board header detected from myport
+@"Partial board header detected from myport: timed out
 Reconnected Reason: watchdog
 1
 2
@@ -245,6 +244,35 @@ Some unexpected failure
             Assert.AreEqual(expectedLog, log);
             
         }
+
+        [TestMethod]
+        public async Task ReadSerialSkipsEmptyLinesAfterTheHeader()
+        {//this was *not* gathered from a box so might not be 100% accurate, but should be good enough
+            var pipe = new Pipe();
+            var (reader, writer) = (pipe.Reader, pipe.Writer);
+            await Write(writer, "1\n");
+            var header = new MCUBoard.Header();
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
+            await Write(writer, "2\n");
+            await Write(writer, "3\n");
+            await Write(writer, "Serial Number: 1234\n");
+            await Write(writer, "Product Type: Custom Board\n");
+            await Write(writer, "Sub Product Type: 0\n");
+            await Write(writer, "MCU Family: The new Mcu\n");
+            await Write(writer, "Software Version: 1.2.3\n");
+            await Write(writer, "Compile Date: 1-1-2023\n");
+            await Write(writer, "Git SHA: abcd\n");
+            await Write(writer, "PCB Version: 1.2\n");
+            await Write(writer, "\n");
+            await Write(writer, "Calibration: abc\n");
+            await Write(writer, "\n");
+            await Write(writer, "\n");
+            await Write(writer, "\n");
+            await Write(writer, "4\n");
+            Assert.IsTrue(await res);
+            Assert.AreEqual("4", await ReadLine(reader));
+        }
+
 
 
         private static Task<string> ReadLine(PipeReader reader) => MCUBoard.ReadLine(reader, "abc", 16, TryReadLine);

@@ -46,7 +46,7 @@ namespace CA_DataUploaderLib
                 foreach (var detection in CustomDetections)
                     if (detection(ioconf, name) is Board board)
                     {
-                        CALog.LogInfoAndConsoleLn(LogID.A, board.ToString());
+                        LogToLocalLogAndConsole(board.ToString());
                         return board;
                     }
                 var mcu = await MCUBoard.OpenDeviceConnection(ioconf, name);
@@ -56,9 +56,7 @@ namespace CA_DataUploaderLib
                     return default;
                 }
 
-                string logline = ioconf?.GetOutputLevel() == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString();
-                Console.WriteLine(logline);      // Always write this in the console
-                CALog.LogData(LogID.A, logline); // + local log, but don't send it to the event log.
+                LogToLocalLogAndConsole(ioconf?.GetOutputLevel() == CALogLevel.Debug ? mcu.ToDebugString(Environment.NewLine) : mcu.ToString());
                 return mcu;
             }
             catch (UnauthorizedAccessException ex)
@@ -71,6 +69,12 @@ namespace CA_DataUploaderLib
             }
 
             return default;
+
+            void LogToLocalLogAndConsole(string line)
+            {
+                Console.WriteLine(line);
+                CALog.LogData(LogID.A, line);
+            }
         }
     }
 }

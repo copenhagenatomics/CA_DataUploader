@@ -589,7 +589,8 @@ namespace CA_DataUploaderLib
             LogInfo(board, "Attempting to reconnect");
             var lostSensorAttempts = 100;
             var delayBetweenAttempts = TimeSpan.FromSeconds(board.ConfigSettings.SecondsBetweenReopens);
-            while (!(await board.SafeReopen(token)))
+            var (reconnected, reconnectResponse) = await board.SafeReopen(token);
+            while (!reconnected)
             {
                 _boardsState.SetDisconnectedState(boxName);
                 if (ExactSensorAttemptsCheck(ref lostSensorAttempts))
@@ -603,10 +604,11 @@ namespace CA_DataUploaderLib
                     reconnectTask = _reconnectTasks[boxName].Task;
                 await Task.WhenAny(reconnectTask, Task.Delay(delayBetweenAttempts, token));
                 token.ThrowIfCancellationRequested();
+                (reconnected, reconnectResponse) = await board.SafeReopen(token);
             }
 
             _boardsState.SetConnectedState(boxName);
-            LogInfo(board, "Board reconnection succeeded");
+            LogInfo(board, $"Board reconnection succeeded{Environment.NewLine}Board response: {reconnectResponse}");
         }
 
         private static bool ExactSensorAttemptsCheck(ref int lostSensorAttempts)
