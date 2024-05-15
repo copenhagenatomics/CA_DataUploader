@@ -51,7 +51,7 @@ namespace CA_DataUploaderLib.Helpers
                 }
 
                 var validSamples = _filterQueue.Where(x => x.All(y => y.Value < 10000 && y.Value != 0)).ToList();
-                if (validSamples.Any())
+                if (validSamples.Count > 0)
                 {
                     var allSamples = validSamples.SelectMany(x => x.Select(y => y)).ToList();
                     Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();

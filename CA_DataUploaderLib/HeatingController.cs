@@ -14,7 +14,7 @@ namespace CA_DataUploaderLib
         public HeatingController(IIOconf ioconf, CommandHandler cmd)
         {
             var heatersConfigs = ioconf.GetHeater().ToList();
-            if (!heatersConfigs.Any())
+            if (heatersConfigs.Count == 0)
                 return;
 
             var ovens = ioconf.GetOven().ToList();

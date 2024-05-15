@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace CA_DataUploaderLib
 {
@@ -13,10 +12,10 @@ namespace CA_DataUploaderLib
         private readonly Dictionary<string, List<Func<List<string>, bool>>> _commands = new(StringComparer.OrdinalIgnoreCase);
         public Action AddCommand(string name, Func<List<string>, bool> func)
         {
-            if (_commands.ContainsKey(name))
-                _commands[name].Add(func);
+            if (_commands.TryGetValue(name, out var value))
+                value.Add(func);
             else
-                _commands.Add(name, new List<Func<List<string>, bool>> { func });
+                _commands.Add(name, [func]);
 
             return () =>
             {
@@ -29,7 +28,7 @@ namespace CA_DataUploaderLib
         public bool Run(string cmdString, bool isUserCommand)
         {
             var cmd = ParseCommand(cmdString);
-            if (!cmd.Any())
+            if (cmd.Count == 0)
                 return false;
 
             string commandName = cmd[0];
@@ -50,8 +49,8 @@ namespace CA_DataUploaderLib
             return res;
         }
 
-        public List<string> ParseCommand(string cmdString) => 
-            cmdString.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
+        public List<string> ParseCommand(string cmdString) =>
+            [.. cmdString.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)];
 
         /// <returns><c>true</c> if at least one function accepted the command, otherwise <c>false</c></returns>
         /// <remarks>If a command returns false or throws an ArgumentException we still run the other commands.</remarks>

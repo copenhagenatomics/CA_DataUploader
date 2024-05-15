@@ -69,8 +69,8 @@ $@"{hostAssembly?.GetName()}
         {
             var dic = GetVersions();
             var key = GetHardwareKey();
-            if(dic.ContainsKey(key))
-                return dic[key];
+            if(dic.TryGetValue(key, out var value))
+                return value;
 
             return "Unknown hardware";
         }
@@ -103,7 +103,7 @@ $@"{hostAssembly?.GetName()}
 
         private static string GetKey(string input)
         {
-            return input.Substring(0, input.IndexOf(';')).Trim();
+            return input[..input.IndexOf(';')].Trim();
         }
 
         private static string GetHardwareKey()

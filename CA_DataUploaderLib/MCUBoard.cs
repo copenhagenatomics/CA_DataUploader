@@ -57,6 +57,7 @@ namespace CA_DataUploaderLib
         private PipeReader? pipeReader;
         public delegate bool TryReadLineDelegate(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)]out string? line);
         private TryReadLineDelegate TryReadLine;
+        private static readonly string[] _newLineCharacters = ["\r\n", "\r", "\n"];
         public delegate (bool finishedDetection, BoardInfo? info) CustomProtocolDetectionDelegate(ReadOnlySequence<byte> buffer, string portName);
         private static readonly List<CustomProtocolDetectionDelegate> customProtocolDetectors = [];
 
@@ -151,8 +152,8 @@ namespace CA_DataUploaderLib
                 port.Close();                
         }
 
-        public string ToDebugString(string seperator) =>
-            $"{BoxNameHeader}{BoxName}{seperator}Port name: {PortName}{seperator}Baud rate: {port.BaudRate}{seperator}{serialNumberHeader} {SerialNumber}{seperator}{productTypeHeader} {ProductType}{seperator}{pcbVersionHeader}{PcbVersion}{seperator}{softwareVersionHeader} {SoftwareVersion}{seperator}{CalibrationHeader} {Calibration}{seperator}";
+        public string ToDebugString(string separator) =>
+            $"{BoxNameHeader}{BoxName}{separator}Port name: {PortName}{separator}Baud rate: {port.BaudRate}{separator}{serialNumberHeader} {SerialNumber}{separator}{productTypeHeader} {ProductType}{separator}{pcbVersionHeader}{PcbVersion}{separator}{softwareVersionHeader} {SoftwareVersion}{separator}{CalibrationHeader} {Calibration}{separator}";
         public override string ToString() => $"{productTypeHeader} {ProductType,-20} {serialNumberHeader} {SerialNumber,-12} Port name: {PortName}";
 
         /// <summary>
@@ -187,7 +188,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                CALog.LogError(LogID.B,$"Failure reopening port {PortName} {ProductType} {SerialNumber}.",ex);
+                CALog.LogError(LogID.B, $"Failure reopening port {PortName} {ProductType} {SerialNumber}.",ex);
                 return false;
             }
 
@@ -230,7 +231,7 @@ namespace CA_DataUploaderLib
                 return null;
 
             portName = portName[(portName.LastIndexOf('/') + 1)..];
-            var result = DULutil.ExecuteShellCommand($"dmesg | grep {portName}").Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            var result = DULutil.ExecuteShellCommand($"dmesg | grep {portName}").Split(_newLineCharacters, StringSplitOptions.None);
             return result.FirstOrDefault(x => x.EndsWith(portName))?.StringBetween(": ", " to ttyUSB");
         }
         private async Task<List<string>> SkipExtraHeaders(int extraHeaderLinesToSkip)
