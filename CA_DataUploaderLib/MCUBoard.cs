@@ -390,33 +390,27 @@ namespace CA_DataUploaderLib
             bool TryOptionalRead(ref ReadOnlySequence<byte> buffer, out string matchingLine) => TryReadOptionalNonEmptyLine(ref buffer, tryReadLine, matches, out matchingLine);
         }
         static bool TryReadOptionalNonEmptyLine(ref ReadOnlySequence<byte> buffer, TryReadLineDelegate tryReadLine, Func<string, bool> matches, out string matchingLine)
-        {//TryPeekNextNonEmptyLine updates the ref buffer to skip any empty line it finds before the next non empty line
+        {
             matchingLine = string.Empty;
-            if (!TryPeekNextNonEmptyLine(ref buffer, out var bufferAfterLine, out var line, tryReadLine)) 
-                return false;
+            var bufferAfterLine = buffer;
+            string? line;
+            do
+            {
+                buffer = bufferAfterLine; //advance the buffer to avoid empty lines from being read again.
+                if (!tryReadLine(ref bufferAfterLine, out line))
+                {//we did not get a line, more data is needed, advance the buffer to ensure the caller fetches more data
+                    buffer = bufferAfterLine;
+                    return false;
+                }
+            }
+            while (string.IsNullOrWhiteSpace(line));
+
             if (!matches(line))
                 return true;
 
             buffer = bufferAfterLine;//advance the caller's buffer to avoid the calibration line from being read again.
             matchingLine = line;
             return true;
-
-            static bool TryPeekNextNonEmptyLine(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> bufferAfterLine, [NotNullWhen(true)] out string? line, TryReadLineDelegate tryReadLine)
-            {
-                bufferAfterLine = buffer;
-                do
-                {
-                    buffer = bufferAfterLine; //advance the buffer to avoid empty lines from being read again.
-                    if (!tryReadLine(ref bufferAfterLine, out line))
-                    {//we did not get a line, more data is needed, advance the buffer to ensure the caller fetches more data
-                        buffer = bufferAfterLine;
-                        return false;
-                    }
-                }
-                while (string.IsNullOrWhiteSpace(line));
-
-                return true;
-            }
         }
 
         static Task<string> SkipEmptyLines(PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine) => ReadOptionalNonEmptyLine(pipeReader, portName, timeoutMilliseconds, tryReadLine, _ => false);
