@@ -3,6 +3,7 @@ using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -82,11 +83,14 @@ namespace CA_DataUploaderLib.IOconf
 
         /// <summary>
         /// Force the board to be disconnected - e.g. in case of misconfiguration.
-        /// NOTE: this has to be called before running subsystems!
         /// </summary>
-        public void ForceDisconnectBoard()
+        public async Task ForceDisconnectBoard()
         {
-            McuBoard?.SafeClose(CancellationToken.None).Wait();
+            if (McuBoard is not null)
+            {
+                await McuBoard.SafeClose(CancellationToken.None);
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Disconnected {McuBoard.BoxName}.");
+            }
             Board = null;
             McuBoard = null;
         }

@@ -61,6 +61,8 @@ namespace CA_DataUploaderLib
         public delegate (bool finishedDetection, BoardInfo? info) CustomProtocolDetectionDelegate(ReadOnlySequence<byte> buffer, string portName);
         private static readonly List<CustomProtocolDetectionDelegate> customProtocolDetectors = [];
 
+        public bool Closed { get; private set; }
+
         private MCUBoard(SerialPort port) : base(port.PortName, null)
         {
             this.port = port;
@@ -140,16 +142,18 @@ namespace CA_DataUploaderLib
             return calibrationMessage;
         }
 
-        public async Task<string> SafeReadLine(CancellationToken token) => (await RunWaitingForAnyOngoingReconnect(ReadLine, token)) ?? string.Empty;
-        public Task SafeWriteLine(string msg, CancellationToken token) => RunWaitingForAnyOngoingReconnect(() => port.WriteLine(msg), token);
+        public async Task<string> SafeReadLine(CancellationToken token) => await RunWaitingForAnyOngoingReconnect(ReadLine, token);
+        public Task SafeWriteLine(string msg, CancellationToken token) => RunWaitingForAnyOngoingReconnect(() => { if (port.IsOpen) port.WriteLine(msg); else throw new ObjectDisposedException("Closed connection detected (port is closed)"); } , token);
 
         public async Task SafeClose(CancellationToken token)
         {
             using var _ = await _reconnectionLock.AcquireWriterLock(token);
             if (pipeReader != null)
                 await pipeReader.CompleteAsync();
+            pipeReader = null;
             if (port.IsOpen)
-                port.Close();                
+                port.Close();
+            Closed = true;
         }
 
         public string ToDebugString(string separator) =>

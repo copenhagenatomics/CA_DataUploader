@@ -351,6 +351,11 @@ namespace CA_DataUploaderLib
                 }
                 catch (OperationCanceledException ex) when (ex.CancellationToken == token)
                 { }
+                catch (ObjectDisposedException)
+                {
+                    LogData(board, "Detected closed connection (write loop)");
+                    return;
+                }
                 catch (Exception ex)
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"Error detected writing to board: {board.ToShortDescription()}", ex);
@@ -411,6 +416,8 @@ namespace CA_DataUploaderLib
                 try
                 {
                     var stillConnected = await SafeReadSensors(board, boxName, targetSamples, token);
+                    if (board.Closed)
+                        return;
                     if (!stillConnected || CheckFails(board, targetSamples))
                         await ReconnectBoard(board, boxName, token);
                 }
