@@ -175,7 +175,7 @@ namespace CA_DataUploaderLib
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {ProductType} {SerialNumber}");
                 port.Open();
                 pipeReader = PipeReader.Create(port.BaseStream);
-                reconnectedLine= await ReadOptionalLine(
+                reconnectedLine = await ReadOptionalNonEmptyLine(
                     pipeReader, PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine, l => l.StartsWith("reconnected", StringComparison.OrdinalIgnoreCase));
             }
             catch (Exception ex)
@@ -381,57 +381,46 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        static Task<string> ReadOptionalLine(PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine, Func<string, bool> matches)
+        /// <summary>advances the reader past any empty lines and returns + advances the next line if it <paramref name="matches"/> returns <c>true</c>.</summary>
+        /// <remarks>returns <c>string.Empty</c> if <paramref name="matches"/> returns <c>false</c>.</remarks>
+        static Task<string> ReadOptionalNonEmptyLine(PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine, Func<string, bool> matches)
         {
             return ReadLine(pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), portName, timeoutMilliseconds, TryOptionalRead);
 
-            bool TryOptionalRead(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? matchingLine) => TryOptionalReadLine(ref buffer, tryReadLine, matches, out matchingLine);
+            bool TryOptionalRead(ref ReadOnlySequence<byte> buffer, out string matchingLine) => TryReadOptionalNonEmptyLine(ref buffer, tryReadLine, matches, out matchingLine);
         }
-        static bool TryOptionalReadLine(ref ReadOnlySequence<byte> buffer, TryReadLineDelegate tryReadLine, Func<string, bool> matches,  [NotNullWhen(true)] out string? matchingLine)
+        static bool TryReadOptionalNonEmptyLine(ref ReadOnlySequence<byte> buffer, TryReadLineDelegate tryReadLine, Func<string, bool> matches, out string matchingLine)
         {//TryPeekNextNonEmptyLine updates the ref buffer to skip any empty line it finds before the next non empty line
             matchingLine = string.Empty;
-            var readLine = TryPeekNextNonEmptyLine(ref buffer, out var bufferAfterLine, out var line, tryReadLine);
-            if (!readLine || line == null) return readLine;
+            if (!TryPeekNextNonEmptyLine(ref buffer, out var bufferAfterLine, out var line, tryReadLine)) 
+                return false;
             if (!matches(line))
-                return readLine;
+                return true;
 
             buffer = bufferAfterLine;//advance the caller's buffer to avoid the calibration line from being read again.
             matchingLine = line;
-            return readLine;
-        }
+            return true;
 
-        static Task<string> SkipEmptyLines(PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine)
-        {
-            return ReadLine(pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), portName, timeoutMilliseconds, TrySkipEmptyLines);
-
-            bool TrySkipEmptyLines(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line)
-            {//TryPeekNextNonEmptyLine updates the ref buffer to skip any empty line it finds before the next non empty line
-                var readLine = TryPeekNextNonEmptyLine(ref buffer, out _, out _, tryReadLine);
-                line = string.Empty; //we don't really read/advance the returned line, so just return string.Empty to meet the not null requirement of ReadLine
-                return readLine;
-            }
-        }
-
-        ///<returns>true if a non empty line was found, or false if more data is needed</returns>
-        static bool TryPeekNextNonEmptyLine(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> bufferAfterLine, out string? line, TryReadLineDelegate tryReadLine)
-        {
-            bufferAfterLine = buffer;
-            bool readLine = tryReadLine(ref bufferAfterLine, out line);
-
-            //skip empty lines advancing the caller's buffer so it does not read the empty line again.
-            while (readLine && string.IsNullOrWhiteSpace(line))
+            static bool TryPeekNextNonEmptyLine(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> bufferAfterLine, [NotNullWhen(true)] out string? line, TryReadLineDelegate tryReadLine)
             {
-                buffer = bufferAfterLine;
-                readLine = tryReadLine(ref bufferAfterLine, out line);
-            }
+                bufferAfterLine = buffer;
+                do
+                {
+                    buffer = bufferAfterLine; //advance the buffer to avoid empty lines from being read again.
+                    if (!tryReadLine(ref bufferAfterLine, out line))
+                    {//we did not get a line, more data is needed, advance the buffer to ensure the caller fetches more data
+                        buffer = bufferAfterLine;
+                        return false;
+                    }
+                }
+                while (string.IsNullOrWhiteSpace(line));
 
-            if (readLine)
                 return true;
-
-            //we did not get a line, more data is needed, advance the buffer to ensure the caller fetches more data
-            buffer = bufferAfterLine;
-            return false;
+            }
         }
+
+        static Task<string> SkipEmptyLines(PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine) => ReadOptionalNonEmptyLine(pipeReader, portName, timeoutMilliseconds, tryReadLine, _ => false);
+        ///<returns>true if a non empty line was found, or false if more data is needed</returns>
 
         private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<TResult> action, CancellationToken token)
         {
@@ -586,7 +575,7 @@ namespace CA_DataUploaderLib
                 bool TryReadOptionalCalibration(ref ReadOnlySequence<byte> buffer, out string? calibration)
                 {
                     calibration = default;
-                    var readLine = TryOptionalReadLine(ref buffer, tryReadLine, l => l.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase), out var line);
+                    var readLine = TryReadOptionalNonEmptyLine(ref buffer, tryReadLine, l => l.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase), out var line);
                     if (readLine && !string.IsNullOrEmpty(line))
                         calibration = line[(line.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
                     return readLine;
