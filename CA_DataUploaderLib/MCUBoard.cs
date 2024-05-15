@@ -157,8 +157,9 @@ namespace CA_DataUploaderLib
         /// 
         /// Log entries about te attempt to reopen the connection are added to <see cref="LogID.B"/>, but not to the console / event log.
         /// </remarks>
-        public async Task<bool> SafeReopen(CancellationToken token)
+        public async Task<(bool, string)> SafeReopen(CancellationToken token)
         {
+            string reconnectedLine;
             try
             {
                 using var _ = await _reconnectionLock.AcquireWriterLock(token);
@@ -174,16 +175,17 @@ namespace CA_DataUploaderLib
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {ProductType} {SerialNumber}");
                 port.Open();
                 pipeReader = PipeReader.Create(port.BaseStream);
-                await SkipEmptyLines(ConfigSettings.MaxMillisecondsWithoutNewValues);
+                reconnectedLine= await ReadOptionalLine(
+                    pipeReader, PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine, l => l.StartsWith("reconnected", StringComparison.OrdinalIgnoreCase));
             }
             catch (Exception ex)
             {
                 CALog.LogError(LogID.B,$"Failure reopening port {PortName} {ProductType} {SerialNumber}.",ex);
-                return false;
+                return (false, string.Empty);
             }
 
             CALog.LogData(LogID.B, $"Reopened port {PortName} {ProductType} {SerialNumber}.");
-            return true;
+            return (true, reconnectedLine);
         }
 
         public async static Task<MCUBoard?> OpenDeviceConnection(IIOconf? ioconf, string name)
@@ -379,7 +381,25 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        Task<string> SkipEmptyLines(int timeoutMilliseconds) => SkipEmptyLines(pipeReader, PortName, timeoutMilliseconds, TryReadLine);
+        static Task<string> ReadOptionalLine(PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine, Func<string, bool> matches)
+        {
+            return ReadLine(pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), portName, timeoutMilliseconds, TryOptionalRead);
+
+            bool TryOptionalRead(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? matchingLine) => TryOptionalReadLine(ref buffer, tryReadLine, matches, out matchingLine);
+        }
+        static bool TryOptionalReadLine(ref ReadOnlySequence<byte> buffer, TryReadLineDelegate tryReadLine, Func<string, bool> matches,  [NotNullWhen(true)] out string? matchingLine)
+        {//TryPeekNextNonEmptyLine updates the ref buffer to skip any empty line it finds before the next non empty line
+            matchingLine = string.Empty;
+            var readLine = TryPeekNextNonEmptyLine(ref buffer, out var bufferAfterLine, out var line, tryReadLine);
+            if (!readLine || line == null) return readLine;
+            if (!matches(line))
+                return readLine;
+
+            buffer = bufferAfterLine;//advance the caller's buffer to avoid the calibration line from being read again.
+            matchingLine = line;
+            return readLine;
+        }
+
         static Task<string> SkipEmptyLines(PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine)
         {
             return ReadLine(pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), portName, timeoutMilliseconds, TrySkipEmptyLines);
@@ -566,14 +586,10 @@ namespace CA_DataUploaderLib
                 bool TryReadOptionalCalibration(ref ReadOnlySequence<byte> buffer, out string? calibration)
                 {
                     calibration = default;
-                    var readLine = TryPeekNextNonEmptyLine(ref buffer, out var bufferAfterLine, out var line, tryReadLine);
-                    if (!readLine || line == null) return false;
-                    if (!line.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase))
-                        return readLine; //note this returns true if we peeked at a non empty non calibration line.
-
-                    buffer = bufferAfterLine;//advance the caller's buffer to avoid the calibration line from being read again.
-                    calibration = line[(line.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
-                    return true;
+                    var readLine = TryOptionalReadLine(ref buffer, tryReadLine, l => l.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase), out var line);
+                    if (readLine && !string.IsNullOrEmpty(line))
+                        calibration = line[(line.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
+                    return readLine;
                 }
             }
 
