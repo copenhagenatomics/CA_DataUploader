@@ -416,6 +416,8 @@ namespace CA_DataUploaderLib
                 try
                 {
                     var stillConnected = await SafeReadSensors(board, boxName, targetSamples, token);
+                    if (!stillConnected)
+                        _boardsState.SetDisconnectedState(boxName);
                     if (board.Closed)
                         return;
                     if (!stillConnected || CheckFails(board, targetSamples))
@@ -611,6 +613,7 @@ namespace CA_DataUploaderLib
                     reconnectTask = _reconnectTasks[boxName].Task;
                 await Task.WhenAny(reconnectTask, Task.Delay(delayBetweenAttempts, token));
                 token.ThrowIfCancellationRequested();
+                _boardsState.SetAttemptingReconnectState(boxName);
                 (reconnected, reconnectResponse) = await board.SafeReopen(token);
             }
 
