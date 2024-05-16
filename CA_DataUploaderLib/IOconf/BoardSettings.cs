@@ -14,7 +14,6 @@ namespace CA_DataUploaderLib.IOconf
 
         public int DefaultBaudRate { get; set; } = 0;
         public int MillisecondsBetweenReads { get; set; } = 100;
-        public int ExpectedHeaderLines { get; set; } = 8;
         public int MaxMillisecondsWithoutNewValues { get; set; } = 2000;
         public int SecondsBetweenReopens { get; set; } = 3;
         public bool SkipBoardAutoDetection { get; set; } = false;

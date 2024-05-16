@@ -112,14 +112,6 @@ namespace CA_DataUploaderLib
                 board.port.Close();
                 Thread.Sleep(100);
             }
-            else if (board != null && board.BoxName == null && board.SerialNumber.IsNullOrEmpty())
-            {//note we don't log this for devices without serial that were mapped by usb (last check above)
-                CALog.LogInfoAndConsoleLn(LogID.B, $"Some data without serial detected for device at port {name} - {baudrate}");
-            }
-            else if (board != null && !board.SerialNumber.IsNullOrEmpty() && (board.ProductType.IsNullOrEmpty() || board.SoftwareVersion.IsNullOrEmpty() || board.PcbVersion.IsNullOrEmpty()))
-            {
-                CALog.LogInfoAndConsoleLn(LogID.B, $"Detected board with incomplete header {name} - {baudrate}");
-            }
 
             return board;
         }
@@ -161,19 +153,18 @@ namespace CA_DataUploaderLib
         public override string ToString() => $"{productTypeHeader} {ProductType,-20} {serialNumberHeader} {SerialNumber,-12} Port name: {PortName}";
 
         /// <summary>
-        /// Reopens the connection skipping the header.
+        /// Reopens the connection.
         /// </summary>
-        /// <param name="expectedHeaderLines">The amount of header lines expected.</param>
         /// <returns><c>false</c> if the reconnect attempt failed.</returns>
         /// <remarks>
-        /// This method assumes only value lines start with numbers, 
-        /// so it considers such a line to be past the header.
+        /// The reconnection is only considered succesfull after the board returns the first non empty line within <see cref="BoardSettings.MaxMillisecondsWithoutNewValues"/>.
+        /// Any initial empty lines returned by the board are skipped.
         /// 
-        /// A log entry to <see cref="LogID.B"/> is added with the skipped header 
-        /// and the bytes in the receive buffer 500ms after the port was opened again.
+        /// Log entries about te attempt to reopen the connection are added to <see cref="LogID.B"/>, but not to the console / event log.
         /// </remarks>
-        public async Task<bool> SafeReopen(CancellationToken token)
+        public async Task<(bool, string)> SafeReopen(CancellationToken token)
         {
+            string reconnectedLine;
             try
             {
                 using var _ = await _reconnectionLock.AcquireWriterLock(token);
@@ -189,15 +180,17 @@ namespace CA_DataUploaderLib
                 CALog.LogData(LogID.B, $"(Reopen) opening port {PortName} {ProductType} {SerialNumber}");
                 port.Open();
                 pipeReader = PipeReader.Create(port.BaseStream);
+                reconnectedLine = await ReadOptionalNonEmptyLine(
+                    pipeReader, PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine, l => l.StartsWith("reconnected", StringComparison.OrdinalIgnoreCase));
             }
             catch (Exception ex)
             {
                 CALog.LogError(LogID.B, $"Failure reopening port {PortName} {ProductType} {SerialNumber}.",ex);
-                return false;
+                return (false, string.Empty);
             }
 
             CALog.LogData(LogID.B, $"Reopened port {PortName} {ProductType} {SerialNumber}.");
-            return true;
+            return (true, reconnectedLine);
         }
 
         public async static Task<MCUBoard?> OpenDeviceConnection(IIOconf? ioconf, string name)
@@ -218,8 +211,6 @@ namespace CA_DataUploaderLib
                 mcu.SerialNumber = "unknown" + Interlocked.Increment(ref _detectedUnknownBoards);
             if (mcu.InitialConnectionSucceeded && map != null && map.BaudRate != 0 && mcu.port.BaudRate != map.BaudRate)
                 CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected baud rate for {map}. Board info {mcu}");
-            if (mcu.InitialConnectionSucceeded && mcu.ConfigSettings.ExpectedHeaderLines > 8)
-                await mcu.SkipExtraHeaders(mcu.ConfigSettings.ExpectedHeaderLines - 8);
             mcu.ProductType ??= GetStringFromDmesg(mcu.PortName);
             return mcu;
         }
@@ -237,19 +228,6 @@ namespace CA_DataUploaderLib
             portName = portName[(portName.LastIndexOf('/') + 1)..];
             var result = DULutil.ExecuteShellCommand($"dmesg | grep {portName}").Split(_newLineCharacters, StringSplitOptions.None);
             return result.FirstOrDefault(x => x.EndsWith(portName))?.StringBetween(": ", " to ttyUSB");
-        }
-        private async Task<List<string>> SkipExtraHeaders(int extraHeaderLinesToSkip)
-        {
-            var lines = new List<string>(extraHeaderLinesToSkip);
-            for (int i = 0; i < ConfigSettings.ExpectedHeaderLines; i++)
-            {
-                var line = await ReadLine();
-                lines.Add(line);
-                if (ConfigSettings.Parser.MatchesValuesFormat(line))
-                    break; // we are past the header.
-            }
-
-            return lines;
         }
 
         private async static Task<MCUBoard?> OpenWithAutoDetection(IIOconf? ioconf, string name, int previouslyAttemptedBaudRate)
@@ -408,6 +386,41 @@ namespace CA_DataUploaderLib
             return true;
         }
 
+        /// <summary>advances the reader past any empty lines and returns + advances the next line if it <paramref name="matches"/> returns <c>true</c>.</summary>
+        /// <remarks>returns <c>string.Empty</c> if <paramref name="matches"/> returns <c>false</c>.</remarks>
+        static Task<string> ReadOptionalNonEmptyLine(PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine, Func<string, bool> matches)
+        {
+            return ReadLine(pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), portName, timeoutMilliseconds, TryOptionalRead);
+
+            bool TryOptionalRead(ref ReadOnlySequence<byte> buffer, out string matchingLine) => TryReadOptionalNonEmptyLine(ref buffer, tryReadLine, matches, out matchingLine);
+        }
+        static bool TryReadOptionalNonEmptyLine(ref ReadOnlySequence<byte> buffer, TryReadLineDelegate tryReadLine, Func<string, bool> matches, out string matchingLine)
+        {
+            matchingLine = string.Empty;
+            var bufferAfterLine = buffer;
+            string? line;
+            do
+            {
+                buffer = bufferAfterLine; //advance the buffer to avoid empty lines from being read again.
+                if (!tryReadLine(ref bufferAfterLine, out line))
+                {//we did not get a line, more data is needed, advance the buffer to ensure the caller fetches more data
+                    buffer = bufferAfterLine;
+                    return false;
+                }
+            }
+            while (string.IsNullOrWhiteSpace(line));
+
+            if (!matches(line))
+                return true;
+
+            buffer = bufferAfterLine;//advance the caller's buffer to avoid the calibration line from being read again.
+            matchingLine = line;
+            return true;
+        }
+
+        static Task<string> SkipEmptyLines(PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine) => ReadOptionalNonEmptyLine(pipeReader, portName, timeoutMilliseconds, tryReadLine, _ => false);
+        ///<returns>true if a non empty line was found, or false if more data is needed</returns>
+
         private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<TResult> action, CancellationToken token)
         {
             using var _ = await _reconnectionLock.AcquireReaderLock(token);
@@ -474,7 +487,10 @@ namespace CA_DataUploaderLib
                         var res = await pipeReader.ReadAsync(token);
 
                         if (res.IsCanceled)
+                        {
+                            LogMissingHeader("pipe canceled");
                             return ableToRead;
+                        }
 
                         var buffer = res.Buffer;
 
@@ -524,26 +540,22 @@ namespace CA_DataUploaderLib
                         {
                             finishedReadingHeader = true;
                             Calibration = UpdatedCalibration = calibration;
+                            buffer = buffer.Slice(0, 0);//don't advance the reader beyond the optional calibration line, so the next read does not unnecesarily fetches more data
                         }
 
                         // Tell the PipeReader how much of the buffer has been consumed.
                         pipeReader.AdvanceTo(buffer.Start, buffer.End);
 
                         if (res.IsCompleted)
-                        {
-                            Dependencies.LogError(LogID.A, $"Unable to read from {port}: pipe reader was closed");
-                            break; // typically means the connection was closed.
+                        { // typically means the connection was closed.
+                            LogMissingHeader("pipe closed");
+                            return ableToRead;
                         }
-                    }
-                    catch (TimeoutException ex)
-                    {
-                        Dependencies.LogException(LogID.A, $"Unable to read from {port}: " + ex.Message, ex);
-                        break;
                     }
                     catch (OperationCanceledException ex) when (ex.CancellationToken == token)
                     {
-                        Dependencies.LogError(LogID.A, $"Unable to read from {port}: timed out");
-                        break;
+                        LogMissingHeader("timed out");
+                        return ableToRead;
                     }
                     catch (Exception ex)
                     {
@@ -551,36 +563,21 @@ namespace CA_DataUploaderLib
                     }
                 }
 
-                if (!finishedReadingHeader && linesRead.Length > 0)
-                    Dependencies.LogError(LogID.A, $"Partial board header detected from {port}{Environment.NewLine}{linesRead}");
+                await SkipEmptyLines(pipeReader, port, 2000, tryReadLine);//avoid any extra empty lines just after the full header from getting read by callers
+                return true;
 
-                return ableToRead;
-
+                void LogMissingHeader(string reason) => 
+                    Dependencies.LogError(LogID.A, linesRead.Length > 0 ? $"Partial board header detected from {port}: {reason}{Environment.NewLine}{linesRead}" : $"Unable to read from {port}: {reason}");
                 // pcbVersion is included in this list because at the time of writting is the last value in the readEEPROM header, which avoids the rest of the header being treated as "values".
                 bool ReadFullHeader() => readSerialNumber && readProductType && readSoftwareVersion && readPcbVersion;
                 ///<returns>true if it finished attempting to read the optional calibration, or false if more data is needed</returns>
                 bool TryReadOptionalCalibration(ref ReadOnlySequence<byte> buffer, out string? calibration)
                 {
                     calibration = default;
-                    var localBuffer = buffer; // take a copy to avoid unnecesarily throwing away data coming after the header
-                    bool readLine = tryReadLine(ref localBuffer, out var input);
-                    while (readLine && (input == null || input.Trim() == string.Empty)) 
-                    {
-                        readLine = tryReadLine(ref localBuffer, out input);
-                        buffer = localBuffer;//advance the caller's buffer so that the caller does not read these again.
-                    }
-                    if (!readLine || input == null)
-                    {
-                        //we did not get a line, more data is needed
-                        buffer = localBuffer;//advance the buffer to ensure the caller fetches more data
-                        return false;
-                    }                   
-                    if (input.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        calibration = input[(input.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
-                        buffer = localBuffer; //avoids the calibration line being treated as data
-                    }
-                    return true;
+                    var readLine = TryReadOptionalNonEmptyLine(ref buffer, tryReadLine, l => l.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase), out var line);
+                    if (readLine && !string.IsNullOrEmpty(line))
+                        calibration = line[(line.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
+                    return readLine;
                 }
             }
 
