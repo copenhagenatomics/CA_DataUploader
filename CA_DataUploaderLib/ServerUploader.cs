@@ -554,7 +554,7 @@ namespace CA_DataUploaderLib
 
         private static void PrintBadPackagesMessage(List<DateTime> badPackages, string type, bool force)
         {
-            if (!badPackages.Any())
+            if (badPackages.Count == 0)
                 return;
 
             if (force || badPackages.First().AddHours(1) < DateTime.UtcNow)

@@ -33,7 +33,7 @@ namespace CA_DataUploaderLib.IOconf
             AllJunction = false;
             if (Skip)
                 return;
-            else if (list[3].ToLower() == "all")
+            else if (list[3].Equals("all", StringComparison.InvariantCultureIgnoreCase))
             {
                 AllJunction = true;   // all => special command to show all junction temperatures including the first as average (used for calibration)
                 PortNumber = 1;

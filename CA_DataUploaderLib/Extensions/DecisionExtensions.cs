@@ -32,7 +32,7 @@ namespace CA_DataUploaderLib.Extensions
                     var target = args[expectedArgs.Length];
                     return target.TryToDouble(out _) ||
                         target.StartsWith("0x") && uint.TryParse(target[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _) ||
-                        target.StartsWith("#") && uint.TryParse(target[1..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _);
+                        target.StartsWith('#') && uint.TryParse(target[1..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _);
                 }
                 );
             }

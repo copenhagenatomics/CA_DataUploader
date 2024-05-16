@@ -3,6 +3,7 @@ using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -10,7 +11,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         private readonly string? _distributedNodeName;
         private IOconfNode? _distributedNode;
-        private Regex ValidateMapNameRegex = new(".*"); // Accepts anything - is replaced in the constructor before Name is updated.
+        private readonly Regex ValidateMapNameRegex = new(".*"); // Accepts anything - is replaced in the constructor before Name is updated.
 
         public IOconfMap(string row, int lineNum) : base(row, lineNum, "Map")
         {
@@ -82,11 +83,14 @@ namespace CA_DataUploaderLib.IOconf
 
         /// <summary>
         /// Force the board to be disconnected - e.g. in case of misconfiguration.
-        /// NOTE: this has to be called before running subsystems!
         /// </summary>
-        public void ForceDisconnectBoard()
+        public async Task ForceDisconnectBoard()
         {
-            McuBoard?.SafeClose(CancellationToken.None).Wait();
+            if (McuBoard is not null)
+            {
+                await McuBoard.SafeClose(CancellationToken.None);
+                CALog.LogInfoAndConsoleLn(LogID.A, $"Disconnected {McuBoard.BoxName}.");
+            }
             Board = null;
             McuBoard = null;
         }
@@ -106,8 +110,6 @@ namespace CA_DataUploaderLib.IOconf
         /// <summary>the baud rate as specified in configuration and otherwise 0</summary>
         /// <remarks>check <see cref="BoardSettings" /> for additional baud rate set by configurations</remarks>
         public int BaudRate { get; private set; }
-        /// <summary>The power phase as specified in the configuration i.e. 1, 2 or 3 - otherwise 0</summary>
-        public int PowerPhase { get; } = 0;
         /// <summary>the cluster node that is directly connected to the device or <c>default</c> when using </summary>
         public IOconfNode DistributedNode 
         { 

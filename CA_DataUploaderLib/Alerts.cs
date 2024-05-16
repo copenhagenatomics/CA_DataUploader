@@ -40,7 +40,7 @@ namespace CA_DataUploaderLib
         public Alerts(IIOconf ioconf, CommandHandler cmd) : base()
         {
             _cmd = cmd;
-            _alerts = GetAlerts(cmd.GetFullSystemVectorDescription(), ioconf, cmd).ToArray();
+            _alerts = [.. GetAlerts(cmd.GetFullSystemVectorDescription(), ioconf, cmd)];
             var reader = _cmd.GetReceivedVectorsReader();
             _ = Task.Run(() => CheckAlertsOnReceivedVectors(reader));
         }
