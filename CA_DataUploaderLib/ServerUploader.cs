@@ -37,6 +37,7 @@ namespace CA_DataUploaderLib
         private readonly Channel<EventFiredArgs> _eventsChannel = Channel.CreateBounded<EventFiredArgs>(BoundedOptions);
         private readonly IIOconf _ioconf;
         private readonly CommandHandler _cmd;
+        private readonly IDictionary<byte, string>? _nodeIdToName;
         private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly Stopwatch _timeSinceLastInvalidValueEvent = new();
         private int _invalidValueEventsSkipped = 0;
@@ -53,6 +54,7 @@ namespace CA_DataUploaderLib
             IsEnabled = IOconfNode.IsCurrentSystemAnUploader(nodes);
             if (!IsEnabled) 
                 return;
+            _nodeIdToName = nodes.ToDictionary(n => n.NodeIndex, n => n.Name);
             _signInfo = new Signing(_loopname);
             cmd.FullVectorDescriptionCreated += DescriptionCreated;
             var reader = cmd.GetReceivedVectorsReader();
@@ -107,7 +109,7 @@ namespace CA_DataUploaderLib
             //note slightly changing the event time below is a workaround to ensure they come in order in the event log
             int @eventIndex = 0;
             foreach (var e in vector.Events)
-                SendEvent(this, new EventFiredArgs(e.Data, e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
+                SendEvent(this, new EventFiredArgs($"{((e.EventType == (byte) EventType.Log || e.EventType == (byte)EventType.LogError) && e.NodeId != byte.MaxValue ? _nodeIdToName?[e.NodeId] + ": " : "")}{e.Data}", e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
 
             //now queue vectors
             _vectorsChannel.Writer.TryWrite(FilterOnlyUploadFieldsAndCheckInvalidValues(vector, out var invalidValueMessage));
@@ -537,8 +539,7 @@ namespace CA_DataUploaderLib
             static string ToShortEventData(SystemChangeNotificationData data)
             {
                 var sb = new StringBuilder(data.Boards.Count * 100);//allocate more than enough space to avoid slow unnecesary resizes
-                sb.Append("Detected devices for ");
-                sb.AppendLine(data.NodeName);
+                sb.AppendLine($"{data.NodeName}: Detected devices:");
                 foreach (var board in data.Boards)
                 {
                     sb.AppendFormat("{0} {1} {2} {3}", board.MappedBoardName, board.ProductType, board.SerialNumber, board.Port);
