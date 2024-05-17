@@ -7,7 +7,7 @@ namespace CA_DataUploaderLib
 {
     public class DataVector
     {
-        public DataVector(double[] data, DateTime time, IReadOnlyList<EventFiredArgs>? events = default) => (this.Data, Timestamp, Events) = (data, time, events ?? Array.Empty<EventFiredArgs>());
+        public DataVector(double[] data, DateTime time, IReadOnlyList<EventFiredArgs>? events = default) => (Data, Timestamp, Events) = (data, time, events ?? []);
 
         /// <remarks>this does not include the events, which at the moment are reported separately by the uploader</remarks>
         public byte[] Buffer {
