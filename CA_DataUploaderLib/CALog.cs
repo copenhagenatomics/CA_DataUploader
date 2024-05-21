@@ -1,8 +1,10 @@
 ﻿#nullable enable
+using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -123,10 +125,12 @@ namespace CA_DataUploaderLib
         public class EventsLogger : ISimpleLogger
         {
             private readonly CommandHandler handler;
+            private readonly IDictionary<byte, string>? nodeIdToName;
 
-            public EventsLogger(CommandHandler handler) 
+            public EventsLogger(IIOconf ioconf, CommandHandler handler) 
             {
                 this.handler = handler;
+                nodeIdToName = ioconf.GetEntries<IOconfNode>().ToDictionary(n => n.NodeIndex, n => n.Name);
                 EnableTempClusterOutputOnLocalActions(handler);
             }
             public void LogData(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log);
@@ -155,18 +159,20 @@ namespace CA_DataUploaderLib
                             if (Interlocked.CompareExchange(ref enabled, 0, 0) == 0)
                                 continue;
                             foreach (var e in vector.Events)
-                                WriteLogEventTo(e.EventType, e.Data);
+                                WriteLogEventTo(e.NodeId, e.EventType, e.Data);
                         }
                     });
                 }
 
-                void WriteLogEventTo(byte type, string data)
+                void WriteLogEventTo(byte nodeId, byte type, string data)
                 {
                     if (type == (byte)EventType.LogError)
-                        logger.LogError(data);
+                        logger.LogError(NodeIdToName(nodeId) + data);
                     else if (type == (byte)EventType.Log)
-                        logger.LogInfo(data);
+                        logger.LogInfo(NodeIdToName(nodeId) + data);
                 }
+
+                string NodeIdToName(byte nodeId) => nodeId != byte.MaxValue ? $"[{nodeIdToName?[nodeId]}] " : "";
 
                 void EnableOnLocalUserCommands(TimeSpan duration, Action enabledCallback, Action disabledCallback)
                 {
