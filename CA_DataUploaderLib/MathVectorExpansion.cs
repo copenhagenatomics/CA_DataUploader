@@ -10,8 +10,8 @@ namespace CA_DataUploaderLib
     public class MathVectorExpansion
     {
         private readonly List<IOconfMath> _mathStatements;
-        private readonly Dictionary<int, string> _fieldsByIndex = new();
-        private readonly List<(IOconfMath math, int mathFieldIndex)> _mathWithFieldIndexes = new();
+        private readonly Dictionary<int, string> _fieldsByIndex = [];
+        private readonly List<(IOconfMath math, int mathFieldIndex)> _mathWithFieldIndexes = [];
         private readonly ObjectPool<Dictionary<string, object>> reusableDictionaryPool = new DefaultObjectPool<Dictionary<string, object>>(new DefaultPooledObjectPolicy<Dictionary<string, object>>());
 
         public MathVectorExpansion(Func<IEnumerable<IOconfMath>> getMath) => _mathStatements = getMath().ToList();

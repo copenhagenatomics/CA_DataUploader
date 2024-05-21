@@ -33,7 +33,7 @@ namespace CA_DataUploaderLib
         void LoadPlugin(string assemblyFullPath)
         {
             var (context, assembly) = LoadAssembly(assemblyFullPath);
-            var decisions = CreateInstances<LoopControlDecision>(assembly, Array.Empty<object>()).ToList();
+            var decisions = CreateInstances<LoopControlDecision>(assembly, []).ToList();
             if (decisions.Count == 0)
             {
                 context.Unload();
@@ -63,7 +63,7 @@ namespace CA_DataUploaderLib
                     var result =
                         (confDecision.Name == confDecision.ClassName
                          ? (T?)Activator.CreateInstance(type, args)
-                         : (T?)Activator.CreateInstance(type, new[] { confDecision.Name }.Concat(args).ToArray()))
+                         : (T?)Activator.CreateInstance(type, [confDecision.Name, .. args]))
                         ?? throw new InvalidOperationException($"Activator.CreateInstance returned null for {type.FullName}");
                     yield return result;
                 }

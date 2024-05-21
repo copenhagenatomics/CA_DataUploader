@@ -11,8 +11,8 @@ namespace CA_DataUploaderLib
     {
         private readonly IIOconf? ioconf;
 
-        private static List<Func<IIOconf?, string, Board?>> CustomDetections { get; } = new();
-        public List<Board> McuBoards { get; } = new();
+        private static List<Func<IIOconf?, string, Board?>> CustomDetections { get; } = [];
+        public List<Board> McuBoards { get; } = [];
 
         public SerialNumberMapper(IIOconf? ioconf)
         {

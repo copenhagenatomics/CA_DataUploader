@@ -18,7 +18,7 @@ namespace CA_DataUploaderLib
         {
             //these avoids nullable warnings in this deserialization constructor 
             Hardware = Software = IOconf = string.Empty;
-            _items = new();
+            _items = [];
         }
         public VectorDescription(List<VectorDescriptionItem> items, string hardware, string software) 
         { 

@@ -25,7 +25,7 @@ namespace CA_DataUploaderLib
                     var commands = events?.Where(e => e.EventType == (byte)EventType.Command);
                     var stringCommands = commands is not null && commands.Any() ? commands.Select(e => e.Data).ToList() : emptyCommands;
                     cmdHandler.MakeDecision(cmdHandler.GetNodeInputs().Concat(cmdHandler.GetGlobalInputs()).ToList(), DateTime.UtcNow, ref vector, stringCommands);
-                    vector = new(vector.Data.ToArray(), vector.Timestamp, events);
+                    vector = new([.. vector.Data], vector.Timestamp, events);
                     cmdHandler.OnNewVectorReceived(vector);
                     await Task.WhenAny(sendThrottle.WaitAsync(token));//whenany for no exceptions on cancel
                 }

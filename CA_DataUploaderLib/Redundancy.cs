@@ -132,8 +132,8 @@ namespace CA_DataUploaderLib
 
             private Indexes? _indexes;
             public override string Name => _config.Name;
-            public override PluginField[] PluginFields => new PluginField[] { Name };
-            public override string[] HandledEvents { get; } = Array.Empty<string>();
+            public override PluginField[] PluginFields => [Name];
+            public override string[] HandledEvents { get; } = [];
             public Decision(Config config) => _config = config;
             public override void Initialize(CA.LoopControlPluginBase.VectorDescription desc) => _indexes = new(desc, _config);
             public override void MakeDecision(CA.LoopControlPluginBase.DataVector vector, List<string> events)

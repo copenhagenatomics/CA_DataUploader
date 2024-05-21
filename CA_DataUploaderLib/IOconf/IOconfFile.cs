@@ -8,8 +8,8 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfFile : IIOconf
     {
-        private readonly List<IOconfRow> Table = new();
-        public List<string> RawLines { get; private set; } = new();
+        private readonly List<IOconfRow> Table = [];
+        public List<string> RawLines { get; private set; } = [];
 
         private static readonly Lazy<IOconfFile> lazy = new(() => new IOconfFile());
         public static IIOconf Instance => lazy.Value;
@@ -121,7 +121,7 @@ namespace CA_DataUploaderLib.IOconf
         public IEnumerable<string> GetBoardStateNames(string sensor)
         {
             var sensorsChecked = new HashSet<string>();
-            return GetBoardStateNamesForSensors(new[] { sensor }, sensorsChecked);
+            return GetBoardStateNamesForSensors([sensor], sensorsChecked);
 
             IEnumerable<string> GetBoardStateNamesForSensors(IEnumerable<string> sensors, HashSet<string> sensorsChecked)
             {

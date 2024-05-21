@@ -16,9 +16,9 @@ namespace CA_DataUploaderLib.IOconf
 
         /// <summary>get expanded conf entries that include both the rms and max within the 100 milliseconds read cycle</summary>
         /// <remarks>the returned entries have port numbers that correspond to the ones returned by the dc switchboard as parsed by the IOconfOut230Vac.SwitchBoardResponseParser</remarks>
-        public override IEnumerable<IOconfInput> GetExpandedConf() => new [] {
+        public override IEnumerable<IOconfInput> GetExpandedConf() => [
             NewInput($"{Name}_rms", 6, Subsystem),
             NewInput($"{Name}_maxIn100ms", 7, Subsystem),
-            };
+            ];
     }
 }

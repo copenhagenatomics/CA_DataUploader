@@ -7,16 +7,18 @@ namespace CA_DataUploaderLib
     public class EventFiredArgs : EventArgs
     {
         public EventFiredArgs(string data, EventType eventType, DateTime timespan) : this(data, (byte) eventType, timespan) { }
-        public EventFiredArgs(string data, byte eventType, DateTime timespan)
+        public EventFiredArgs(string data, byte eventType, DateTime timespan, byte nodeId = byte.MaxValue)
         {
             Data = data;
             EventType = eventType;
             TimeSpan = timespan;
+            NodeId = nodeId;
         }
 
         public string Data { get; }
         public byte EventType { get; }
         public DateTime TimeSpan { get; }
+        public byte NodeId { get; }
 
         public byte[] ToByteArray()
         {

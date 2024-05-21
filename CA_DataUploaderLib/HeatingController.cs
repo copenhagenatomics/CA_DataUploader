@@ -33,8 +33,8 @@ namespace CA_DataUploaderLib
             private readonly Config _config;
             private Indexes? _indexes;
             public override string Name => _config.Name;
-            public override PluginField[] PluginFields => new PluginField[] { 
-                $"{Name}_state", ($"{Name}_onoff", FieldType.Output), new($"{Name}_nextcontrolperiod") { Upload = false }, new($"{Name}_controlperiodtimeoff") { Upload = false} };
+            public override PluginField[] PluginFields => [ 
+                $"{Name}_state", ($"{Name}_onoff", FieldType.Output), new($"{Name}_nextcontrolperiod") { Upload = false }, new($"{Name}_controlperiodtimeoff") { Upload = false} ];
             public override string[] HandledEvents => new List<string>(_eventsMap.Keys).ToArray();
             public HeaterDecision(IOconfHeater heater, IOconfOven? oven, IIOconf ioconf) : this(ToConfig(heater, oven, ioconf)) { }
             public HeaterDecision(Config config)
@@ -307,8 +307,8 @@ namespace CA_DataUploaderLib
                 _config = config;
                 var canUpdatePArgs = config.OvenProportionalControlUpdatesConf != null;
                 PluginFields = canUpdatePArgs ?
-                    new PluginField[] { $"{Name}_state", $"{Name}_target", $"{Name}_pgain", $"{Name}_controlperiodseconds", $"{Name}_maxoutput" } :
-                    new PluginField[] { $"{Name}_state", $"{Name}_target" };
+                    [$"{Name}_state", $"{Name}_target", $"{Name}_pgain", $"{Name}_controlperiodseconds", $"{Name}_maxoutput"] :
+                    [$"{Name}_state", $"{Name}_target"];
                 var eventsMap = new List<(string prefix, Events e, bool targetRequired)>() {
                     (prefix: "oven", Events.oven, true),
                     (prefix: $"ovenarea {config.Area}", Events.ovenarea, true),
@@ -320,7 +320,7 @@ namespace CA_DataUploaderLib
                     eventsMap.Insert(0, (prefix: $"ovenarea {config.Area} controlperiodseconds", Events.controlperiodseconds, true));
                     eventsMap.Insert(0, (prefix: $"ovenarea {config.Area} maxoutput", Events.maxoutputs, true));
                 }
-                _eventsMap = eventsMap.ToArray();
+                _eventsMap = [.. eventsMap];
                 HandledEvents = eventsMap.Select(e => e.prefix).ToArray();
             }
 
