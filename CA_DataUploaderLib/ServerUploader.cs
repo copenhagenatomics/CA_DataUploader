@@ -109,7 +109,7 @@ namespace CA_DataUploaderLib
             //note slightly changing the event time below is a workaround to ensure they come in order in the event log
             int @eventIndex = 0;
             foreach (var e in vector.Events)
-                SendEvent(this, new EventFiredArgs($"{((e.EventType == (byte) EventType.Log || e.EventType == (byte)EventType.LogError) && e.NodeId != byte.MaxValue ? _nodeIdToName?[e.NodeId] + ": " : "")}{e.Data}", e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
+                SendEvent(this, new EventFiredArgs($"{((e.EventType == (byte) EventType.Log || e.EventType == (byte)EventType.LogError) && e.NodeId != byte.MaxValue ? $"[{_nodeIdToName?[e.NodeId]}] " : "")}{e.Data}", e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
 
             //now queue vectors
             _vectorsChannel.Writer.TryWrite(FilterOnlyUploadFieldsAndCheckInvalidValues(vector, out var invalidValueMessage));
@@ -539,7 +539,7 @@ namespace CA_DataUploaderLib
             static string ToShortEventData(SystemChangeNotificationData data)
             {
                 var sb = new StringBuilder(data.Boards.Count * 100);//allocate more than enough space to avoid slow unnecesary resizes
-                sb.AppendLine($"{data.NodeName}: Detected devices:");
+                sb.AppendLine($"[{data.NodeName}] Detected devices:");
                 foreach (var board in data.Boards)
                 {
                     sb.AppendFormat("{0} {1} {2} {3}", board.MappedBoardName, board.ProductType, board.SerialNumber, board.Port);
