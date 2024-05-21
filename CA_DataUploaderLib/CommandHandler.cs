@@ -418,14 +418,13 @@ namespace CA_DataUploaderLib
         }
 
         public void Uptime(List<string> _) => 
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{GetCurrentNode().Name} - {DateTime.UtcNow.Subtract(_start)}");
+            CALog.LogInfoAndConsoleLn(LogID.A, $"{DateTime.UtcNow.Subtract(_start)}");
 
         public void GetVersion(List<string> _)
         {
             var connInfo = _ioconf.GetConnectionInfo();
             CALog.LogInfoAndConsoleLn(LogID.A, 
-$@"{GetCurrentNode().Name}
-{RpiVersion.GetSoftware()}
+$@"{RpiVersion.GetSoftware()}
 {RpiVersion.GetHardware()}
 {connInfo.LoopName} - {connInfo.Email}
 {(_mapper != null ? string.Join(Environment.NewLine, Mapper.McuBoards.Select(x => x.ToString())) : "")}");

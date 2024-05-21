@@ -109,7 +109,7 @@ namespace CA_DataUploaderLib
             //note slightly changing the event time below is a workaround to ensure they come in order in the event log
             int @eventIndex = 0;
             foreach (var e in vector.Events)
-                SendEvent(this, new EventFiredArgs($"{((e.EventType == (byte) EventType.Log || e.EventType == (byte)EventType.LogError) && e.NodeId != byte.MaxValue ? $"[{_nodeIdToName?[e.NodeId]}] " : "")}{e.Data}", e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
+                SendEvent(this, new EventFiredArgs($"{((e.EventType == (byte) EventType.Log || e.EventType == (byte)EventType.LogError) ? NodeIdToName(e.NodeId) : "")}{e.Data}", e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
 
             //now queue vectors
             _vectorsChannel.Writer.TryWrite(FilterOnlyUploadFieldsAndCheckInvalidValues(vector, out var invalidValueMessage));
@@ -117,6 +117,8 @@ namespace CA_DataUploaderLib
             //Possibly send event due to invalid values detected in the vector
             if (!string.IsNullOrWhiteSpace(invalidValueMessage))
                 SendInvalidValueEvent(new EventFiredArgs("Invalid values detected: " + invalidValueMessage[2..], EventType.LogError, DateTime.UtcNow));
+
+            string NodeIdToName(byte nodeId) => nodeId != byte.MaxValue ? $"[{_nodeIdToName?[nodeId]}] " : "";
 
             DataVector FilterOnlyUploadFieldsAndCheckInvalidValues(DataVector fullVector, out string invalidValueMessage)
             {
