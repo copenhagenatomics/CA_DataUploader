@@ -24,7 +24,7 @@ namespace CA_DataUploaderLib.IOconf
         public string Row { get; }
         public string Type { get; }
         /// <summary>
-        /// 0-based line number in the configuration.
+        /// 1-based line number in the configuration.
         /// </summary>
         public int LineNumber { get; }
         public string Name 

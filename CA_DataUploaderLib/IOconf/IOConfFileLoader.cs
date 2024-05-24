@@ -34,7 +34,7 @@ namespace CA_DataUploaderLib.IOconf
             var linesList = lines.Select(x => x.Trim()).ToList();
             // remove empty lines and commented out lines
             var lines2 = linesList.Where(x => !x.StartsWith("//") && x.Length > 2).ToList();
-            return lines2.Select(x => CreateType(x, linesList.IndexOf(x)));
+            return lines2.Select(x => CreateType(x, linesList.IndexOf(x) + 1));
         }
 
         /// <summary>
