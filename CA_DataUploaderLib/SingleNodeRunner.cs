@@ -15,7 +15,7 @@ namespace CA_DataUploaderLib
             {
                 var alerts = new Alerts(ioconf, cmdHandler);
                 var subsystemsTask = Task.Run(() => cmdHandler.RunSubsystems(token), token);
-                var sendThrottle = new TimeThrottle(100);
+                var sendThrottle = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
                 DataVector? vector = null;
                 var emptyCommands = new List<string>(0);
 
@@ -27,7 +27,7 @@ namespace CA_DataUploaderLib
                     cmdHandler.MakeDecision(cmdHandler.GetNodeInputs().Concat(cmdHandler.GetGlobalInputs()).ToList(), DateTime.UtcNow, ref vector, stringCommands);
                     vector = new([.. vector.Data], vector.Timestamp, events);
                     cmdHandler.OnNewVectorReceived(vector);
-                    await Task.WhenAny(sendThrottle.WaitAsync(token));//whenany for no exceptions on cancel
+                    await Task.WhenAny(sendThrottle.WaitForNextTickAsync(token).AsTask());//whenany for no exceptions on cancel
                 }
 
                 CALog.LogInfoAndConsoleLn(LogID.A, "waiting for subsystems to stop");
