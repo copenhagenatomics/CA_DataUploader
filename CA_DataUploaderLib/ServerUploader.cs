@@ -41,6 +41,7 @@ namespace CA_DataUploaderLib
         private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly Stopwatch _timeSinceLastInvalidValueEvent = new();
         private int _invalidValueEventsSkipped = 0;
+        private bool _muteErrors = false;
 
         public string Title => nameof(ServerUploader);
         public bool IsEnabled { get; }
@@ -349,6 +350,8 @@ namespace CA_DataUploaderLib
             }
         }
 
+        public void MuteErrors() => _muteErrors = true;
+
         static IReadOnlyList<T> DequeueAllEntries<T>(ChannelReader<T> reader)
         {
             if (!reader.TryRead(out var value))
@@ -397,6 +400,9 @@ namespace CA_DataUploaderLib
 
         private void OnError(string message, bool addToEventLog, Exception? ex = null)
         {
+            if (_muteErrors)
+                return;
+
             if (!addToEventLog)
             {
                 OnError(message, ex);
@@ -471,7 +477,7 @@ namespace CA_DataUploaderLib
 
             foreach (var e in events)
             {
-                if (TrackDuplicate(e.Data)) continue;
+                if (TrackDuplicate(e.Data) || (_muteErrors && e.Data.StartsWith("Failed sharing decision"))) continue;
 
                 stateWriter.TryWrite(UploadState.EventUpload);
                 if (!await PostEventAsync(e))
