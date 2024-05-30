@@ -76,7 +76,7 @@ namespace CA_DataUploaderLib.IOconf
         /// </summary>
         public virtual IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
         {
-            return Enumerable.Empty<string>();
+            return [];
         }
 
         /// <summary>
