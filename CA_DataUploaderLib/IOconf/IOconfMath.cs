@@ -93,9 +93,12 @@ namespace CA_DataUploaderLib.IOconf
                     expression.Accept(this);
             }
 
-            public override void Visit(LogicalExpression expression) { }
+            public override void Visit(LogicalExpression expression) 
+            {
+                throw new InvalidOperationException("Unexpected math expression.");
+            }
 
-            public override void Visit(ValueExpression expression) { }
+            public override void Visit(ValueExpression expression) { } //Constant - discard
         }
     }
 }

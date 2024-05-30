@@ -62,6 +62,8 @@ namespace UnitTests
         [DataRow("Math;MyName;Abs(MyValue % 1)", "MyValue")]
         [DataRow("Math;MyName;Sqrt(MyValue)", "MyValue")]
         [DataRow("Math;MyName;10/(MyValue - 1)", "MyValue")]//because GetSources replaces MyValue with 1 while processing the expression, this test case checks a division by 0 does not prevent getting sources
+        [DataRow("Math;MyName;1")]
+        [DataRow("Math;MyName;Left", "Left")]
         [DataRow("Math;MyName;Left && Right", "Left", "Right")]
         [DataRow("Math;MyName;Left || Right", "Left", "Right")]
         [DataRow("Math;MyName;Left || Middle && Right", "Left", "Middle", "Right")]
