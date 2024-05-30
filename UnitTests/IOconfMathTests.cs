@@ -53,7 +53,7 @@ namespace UnitTests
 
         [DataRow("Math;MyName;MyValue + 123", "MyValue")]
         [DataRow("Math;MyName;2 / MyValue", "MyValue")]
-        [DataRow("Math;MyName;Sin(MyValue*PI/180)", "MyValue,PI")]//note PI is not predefined so it is also an argument
+        [DataRow("Math;MyName;Sin(MyValue*PI/180)", "MyValue", "PI")]//note PI is not predefined so it is also an argument
         [DataRow("Math;MyName;Round(MyValue % 1, 4)", "MyValue")]
         [DataRow("Math;MyName;Round(Abs(MyValue % 1), 4)", "MyValue")]
         [DataRow("Math;MyName;Max(MyValue, 124)", "MyValue")]
@@ -62,11 +62,16 @@ namespace UnitTests
         [DataRow("Math;MyName;Abs(MyValue % 1)", "MyValue")]
         [DataRow("Math;MyName;Sqrt(MyValue)", "MyValue")]
         [DataRow("Math;MyName;10/(MyValue - 1)", "MyValue")]//because GetSources replaces MyValue with 1 while processing the expression, this test case checks a division by 0 does not prevent getting sources
+        [DataRow("Math;MyName;Left && Right", "Left", "Right")]
+        [DataRow("Math;MyName;Left || Right", "Left", "Right")]
+        [DataRow("Math;MyName;Left || Middle && Right", "Left", "Middle", "Right")]
+        [DataRow("Math;MyName;(Left && Middle) || (Middle || Left) && (Right || Middle && Left)", "Left", "Middle", "Right")]
+        [DataRow("Math;MyName;(Left > 5) || (Middle == 42) && (Right <= 12)", "Left", "Middle", "Right")]
         [DataTestMethod]
-        public void CanParseSources(string row, string expectedSources) 
+        public void CanParseSources(string row, params string[] expectedSources) 
         {
             var math = new IOconfMath(row, 0);
-            Assert.AreEqual(expectedSources, string.Join(',', math.SourceNames));
+            CollectionAssert.AreEqual(expectedSources, math.SourceNames);
         }
 
         [TestMethod]
