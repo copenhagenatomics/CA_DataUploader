@@ -20,7 +20,7 @@ namespace CA_DataUploaderLib.IOconf
             if (PortNumber < 1) throw new Exception($"{type}: port numbers must start at 1 {row}");
         }
 
-        public virtual IEnumerable<IOconfInput> GetExpandedInputConf() => Enumerable.Empty<IOconfInput>();
+        public virtual IEnumerable<IOconfInput> GetExpandedInputConf() => [];
 
         public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
         {

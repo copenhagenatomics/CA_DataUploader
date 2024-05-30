@@ -55,32 +55,50 @@ namespace CA_DataUploaderLib.IOconf
 
         private List<string> GetSources() 
         {
-            HashSet<string> sources = new();
-            var expression = new Expression(compiledExpression);
-            expression.EvaluateFunction += EvalFunction; 
-            expression.EvaluateParameter += EvalParameter;
-            try
-            {
-                expression.Evaluate();              
-            }
-            finally
-            {
-                expression.EvaluateFunction -= EvalFunction; 
-                expression.EvaluateParameter -= EvalParameter;
-            }
-            return new List<string>(sources);
+            ParameterExtractionVisitor visitor = new();
+            compiledExpression.Accept(visitor);
+            return [..visitor.Parameters];
+        }
 
-            void EvalFunction(string name, FunctionArgs args) 
-            {
-                args.EvaluateParameters();
-                args.Result = 1;
-            };
+        private class ParameterExtractionVisitor : LogicalExpressionVisitor
+        {
+            public HashSet<string> Parameters = [];
 
-            void EvalParameter(string name, ParameterArgs args) 
+            public override void Visit(Identifier function)
             {
-                sources.Add(name);
-                args.Result = 1;
-            };
+                Parameters.Add(function.Name);
+            }
+
+            public override void Visit(UnaryExpression expression)
+            {
+                expression.Expression.Accept(this);
+            }
+
+            public override void Visit(BinaryExpression expression)
+            {
+                expression.LeftExpression.Accept(this);
+                expression.RightExpression.Accept(this);
+            }
+
+            public override void Visit(TernaryExpression expression)
+            {
+                expression.LeftExpression.Accept(this);
+                expression.RightExpression.Accept(this);
+                expression.MiddleExpression.Accept(this);
+            }
+
+            public override void Visit(Function function)
+            {
+                foreach (var expression in function.Expressions)
+                    expression.Accept(this);
+            }
+
+            public override void Visit(LogicalExpression expression) 
+            {
+                throw new InvalidOperationException("Unexpected math expression.");
+            }
+
+            public override void Visit(ValueExpression expression) { } //Constant - discard
         }
     }
 }

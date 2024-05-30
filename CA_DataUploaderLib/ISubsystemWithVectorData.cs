@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib
         /// <returns>The input values coming from local boards</returns>
         IEnumerable<SensorSample> GetInputValues();
         /// <returns>Unlike <see cref="GetInputValues"/>, these values are not specific to a given node e.g.  information about operations only done by a current cluster leader and after a leader change it is the new leader that reports these values.</returns>
-        IEnumerable<SensorSample> GetGlobalInputValues() => Enumerable.Empty<SensorSample>();
+        IEnumerable<SensorSample> GetGlobalInputValues() => [];
         Task Run(CancellationToken token);
     }
 
