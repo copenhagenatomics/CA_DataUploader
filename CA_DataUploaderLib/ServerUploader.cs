@@ -41,7 +41,7 @@ namespace CA_DataUploaderLib
         private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly Stopwatch _timeSinceLastInvalidValueEvent = new();
         private int _invalidValueEventsSkipped = 0;
-        private bool _muteErrors = false;
+        private IReadOnlyList<Func<EventFiredArgs, bool>> _eventFilters = [];
 
         public string Title => nameof(ServerUploader);
         public bool IsEnabled { get; }
@@ -53,13 +53,13 @@ namespace CA_DataUploaderLib
             _loopname = ioconf.GetLoopName();
             var nodes = ioconf.GetEntries<IOconfNode>().ToList();
             IsEnabled = IOconfNode.IsCurrentSystemAnUploader(nodes);
-            if (!IsEnabled) 
+            if (!IsEnabled)
                 return;
             _nodeIdToName = nodes.ToDictionary(n => n.NodeIndex, n => n.Name);
             _signInfo = new Signing(_loopname);
             cmd.FullVectorDescriptionCreated += DescriptionCreated;
             var reader = cmd.GetReceivedVectorsReader();
-            _ = Task.Run(async () => 
+            _ = Task.Run(async () =>
             {
                 await foreach (var vector in reader.ReadAllAsync(cmd.StopToken))
                     SendVector(vector);
@@ -90,6 +90,15 @@ namespace CA_DataUploaderLib
             _eventsChannel.Writer.TryWrite(e);
             _invalidValueEventsSkipped = 0;
         }
+        /// <summary>
+        /// Add filters that prevent events from getting uploaded.
+        /// A filter gets an event as input and returns true if the event should be ignored (i.e. not uploaded).
+        /// </summary>
+        public void AddEventFilters(params Func<EventFiredArgs, bool>[] filters)
+        {
+            _eventFilters = [.._eventFilters, ..filters];
+        }
+
         private void SendVector(DataVector vector)
         {
             var (uploadMap, uploadDesc) = Desc;
@@ -350,8 +359,6 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public void MuteErrors() => _muteErrors = true;
-
         static IReadOnlyList<T> DequeueAllEntries<T>(ChannelReader<T> reader)
         {
             if (!reader.TryRead(out var value))
@@ -400,9 +407,6 @@ namespace CA_DataUploaderLib
 
         private void OnError(string message, bool addToEventLog, Exception? ex = null)
         {
-            if (_muteErrors)
-                return;
-
             if (!addToEventLog)
             {
                 OnError(message, ex);
@@ -466,6 +470,17 @@ namespace CA_DataUploaderLib
             }
         }
 
+        private IEnumerable<EventFiredArgs> FilterEvents(IEnumerable<EventFiredArgs> events)
+        {
+            var filters = _eventFilters;
+            foreach (var e in events)
+            {
+                if (filters.Any(eval => eval(e)))
+                    continue;
+                yield return e;
+            }
+        }
+
         private async ValueTask PostQueuedEventsAsync(
             ChannelWriter<UploadState> stateWriter, List<DateTime> badEvents, Dictionary<string, int> duplicateEventsDetection, 
             Queue<(DateTime expirationTime, string @event)> duplicateEventsExpirationTimes)
@@ -475,9 +490,9 @@ namespace CA_DataUploaderLib
             var events = DequeueAllEntries(_eventsChannel.Reader);
             if (events.Count == 0) return;
 
-            foreach (var e in events)
+            foreach (var e in FilterEvents(events))
             {
-                if (TrackDuplicate(e.Data) || (_muteErrors && e.Data.StartsWith("Failed sharing decision"))) continue;
+                if (TrackDuplicate(e.Data)) continue;
 
                 stateWriter.TryWrite(UploadState.EventUpload);
                 if (!await PostEventAsync(e))
