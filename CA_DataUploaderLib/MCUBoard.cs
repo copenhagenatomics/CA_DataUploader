@@ -90,6 +90,7 @@ namespace CA_DataUploaderLib
 
                 if (ioconf is not null)
                 { // note that unlike the discovery at MCUBoard.OpenDeviceConnection that only considers the usb port, in here we can find the boards by the serial number too.
+                    var didMap = false;
                     foreach (var ioconfMap in ioconf.GetMap())
                     {
                         if (board.TrySetMap(ioconfMap))
@@ -97,8 +98,11 @@ namespace CA_DataUploaderLib
                             board.ConfigSettings = ioconfMap.BoardSettings;
                             port.ReadTimeout = ioconfMap.BoardSettings.MaxMillisecondsWithoutNewValues;
                             await board.UpdateCalibration(board.ConfigSettings);
+                            didMap = true;
                         }
                     }
+                    if (!didMap)
+                        await board.SafeClose(CancellationToken.None);
                 }
             }
             catch (Exception ex)
