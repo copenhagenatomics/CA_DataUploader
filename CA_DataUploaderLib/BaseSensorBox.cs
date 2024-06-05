@@ -468,9 +468,9 @@ namespace CA_DataUploaderLib
             var timeSinceLastValidRead = Stopwatch.StartNew();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
             var msBetweenReads = (int)Math.Ceiling(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
-            Stopwatch timeSinceLastLogInfo = new(), timeSinceLastLogError = new();
-            int logInfoSkipped = 0, logErrorSkipped = 0;
-            MultilineMessageReceiver multilineMessageReceiver = new((message) => CALog.LogInfoAndConsoleLn(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}"));
+            Stopwatch timeSinceLastLogInfo = new(), timeSinceLastLogError = new(), timeSinceLastMultilineMessage = new();
+            int logInfoSkipped = 0, logErrorSkipped = 0, multilineMessageSkipped = 0;
+            MultilineMessageReceiver multilineMessageReceiver = new((message) => LowFrequencyMultilineMessage((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)));
             //We set the state early if we detect no data is being returned or if we received values,
             //but we only set ReturningNonValues if it has passed msBetweenReads since the last valid read
             while (true) // we only stop reading if a disconnect or timeout is detected
@@ -522,8 +522,8 @@ namespace CA_DataUploaderLib
             }
 
             void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastLogInfo, ref logInfoSkipped);
-
             void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastLogError, ref logErrorSkipped);
+            void LowFrequencyMultilineMessage<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastMultilineMessage, ref multilineMessageSkipped);
 
             void LowFrequencyLog<T>(Action<T, string> logAction, T args, Stopwatch timeSinceLastLog, ref int logSkipped)
             {
