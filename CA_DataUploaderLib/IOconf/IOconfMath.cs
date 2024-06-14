@@ -26,6 +26,10 @@ namespace CA_DataUploaderLib.IOconf
                 // Perform test calculation using default input values
                 Calculate(SourceNames.ToDictionary(s => s, s => (object)0));
             }
+            catch (OverflowException ex)
+            {
+                throw new OverflowException("IOconfMath: expression causes integer overflow: " + row, ex);
+            }
             catch (Exception ex)
             {
                 throw new Exception("IOconfMath: wrong format - expression: " + row, ex);
@@ -46,7 +50,7 @@ namespace CA_DataUploaderLib.IOconf
         // https://github.com/sklose/NCalc2/blob/master/test/NCalc.Tests/Fixtures.cs
         public double Calculate(Dictionary<string, object> values)
         {
-            var expression = new Expression(compiledExpression);
+            var expression = new Expression(compiledExpression, EvaluateOptions.OverflowProtection);
             expression.Parameters = values;
             // Convert.ToDouble allows some expressions that return int, decimals or even boolean to work
             // note that some expression may even return different values depending on the branch hit i.e. when using if(...)

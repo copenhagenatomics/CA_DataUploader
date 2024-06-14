@@ -101,5 +101,17 @@ namespace UnitTests
             var ex = Assert.ThrowsException<Exception>(() => new IOconfMath(row, 0));
             Assert.IsTrue(ex.Message.StartsWith("IOconfMath: wrong format - expression:"));
         }
+
+        [TestMethod]
+        public void IntegerOverflowCheckAtConstruction()
+        {
+            Assert.ThrowsException<OverflowException>(() => new IOconfMath("Math; overflowTest; 298*200*200*200*decimalNumber", 0));
+        }
+
+        [TestMethod]
+        public void IntegerUnderflowCheckAtConstruction()
+        {
+            Assert.ThrowsException<OverflowException>(() => new IOconfMath("Math; overflowTest; -298*200*200*200*decimalNumber", 0));
+        }
     }
 }
