@@ -42,7 +42,9 @@ namespace CA_DataUploaderLib.IOconf
         public void CheckConfig()
         {
             CheckUniquenessRule();
-            Table.ForEach(e => e.ValidateDependencies(this));
+            // Work-around for dealing with Redundant-lines after everything else
+            Table.Where(e => e is not Redundancy.IOconfRedundant).ToList().ForEach(e => e.ValidateDependencies(this));
+            Table.Where(e => e is Redundancy.IOconfRedundant).ToList().ForEach(e => e.ValidateDependencies(this));
             CheckOvenHeaterRelationshipRule();
         }
 

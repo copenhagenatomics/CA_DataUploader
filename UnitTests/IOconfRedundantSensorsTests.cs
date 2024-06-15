@@ -84,5 +84,16 @@ RedundantSensors; redundant; math_filter
 ".SplitNewLine(StringSplitOptions.None));
         }
 
+        [TestMethod]
+        public void ValidateDependencies_PointingToHeaterDefinedAfter_Ok()
+        {
+            // Act
+            _ = new IOconfFile(@"
+Map; 3900553433511235353736; ac01
+RedundantSensors; redundant; Heater01Top_current
+Heater;Heater01Top;ac01;01;850
+".SplitNewLine(StringSplitOptions.None));
+        }
+
     }
 }
