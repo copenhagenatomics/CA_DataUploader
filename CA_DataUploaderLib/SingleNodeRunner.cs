@@ -30,21 +30,21 @@ namespace CA_DataUploaderLib
                     await Task.WhenAny(sendThrottle.WaitForNextTickAsync(token).AsTask());//whenany for no exceptions on cancel
                 }
 
-                CALog.LogInfoAndConsoleLn(LogID.A, "waiting for subsystems to stop");
+                CALog.LogInfoAndConsoleLn(LogID.A, "Waiting for subsystems to stop");
                 await subsystemsTask; //note we can only get here if the token has been cancelled, so the subsystems have already been told to stop
             }
             catch (Exception ex) when (token.IsCancellationRequested)
             {
-                uploader.SendEvent(uploader, new EventFiredArgs("user initiated uploader stop", EventType.Log, DateTime.UtcNow));
+                uploader.SendEvent(uploader, new EventFiredArgs("User initiated uploader stop", EventType.Log, DateTime.UtcNow));
                 if (ex is not OperationCanceledException)
                 {
                     CALog.LoggerForUserOutput = new CALog.ConsoleLogger(); //we are about to stop the uploader, so we change inmediately to the console logger so the below already shows in the screen.
-                    CALog.LogErrorAndConsoleLn(LogID.B, "error detected while stopping uploader", ex);
+                    CALog.LogErrorAndConsoleLn(LogID.B, "Error detected while stopping uploader", ex);
                 }
             }
             catch (Exception ex)
             {
-                uploader.SendEvent(uploader, new EventFiredArgs($"error detected (stopping uploader): {ex.Message}", EventType.LogError, DateTime.UtcNow));
+                uploader.SendEvent(uploader, new EventFiredArgs($"Error detected (stopping uploader): {ex.Message}", EventType.LogError, DateTime.UtcNow));
                 throw;
             }
         }

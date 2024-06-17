@@ -6,8 +6,8 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfLoader : IIOconfLoader
     {
-        private readonly List<(string rowType, Func<string, int, IOconfRow> loader)> Loaders = new()
-        {
+        private readonly List<(string rowType, Func<string, int, IOconfRow> loader)> Loaders =
+        [
             ("LoopName", (r, l) => new IOconfLoopName(r, l)),
             ("Account", (r, l) => new IOconfAccount(r, l)),
             (IOconfSamplingRates.TypeName, (r, l) => new IOconfSamplingRates(r, l)),
@@ -28,7 +28,7 @@ namespace CA_DataUploaderLib.IOconf
             ("Code", (r, l) => new IOconfCode(r, l)),
             (IOconfCurrent.TypeName, (r, l) => new IOconfCurrent(r, l)),
             (IOconfCurrentFault.TypeName, (r, l) => new IOconfCurrentFault(r, l)),
-        };
+        ];
 
         public void AddLoader(string rowType, Func<string, int, IOconfRow> loader)
         {
