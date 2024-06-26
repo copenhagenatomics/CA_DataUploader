@@ -23,10 +23,10 @@ namespace CA_DataUploaderLib.Helpers
         {
             InputsPerNode = inputsPerNode;
             List<VectorDescriptionItem> allItems = inputsPerNode.SelectMany(n => n.values).Concat(globalInputs).ToList();
-            _filterVectorExpansion = new FilterVectorExpansion(allItems, ioconf.GetFilters, ioconf.GetOutputLevel());
+            _filterVectorExpansion = new FilterVectorExpansion(allItems, ioconf.GetFilters(), ioconf.GetOutputLevel());
             _inputsCount = allItems.Count; //this count includes legacy filters and excludes hidden sources
 
-            _mathVectorExpansion = new MathVectorExpansion(ioconf.GetMath);
+            _mathVectorExpansion = new MathVectorExpansion(ioconf.GetMath());
             allItems.AddRange(_filterVectorExpansion.GetDecisionVectorDescriptionEntries());
             allItems.AddRange(_mathVectorExpansion.GetVectorDescriptionEntries());
             allItems.AddRange(outputs);

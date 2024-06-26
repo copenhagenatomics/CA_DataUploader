@@ -16,10 +16,10 @@ namespace CA_DataUploaderLib
         /// <remarks>
         /// <paramref name="inputs"/> is updated by adding classic input filters and removing hidden sources.
         /// </remarks>
-        public FilterVectorExpansion(List<VectorDescriptionItem> inputs, Func<IEnumerable<IOconfFilter>> getFilters, CALogLevel logLevel)
+        public FilterVectorExpansion(List<VectorDescriptionItem> inputs, IEnumerable<IOconfFilter> configuredFilters, CALogLevel logLevel)
         {
             _logLevel = logLevel;
-            var allfilters = getFilters().ToList();
+            var allfilters = configuredFilters.ToList();
             _decisionFilters = allfilters.Where(f => f.IsDecisionFilter).ToList();
             _legacyInputFilters = GetLegacyFilters();
             inputs.AddRange(_legacyInputFilters.Select(m => new VectorDescriptionItem("double", m.Output.Name, DataTypeEnum.Input)));

@@ -62,7 +62,7 @@ namespace CA_DataUploaderLib.IOconf
                 var (sustainedExpression, sourceNames) = IOconfMath.CompileExpression(list[4]);
                 // Perform test calculation using default input values
                 if (IOconfMath.Calculate(sourceNames.ToDictionary(s => s, s => (object)0), sustainedExpression) is not bool)
-                    throw new FormatException($"Only boolean filter expressions are supported: {row}{Environment.NewLine}{format}");
+                    throw new FormatException($"Only boolean filter expressions are supported for Sustained filters: {row}{Environment.NewLine}{format}");
                 return (sustainedExpression, sourceNames);
             }
             catch (OverflowException ex)
@@ -84,12 +84,12 @@ namespace CA_DataUploaderLib.IOconf
         public IEnumerable<string> GetDecisionFields() => 
             filterType == FilterType.Sustained 
                 ? [NameInVector, NameInVector + "_targettime"]
-                : throw new InvalidOperationException($"Unexpected call to GetDecisionFields for filter type {Row}");
+                : throw new InvalidOperationException($"Unexpected call to GetDecisionFields in {Row}");
 
         public void MakeDecision(MathVectorExpansion.MathContext context)
         {
             if (filterType != FilterType.Sustained) 
-                throw new InvalidOperationException($"Unexpected MakeDecision call for non decision filter: {Row}");
+                throw new InvalidOperationException($"Unexpected call to MakeDecision in {Row}");
 
             MakeDecisionSustained(context);
         }
@@ -97,7 +97,7 @@ namespace CA_DataUploaderLib.IOconf
         private void MakeDecisionSustained(MathVectorExpansion.MathContext context)
         {
             var (time, vector) = (context.Vector.Timestamp, context.Vector.Data);
-            var expr = _sustainedExpression ?? throw new InvalidOperationException($"Unexpected null expression for filter: {Row}");
+            var expr = _sustainedExpression ?? throw new InvalidOperationException($"Unexpected null expression in {Row}");
             ref var targetTime = ref vector[_sustainedTargetTimeFieldIndex];
             ref var output = ref vector[_decisionFieldIndex];
 
@@ -112,17 +112,15 @@ namespace CA_DataUploaderLib.IOconf
         public void Initialize(List<string> fields)
         {
             if (filterType != FilterType.Sustained) 
-                throw new InvalidOperationException($"Unexpected Initialize call for non decision filter: {Row}");
+                throw new InvalidOperationException($"Unexpected call to Initialize in {Row}");
 
             _decisionFieldIndex = fields.IndexOf(Name);
             if (_decisionFieldIndex < 0) throw new ArgumentException($"{Name} was not found in received vector fields", nameof(fields));
             _sustainedTargetTimeFieldIndex = fields.IndexOf(Name + "_targettime");
             if (_sustainedTargetTimeFieldIndex < 0) throw new ArgumentException($"{Name} was not found in received vector fields", nameof(fields));
-            foreach (var source in SourceNames)
-            {
-                if (!fields.Contains(source))
-                    throw new ArgumentException($"Filter {Name} uses {source} which was not found in received vector fields", nameof(fields));
-            }
+            var missingSources = SourceNames.Where(s => !fields.Contains(s)).ToList();
+            if (missingSources.Count > 0)
+                throw new FormatException($"Filter {Name} uses sources {string.Join(',', missingSources)} which were not found in received vector fields. Row: {Row}");
         }
     }
 }

@@ -15,7 +15,7 @@ namespace CA_DataUploaderLib
         private readonly List<(IOconfMath math, int mathFieldIndex)> _mathWithFieldIndexes = [];
         private readonly ObjectPool<Dictionary<string, object>> reusableDictionaryPool = new DefaultObjectPool<Dictionary<string, object>>(new DefaultPooledObjectPolicy<Dictionary<string, object>>());
 
-        public MathVectorExpansion(Func<IEnumerable<IOconfMath>> getMath) => _mathStatements = getMath().ToList();
+        public MathVectorExpansion(IEnumerable<IOconfMath> maths) => _mathStatements = maths.ToList();
         public int Count => _mathStatements.Count;
         public IEnumerable<VectorDescriptionItem> GetVectorDescriptionEntries() => _mathStatements.Select(m => new VectorDescriptionItem("double", m.Name, DataTypeEnum.State));
         /// <param name="vectorFields">all the vector fields, including those returned by <see cref="GetVectorDescriptionEntries"/></param>
