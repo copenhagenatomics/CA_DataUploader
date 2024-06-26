@@ -106,7 +106,7 @@ namespace CA_DataUploaderLib.IOconf
             else if (targetTime == 0)
                 (output, targetTime) = (0, time.AddSeconds(filterLength).ToOADate());//the first cycle meeting the condition sets the target time in filterLength seconds
             else
-                output = DateTime.FromOADate(targetTime) >= time ? 1 : 0; //set the output to 1 if we already reached the target time
+                output = time >= DateTime.FromOADate(targetTime) ? 1 : 0; //set the output to 1 if we already reached the target time
         }
 
         public void Initialize(List<string> fields)
