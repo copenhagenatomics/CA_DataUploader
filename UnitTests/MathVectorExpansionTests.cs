@@ -23,7 +23,7 @@ namespace UnitTests
         {
             var math = GetInitializedMathExpansion(new("Math;MyMath;MyName + 2", 2), new[] { "MyName", "MyMath" });
             var values = new[]{0.2, 0};
-            math.Apply(values);
+            math.Apply(new DataVector(values, DateTime.UtcNow));
             CollectionAssert.AreEqual(new[] { 0.2, 2.2 }, values);
         }
 
@@ -33,7 +33,7 @@ namespace UnitTests
             var math = new MathVectorExpansion(() => new[] { new IOconfMath("Math;Math1;Math1 + 1", 0), new("Math;Math2;Math1", 0) });
             math.Initialize(new[] { "Math1", "Math2" });
             var values = new[] { 2d, 2 };
-            math.Apply(values);
+            math.Apply(new DataVector(values, DateTime.UtcNow));
             CollectionAssert.AreEqual(new[] { 3d, 3 }, values);
         }
 
@@ -42,7 +42,7 @@ namespace UnitTests
         {
             var math = GetInitializedMathExpansion(new("Math;MyMath;MyName + 2", 2), new[] { "MyName", "UnusedValue", "MyMath" });
             var values = new[]{0.2, 3, 0};
-            math.Apply(values);
+            math.Apply(new DataVector(values, DateTime.UtcNow));
             CollectionAssert.AreEqual(new[] { 0.2, 3, 2.2 }, values);
         }
 
@@ -56,7 +56,7 @@ namespace UnitTests
             var values = new[]{0.2,0,100};
 
             ioconfEntries = new IOconfMath[] { new("Math;MyMath;MyName + 2", 2), new("Math;MyMath2;MyName + 3", 2) };
-            math.Apply(values);
+            math.Apply(new DataVector(values, DateTime.UtcNow));
 
             CollectionAssert.AreEqual(new[] { 0.2, 2.2, 100 }, values, "the extra math statement must be ignored and must not incorrectly update the output");
         }
@@ -82,7 +82,7 @@ namespace UnitTests
                 var expected = values.Take(10).Sum();
                 return () =>
                 {
-                    math.Apply(values);
+                    math.Apply(new DataVector(values, DateTime.UtcNow));
                     Assert.AreEqual(expected, values[10], "detected thread safety issue");
                 };
             });

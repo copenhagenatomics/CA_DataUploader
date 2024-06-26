@@ -21,8 +21,7 @@ namespace CA_DataUploaderLib.IOconf
 
             try
             {
-                compiledExpression = Expression.Compile(ToList()[2], true);
-                SourceNames = GetSources();
+                (compiledExpression, SourceNames) = CompileExpression(ToList()[2]);
                 // Perform test calculation using default input values
                 Calculate(SourceNames.ToDictionary(s => s, s => (object)0));
             }
@@ -34,6 +33,13 @@ namespace CA_DataUploaderLib.IOconf
             {
                 throw new Exception("IOconfMath: wrong format - expression: " + row, ex);
             }
+        }
+
+        public static (LogicalExpression expression, List<string> sources) CompileExpression(string expression)
+        {
+            var compiledExpression = Expression.Compile(expression, true);
+            var sourceNames = GetSources(compiledExpression);
+            return (compiledExpression, sourceNames);
         }
 
         public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
@@ -48,16 +54,18 @@ namespace CA_DataUploaderLib.IOconf
         // https://github.com/sklose/NCalc2
         // examples:
         // https://github.com/sklose/NCalc2/blob/master/test/NCalc.Tests/Fixtures.cs
-        public double Calculate(Dictionary<string, object> values)
+        // Convert.ToDouble allows some expressions that return int, decimals or even boolean to work
+        // note that some expression may even return different values depending on the branch hit i.e. when using if(...)
+        public double Calculate(Dictionary<string, object> values) => Convert.ToDouble(Calculate(values, compiledExpression));
+        public static bool CalculateBoolean(Dictionary<string, object> values, LogicalExpression compiledExpression) => Convert.ToBoolean(Calculate(values, compiledExpression));
+        public static object Calculate(Dictionary<string, object> values, LogicalExpression compiledExpression)
         {
             var expression = new Expression(compiledExpression, EvaluateOptions.OverflowProtection);
             expression.Parameters = values;
-            // Convert.ToDouble allows some expressions that return int, decimals or even boolean to work
-            // note that some expression may even return different values depending on the branch hit i.e. when using if(...)
-            return Convert.ToDouble(expression.Evaluate());
+            return expression.Evaluate();
         }
 
-        private List<string> GetSources() 
+        private static List<string> GetSources(LogicalExpression compiledExpression) 
         {
             ParameterExtractionVisitor visitor = new();
             compiledExpression.Accept(visitor);

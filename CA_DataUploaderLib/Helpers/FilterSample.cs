@@ -15,6 +15,7 @@ namespace CA_DataUploaderLib.Helpers
         SumAvg = 4,
         DiffAvg = 5,
         Triangle = 6,
+        Sustained = 7,
     }
 
     public class FilterSample
@@ -65,7 +66,8 @@ namespace CA_DataUploaderLib.Helpers
                             validSamples.Average(y => y[0].Value - y[1].Value) : 
                             throw new Exception("Filter DiffAvg must have two input source names"),
                         FilterType.Triangle => TriangleFilter(validSamples, Filter.filterLength, Output.TimeStamp),
-                        _ => validSamples.Last().Select(x => x.Value).Average()
+                        FilterType.None => validSamples.Last().Select(x => x.Value).Average(),
+                        _ => throw new InvalidOperationException($"unexpected filter type in FilterSample: {Filter.filterType}")
                     };
                     return;
                 }

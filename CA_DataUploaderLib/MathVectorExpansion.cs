@@ -1,6 +1,7 @@
 ﻿#nullable enable
 using CA_DataUploaderLib.IOconf;
 using Microsoft.Extensions.ObjectPool;
+using NCalc.Domain;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,29 +38,47 @@ namespace CA_DataUploaderLib
         }
 
         /// <param name="vector">the full vector with the same fields as specified in <see cref="Initialize"/> (with only the inputs updated in this cycle)</param>
-        public void Apply(Span<double> vector)
+        public void Apply(MathContext context)
         {
-            if (_fieldsByIndex == null) throw new InvalidOperationException("Initialize has not been called before calling Apply");
-            if (vector.Length != _fieldsByIndex.Count)
-                throw new ArgumentException($"the specified vector length does not match the fields received during initialize - {vector.Length} vs {_fieldsByIndex.Count}", nameof(vector));
+            foreach (var (math, index) in _mathWithFieldIndexes)
+                context.Calculate(math, index);
+        }
+        public void Apply(DataVector vector)
+        {
+            using var ctx = NewContext(vector);
+            Apply(ctx);
+        }
 
-            //note that not only we have all the innecesary copying of data here, but even though the dictionary its reused we have boxing of the values (IOConfMath.Calculate requires a Dictionary<string, object>).
-            //one option to improve both is to have a different math expression engine that allows preprocessing the expression in a way that allows to specify the parameters by index
-            //and allows to specify them in a single desired type. Also note the engine also causes boxing of the result as it returns an object we convert to a double.
-            //one extra issue is that the dictionary is passed through a property instead of an argument, which also forces a creation of an Expresion inside the the calculate method.
-            var reusableFiedsDictionary = reusableDictionaryPool.Get();
-            try
-            {
-                for (int i = 0; i < _fieldsByIndex.Count; i++)
-                    reusableFiedsDictionary[_fieldsByIndex[i]] = vector[i];
+        public MathContext NewContext(DataVector vector) => new(_fieldsByIndex, reusableDictionaryPool, vector);
 
-                foreach (var (math, index) in _mathWithFieldIndexes)
-                    reusableFiedsDictionary[_fieldsByIndex[index]] = vector[index] = math.Calculate(reusableFiedsDictionary);
-            }
-            finally
+        public readonly ref struct MathContext
+        {
+            ///note that not only we have all the innecesary copying of data to the dictionary, but even though the dictionary is reused we have boxing of the values (IOConfMath.Calculate requires a Dictionary<string, object>).
+            ///one option to improve both is to have a different math expression engine that allows preprocessing the expression in a way that allows to specify the parameters by index
+            ///and allows to specify them in a single desired type. Also note the engine also causes boxing of the result as it returns an object we convert to a double.
+            ///one extra issue is that the dictionary is passed through a property instead of an argument, which also forces a creation of an Expresion inside the the calculate method.
+
+            private readonly Dictionary<int, string> _fieldsByIndex;
+            private readonly ObjectPool<Dictionary<string, object>> _reusableDictionaryPool;
+            public readonly DataVector Vector { get; }
+            private readonly Dictionary<string, object> _reusableFieldsDictionary;
+
+            public MathContext(Dictionary<int, string> fieldsByIndex, ObjectPool<Dictionary<string, object>> reusableDictionaryPool, DataVector vector)
             {
-                reusableDictionaryPool.Return(reusableFiedsDictionary);
+                _fieldsByIndex = fieldsByIndex ?? throw new InvalidOperationException("Initialize has not been called before calling Apply");
+                if (vector.Data.Length != _fieldsByIndex.Count)
+                    throw new ArgumentException($"the specified vector length does not match the fields received during initialize - {vector.Data.Length} vs {_fieldsByIndex.Count}", nameof(vector));
+                _reusableDictionaryPool = reusableDictionaryPool;
+                Vector = vector;
+                _reusableFieldsDictionary = reusableDictionaryPool.Get();
+                for (int i = 0; i < fieldsByIndex.Count; i++)
+                    _reusableFieldsDictionary[fieldsByIndex[i]] = vector[i];
             }
+
+            public void Calculate(IOconfMath math, int index) => _reusableFieldsDictionary[_fieldsByIndex[index]] = Vector.Data[index] = math.Calculate(_reusableFieldsDictionary);
+            public void Dispose() => _reusableDictionaryPool.Return(_reusableFieldsDictionary);
+            /// <remarks>this only calculates the expression result without updating any field</remarks>
+            public bool CalculateBoolean(LogicalExpression sustainedExpression) => IOconfMath.CalculateBoolean(_reusableFieldsDictionary, sustainedExpression);
         }
     }
 }
