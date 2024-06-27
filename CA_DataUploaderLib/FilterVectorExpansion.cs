@@ -36,7 +36,7 @@ public class FilterVectorExpansion
             {
                 var names = string.Join(',', filtersWithoutSource.Select(f => f.Filter.Name).Distinct());
                 var sources = string.Join(',', filtersWithoutSource.Select(f => f.Source).Distinct());
-                throw new InvalidOperationException($"Misconfigured filters detected.{Environment.NewLine}Filters: {names}{Environment.NewLine}Missing sources: {sources}");
+                throw new InvalidOperationException($"Misconfigured filter(s) detected.{Environment.NewLine}Filter(s): {names}{Environment.NewLine}Missing source(s): {sources}");
             }
 
             var filtersWithDuplicateSources = filtersWithInputsCounts.Where(f => f.InputsCount > 2).ToList();
@@ -44,7 +44,7 @@ public class FilterVectorExpansion
             {
                 var names = string.Join(',', filtersWithDuplicateSources.Select(f => f.Filter.Name).Distinct());
                 var sources = string.Join(',', filtersWithDuplicateSources.Select(f => f.Source).Distinct());
-                throw new InvalidOperationException($"Misconfigured filters detected.{Environment.NewLine}Filters: {names}{Environment.NewLine}Sources without unique inputs names: {sources}");
+                throw new InvalidOperationException($"Misconfigured filter(s) detected.{Environment.NewLine}Filter(s): {names}{Environment.NewLine}Source(s) without unique input(s) names: {sources}");
             }
         }
     }
