@@ -14,7 +14,7 @@ public class FilterVectorExpansion
     private readonly CALogLevel _logLevel;
 
     /// <remarks>
-    /// <paramref name="inputs"/> is updated by adding classic input filters and removing hidden sources.
+    /// <paramref name="inputs"/> is updated by adding legacy input filters and removing hidden sources.
     /// </remarks>
     public FilterVectorExpansion(List<VectorDescriptionItem> inputs, IEnumerable<IOconfFilter> configuredFilters, CALogLevel logLevel)
     {
@@ -67,7 +67,7 @@ public class FilterVectorExpansion
     }
 
     /// <remarks>
-    /// <paramref name="inputs"/> is updated by adding classic input filters and removing hidden sources.
+    /// <paramref name="inputs"/> is updated by adding legacy input filters and removing hidden sources.
     /// </remarks>
     public void ApplyLegacyFilters(List<SensorSample> inputs)
     {
