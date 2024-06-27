@@ -65,7 +65,7 @@ namespace CA_DataUploaderLib
 
             public MathContext(Dictionary<int, string> fieldsByIndex, ObjectPool<Dictionary<string, object>> reusableDictionaryPool, DataVector vector)
             {
-                _fieldsByIndex = fieldsByIndex ?? throw new InvalidOperationException("Initialize has not been called before calling Apply");
+                _fieldsByIndex = fieldsByIndex;
                 if (vector.Data.Length != _fieldsByIndex.Count)
                     throw new ArgumentException($"the specified vector length does not match the fields received during initialize - {vector.Data.Length} vs {_fieldsByIndex.Count}", nameof(vector));
                 _reusableDictionaryPool = reusableDictionaryPool;
