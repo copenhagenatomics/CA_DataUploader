@@ -8,119 +8,140 @@ using NCalc.Domain;
 
 namespace CA_DataUploaderLib.IOconf
 {
+    public enum FilterType
+    {
+        None = 0,
+        Average = 1,
+        Max = 2,
+        Min = 3,
+        SumAvg = 4,
+        DiffAvg = 5,
+        Triangle = 6,
+        Sustained = 7,
+    }
+
     public class IOconfFilter : IOconfRow
     {
-        public readonly FilterType filterType;
-        public readonly double filterLength;  // in seconds. 
-        private readonly LogicalExpression? _sustainedExpression;
-        private int _decisionFieldIndex = -1;
-        private int _sustainedTargetTimeFieldIndex = -1;
+        private readonly LegacyFilterSample? _legacyFilter;
+        private readonly DecisionFilter? _decisionFilter;
 
-        //TODO: legacy vs. decision uses different type of sources, name in vector, etcvalidation
-        public string NameInVector => filterType == FilterType.Sustained ? Name : Name + "_filter";
+        public string NameInVector { get; }
         public List<string> SourceNames { get; }
-        public bool HideSource { get; }
-        public bool IsDecisionFilter => filterType == FilterType.Sustained;
 
         public IOconfFilter(string row, int lineNum) : base(row, lineNum, "Filter")
         {
             Format = $"Filter;Name;Sustained;FilterLength;conditionExpression{Environment.NewLine}Filter;Name;Average/Max/Min/SumAvg/DiffAvg/Triangle;FilterLength;SourceNames;[hidesource]";
 
             var list = ToList();
-            if (!Enum.TryParse(list[2], out filterType))
-                throw new Exception($"Wrong filter type: {row} {Environment.NewLine}{Format}");
+            if (list.Count < 5)
+                throw new Exception($"Wrong filter format: {row}{Environment.NewLine}{Format}");
 
-            if (!list[3].TryToDouble(out filterLength))
-                throw new Exception($"Wrong filter length: {row} {Environment.NewLine}{Format}");
+            if (!Enum.TryParse(list[2], out FilterType filterType))
+                throw new Exception($"Wrong filter type: {row}{Environment.NewLine}{Format}");
 
-            if (!IsDecisionFilter)
-                (SourceNames, HideSource) = InitLegacyFilter(list);
-            else if (list.Count != 5)
-                throw new FormatException($"Unexpected format for {filterType} filter: {Row}{Environment.NewLine}{Format}");
+            if (!list[3].TryToDouble(out var filterLength))
+                throw new Exception($"Wrong filter length: {row}{Environment.NewLine}{Format}");
+
+            if (filterType == FilterType.Sustained)
+                (_decisionFilter, NameInVector, SourceNames) = InitSustainedFilter(list);
             else
-                (_sustainedExpression, SourceNames) = InitSustainedFilter(list, Row, Format);
-        }
+                (_legacyFilter, NameInVector, SourceNames) = InitLegacyFilter(list);
 
-        private (List<string> sources, bool hideSource) InitLegacyFilter(List<string> list)
-        {
-            var hideSource = false;
-            var sources = list.Skip(4).ToList();
-            if (!IsDecisionFilter && sources.Last() == "hidesource")
+            (SustainedDecisionFilter, string nameInVector, List<string>) InitSustainedFilter(List<string> list)
             {
-                hideSource = true;
-                sources.Remove("hidesource");
+                if (list.Count != 5)
+                    throw new FormatException($"Unexpected format for {filterType} filter: {Row}{Environment.NewLine}{Format}");
+                var decision = new SustainedDecisionFilter(Name, filterLength, list[4], Row, Format);
+                return (decision, Name, decision.SourceNames);
             }
 
-            // source validation happens later, as there is not a 1-1 relation of IOConfFile entries and values getting into the Vector i.e. some oxygen sensors have 3 values. 
-            return (sources, hideSource);
+            (LegacyFilterSample, string nameInVector, List<string>) InitLegacyFilter(List<string> list)
+            {
+                var sources = list.Skip(4).ToList();
+                var hideSource = sources.Last() == "hidesource";
+                if (hideSource)
+                    sources.Remove("hidesource");
+                var name = Name + "_filter";
+                return (new(name, filterType, filterLength, sources, hideSource), name, sources);
+            }
         }
 
-        private static (LogicalExpression sustainedExpression, List<string> sourceNames) InitSustainedFilter(List<string> list, string row, string format)
-        {
-            try
-            {
-                var (sustainedExpression, sourceNames) = IOconfMath.CompileExpression(list[4]);
-                // Perform test calculation using default input values
-                if (IOconfMath.Calculate(sourceNames.ToDictionary(s => s, s => (object)0), sustainedExpression) is not bool)
-                    throw new FormatException($"Only boolean filter expressions are supported for Sustained filters: {row}{Environment.NewLine}{format}");
-                return (sustainedExpression, sourceNames);
-            }
-            catch (OverflowException ex)
-            {
-                throw new OverflowException($"Filter expression causes integer overflow: {row}{Environment.NewLine}{format}", ex);
-            }
-            catch (FormatException) { throw; }
-            catch (Exception ex)
-            {
-                throw new Exception($"Wrong format for filter expression: {row}{Environment.NewLine}{format}", ex);
-            }
-        }
+        public static List<LegacyFilterSample> LegacyFilters(IEnumerable<IOconfFilter> filters) => filters.Select(f => f._legacyFilter).OfType<LegacyFilterSample>().ToList();
+        public static List<DecisionFilter> DecisionFilters(IEnumerable<IOconfFilter> filters) => filters.Select(f => f._decisionFilter).OfType<DecisionFilter>().ToList();
 
         public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
         {
             yield return NameInVector;
         }
 
-        public IEnumerable<string> GetDecisionFields() => 
-            filterType == FilterType.Sustained 
-                ? [NameInVector, NameInVector + "_targettime"]
-                : throw new InvalidOperationException($"Unexpected call to GetDecisionFields in {Row}");
-
-        public void MakeDecision(MathVectorExpansion.MathContext context)
+        public abstract class DecisionFilter
         {
-            if (filterType != FilterType.Sustained) 
-                throw new InvalidOperationException($"Unexpected call to MakeDecision in {Row}");
-
-            MakeDecisionSustained(context);
+            public abstract IEnumerable<string> GetDecisionFields();
+            public abstract void Initialize(List<string> fields);
+            public abstract void MakeDecision(MathVectorExpansion.MathContext context);
         }
 
-        private void MakeDecisionSustained(MathVectorExpansion.MathContext context)
+        public class SustainedDecisionFilter : DecisionFilter
         {
-            var (time, vector) = (context.Vector.Timestamp, context.Vector.Data);
-            var expr = _sustainedExpression ?? throw new InvalidOperationException($"Unexpected null expression in {Row}");
-            ref var targetTime = ref vector[_sustainedTargetTimeFieldIndex];
-            ref var output = ref vector[_decisionFieldIndex];
+            private readonly string _name;
+            private readonly string _row;
+            private readonly double _length;
+            private readonly LogicalExpression _sustainedExpression;
+            private int _outputFieldIndex = -1;
+            private int _targetTimeFieldIndex = -1;
+            public List<string> SourceNames;
 
-            if (!context.CalculateBoolean(expr))
-                (output, targetTime) = (0, 0);//the condition is not met, reset both the filter output and target time
-            else if (targetTime == 0)
-                (output, targetTime) = (0, time.AddSeconds(filterLength).ToOADate());//the first cycle meeting the condition sets the target time in filterLength seconds
-            else
-                output = time >= DateTime.FromOADate(targetTime) ? 1 : 0; //set the output to 1 if we already reached the target time
-        }
+            public SustainedDecisionFilter(string name, double length, string expression, string row, string format)
+            {
+                try
+                {
+                    _name = name;
+                    _length = length;
+                    _row = row;
+                    (_sustainedExpression, SourceNames) = IOconfMath.CompileExpression(expression);
+                    // Perform test calculation using default input values
+                    if (IOconfMath.Calculate(SourceNames.ToDictionary(s => s, s => (object)0), _sustainedExpression) is not bool)
+                        throw new FormatException($"Only boolean filter expressions are supported for Sustained filters: {row}{Environment.NewLine}{format}");
+                }
+                catch (OverflowException ex)
+                {
+                    throw new OverflowException($"Filter expression causes integer overflow: {row}{Environment.NewLine}{format}", ex);
+                }
+                catch (FormatException)
+                { 
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Wrong format for filter expression: {row}{Environment.NewLine}{format}", ex);
+                }
+            }
 
-        public void Initialize(List<string> fields)
-        {
-            if (filterType != FilterType.Sustained) 
-                throw new InvalidOperationException($"Unexpected call to Initialize in {Row}");
+            public override IEnumerable<string> GetDecisionFields() => [_name, _name + "_targettime"];
+            public override void MakeDecision(MathVectorExpansion.MathContext context)
+            {
+                var (time, vector) = (context.Vector.Timestamp, context.Vector.Data);
+                ref var targetTime = ref vector[_targetTimeFieldIndex];
+                ref var output = ref vector[_outputFieldIndex];
 
-            _decisionFieldIndex = fields.IndexOf(Name);
-            if (_decisionFieldIndex < 0) throw new ArgumentException($"{Name} was not found in received vector fields", nameof(fields));
-            _sustainedTargetTimeFieldIndex = fields.IndexOf(Name + "_targettime");
-            if (_sustainedTargetTimeFieldIndex < 0) throw new ArgumentException($"{Name} was not found in received vector fields", nameof(fields));
-            var missingSources = SourceNames.Where(s => !fields.Contains(s)).ToList();
-            if (missingSources.Count > 0)
-                throw new FormatException($"Filter {Name} uses sources {string.Join(',', missingSources)} which were not found in received vector fields. Row: {Row}");
+                if (!context.CalculateBoolean(_sustainedExpression))
+                    (output, targetTime) = (0, 0);//the condition is not met, reset both the filter output and target time
+                else if (targetTime == 0)
+                    (output, targetTime) = (0, time.AddSeconds(_length).ToOADate());//the first cycle meeting the condition sets the target time in filterLength seconds
+                else
+                    output = time >= DateTime.FromOADate(targetTime) ? 1 : 0; //set the output to 1 if we already reached the target time
+            }
+
+            public override void Initialize(List<string> fields)
+            {
+                _outputFieldIndex = fields.IndexOf(_name);
+                if (_outputFieldIndex < 0) throw new ArgumentException($"{_name} was not found in received vector fields", nameof(fields));
+                _targetTimeFieldIndex = fields.IndexOf(_name + "_targettime");
+                if (_targetTimeFieldIndex < 0) throw new ArgumentException($"{_name} was not found in received vector fields", nameof(fields));
+                var missingSources = SourceNames.Where(s => !fields.Contains(s)).ToList();
+                if (missingSources.Count > 0)
+                    throw new FormatException($"Filter {_name} uses sources {string.Join(',', missingSources)} which were not found in received vector fields. Row: {_row}");
+            }
         }
     }
 }
