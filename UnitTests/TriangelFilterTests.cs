@@ -11,7 +11,7 @@ namespace UnitTests
     [TestClass]
     public class TriangelFilterTests
     {
-        public static LegacyFilterSample NewLegacyFilter(string filter) => IOconfFilter.LegacyFilters([new IOconfFilter(filter, 0)]).First();
+        public static LegacyFilter NewLegacyFilter(string filter) => IOconfFilter.LegacyFilters([new IOconfFilter(filter, 0)]).First();
         [TestMethod]
         public void TriangleFilter1()
         {

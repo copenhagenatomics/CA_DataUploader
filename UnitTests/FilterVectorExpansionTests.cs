@@ -10,6 +10,16 @@ namespace UnitTests
     [TestClass]
     public class FilterVectorExpansionTests
     {
+        static double[] TestFilterInputs => [11,6,1,6,7,6,6,5,6,5,4,5,6,5,7];
+        public record TestRecord(int Length, string Expression, string ExpectedValues);
+        public static IEnumerable<object[]> TestData =>
+            [
+                new [] {new TestRecord(3, "MyName - 2 >= 3", "0,0,0,0,0,0,1,1,1,1,0,0,0,0,1")},
+                new [] {new TestRecord(3, "3 <= MyName - 2", "0,0,0,0,0,0,1,1,1,1,0,0,0,0,1")},
+                new [] {new TestRecord(1, "MyName == 6", "0,0,0,0,0,0,1,0,0,0,0,0,0,0,0")},
+                new [] {new TestRecord(1, "MyName != 6", "0,0,0,0,0,0,0,0,0,0,1,1,0,0,1")},
+                new [] {new TestRecord(1, "if(MyName > 5, MyName == 7, true)", "0,0,0,0,0,0,0,0,0,0,1,1,0,0,1")},
+            ];
         [TestMethod]
         public void InputsIncludeLegacyFilter()
         {
@@ -29,70 +39,39 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void AppliesSustainedFilter()
+        public void SustainedFilterRequiresBooleanExpression()
         {
-            var inputsDesc = ToDescItemInputs(["MyName"]);
-            var expansion = new FilterVectorExpansion(inputsDesc, GetFilters("Filter;MyFilter;Sustained;3;MyName - 2 >= 3"), CALogLevel.Normal);
-            var mathExpansion = new MathVectorExpansion([]);
-            List<VectorDescriptionItem> allFields = [.. inputsDesc, .. expansion.GetDecisionVectorDescriptionEntries()];
-            expansion.Initialize(allFields.Select(v => v.Descriptor));
-            mathExpansion.Initialize(allFields.Select(v => v.Descriptor));
-            var vector = new DataVector([0,0,0], DateTime.UtcNow);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 0, 11, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 1, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 7, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 1);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 5, 1);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 1);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 5, 1);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 4, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 5, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 5, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 7, 1);
+            var ex = Assert.ThrowsException<FormatException>(() => GetFilters("Filter;MyFilter;Sustained;3;MyName"));
+            StringAssert.Contains(ex.Message, "Only boolean filter expressions are supported");
+            StringAssert.Contains(ex.Message, "Filter;MyFilter;Sustained;3;MyName");
         }
 
-        [TestMethod]
-        public void AppliesSustainedFilterWithLessThanCondition()
+        [TestMethod, DynamicData(nameof(TestData))]
+        public void AppliesSustainedFilterParametrized(TestRecord record)
         {
             var inputsDesc = ToDescItemInputs(["MyName"]);
-            var expansion = new FilterVectorExpansion(inputsDesc, GetFilters("Filter;MyFilter;Sustained;3;3 <= MyName - 2"), CALogLevel.Normal);
+            var expansion = new FilterVectorExpansion(inputsDesc, GetFilters($"Filter;MyFilter;Sustained;{record.Length};{record.Expression}"), CALogLevel.Normal);
             var mathExpansion = new MathVectorExpansion([]);
             List<VectorDescriptionItem> allFields = [.. inputsDesc, .. expansion.GetDecisionVectorDescriptionEntries()];
             expansion.Initialize(allFields.Select(v => v.Descriptor));
             mathExpansion.Initialize(allFields.Select(v => v.Descriptor));
             var vector = new DataVector([0, 0, 0], DateTime.UtcNow);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 0, 11, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 1, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 7, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 1);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 5, 1);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 1);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 5, 1);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 4, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 5, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 6, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 5, 0);
-            ApplyFilterCycleAndAssertExpectedValues(expansion, mathExpansion, ref vector, 1, 7, 1);
+            var filterValues = string.Join(',', TestFilterInputs.Select(i => ApplyFilterCycle(ref vector, i)));
+            Assert.AreEqual(record.ExpectedValues, filterValues);
+
+            double ApplyFilterCycle(ref DataVector vector, double input)
+            {
+                vector = new(vector.Data, vector.Timestamp.AddSeconds(1));
+                List<SensorSample> inputs = [new("MyName", input)];
+                expansion.ApplyLegacyFilters(inputs);//for decision filters this does not do any change
+                for (int i = 0; i < inputs.Count; i++)
+                    vector.Data[i] = inputs[i].Value;
+                using (var ctx = mathExpansion.NewContext(vector))
+                    expansion.Apply(ctx);
+                return vector.Data[1];
+            }
         }
 
-        static void ApplyFilterCycleAndAssertExpectedValues(FilterVectorExpansion expansion, MathVectorExpansion mathExpansion, ref DataVector vector, double seconds, double input, double expectedFilterValue)
-        {
-            vector = new(vector.Data, vector.Timestamp.AddSeconds(seconds));
-            List<SensorSample> inputs = [new("MyName", input)];
-            expansion.ApplyLegacyFilters(inputs);//for decision filters this does not do any change
-            for (int i = 0; i < inputs.Count; i++)
-                vector.Data[i] = inputs[i].Value;
-            using (var ctx = mathExpansion.NewContext(vector))
-                expansion.Apply(ctx);
-            Assert.AreEqual(expectedFilterValue, vector.Data[1]);
-        }
         private static IEnumerable<IOconfFilter> GetFilters(string filter) => [new(filter, 2)];
         private static List<VectorDescriptionItem> ToDescItemInputs(IEnumerable<string> inputs) =>
             inputs.Select(n => new VectorDescriptionItem("double", n, DataTypeEnum.Input)).ToList();
