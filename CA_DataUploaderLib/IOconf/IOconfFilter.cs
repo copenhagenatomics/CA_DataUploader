@@ -22,7 +22,7 @@ namespace CA_DataUploaderLib.IOconf
 
     public class IOconfFilter : IOconfRow
     {
-        private readonly LegacyFilterSample? _legacyFilter;
+        private readonly LegacyFilter? _legacyFilter;
         private readonly DecisionFilter? _decisionFilter;
 
         public string NameInVector { get; }
@@ -55,7 +55,7 @@ namespace CA_DataUploaderLib.IOconf
                 return (decision, Name, decision.SourceNames);
             }
 
-            (LegacyFilterSample, string nameInVector, List<string>) InitLegacyFilter(List<string> list)
+            (LegacyFilter, string nameInVector, List<string>) InitLegacyFilter(List<string> list)
             {
                 var sources = list.Skip(4).ToList();
                 var hideSource = sources.Last() == "hidesource";
@@ -66,7 +66,7 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        public static List<LegacyFilterSample> LegacyFilters(IEnumerable<IOconfFilter> filters) => filters.Select(f => f._legacyFilter).OfType<LegacyFilterSample>().ToList();
+        public static List<LegacyFilter> LegacyFilters(IEnumerable<IOconfFilter> filters) => filters.Select(f => f._legacyFilter).OfType<LegacyFilter>().ToList();
         public static List<DecisionFilter> DecisionFilters(IEnumerable<IOconfFilter> filters) => filters.Select(f => f._decisionFilter).OfType<DecisionFilter>().ToList();
 
         public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)

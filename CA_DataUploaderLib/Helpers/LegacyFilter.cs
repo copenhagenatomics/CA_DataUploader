@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace CA_DataUploaderLib.Helpers
 {
-    public class LegacyFilterSample(string name, FilterType filterType, double length, List<string> sourceNames, bool hideSource)
+    public class LegacyFilter(string name, FilterType filterType, double length, List<string> sourceNames, bool hideSource)
     {
         private readonly Queue<List<SensorSample>> _filterQueue = new();
 

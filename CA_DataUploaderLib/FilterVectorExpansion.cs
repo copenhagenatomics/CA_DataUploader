@@ -10,7 +10,7 @@ namespace CA_DataUploaderLib;
 public class FilterVectorExpansion
 {
     private readonly List<IOconfFilter.DecisionFilter> _decisionFilters;
-    private readonly List<LegacyFilterSample> _legacyInputFilters;
+    private readonly List<LegacyFilter> _legacyInputFilters;
     private readonly CALogLevel _logLevel;
 
     /// <remarks>
