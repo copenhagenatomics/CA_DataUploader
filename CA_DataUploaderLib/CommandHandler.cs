@@ -143,23 +143,21 @@ namespace CA_DataUploaderLib
         {
             var extendedDesc = _fullsystemFilterAndMath.Value;
             DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, vectorTime);
-            extendedDesc.ApplyInputsAndFilters(inputs, vector);
-            MakeDecisionsAfterInputsAndFilters(vector, commands, extendedDesc);
+            extendedDesc.ApplyInputsTo(inputs, vector);
+            MakeDecisionsAfterInputs(vector, commands, extendedDesc);
         }
 
-        public void MakeDecisionUsingInputsAndFiltersFromNewVector(DataVector newVector, DataVector vector, List<string> events)
+        public void MakeDecisionUsingInputsFromNewVector(DataVector newVector, DataVector vector, List<string> events)
         {
             var extendedDesc = _fullsystemFilterAndMath.Value;
             DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, newVector.Timestamp);
-            var data = vector.Data;
-            for (int i = 0; i < extendedDesc.InputsAndFiltersCount; i++)
-                data[i] = newVector[i];
-            MakeDecisionsAfterInputsAndFilters(vector, events, extendedDesc);
+            extendedDesc.CopyInputsTo(newVector, vector);
+            MakeDecisionsAfterInputs(vector, events, extendedDesc);
         }
 
-        private void MakeDecisionsAfterInputsAndFilters(DataVector vector, List<string> commands, ExtendedVectorDescription extendedDesc)
+        private void MakeDecisionsAfterInputs(DataVector vector, List<string> commands, ExtendedVectorDescription extendedDesc)
         {
-            extendedDesc.ApplyMath(vector);
+            extendedDesc.MakeDecision(vector);
             var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.Timestamp, vector.Data);
             foreach (var decision in _decisions)
                 decision.MakeDecision(decisionsVector, commands);

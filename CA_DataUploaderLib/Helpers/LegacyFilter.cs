@@ -6,36 +6,15 @@ using System.Linq;
 
 namespace CA_DataUploaderLib.Helpers
 {
-    public enum FilterType
+    public class LegacyFilter(string name, FilterType filterType, double length, List<string> sourceNames, bool hideSource)
     {
-        None = 0,
-        Average = 1, 
-        Max = 2,
-        Min = 3,
-        SumAvg = 4,
-        DiffAvg = 5,
-        Triangle = 6,
-    }
+        private readonly Queue<List<SensorSample>> _filterQueue = new();
 
-    public class FilterSample
-    {
-        public FilterSample(IOconfFilter filter)
-        {
-            Filter = filter;
-            Output = new SensorSample(filter.Name + "_filter");
-        }
-
-        public IOconfFilter Filter { get; private set; }
-
-        private Queue<List<SensorSample>> _filterQueue = new Queue<List<SensorSample>>();
-
-
-        public void Input(List<SensorSample> input)
-        {
-            CalculateOutput(input.Where(x => Filter.SourceNames.Contains(x.Name)).ToList());
-        }
-
-        public SensorSample Output { get; }
+        public void Input(List<SensorSample> inputs) => CalculateOutput(inputs.Where(x => SourceNames.Contains(x.Name)).ToList());
+        public SensorSample Output { get; } = new SensorSample(name);
+        public string Name { get; } = name;
+        public List<string> SourceNames { get; } = sourceNames;
+        public bool HideSource { get; } = hideSource;
 
         private void CalculateOutput(List<SensorSample> input)
         {
@@ -43,7 +22,7 @@ namespace CA_DataUploaderLib.Helpers
             {
                 _filterQueue.Enqueue(input);
                 var latestEntryTime = input.Select(y => y.TimeStamp.Ticks).AverageTime();
-                var removeBefore = latestEntryTime.AddSeconds(-Filter.filterLength);
+                var removeBefore = latestEntryTime.AddSeconds(-length);
 
                 while (_filterQueue.First().Any(x => x.TimeStamp < removeBefore))
                 {
@@ -55,7 +34,7 @@ namespace CA_DataUploaderLib.Helpers
                 {
                     var allSamples = validSamples.SelectMany(x => x.Select(y => y)).ToList();
                     Output.TimeStamp = validSamples.Last().Select(d => d.TimeStamp.Ticks).AverageTime();
-                    Output.Value = Filter.filterType switch
+                    Output.Value = filterType switch
                     {
                         FilterType.Average => allSamples.Average(x => x.Value),
                         FilterType.Max => allSamples.Max(x => x.Value),
@@ -64,8 +43,9 @@ namespace CA_DataUploaderLib.Helpers
                         FilterType.DiffAvg => validSamples.First().Count == 2 ? 
                             validSamples.Average(y => y[0].Value - y[1].Value) : 
                             throw new Exception("Filter DiffAvg must have two input source names"),
-                        FilterType.Triangle => TriangleFilter(validSamples, Filter.filterLength, Output.TimeStamp),
-                        _ => validSamples.Last().Select(x => x.Value).Average()
+                        FilterType.Triangle => TriangleFilter(validSamples, length, Output.TimeStamp),
+                        FilterType.None => validSamples.Last().Select(x => x.Value).Average(),
+                        _ => throw new InvalidOperationException($"unexpected filter type in FilterSample: {filterType}")
                     };
                     return;
                 }
@@ -76,7 +56,7 @@ namespace CA_DataUploaderLib.Helpers
             }
         }
 
-        public bool HasSource(string sourceName) => Filter.SourceNames.Contains(sourceName);
+        public bool HasSource(string sourceName) => SourceNames.Contains(sourceName);
 
         /// <summary>
         /// filter where values weight more the closest they are to the latest. 
