@@ -54,7 +54,7 @@ Port 2 measures voltage[0 - 5V]
 
             // Act
             foreach (var line in linesWithCompleteMessage)
-                sut.HandleLine(line);
+                sut.HandleLine($"\n{line}"); // Added extra newline-character which should get ignored
 
             // Assert
             Assert.AreEqual(1, logCount);
