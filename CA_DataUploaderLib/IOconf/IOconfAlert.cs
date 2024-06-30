@@ -93,7 +93,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             var match = comparisonRegex.Match(expression);
             if (!match.Success)
-                throw new Exception(formatErrorMessage + " Supported comparisons: =,!=, >, <, >=, <=");
+                throw new Exception(formatErrorMessage + " Supported comparisons: =, !=, >, <, >=, <=");
             return ParseExpression(name, expression, match);
         }
 
@@ -118,7 +118,7 @@ namespace CA_DataUploaderLib.IOconf
                 "<" => AlertCompare.SmallerThan,
                 ">=" => AlertCompare.BiggerOrEqualTo,
                 "<=" => AlertCompare.SmallerOrEqualTo,
-                _ => throw new Exception("alert expression - wrong format: " + expression),
+                _ => throw new Exception("Alert expression - wrong format: " + expression),
             };
 
             return (sensor, value, messageTemplate, type);
