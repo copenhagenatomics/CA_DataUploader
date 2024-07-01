@@ -28,6 +28,8 @@ namespace UnitTests
         [DataRow("Math;MyName;Abs(MyValue % 1)", 123.6542, 0.654200000000003d)]
         [DataRow("Math;MyName;Sqrt(MyValue)", 4, 2)]
         [DataRow("Math;MyName;Sqrt(MyValue)", -1, double.NaN)]
+        [DataRow("Math;MyName;MyValue ** 8", 2d, 256d)] // ** = Pow = exponential
+        [DataRow("Math;MyName;Pow(MyValue, 8)", 2d, 256d)]
         [DataTestMethod]
         public void CalculatesExpectedValue(string row, double value, double expectedResult) 
         {

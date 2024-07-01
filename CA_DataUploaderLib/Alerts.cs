@@ -75,7 +75,7 @@ namespace CA_DataUploaderLib
                             }
                             catch (Exception ex)
                             {//note that a distributed host might postpone the execution of the command above, but it would then be responsible of logging information about any error.
-                                CALog.LogError(LogID.A, $"unexpected error running command for alert {alert.Name}", ex);
+                                CALog.LogError(LogID.A, $"Unexpected error running command for alert {alert.Name}", ex);
                             }
                         }
                     }
