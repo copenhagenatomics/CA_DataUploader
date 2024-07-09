@@ -245,7 +245,7 @@ namespace CA_DataUploaderLib
             }
             else
                 sb = new StringBuilder();
-            foreach (var t in _values)
+            foreach (var t in _localValues)
             {
                 string? subsystemOverride = t.Input.SubsystemOverride;
                 var matchesSubsystem = (isMainCommand && subsystemOverride == default) || subsystemOverride == subsystem;
