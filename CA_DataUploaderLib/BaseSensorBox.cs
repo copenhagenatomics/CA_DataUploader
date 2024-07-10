@@ -27,7 +27,7 @@ namespace CA_DataUploaderLib
         private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamplesLookup = new();
         private readonly string mainSubsystem;
         private readonly PluginsCommandHandler _cmdAdvanced;
-        private readonly Dictionary<MCUBoard, List<(Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
+        private readonly Dictionary<MCUBoard, List<(Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _builtInWriteActions = new();
         private readonly Dictionary<MCUBoard, (ChannelReader<string> Reader, ChannelWriter<string> Writer)> _boardCustomCommands = [];
         private static readonly Dictionary<CommandHandler, Dictionary<string, string>> _usedBoxNames = []; //Dictionary of used board names tied to a specific CommandHandler-instance
         private uint _lastStatus = 0U;
@@ -61,7 +61,7 @@ namespace CA_DataUploaderLib
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
 
 
-            static void EnforceNoDuplicatePorts(string boxName, SensorSample.InputBased[] sensors)
+            static void EnforceNoDuplicatePorts(string boxName, SensorSample[] sensors)
             {
                 var duplicate = sensors.GroupBy(v => v.Input.PortNumber).FirstOrDefault(g => g.Count() > 1);
                 if (duplicate == null) return;
@@ -72,7 +72,7 @@ namespace CA_DataUploaderLib
             {
                 if (!_usedBoxNames.ContainsKey(cmd))
                 {
-                    _usedBoxNames[cmd] = [];
+                    _usedBoxNames[cmd] = new();
                     cmd.StopToken.Register(() => _usedBoxNames.Remove(cmd));
                 }
 
@@ -142,7 +142,7 @@ namespace CA_DataUploaderLib
         /// <remarks>must be called before <see cref="Run"/> is called</remarks>
         public void AddBuildInWriteAction(MCUBoard board, Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> writeAction, Func<MCUBoard, CancellationToken, Task> exitAction)
         {
-            if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = new() { (writeAction, exitAction ) };
+            if (!_builtInWriteActions.TryGetValue(board, out var actions)) _builtInWriteActions[board] = new() { (writeAction, exitAction ) };
             else actions.Add((writeAction, exitAction));
         }
 
@@ -233,7 +233,7 @@ namespace CA_DataUploaderLib
                     if (customWritesEnabled && customCommandsChannel!.Reader.TryRead(out var command))
                         await board.SafeWriteLine(command, token);
 
-                    if (!buildInActionsEnabled)
+                    if (!builtInActionsEnabled)
                     {
                         EnsureResumeAfterTimeoutIsReported();
                         await customCommandsChannel!.Reader.WaitToReadAsync(token);
@@ -244,7 +244,7 @@ namespace CA_DataUploaderLib
                     if (!CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector))
                         continue; // no point trying to send commands while there is no connection to the board.
 
-                    foreach (var (writeAction, _) in buildInActions)
+                    foreach (var (writeAction, _) in builtInActions)
                         await writeAction(vector, board, token);
 
                     EnsureResumeAfterTimeoutIsReported();
@@ -262,11 +262,11 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            if (!buildInActionsEnabled) return;
+            if (!builtInActionsEnabled) return;
 
             try
             {
-                foreach (var (_, exitAction) in buildInActions)
+                foreach (var (_, exitAction) in builtInActions)
                 {
                     using var timeoutToken = new CancellationTokenSource(3000);
                     await exitAction(board, timeoutToken.Token);
@@ -601,7 +601,7 @@ namespace CA_DataUploaderLib
         /// <summary>
         /// Receives and logs lines part of a multiline message delimited by "Start of" and "End of".
         /// </summary>
-        public class MultilineMessageReceiver(Action<string> log)
+        public class MultilineMessageReceiver
         {
             private StringBuilder multilineMessage = new();
             private bool multilineMessageMode = false;
@@ -609,6 +609,12 @@ namespace CA_DataUploaderLib
             private const int maxMultilineMessageLineCount = 30;
             private const string startTag = "Start of";
             private const string endTag = "End of";
+            private readonly Action<string> log;
+
+            public MultilineMessageReceiver(Action<string> log)
+            {
+                this.log = log;
+            }
 
             /// <summary>
             /// Detects and logs multiline messages.

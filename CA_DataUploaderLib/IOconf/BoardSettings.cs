@@ -38,7 +38,7 @@ namespace CA_DataUploaderLib.IOconf
             private static readonly Regex _hasCommaSeparatedNumbers = new(@"^\s*(?<Values>-?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*-?(?:[0-9]*[.])?[0-9]+\s*)*)(?:,\s*0x(?<Status>[0-9a-fA-F]+))?,?\s*$");
 
             /// <returns>the list of doubles, or null when the line did not match the expected format</returns>
-            public virtual (List<double>?, uint) TryParseAsDoubleList(string line)
+            public virtual (List<double>, uint) TryParseAsDoubleList(string line)
             {
                 var status = 0U;
                 var lineMatch = _hasCommaSeparatedNumbers.Match(line);
