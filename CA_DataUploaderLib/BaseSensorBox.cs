@@ -28,8 +28,8 @@ namespace CA_DataUploaderLib
         private readonly string mainSubsystem;
         private readonly PluginsCommandHandler _cmdAdvanced;
         private readonly Dictionary<MCUBoard, List<(Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _builtInWriteActions = new();
-        private readonly Dictionary<MCUBoard, (ChannelReader<string> Reader, ChannelWriter<string> Writer)> _boardCustomCommands = [];
-        private static readonly Dictionary<CommandHandler, Dictionary<string, string>> _usedBoxNames = []; //Dictionary of used board names tied to a specific CommandHandler-instance
+        private readonly Dictionary<MCUBoard, (ChannelReader<string> Reader, ChannelWriter<string> Writer)> _boardCustomCommands = new();
+        private static readonly Dictionary<CommandHandler, Dictionary<string, string>> _usedBoxNames = new(); //Dictionary of used board names tied to a specific CommandHandler-instance
         private uint _lastStatus = 0U;
 
         public BaseSensorBox(

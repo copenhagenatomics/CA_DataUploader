@@ -2,6 +2,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using static CA_DataUploaderLib.BaseSensorBox;
 
 namespace UnitTests
@@ -9,8 +10,8 @@ namespace UnitTests
     [TestClass]
     public class MultilineMessageReceiverTests
     {
-        private static readonly string completeMultilineMessage = """
-Start of board Status:
+        private static readonly string completeMultilineMessage =
+@"Start of board Status:
 The board is operating normally.
 Port 1 measures voltage[0 - 5V]
 Port 2 measures voltage[0 - 5V]
@@ -20,29 +21,33 @@ Port 5 measures voltage[0 - 5V]
 Port 6 measures voltage[0 - 5V]
 
 End of board status.
-""";
+";
 
-        private static readonly string incompleteMultilineMessage = """
-Start of board Status:
+        private static readonly string incompleteMultilineMessage =
+@"Start of board Status:
 The board is operating normally.
 Port 1 measures voltage[0 - 5V]
 Port 2 measures voltage[0 - 5V]
 
-""";
+";
 
-        private readonly List<string> linesWithCompleteMessage = [
+        private readonly List<string> linesWithCompleteMessage = new[] {
 "4.650325, 3543.687988, 4.639473, 4.656060, 4.628024, 4.629683, 0x0",
-"4.650254, 3543.561768, 4.639433, 4.655966, 4.627975, 4.629673, 0x0",
-..completeMultilineMessage.Split(Environment.NewLine),
+"4.650254, 3543.561768, 4.639433, 4.655966, 4.627975, 4.629673, 0x0" }
+        .Concat(completeMultilineMessage.Split(Environment.NewLine))
+        .Concat(new[] {
 "4.650369, 3543.680420, 4.639513, 4.656144, 4.627993, 4.629726, 0x0",
-"4.650223, 3543.606201, 4.639447, 4.656077, 4.627962, 4.629629, 0x0" ];
+"4.650223, 3543.606201, 4.639447, 4.656077, 4.627962, 4.629629, 0x0"})
+        .ToList();
 
-        private readonly List<string> linesWithIncompleteMessage = [
+        private readonly List<string> linesWithIncompleteMessage = new[] {
 "4.650325, 3543.687988, 4.639473, 4.656060, 4.628024, 4.629683, 0x0",
-"4.650254, 3543.561768, 4.639433, 4.655966, 4.627975, 4.629673, 0x0",
-..incompleteMultilineMessage.Split(Environment.NewLine),
+"4.650254, 3543.561768, 4.639433, 4.655966, 4.627975, 4.629673, 0x0"}
+        .Concat(incompleteMultilineMessage.Split(Environment.NewLine))
+        .Concat(new[] {
 "4.650369, 3543.680420, 4.639513, 4.656144, 4.627993, 4.629726, 0x0",
-"4.650223, 3543.606201, 4.639447, 4.656077, 4.627962, 4.629629, 0x0" ];
+"4.650223, 3543.606201, 4.639447, 4.656077, 4.627962, 4.629629, 0x0"})
+        .ToList();
 
         [TestMethod]
         public void HandleLine_CompleteInfoBlock_Logged()
