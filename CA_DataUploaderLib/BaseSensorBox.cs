@@ -27,8 +27,10 @@ namespace CA_DataUploaderLib
         private readonly Dictionary<MCUBoard, SensorSample[]> _boardSamplesLookup = new();
         private readonly string mainSubsystem;
         private readonly PluginsCommandHandler _cmdAdvanced;
-        private readonly Dictionary<MCUBoard, List<(Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _buildInWriteActions = new();
-        private readonly Dictionary<MCUBoard, ChannelReader<string>> _boardCustomCommandsReceived = new();
+        private readonly Dictionary<MCUBoard, List<(Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _builtInWriteActions = new();
+        private readonly Dictionary<MCUBoard, (ChannelReader<string> Reader, ChannelWriter<string> Writer)> _boardCustomCommands = new();
+        private static readonly Dictionary<CommandHandler, Dictionary<string, string>> _usedBoxNames = new(); //Dictionary of used board names tied to a specific CommandHandler-instance
+        private uint _lastStatus = 0U;
 
         public BaseSensorBox(
             CommandHandler cmd, string commandName, string commandArgsHelp, string commandDescription, IEnumerable<IOconfInput> values)
@@ -49,12 +51,36 @@ namespace CA_DataUploaderLib
             }
 
             var allBoards = _values.Where(x => !x.Input.Skip).GroupBy(x => x.Input.Map).Select(g => (map: g.Key, values: g.ToArray())).ToArray();
-            foreach (var board in allBoards.Where(b => b.map.CustomWritesEnabled))
-                RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommandsReceived);
+            foreach (var board in allBoards)
+            {
+                RegisterCustomBoardCommand(board.map, cmd, _boardCustomCommands);
+                EnforceBoardNotAlreadyInUse(board.map.BoxName, board.values.First().Input.Row, cmd);//used by another sensor type / BaseSensorBox instance
+                EnforceNoDuplicatePorts(board.map.BoxName, board.values);
+            }
             _boards = allBoards.Where(b => b.map.IsLocalBoard).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
 
-            static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, ChannelReader<string>> boardCustomCommandsReceived)
+
+            static void EnforceNoDuplicatePorts(string boxName, SensorSample[] sensors)
+            {
+                var duplicate = sensors.GroupBy(v => v.Input.PortNumber).FirstOrDefault(g => g.Count() > 1);
+                if (duplicate == null) return;
+                var dupSensors = string.Join(Environment.NewLine, duplicate.Select(s => s.Input.Row));
+                throw new FormatException($"Can't map the same board port to different IO.conf lines: {boxName};{duplicate.Key}{Environment.NewLine}{dupSensors}");
+            }
+            static void EnforceBoardNotAlreadyInUse(string boxName, string newRow, CommandHandler cmd)
+            {
+                if (!_usedBoxNames.ContainsKey(cmd))
+                {
+                    _usedBoxNames[cmd] = new();
+                    cmd.StopToken.Register(() => _usedBoxNames.Remove(cmd));
+                }
+
+                if (_usedBoxNames[cmd].TryGetValue(boxName, out var usedRow))
+                    throw new FormatException($"Can't map the same board to different IO.conf line types: {boxName}{Environment.NewLine}{usedRow}{Environment.NewLine}{newRow}");
+                _usedBoxNames[cmd].Add(boxName, newRow);
+            }
+            static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, (ChannelReader<string> reader, ChannelWriter<string> writer)> boardCustomCommands)
             {
                 if (!map.IsLocalBoard)
                 {//if the board is not local we register the command validation with an empty action
@@ -73,8 +99,8 @@ namespace CA_DataUploaderLib
 
                 //for local boards we instead register a multinode that sends the command to a local channel the write loop uses
                 var channel = Channel.CreateUnbounded<string>();
-                var channelWriter = channel.Writer;
-                boardCustomCommandsReceived.Add(map.McuBoard, channel.Reader);
+                var channelWriter = channel.Writer; 
+                boardCustomCommands.Add(map.McuBoard, (channel.Reader, channelWriter));
                 cmd.AddMultinodeCommand(
                     "custom", 
                     a => a.Count >= 3 && a[1] == map.BoxName, 
@@ -116,7 +142,7 @@ namespace CA_DataUploaderLib
         /// <remarks>must be called before <see cref="Run"/> is called</remarks>
         public void AddBuildInWriteAction(MCUBoard board, Func<NewVectorReceivedArgs, MCUBoard, CancellationToken, Task> writeAction, Func<MCUBoard, CancellationToken, Task> exitAction)
         {
-            if (!_buildInWriteActions.TryGetValue(board, out var actions)) _buildInWriteActions[board] = new() { (writeAction, exitAction ) };
+            if (!_builtInWriteActions.TryGetValue(board, out var actions)) _builtInWriteActions[board] = new() { (writeAction, exitAction ) };
             else actions.Add((writeAction, exitAction));
         }
 
@@ -190,9 +216,9 @@ namespace CA_DataUploaderLib
 
         private async Task BoardWriteLoop(MCUBoard board, CancellationToken token)
         {
-            var customWritesEnabled = _boardCustomCommandsReceived.TryGetValue(board, out var customCommandsChannel);
-            var buildInActionsEnabled = _buildInWriteActions.TryGetValue(board, out var buildInActions);
-            if (!buildInActionsEnabled && !customWritesEnabled) return;
+            var customWritesEnabled = _boardCustomCommands.TryGetValue(board, out var customCommandsChannel);
+            var builtInActionsEnabled = _builtInWriteActions.TryGetValue(board, out var builtInActions);
+            if (!builtInActionsEnabled && !customWritesEnabled) return;
 
             var boardStateName = board.BoxName + "_state";
             // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operation.
@@ -204,13 +230,13 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    if (customWritesEnabled && customCommandsChannel.TryRead(out var command))
+                    if (customWritesEnabled && customCommandsChannel!.Reader.TryRead(out var command))
                         await board.SafeWriteLine(command, token);
 
-                    if (!buildInActionsEnabled)
+                    if (!builtInActionsEnabled)
                     {
                         EnsureResumeAfterTimeoutIsReported();
-                        await customCommandsChannel.WaitToReadAsync(token);
+                        await customCommandsChannel!.Reader.WaitToReadAsync(token);
                         continue;
                     }
 
@@ -218,7 +244,7 @@ namespace CA_DataUploaderLib
                     if (!CheckConnectedStateInVector(board, boardStateName, ref waitingBoardReconnect, vector))
                         continue; // no point trying to send commands while there is no connection to the board.
 
-                    foreach (var (writeAction, _) in buildInActions)
+                    foreach (var (writeAction, _) in builtInActions)
                         await writeAction(vector, board, token);
 
                     EnsureResumeAfterTimeoutIsReported();
@@ -236,11 +262,11 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            if (!buildInActionsEnabled) return;
+            if (!builtInActionsEnabled) return;
 
             try
             {
-                foreach (var (_, exitAction) in buildInActions)
+                foreach (var (_, exitAction) in builtInActions)
                 {
                     using var timeoutToken = new CancellationTokenSource(3000);
                     await exitAction(board, timeoutToken.Token);
@@ -338,19 +364,31 @@ namespace CA_DataUploaderLib
         {
             var timeSinceLastValidRead = Stopwatch.StartNew();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
-            var msBetweenReads = (int)Math.Ceiling(board.ConfigSettings.MillisecondsBetweenReads * 1.5); 
+            var msBetweenReads = (int)Math.Ceiling(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
+            Stopwatch timeSinceLastLogInfo = new(), timeSinceLastLogError = new(), timeSinceLastMultilineMessage = new();
+            int logInfoSkipped = 0, logErrorSkipped = 0, multilineMessageSkipped = 0;
+            MultilineMessageReceiver multilineMessageReceiver = new((message) => LowFrequencyMultilineMessage((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)));
             //We set the state early if we detect no data is being returned or if we received values,
             //but we only set ReturningNonValues if it has passed msBetweenReads since the last valid read
             while (true) // we only stop reading if a disconnect or timeout is detected
             {
                 var (stillConnected, line) = await TryReadLineWithStallDetection(board, msBetweenReads, token);
                 if (!stillConnected)
+                {
+                    multilineMessageReceiver.LogPossibleIncompleteMessage();
                     return false;  //board disconnect detected, let caller know 
-                if (line == default) 
+                }
+                if (line == default)
+                {
+                    multilineMessageReceiver.LogPossibleIncompleteMessage();
                     return true; //timed out reading from the board, TryReadLineWithStallDetection already updated the state after the first msBetweenReads / still considered connected
+                }
                 try
                 {
-                    var numbers = TryParseAsDoubleList(board, line);
+                    if (multilineMessageReceiver.HandleLine(line))
+                        continue;
+
+                    var (numbers, status) = TryParseAsDoubleList(board, line);
                     if (numbers != null)
                     {
                         ProcessLine(numbers, board, targetSamples);
@@ -359,17 +397,43 @@ namespace CA_DataUploaderLib
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
-                        LogInfo(board, $"unexpected board response {line.Replace("\r", "\\r")}"); // we avoid \r as it makes the output hard to read
+                        LowFrequencyLogInfo((args, skipMessage) => LogInfo(args.board, $"Unexpected board response {args.line.Replace("\r", "\\r")}{skipMessage}"), (board, line));// we avoid \r as it makes the output hard to read
                         if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                             _boardsState.SetState(board, ConnectionState.ReturningNonValues);
                     }
+
+                    if (status != _lastStatus && (status & 0x80000000) != 0) //Was there a change in status and is the most significant bit set?
+                    {
+                        LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Board responded with error status 0x{args.status:X}{skipMessage}"), (board, status));
+                        if (_boardCustomCommands.TryGetValue(board, out var customCommandsChannel))
+                            customCommandsChannel.Writer.TryWrite("Status");
+                    }
+                    _lastStatus = status;
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in msBetweenReads
-                    LogError(board, $"failed handling board response {line.Replace("\r", "\\r")}", ex); // we avoid \r as it makes the output hard to read
+                    LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Failed handling board response {args.line.Replace("\r", "\\r")}{skipMessage}", args.ex), (board, line, ex)); // we avoid \r as it makes the output hard to read
                     if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
                         _boardsState.SetState(board, ConnectionState.ReturningNonValues);
                 }
+            }
+
+            void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastLogInfo, ref logInfoSkipped);
+            void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastLogError, ref logErrorSkipped);
+            void LowFrequencyMultilineMessage<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastMultilineMessage, ref multilineMessageSkipped);
+
+            void LowFrequencyLog<T>(Action<T, string> logAction, T args, Stopwatch timeSinceLastLog, ref int logSkipped)
+            {
+                if (timeSinceLastLog.IsRunning && timeSinceLastLog.ElapsedMilliseconds < 5 * 60000)
+                {
+                    if (logSkipped++ == 0)
+                        logAction(args, $"{Environment.NewLine}Skipping further messages for this board (max 2 messages every 5 minutes)");
+                    return;
+                }
+
+                timeSinceLastLog.Restart();
+                logAction(args, "");
+                logSkipped = 0;
             }
         }
 
@@ -414,8 +478,8 @@ namespace CA_DataUploaderLib
             }
         }
 
-        /// <returns>the list of doubles, otherwise <c>null</c></returns>
-        protected virtual List<double> TryParseAsDoubleList(MCUBoard board, string line) => 
+        /// <returns>the list of doubles (<c>null</c> if failing to parse the line) and a status value</returns>
+        protected virtual (List<double>, uint) TryParseAsDoubleList(MCUBoard board, string line) =>
             board.ConfigSettings.Parser.TryParseAsDoubleList(line);
 
         private bool CheckFails(MCUBoard board, SensorSample[] values)
@@ -521,10 +585,10 @@ namespace CA_DataUploaderLib
             else
                 CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.BoxName} (missing)", ex); 
         }
-        private void LogError(MCUBoard board, string message, Exception ex) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}", ex);
-        private void LogError(MCUBoard board, string message) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}");
-        private void LogData(MCUBoard board, string message) => CALog.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
-        private void LogInfo(MCUBoard board, string message) => CALog.LogInfoAndConsoleLn(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
+        private void LogError(Board board, string message, Exception ex) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}", ex);
+        private void LogError(Board board, string message) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}");
+        private void LogData(Board board, string message) => CALog.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
+        private void LogInfo(Board board, string message) => CALog.LogInfoAndConsoleLn(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
         protected virtual void Dispose(bool disposing) => _boardLoopsStopTokenSource.Cancel();
         public void Dispose()
         {
@@ -533,7 +597,69 @@ namespace CA_DataUploaderLib
             GC.SuppressFinalize(this);
         }
 
-        protected class AllBoardsState : IEnumerable<(string sensorName, ConnectionState State)>
+
+        /// <summary>
+        /// Receives and logs lines part of a multiline message delimited by "Start of" and "End of".
+        /// </summary>
+        public class MultilineMessageReceiver
+        {
+            private StringBuilder multilineMessage = new();
+            private bool multilineMessageMode = false;
+            private int multilineMessageLineCount = 0;
+            private const int maxMultilineMessageLineCount = 30;
+            private const string startTag = "Start of";
+            private const string endTag = "End of";
+            private readonly Action<string> log;
+
+            public MultilineMessageReceiver(Action<string> log)
+            {
+                this.log = log;
+            }
+
+            /// <summary>
+            /// Detects and logs multiline messages.
+            /// </summary>
+            /// <param name="line"></param>
+            /// <returns>True, if the line is part of a multiline message and should be considered handled.</returns>
+            public bool HandleLine(string line)
+            {
+                line = line.Trim();
+                if (line.StartsWith(startTag, StringComparison.InvariantCultureIgnoreCase) || multilineMessageMode)
+                {
+                    multilineMessageMode = true;
+                    multilineMessage.AppendLine(line);
+                    if (line.StartsWith(endTag, StringComparison.InvariantCultureIgnoreCase) ||
+                        multilineMessageLineCount++ >= maxMultilineMessageLineCount)
+                    {
+                        LogMessage();
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            /// <summary>
+            /// Logs any incomplete multiline message.
+            /// </summary>
+            public void LogPossibleIncompleteMessage()
+            {
+                if (!multilineMessageMode)
+                    return;
+
+                multilineMessage.AppendLine("*Incomplete*");
+                LogMessage();
+            }
+
+            private void LogMessage()
+            {
+                log($"{multilineMessage}");
+                multilineMessage = new();
+                multilineMessageMode = false;
+                multilineMessageLineCount = 0;
+            }
+        }
+
+        public class AllBoardsState : IEnumerable<(string sensorName, ConnectionState State)>
         {
             private readonly ConnectionState[] _states;
             private readonly string[] _sensorNames;

@@ -16,9 +16,10 @@ namespace CA_DataUploaderLib.IOconf
             Name = list[1]; // could be overwritten elsewhere. 
         }
 
-        protected readonly string Row;
-        protected readonly string Type;
-        protected readonly int LineNumber;
+        public string Row { get; }
+        public string Type { get; }
+        public int LineNumber { get; }
+
         public string Name { get; init; } 
         protected string Format { get; init; }
 
