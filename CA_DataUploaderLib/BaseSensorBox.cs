@@ -623,6 +623,7 @@ namespace CA_DataUploaderLib
             /// <returns>True, if the line is part of a multiline message and should be considered handled.</returns>
             public bool HandleLine(string line)
             {
+                line = line.Trim();
                 if (line.StartsWith(startTag, StringComparison.InvariantCultureIgnoreCase) || multilineMessageMode)
                 {
                     multilineMessageMode = true;
