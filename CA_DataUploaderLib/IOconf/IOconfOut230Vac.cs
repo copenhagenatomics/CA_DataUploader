@@ -60,6 +60,7 @@ namespace CA_DataUploaderLib.IOconf
             }
 
             // returns currents 0-3, board temperature (, sensorport_rms, sensorport_max)
+            //      or currents 0-6
             public (List<double>?, uint) TryParseOnlyNumbersAsDoubleList(string line)
             {
                 var (numbers, status) = base.TryParseAsDoubleList(line); //the base implementation deals with any amount of simple numbers separated by commas.

@@ -12,7 +12,10 @@ namespace CA_DataUploaderLib
 
         private SwitchBoardController(IIOconf ioconf, CommandHandler cmd) : base(cmd, "switchboards",
             ioconf.GetEntries<IOconfOut230Vac>().SelectMany(p => p.GetExpandedInputConf())
-            .Concat(ioconf.GetEntries<IOconfOut230Vac>().GroupBy(p => p.BoxName).Select(g => g.First().GetBoardTemperatureInputConf()))
+            .Concat(ioconf.GetEntries<IOconfOut230Vac>()
+                .GroupBy(p => p.BoxName)
+                .Where(g => !g.Any(p => p.PortNumber > 4)) //avoid port 5 board temperature conflict with boards that support 5 or more ports (without temperatures)
+                .Select(g => g.First().GetBoardTemperatureInputConf()))
             .Concat(ioconf.GetEntries<IOconfSwitchboardSensor>().SelectMany(i => i.GetExpandedConf())))
         {
             //we ignore remote boards and boards missing during the start sequence (as we don't have auto reconnect logic yet for those). Note the BaseSensorBox already reports the missing local boards.
