@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib.IOconf
             {
                 (compiledExpression, SourceNames) = CompileExpression(ToList()[2]);
                 // Perform test calculation using default input values
-                Calculate(SourceNames.ToDictionary(s => s, s => (object)0));
+                Convert.ToDouble(Calculate(SourceNames.ToDictionary(s => s, s => (object)0), compiledExpression));
             }
             catch (OverflowException ex)
             {
@@ -56,7 +56,18 @@ namespace CA_DataUploaderLib.IOconf
         // https://github.com/sklose/NCalc2/blob/master/test/NCalc.Tests/Fixtures.cs
         // Convert.ToDouble allows some expressions that return int, decimals or even boolean to work
         // note that some expression may even return different values depending on the branch hit i.e. when using if(...)
-        public double Calculate(Dictionary<string, object> values) => Convert.ToDouble(Calculate(values, compiledExpression));
+        public double Calculate(Dictionary<string, object> values)
+        {
+            try
+            {
+                return Convert.ToDouble(Calculate(values, compiledExpression));
+            }
+            catch
+            {
+                return double.NaN;
+            }
+        }
+
         public static bool CalculateBoolean(Dictionary<string, object> values, LogicalExpression compiledExpression) => Convert.ToBoolean(Calculate(values, compiledExpression));
         public static object Calculate(Dictionary<string, object> values, LogicalExpression compiledExpression)
         {
