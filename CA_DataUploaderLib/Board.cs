@@ -38,7 +38,7 @@ namespace CA_DataUploaderLib
             return boardMatched;
         }
 
-        public override string ToString() => $"Product Type: {ProductType,-20} Serial Number: {SerialNumber,-12} Port name: {PortName}";
+        public override string ToString() => $"Product Type: {ProductType,-20} Serial Number: {SerialNumber,-12} Port name: {PortName,-18} PCB version: {PcbVersion}";
         public string ToShortDescription() => $"{BoxName} {ProductType} {SerialNumber} {PortName}";
     }
 }
