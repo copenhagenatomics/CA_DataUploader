@@ -40,7 +40,7 @@ namespace CA_DataUploaderLib.Helpers
             using (var p = CreateAndStartShellProcess(command) ?? throw new InvalidOperationException($"Failed to start process {command}"))
             {
                 string? err = null;
-                p.ErrorDataReceived += (sender, e) => err += e.Data;
+                p.ErrorDataReceived += ErrorDataReceived;
                 string output = p.StandardOutput.ReadToEnd();
                 if (!p.WaitForExit(waitForExit))
                     CALog.LogData(LogID.A, $"Timed out waiting for command to exit: {command}");
@@ -49,8 +49,10 @@ namespace CA_DataUploaderLib.Helpers
                 if (!string.IsNullOrEmpty(err))
                     CALog.LogData(LogID.A, $"Error while running command {command} - {err}");
 
-                p.ErrorDataReceived -= (sender, e) => err += e.Data; //TODO: check if this way of unsubscribing works
+                p.ErrorDataReceived -= ErrorDataReceived;
                 return output;
+
+                void ErrorDataReceived(object sender, DataReceivedEventArgs e) => err += e.Data;
             }
         }
 
