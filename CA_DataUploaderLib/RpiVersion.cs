@@ -189,6 +189,7 @@ $@"{hostAssembly?.GetName()}
             return Environment.ProcessorCount;
         }
 
+        public static bool IsRpi() => GetHardwareInfo() != "Unknown hardware";
         public static bool IsWindows() => OperatingSystem.IsWindows();
     }
 }
