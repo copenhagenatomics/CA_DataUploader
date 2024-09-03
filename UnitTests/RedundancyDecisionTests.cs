@@ -27,7 +27,7 @@ namespace UnitTests
                     "red4median",
                     new(){"a","b","c","d" },
                     new(){ new() { "abox"}, new() { "bbox"}, new() { "cbox"}, new() { "dbox"} },
-                    (0,2000), 
+                    (0,2000),
                     -0.001,
                     Redundancy.RedundancyStrategy.Median)),
                 new Redundancy.Decision(new(
@@ -50,7 +50,15 @@ namespace UnitTests
                     new() { new() { "abox" }, new() { "bbox" }, new() { "cbox" }, new() { "dbox" }, new() { "ebox" } },
                     (0, 2000),
                     10000,
-                    Redundancy.RedundancyStrategy.Average))},
+                    Redundancy.RedundancyStrategy.Average)),
+                new Redundancy.Decision(new(
+                    "red5avgInvalidValueDelay",
+                    new() { "a", "b", "c", "d", "e" },
+                    new() { new() { "abox" }, new() { "bbox" }, new() { "cbox" }, new() { "dbox" }, new() { "ebox" } },
+                    (0, 2000),
+                    10000,
+                    Redundancy.RedundancyStrategy.Average,
+                    0.3))},
             new()
             {
                 { "abox", (int)BaseSensorBox.ConnectionState.ReceivingValues },
@@ -201,6 +209,36 @@ namespace UnitTests
             Field("abox") = Field("bbox") = Field("cbox") = Field("dbox") = Field("ebox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
             MakeDecisions();
             Assert.AreEqual(10000, Field(FieldName), "must use default invalid value when all sensors are stale");
+        }
+
+        [TestMethod]
+        public void UsesInvalidValueDelay()
+        {
+            MakeDecisions();
+            const string FieldName = "red5avgInvalidValueDelay";
+            Assert.AreEqual(16.0, Field(FieldName));
+            Field("abox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
+            Field("bbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
+            Field("cbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
+            Field("dbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
+            Field("ebox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
+            MakeDecisions(0.1);
+            Assert.AreEqual(16.0, Field(FieldName), "must hold last valid value");
+            MakeDecisions(0.2);
+            Assert.AreEqual(16.0, Field(FieldName), "must hold last valid value");
+            MakeDecisions(0.3);
+            Assert.AreEqual(16.0, Field(FieldName), "must hold last valid value");
+            MakeDecisions(0.4);
+            Assert.AreEqual(10000, Field(FieldName), "must use default invalid value after delay");
+            MakeDecisions(0.5);
+            Assert.AreEqual(10000, Field(FieldName), "must use default invalid value after delay");
+            Field("abox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
+            Field("bbox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
+            Field("cbox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
+            Field("dbox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
+            Field("ebox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
+            MakeDecisions(0.6);
+            Assert.AreEqual(16.0, Field(FieldName), "must go back to calculating valid value");
         }
     }
 }
