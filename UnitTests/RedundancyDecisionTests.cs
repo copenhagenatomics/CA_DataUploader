@@ -58,7 +58,7 @@ namespace UnitTests
 					(0, 2000),
 					10000,
 					Redundancy.RedundancyStrategy.Average,
-                    3))},
+                    0.3))},
             new()
             {
                 { "abox", (int)BaseSensorBox.ConnectionState.ReceivingValues },
@@ -222,22 +222,22 @@ namespace UnitTests
 			Field("cbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
 			Field("dbox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
 			Field("ebox") = (int)BaseSensorBox.ConnectionState.NoDataAvailable;
-			MakeDecisions();
+			MakeDecisions(0.1);
 			Assert.AreEqual(16.0, Field(FieldName), "must hold last valid value");
-			MakeDecisions();
+			MakeDecisions(0.2);
 			Assert.AreEqual(16.0, Field(FieldName), "must hold last valid value");
-			MakeDecisions();
+			MakeDecisions(0.3);
 			Assert.AreEqual(16.0, Field(FieldName), "must hold last valid value");
-			MakeDecisions();
+			MakeDecisions(0.4);
 			Assert.AreEqual(10000, Field(FieldName), "must use default invalid value after delay");
-			MakeDecisions();
+			MakeDecisions(0.5);
 			Assert.AreEqual(10000, Field(FieldName), "must use default invalid value after delay");
 			Field("abox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
 			Field("bbox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
 			Field("cbox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
 			Field("dbox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
 			Field("ebox") = (int)BaseSensorBox.ConnectionState.ReceivingValues;
-			MakeDecisions();
+			MakeDecisions(0.6);
 			Assert.AreEqual(16.0, Field(FieldName), "must go back to calculating valid value");
 		}
 	}
