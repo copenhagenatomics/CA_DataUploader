@@ -3,7 +3,6 @@ using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 
 namespace CA_DataUploaderLib
@@ -23,22 +22,22 @@ namespace CA_DataUploaderLib
             loader.AddLoader(IOconfRedundantValidRange.RowType, (row, lineNumber) => new IOconfRedundantValidRange(row, lineNumber));
             loader.AddLoader(IOconfRedundantInvalidDefault.RowType, (row, lineNumber) => new IOconfRedundantInvalidDefault(row, lineNumber));
             loader.AddLoader(IOconfRedundantStrategy.RowType, (row, lineNumber) => new IOconfRedundantStrategy(row, lineNumber));
-			loader.AddLoader(IOconfRedundantInvalidValueDelay.RowType, (row, lineNumber) => new IOconfRedundantInvalidValueDelay(row, lineNumber));
+            loader.AddLoader(IOconfRedundantInvalidValueDelay.RowType, (row, lineNumber) => new IOconfRedundantInvalidValueDelay(row, lineNumber));
         }
 
         public enum RedundancyStrategy { Median, Max, Min, Average }
         public class IOconfRedundant : IOconfRow
         {
             protected IOconfRedundant(string row, int lineNum, string type) : base(row, lineNum, type) { }
-            
+
             public static IEnumerable<Decision.Config> ToDecisionConfigs(IEnumerable<IOconfRedundant> redundants, IIOconf ioconf)
             {
                 var invalidValueDelay = redundants.OfType<IOconfRedundantInvalidValueDelay>().SingleOrDefault()?.InvalidValueDelay ?? 0;
-				var grouped = redundants.Where(r => r is not IOconfRedundantInvalidValueDelay).GroupBy(r => r.Name).ToList();
+                var grouped = redundants.Where(r => r is not IOconfRedundantInvalidValueDelay).GroupBy(r => r.Name).ToList();
                 foreach (var group in grouped)
                 {
                     var configs = group.ToList();
-                    var sensorsConfig = configs.OfType<IOconfRedundantSensors>().SingleOrDefault() 
+                    var sensorsConfig = configs.OfType<IOconfRedundantSensors>().SingleOrDefault()
                         ?? throw new FormatException($"Redundancy - missing sensors for: {Environment.NewLine + string.Join(Environment.NewLine, configs.Select(c => c.Row))}");
                     var validRange = configs.OfType<IOconfRedundantValidRange>().SingleOrDefault()?.ValidRange ?? (double.MinValue, double.MaxValue);
                     var invalidDefault = configs.OfType<IOconfRedundantInvalidDefault>().SingleOrDefault()?.InvalidDefault ?? 10000;
@@ -128,37 +127,37 @@ namespace CA_DataUploaderLib
             public RedundancyStrategy Strategy { get; }
         }
 
-		private class IOconfRedundantInvalidValueDelay : IOconfRedundant
-		{
-			public const string RowType = "RedundantInvalidValueDelay";
+        private class IOconfRedundantInvalidValueDelay : IOconfRedundant
+        {
+            public const string RowType = "RedundantInvalidValueDelay";
 
             /// <summary>
             /// In seconds.
             /// </summary>
 			public double InvalidValueDelay { get; }
 
-			public IOconfRedundantInvalidValueDelay(string row, int lineNum) : base(row, lineNum, RowType)
-			{
-				var vals = ToList();
-				if (vals.Count < 2) throw new FormatException($"Too few values. Format: {RowType};InvalidValueDelay. Row {Row}");
+            public IOconfRedundantInvalidValueDelay(string row, int lineNum) : base(row, lineNum, RowType)
+            {
+                var vals = ToList();
+                if (vals.Count < 2) throw new FormatException($"Too few values. Format: {RowType};InvalidValueDelay. Row {Row}");
                 if (!vals[1].TryToDouble(out var invalidValueDelay))
-					throw new FormatException($"Failed to parse invalid value delay. Format: {RowType};InvalidValueDelay. Row {Row}");
+                    throw new FormatException($"Failed to parse invalid value delay. Format: {RowType};InvalidValueDelay. Row {Row}");
 
-				InvalidValueDelay = invalidValueDelay;
-			}
+                InvalidValueDelay = invalidValueDelay;
+            }
 
-			protected override void ValidateName(string name) { } // no validation
-		}
+            protected override void ValidateName(string name) { } // no validation
+        }
 
 
-		public class Decision : LoopControlDecision
+        public class Decision : LoopControlDecision
         {
             public enum Events { none, vector };
             private readonly Config _config;
 
             private Indexes? _indexes;
             public override string Name => _config.Name;
-			public override PluginField[] PluginFields => _config.InvalidValueDelay > 0 ? [Name, $"{Name}_invalidValueDelay"] : [Name];
+            public override PluginField[] PluginFields => _config.InvalidValueDelay > 0 ? [Name, $"{Name}_invalidValueDelay"] : [Name];
             public override string[] HandledEvents { get; } = [];
             public Decision(Config config) => _config = config;
             public override void Initialize(CA.LoopControlPluginBase.VectorDescription desc) => _indexes = new(desc, _config);
@@ -171,7 +170,7 @@ namespace CA_DataUploaderLib
 
             public class Config
             {
-                public Config(string name, List<string> sensors, List<List<string>> sensorBoardStates, (double min, double max) validRange, double defaultInvalidValue, RedundancyStrategy strategy, double invalidValueDelay=0)
+                public Config(string name, List<string> sensors, List<List<string>> sensorBoardStates, (double min, double max) validRange, double defaultInvalidValue, RedundancyStrategy strategy, double invalidValueDelay = 0)
                 {
                     Name = name;
                     Sensors = sensors;
@@ -190,7 +189,7 @@ namespace CA_DataUploaderLib
                 public double[] ReusableBuffer { get; }
                 public double DefaultInvalidValue { get; }
                 public double InvalidValueDelay { get; }
-				public RedundancyStrategy Strategy { get; }
+                public RedundancyStrategy Strategy { get; }
                 public List<List<string>> SensorBoardStates { get; }
                 public string Name { get; }
 
@@ -253,7 +252,7 @@ namespace CA_DataUploaderLib
                 public double value { get => _latestVector[_indexes.value]; set => _latestVector[_indexes.value] = value; }
                 public double invalidValueDelay { get => _latestVector[_indexes.invalidValueDelay]; set => _latestVector[_indexes.invalidValueDelay] = value; }
 
-				internal void MakeDecision()
+                internal void MakeDecision()
                 {
                     var validValues = _config.ReusableBuffer.AsSpan();
                     var validValuesCount = 0;
@@ -263,7 +262,7 @@ namespace CA_DataUploaderLib
                         if (!BoardsConnected(i)) continue;
 
                         var val = _latestVector[_indexes.sensors[i]];
-                        if (val < _config.ValidRange.min || val > _config.ValidRange.max) continue; 
+                        if (val < _config.ValidRange.min || val > _config.ValidRange.max) continue;
 
                         validValues[validValuesCount++] = val;
                     }
@@ -273,20 +272,20 @@ namespace CA_DataUploaderLib
                     {
                         value = _config.Calculate(validValues);
                         if (_config.InvalidValueDelay > 0)
-							invalidValueDelay = 0.0;
+                            invalidValueDelay = 0.0;
                     }
                     else if (_config.InvalidValueDelay == 0)
                         value = _config.DefaultInvalidValue;
                     else if (invalidValueDelay == 0.0)
-						invalidValueDelay = _latestVector.TimeAfter((int)(_config.InvalidValueDelay * 1000));
+                        invalidValueDelay = _latestVector.TimeAfter((int)(_config.InvalidValueDelay * 1000));
                     else if (_latestVector.Reached(invalidValueDelay))
-						value = _config.DefaultInvalidValue;
-				}
+                        value = _config.DefaultInvalidValue;
+                }
 
-				bool BoardsConnected(int index)
+                bool BoardsConnected(int index)
                 {
                     foreach (var stateIndex in _indexes.boardStates[index])
-                        if (_latestVector[stateIndex] != (int)BaseSensorBox.ConnectionState.ReceivingValues) 
+                        if (_latestVector[stateIndex] != (int)BaseSensorBox.ConnectionState.ReceivingValues)
                             return false;
 
                     return true;
@@ -297,7 +296,7 @@ namespace CA_DataUploaderLib
             {
                 public int value { get; internal set; } = -1;
                 public int invalidValueDelay { get; internal set; } = -1;
-				public int[] sensors { get; init; }
+                public int[] sensors { get; init; }
                 public int[][] boardStates { get; init; }
 
                 public Indexes(CA.LoopControlPluginBase.VectorDescription desc, Config _config)
@@ -314,18 +313,18 @@ namespace CA_DataUploaderLib
                         if (field == $"{_config.Name}")
                             value = i;
                         if (field == $"{_config.Name}_invalidValueDelay")
-							invalidValueDelay = i;
+                            invalidValueDelay = i;
                         for (int j = 0; j < sensors.Length; j++)
                             if (field == _config.Sensors[j])
                                 sensors[j] = i;
                         for (int j = 0; j < boardStates.Length; j++)
-                        for (int k = 0; k < boardStates[j].Length; k++)
-                            if (field == _config.SensorBoardStates[j][k])
-                                boardStates[j][k] = i;
+                            for (int k = 0; k < boardStates[j].Length; k++)
+                                if (field == _config.SensorBoardStates[j][k])
+                                    boardStates[j][k] = i;
                     }
 
                     if (value == -1) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_target", nameof(desc));
-					if (invalidValueDelay == -1 && _config.InvalidValueDelay > 0) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_invalidValueDelay", nameof(desc));
+                    if (invalidValueDelay == -1 && _config.InvalidValueDelay > 0) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Name}_invalidValueDelay", nameof(desc));
                     var missingIndex = Array.IndexOf(sensors, -1);
                     if (missingIndex >= 0) throw new ArgumentException($"Field used by '{_config.Name}' is not in the vector description: {_config.Sensors[missingIndex]}", nameof(desc));
                     for (int i = 0; i < boardStates.Length; i++)
