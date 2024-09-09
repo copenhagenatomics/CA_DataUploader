@@ -39,7 +39,7 @@ namespace CA_DataUploaderLib
                     writer.WriteString("CompileDate", board.CompileDate);
                     writer.WriteString("GitSha", board.GitSha);
                     writer.WriteString("PcbVersion", board.PcbVersion);
-                    writer.WriteString("Calibration", board.Calibration);
+                    writer.WriteString("Calibration", board.UpdatedCalibration); //Note: intentionally writing UpdatedCalibration value to Calibration property
                     writer.WriteString("TimeStamp", timeSpan);
                     writer.WriteString("NodeName", NodeName);
                     writer.WriteEndObject();
