@@ -199,11 +199,7 @@ namespace CA_DataUploaderLib
             return await plot.PutAsync(requestUri, Sign(bytes), token);
         }
 
-        public byte[] GetPublicKey() => SignInfo.GetPublicKey();
-        public byte[] GetPrivateKey() => SignInfo.GetPrivateKey();
         public byte[] Sign(byte[] bytes) => [.. SignInfo.GetSignature(bytes), .. bytes];
-        //public byte[] Sign2(byte[] bytes) => [.. SignInfo.GetSignature(bytes)];
-        //public byte[] Encrypt(byte[] bytes) => [.. SignInfo.Encrypt(bytes)];
 
         public static async Task<bool> ConnectionTest(string loopServer)
         {
@@ -807,7 +803,6 @@ namespace CA_DataUploaderLib
             }
 
             public byte[] GetPublicKey() => _rsaWriter.ExportCspBlob(false);
-            public byte[] GetPrivateKey() => _rsaWriter.ExportCspBlob(true);
 
             public byte[] GetSignature(byte[] data) => _rsaWriter.SignData(data, SHA1.Create());
         }
