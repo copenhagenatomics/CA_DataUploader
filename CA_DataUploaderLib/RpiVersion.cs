@@ -72,7 +72,7 @@ $@"{hostAssembly?.GetName()}
             if(dic.TryGetValue(key, out var value))
                 return value;
 
-            return "Unknown hardware";
+            return "Unknown hardware" + Environment.NewLine;
         }
 
         private static Dictionary<string, string> GetVersions()
@@ -189,7 +189,7 @@ $@"{hostAssembly?.GetName()}
             return Environment.ProcessorCount;
         }
 
-        public static bool IsRpi() => GetHardwareInfo() != "Unknown hardware";
+        public static bool IsRpi() => !GetHardwareInfo().StartsWith("Unknown hardware");
         public static bool IsWindows() => OperatingSystem.IsWindows();
     }
 }
