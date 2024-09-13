@@ -161,6 +161,17 @@ namespace CA_DataUploaderLib
             var plot = await GetPlot(token);
             return plot.PlotId;
         }
+
+        /// <remarks>
+        /// This method waits until a connection has been established and if there is a connection failure it throws <see cref="InvalidOperationException"/>.
+        /// </remarks>
+        public async Task<string> GetPlotName(CancellationToken token)
+        {
+            if (!IsEnabled) throw new NotSupportedException("GetPlotName is only supported in uploader nodes");
+            var plot = await GetPlot(token);
+            return plot.PlotName;
+        }
+
         private async Task<PlotConnection> GetPlot(CancellationToken token)
         {
             if (!IsEnabled) throw new NotSupportedException("The uploader is not enabled in this node");
