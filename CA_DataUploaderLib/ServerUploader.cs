@@ -161,6 +161,17 @@ namespace CA_DataUploaderLib
             var plot = await GetPlot(token);
             return plot.PlotId;
         }
+
+        /// <remarks>
+        /// This method waits until a connection has been established and if there is a connection failure it throws <see cref="InvalidOperationException"/>.
+        /// </remarks>
+        public async Task<string> GetPlotName(CancellationToken token)
+        {
+            if (!IsEnabled) throw new NotSupportedException("GetPlotName is only supported in uploader nodes");
+            var plot = await GetPlot(token);
+            return plot.PlotName;
+        }
+
         private async Task<PlotConnection> GetPlot(CancellationToken token)
         {
             if (!IsEnabled) throw new NotSupportedException("The uploader is not enabled in this node");
@@ -188,7 +199,11 @@ namespace CA_DataUploaderLib
             return await plot.PutAsync(requestUri, Sign(bytes), token);
         }
 
+        public byte[] GetPublicKey() => SignInfo.GetPublicKey();
+        public byte[] GetPrivateKey() => SignInfo.GetPrivateKey();
         public byte[] Sign(byte[] bytes) => [.. SignInfo.GetSignature(bytes), .. bytes];
+        //public byte[] Sign2(byte[] bytes) => [.. SignInfo.GetSignature(bytes)];
+        //public byte[] Encrypt(byte[] bytes) => [.. SignInfo.Encrypt(bytes)];
 
         public static async Task<bool> ConnectionTest(string loopServer)
         {
@@ -792,6 +807,7 @@ namespace CA_DataUploaderLib
             }
 
             public byte[] GetPublicKey() => _rsaWriter.ExportCspBlob(false);
+            public byte[] GetPrivateKey() => _rsaWriter.ExportCspBlob(true);
 
             public byte[] GetSignature(byte[] data) => _rsaWriter.SignData(data, SHA1.Create());
         }
