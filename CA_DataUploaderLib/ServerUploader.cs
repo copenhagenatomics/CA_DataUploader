@@ -201,13 +201,14 @@ namespace CA_DataUploaderLib
 
         public byte[] Sign(byte[] bytes) => [.. SignInfo.GetSignature(bytes), .. bytes];
 
-        public static async Task<bool> ConnectionTest(string loopServer)
+        public static async Task<bool> ConnectionTest(string loopServer, CancellationToken token)
         {
             var client = new HttpClient
             {
-                BaseAddress = new Uri(loopServer)
+                BaseAddress = new Uri(loopServer),
+                Timeout = TimeSpan.FromSeconds(5)
             };
-            var response = await client.GetAsync("/api/v1/LoopControl/PingTest");
+            var response = await client.GetAsync("/api/v1/LoopControl/PingTest", token);
             return response.IsSuccessStatusCode;
         }
 
@@ -496,7 +497,7 @@ namespace CA_DataUploaderLib
             ChannelWriter<UploadState> stateWriter, List<DateTime> badEvents, Dictionary<string, int> duplicateEventsDetection, 
             Queue<(DateTime expirationTime, string @event)> duplicateEventsExpirationTimes)
         {
-            RemoveExpireduplicateEvents();
+            RemoveExpiredDuplicateEvents();
 
             var events = DequeueAllEntries(_eventsChannel.Reader);
             if (events.Count == 0) return;
@@ -521,7 +522,7 @@ namespace CA_DataUploaderLib
                     duplicateEventsExpirationTimes.Enqueue((DateTime.UtcNow.AddMinutes(1), e));
                 return false;
             }
-            void RemoveExpireduplicateEvents()
+            void RemoveExpiredDuplicateEvents()
             {
                 var now = DateTime.UtcNow;
                 while (duplicateEventsExpirationTimes.TryPeek(out var e) && now > e.expirationTime)
@@ -572,7 +573,7 @@ namespace CA_DataUploaderLib
             }
             static string ToShortEventData(SystemChangeNotificationData data)
             {
-                var sb = new StringBuilder(data.Boards.Count * 100);//allocate more than enough space to avoid slow unnecesary resizes
+                var sb = new StringBuilder(data.Boards.Count * 100);//allocate more than enough space to avoid slow unnecessary resizes
                 sb.AppendLine($"[{data.NodeName}] Detected devices:");
                 foreach (var board in data.Boards)
                 {
@@ -686,7 +687,7 @@ namespace CA_DataUploaderLib
                     try
                     {
                         string query = $"/api/v1/Plotdata/GetPlotnameId?loopname={loopName}&ticks={DateTime.UtcNow.Ticks}&logintoken={loginToken}";
-                        var signedValue = publicKey.Concat(signedVectorDescription).ToArray(); // Note that it will only work if converted to array and not IEnummerable
+                        var signedValue = publicKey.Concat(signedVectorDescription).ToArray(); // Note that it will only work if converted to array and not IEnumerable
                         response = await client.PutAsJsonAsync(query, signedValue, cancellationToken);
                         response.EnsureSuccessStatusCode();
                         var result = await response.Content.ReadFromJsonAsync<string>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("Unexpected null result when getting plotid");
@@ -697,7 +698,7 @@ namespace CA_DataUploaderLib
                         var contentTask = response?.Content?.ReadAsStringAsync(cancellationToken);
                         var error = contentTask != null ? await contentTask : null;
                         if (!string.IsNullOrEmpty(error))
-                            OnError($"Failure getting plot id: {error}");
+                            OnError($"Failure getting plot id: {error} {ex.Message}");
 
                         if (ex is HttpRequestException rex && (rex.StatusCode == HttpStatusCode.Unauthorized || rex.StatusCode == HttpStatusCode.BadRequest))
                             throw new UnauthorizedAccessException($"System private key or verified account token was rejected ({rex.StatusCode}).", ex);//UnauthorizedAccessException skips retries
@@ -765,7 +766,7 @@ namespace CA_DataUploaderLib
                     catch (Exception ex)
                     {
                         //Based on documented behavior it should only be HttpRequestException, but doing retries for other exceptions due to info out there on Socket and IO exceptions.
-                        //Above is expected to be improved in .net 8, but it was unclear while writting this which exception set is guaranteed to really include all types of failures doing the request and fetching the corresponding response.
+                        //Above is expected to be improved in .net 8, but it was unclear while writing this which exception set is guaranteed to really include all types of failures doing the request and fetching the corresponding response.
                         //Failures should usually be a network or potentially a temporary error returned by the server, we continue retrying - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
                         //however, it is also some error codes the server returns that can be shared by temporary and permanent rejection errors
                         OnError($"Failed to {actionMsg}, attempting to reconnect in 5 seconds.", ex);
