@@ -13,7 +13,7 @@
     <Copyright>Copyright © $([System.DateTime]::UtcNow.Year) Copenhagen Atomics ($([System.DateTime]::UtcNow.ToString("dd-MMM-yyyy HH:mm")))</Copyright>
     <RepositoryUrl>https://github.com/copenhagenatomics/CA_DataUploader</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-	<Nullable>enable</Nullable>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,15 +37,14 @@
 
   <ItemGroup>
     <PackageReference Include="CoreCLR-NCalc" Version="3.1.253" />
-    <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="8.0.2" />
     <PackageReference Include="MinVer" Version="3.1.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="System.IO.Ports" Version="6.0.0" />
-	  <PackageReference Include="CA.LoopControlPluginBase" Version="1.2.0" />
-	  <PackageReference Include="System.IO.Pipelines" Version="6.0.2" />
-
+    <PackageReference Include="CA.LoopControlPluginBase" Version="1.2.0" />
+    <PackageReference Include="System.IO.Pipelines" Version="6.0.2" />
+    <PackageReference Include="UdpToHttpGateway.Client" Version="0.1.6" />
   </ItemGroup>
 
   <ItemGroup>
