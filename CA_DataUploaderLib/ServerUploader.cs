@@ -4,6 +4,7 @@ using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -13,10 +14,12 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
+using UdpToHttpGateway.Client;
 
 namespace CA_DataUploaderLib
 {
@@ -155,11 +158,11 @@ namespace CA_DataUploaderLib
         /// <remarks>
         /// This method waits until a connection has been established and if there is a connection failure it throws <see cref="InvalidOperationException"/>.
         /// </remarks>
-        public async Task<int> GetPlotId(CancellationToken token)
+        public async Task<(int plotId, bool supports2WayCommunication)> GetPlotId(CancellationToken token)
         {
             if (!IsEnabled) throw new NotSupportedException("GetPlotId is only supported in uploader nodes");
             var plot = await GetPlot(token);
-            return plot.PlotId;
+            return (plot.PlotId, plot.Supports2WayCommunication);
         }
 
         /// <remarks>
@@ -169,6 +172,7 @@ namespace CA_DataUploaderLib
         {
             if (!IsEnabled) throw new NotSupportedException("GetPlotName is only supported in uploader nodes");
             var plot = await GetPlot(token);
+            if (!plot.Supports2WayCommunication) throw new NotSupportedException("GetPlotName is only supported when using 2 way communication");
             return plot.PlotName;
         }
 
@@ -636,15 +640,20 @@ namespace CA_DataUploaderLib
         private class PlotConnection
         {
             readonly HttpClient _client;
-            private PlotConnection(HttpClient client, int plotID, string plotname)
+            private PlotConnection(HttpClient client, int plotID, string? plotName, bool supports2WayCommunication)
             {
+                if (!supports2WayCommunication)
+                    ArgumentNullException.ThrowIfNull(PlotName);
                 _client = client;
                 PlotId = plotID;
-                PlotName = plotname;
+                PlotName = plotName;
+                Supports2WayCommunication = supports2WayCommunication;
             }
 
-            public string PlotName { get; set; }
+            public string? PlotName { get; set; }
             public int PlotId { get; }
+            [MemberNotNullWhen(true, nameof(PlotName))]
+            public bool Supports2WayCommunication { get; }
             public Task<HttpResponseMessage> PostVectorAsync(byte[] buffer, DateTime timestamp) => PutAsync($"/api/v2/Timeserie/UploadVectorRetroAsync?plotNameId={PlotId}&ticks={timestamp.Ticks}", buffer);
             public Task<HttpResponseMessage> PostEventAsync(byte[] signedMessage) => PutAsync($"/api/v2/Event?plotNameId={PlotId}", signedMessage);
             public Task<HttpResponseMessage> PostBoardsAsync(byte[] signedMessage) => PutAsync($"/api/v1/McuSerialnumber?plotNameId={PlotId}", signedMessage);
@@ -657,10 +666,9 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    var client = NewClient(connectionInfo.Server);
-                    var token = await GetLoginTokenWithRetries(client, connectionInfo, cancellationToken); // retries here are important as its the first connection so running after a restart can run into the connection not being initialized
-                    var (plotId, plotName) = await GetPlotIDAsyncWithRetries(connectionInfo.LoopName, client, token, publicKey, signedVectorDescription, cancellationToken);
-                    var connection = new PlotConnection(client, plotId, plotName);
+                    PlotConnection connection = 
+                        await TryGetConnectionViaUdpToHttpGateway(connectionInfo, cancellationToken) ?? 
+                        await GetDirectConnection(connectionInfo, publicKey, signedVectorDescription, cancellationToken);
                     connectionEstablishedSource.TrySetResult(connection);
                     return connection;
                 }
@@ -674,6 +682,33 @@ namespace CA_DataUploaderLib
                     connectionEstablishedSource.TrySetException(ex);
                     throw;
                 }
+            }
+
+            private static async Task<PlotConnection> GetDirectConnection(ConnectionInfo connectionInfo, byte[] publicKey, byte[] signedVectorDescription, CancellationToken cancellationToken)
+            {
+                //PooledConnectionLifetime allows the system to notice dns changes as recommended at https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines#recommended-use
+                var client = NewClient(connectionInfo.Server, new SocketsHttpHandler() { PooledConnectionLifetime = TimeSpan.FromMinutes(15) });
+                var token = await GetLoginTokenWithRetries(client, connectionInfo, cancellationToken); // retries here are important as its the first connection so running after a restart can run into the connection not being initialized
+                var (plotId, plotName) = await GetPlotIDAsyncWithRetries(connectionInfo.LoopName, client, token, publicKey, signedVectorDescription, cancellationToken);
+                return new PlotConnection(client, plotId, plotName, true);
+            }
+
+            record struct DiodeConf(int PlotId, string IPEndpoint);
+            private static async Task<PlotConnection?> TryGetConnectionViaUdpToHttpGateway(ConnectionInfo connectionInfo, CancellationToken token)
+            {
+                const string file = "diode.json";
+                if (!File.Exists(file))
+                    return null;
+                using FileStream openStream = File.OpenRead(file);
+                var conf = await JsonSerializer.DeserializeAsync<DiodeConf>(openStream, cancellationToken: token);
+
+                //for now we just assume the conf matches, but we might want to lock the related config,
+                //so that new changes to come into effect require a new plot id must be given
+                //(which could need us to post the proposed config to the server first).
+                var plotId = conf.PlotId;
+                CALog.LogData(LogID.A, $"Using diode.conf plotId {plotId}, IpEndPoint {conf.IPEndpoint}");
+                var gatewayIp = IPEndPoint.Parse(conf.IPEndpoint);
+                return new(NewClient(connectionInfo.Server, new SendViaUdpGatewayMessageHandler(gatewayIp)), plotId, default, false);
             }
 
             private static async Task<(int plotId, string plotName)> GetPlotIDAsyncWithRetries(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription, CancellationToken cancellationToken)
@@ -775,15 +810,9 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            private static HttpClient NewClient(string server)
+            private static HttpClient NewClient(string server, HttpMessageHandler handler)
             {
-                var handler = new SocketsHttpHandler()
-                {
-                    //allows the system to notice dns changes as recommended at https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines#recommended-use
-                    PooledConnectionLifetime = TimeSpan.FromMinutes(15),
-                };
-                var client = new HttpClient(handler);
-                client.BaseAddress = new Uri(server);
+                var client = new HttpClient(handler) { BaseAddress = new Uri(server) };
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 return client;
