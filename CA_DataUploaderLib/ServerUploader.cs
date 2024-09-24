@@ -643,7 +643,7 @@ namespace CA_DataUploaderLib
             private PlotConnection(HttpClient client, int plotID, string? plotName, bool supports2WayCommunication)
             {
                 if (supports2WayCommunication)
-                    ArgumentNullException.ThrowIfNull(PlotName);
+                    ArgumentNullException.ThrowIfNull(plotName);
                 _client = client;
                 PlotId = plotID;
                 PlotName = plotName;
