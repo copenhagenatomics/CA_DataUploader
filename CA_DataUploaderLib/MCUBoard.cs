@@ -84,7 +84,7 @@ namespace CA_DataUploaderLib
                 port.WriteTimeout = 2000;
                 port.Open();
                 board.pipeReader = PipeReader.Create(port.BaseStream);
-                Thread.Sleep(30); // it needs to await that the board registers that the COM port has been opened before sending commands (work arounds issue when first opening the connection and sending serial).
+                Thread.Sleep(100); // it needs to await that the board registers that the COM port has been opened before sending commands (work arounds issue when first opening the connection and sending serial).
                 board.ProductType = "NA";
                 board.InitialConnectionSucceeded = skipBoardAutoDetection || await board.ReadSerialNumber(board.pipeReader);
 
