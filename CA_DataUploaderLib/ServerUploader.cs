@@ -702,15 +702,13 @@ namespace CA_DataUploaderLib
                 const string file = "diode.json";
                 if (!File.Exists(file))
                     return null;
-                using FileStream openStream = File.OpenRead(file);
-                var conf = await JsonSerializer.DeserializeAsync<DiodeConf>(openStream, cancellationToken: token);
+                DiodeConf conf = await ReadConfig(file, token);
                 byte[] descRelevantBytes = hashEncoding.GetBytes(desc.IOconf + desc.ToString() + desc.Software);
                 var configHash = Convert.ToHexString(hash.ComputeHash(descRelevantBytes));
                 if (conf.ConfigLock == null)
                 {
                     conf.ConfigLock = configHash;
-                    using var writeStream = File.OpenWrite(file);
-                    await JsonSerializer.SerializeAsync(writeStream, conf, cancellationToken: token);
+                    await SaveConfig(file, conf, token);
                 }
                 else if (conf.ConfigLock != configHash)
                     throw new InvalidOperationException("Configuration or software change detected. Either revert the configuration changes/software change or get a new plot id by running in normal mode (replace it in diode.json and remove the configLock)");
@@ -719,9 +717,21 @@ namespace CA_DataUploaderLib
                 //so that new changes to come into effect require a new plot id must be given
                 //(which could need us to post the proposed config to the server first).
                 var plotId = conf.PlotId;
-                CALog.LogData(LogID.A, $"Using diode.json plotId {plotId}, IpEndPoint {conf.IPEndpoint}");
+                CALog.LogData(LogID.A, $"Using diode.json plotId {plotId}, IpEndPoint {conf.IPEndpoint}, ConfigLock {conf.ConfigLock}");
                 var gatewayIp = IPEndPoint.Parse(conf.IPEndpoint);
                 return new(NewClient(connectionInfo.Server, new SendViaUdpGatewayMessageHandler(gatewayIp)), plotId, default, false);
+
+                static async ValueTask<DiodeConf> ReadConfig(string file, CancellationToken token)
+                {
+                    using var openStream = File.OpenRead(file);
+                    return await JsonSerializer.DeserializeAsync<DiodeConf>(openStream, cancellationToken: token);
+                }
+
+                static async ValueTask SaveConfig(string file, DiodeConf conf, CancellationToken token)
+                {
+                    using var writeStream = File.OpenWrite(file);
+                    await JsonSerializer.SerializeAsync(writeStream, conf, cancellationToken: token);
+                }
             }
 
             private static async Task<(int plotId, string plotName)> GetPlotIDAsyncWithRetries(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription, CancellationToken cancellationToken)
