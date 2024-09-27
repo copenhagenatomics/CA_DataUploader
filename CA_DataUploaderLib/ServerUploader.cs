@@ -694,7 +694,9 @@ namespace CA_DataUploaderLib
                 return new PlotConnection(client, plotId, plotName, true);
             }
 
-            record struct DiodeConf(int PlotId, string IPEndpoint, int? ConfigLock);
+            record struct DiodeConf(int PlotId, string IPEndpoint, string? ConfigLock);
+            static readonly SHA256 hash = SHA256.Create();
+            static readonly Encoding hashEncoding = Encoding.UTF8;
             private static async Task<PlotConnection?> TryGetConnectionViaUdpToHttpGateway(ConnectionInfo connectionInfo, VectorDescription desc, CancellationToken token)
             {
                 const string file = "diode.json";
@@ -702,7 +704,8 @@ namespace CA_DataUploaderLib
                     return null;
                 using FileStream openStream = File.OpenRead(file);
                 var conf = await JsonSerializer.DeserializeAsync<DiodeConf>(openStream, cancellationToken: token);
-                var configHash = HashCode.Combine(desc.IOconf, desc.ToString(), desc.Software);
+                byte[] descRelevantBytes = hashEncoding.GetBytes(desc.IOconf + desc.ToString() + desc.Software);
+                var configHash = Convert.ToHexString(hash.ComputeHash(descRelevantBytes));
                 if (conf.ConfigLock == null)
                     conf.ConfigLock = configHash;
                 else if (conf.ConfigLock != configHash)
