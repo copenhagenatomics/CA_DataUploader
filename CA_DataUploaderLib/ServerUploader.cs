@@ -690,6 +690,7 @@ namespace CA_DataUploaderLib
                 var client = NewClient(connectionInfo.Server, new SocketsHttpHandler() { PooledConnectionLifetime = TimeSpan.FromMinutes(15) });
                 var token = await GetLoginTokenWithRetries(client, connectionInfo, cancellationToken); // retries here are important as its the first connection so running after a restart can run into the connection not being initialized
                 var (plotId, plotName) = await GetPlotIDAsyncWithRetries(connectionInfo.LoopName, client, token, publicKey, signedVectorDescription, cancellationToken);
+                CALog.LogData(LogID.A, $"Using direct connection plotId {plotId}");
                 return new PlotConnection(client, plotId, plotName, true);
             }
 
@@ -711,7 +712,7 @@ namespace CA_DataUploaderLib
                 //so that new changes to come into effect require a new plot id must be given
                 //(which could need us to post the proposed config to the server first).
                 var plotId = conf.PlotId;
-                CALog.LogData(LogID.A, $"Using diode.conf plotId {plotId}, IpEndPoint {conf.IPEndpoint}");
+                CALog.LogData(LogID.A, $"Using diode.json plotId {plotId}, IpEndPoint {conf.IPEndpoint}");
                 var gatewayIp = IPEndPoint.Parse(conf.IPEndpoint);
                 return new(NewClient(connectionInfo.Server, new SendViaUdpGatewayMessageHandler(gatewayIp)), plotId, default, false);
             }
