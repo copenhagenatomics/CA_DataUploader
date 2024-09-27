@@ -221,7 +221,7 @@ namespace CA_DataUploaderLib
             try
             {
                 var (_, uploadDesc) = Desc;
-                _plot = await PlotConnection.Establish(_ioconf.GetConnectionInfo(), SignInfo.GetPublicKey(), GetSignedVectorDescription(uploadDesc), _connectionEstablishedSource, token);
+                _plot = await PlotConnection.Establish(_ioconf.GetConnectionInfo(), SignInfo.GetPublicKey(), uploadDesc, GetSignedVectorDescription(uploadDesc), _connectionEstablishedSource, token);
 
                 var stateTracker = WithExceptionLogging(TrackUploadState(token), "upload state tracker");
                 var vectorsSender = WithExceptionLogging(VectorsSender(token), "upload vector sender");
@@ -662,12 +662,12 @@ namespace CA_DataUploaderLib
             public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token = default) => _client.SendAsync(request, token);
             internal Task<HttpResponseMessage> PutAsync(string requestUri, byte[] message, CancellationToken token = default)
                 => _client.PutAsJsonAsync(requestUri, message, token);
-            public static async Task<PlotConnection> Establish(ConnectionInfo connectionInfo, byte[] publicKey, byte[] signedVectorDescription, TaskCompletionSource<PlotConnection> connectionEstablishedSource, CancellationToken cancellationToken)
+            public static async Task<PlotConnection> Establish(ConnectionInfo connectionInfo, byte[] publicKey, VectorDescription vectorDescription, byte[] signedVectorDescription, TaskCompletionSource<PlotConnection> connectionEstablishedSource, CancellationToken cancellationToken)
             {
                 try
                 {
                     PlotConnection connection = 
-                        await TryGetConnectionViaUdpToHttpGateway(connectionInfo, cancellationToken) ?? 
+                        await TryGetConnectionViaUdpToHttpGateway(connectionInfo, vectorDescription, cancellationToken) ?? 
                         await GetDirectConnection(connectionInfo, publicKey, signedVectorDescription, cancellationToken);
                     connectionEstablishedSource.TrySetResult(connection);
                     return connection;
@@ -690,25 +690,48 @@ namespace CA_DataUploaderLib
                 var client = NewClient(connectionInfo.Server, new SocketsHttpHandler() { PooledConnectionLifetime = TimeSpan.FromMinutes(15) });
                 var token = await GetLoginTokenWithRetries(client, connectionInfo, cancellationToken); // retries here are important as its the first connection so running after a restart can run into the connection not being initialized
                 var (plotId, plotName) = await GetPlotIDAsyncWithRetries(connectionInfo.LoopName, client, token, publicKey, signedVectorDescription, cancellationToken);
+                CALog.LogData(LogID.A, $"Using direct connection plotId {plotId}");
                 return new PlotConnection(client, plotId, plotName, true);
             }
 
-            record struct DiodeConf(int PlotId, string IPEndpoint);
-            private static async Task<PlotConnection?> TryGetConnectionViaUdpToHttpGateway(ConnectionInfo connectionInfo, CancellationToken token)
+            record struct DiodeConf(int PlotId, string IPEndpoint, string? ConfigLock);
+            static readonly SHA256 hash = SHA256.Create();
+            static readonly Encoding hashEncoding = Encoding.UTF8;
+            private static async Task<PlotConnection?> TryGetConnectionViaUdpToHttpGateway(ConnectionInfo connectionInfo, VectorDescription desc, CancellationToken token)
             {
                 const string file = "diode.json";
                 if (!File.Exists(file))
                     return null;
-                using FileStream openStream = File.OpenRead(file);
-                var conf = await JsonSerializer.DeserializeAsync<DiodeConf>(openStream, cancellationToken: token);
+                DiodeConf conf = await ReadConfig(file, token);
+                byte[] descRelevantBytes = hashEncoding.GetBytes(desc.IOconf + desc.ToString() + desc.Software);
+                var configHash = Convert.ToHexString(hash.ComputeHash(descRelevantBytes));
+                if (conf.ConfigLock == null)
+                {
+                    conf.ConfigLock = configHash;
+                    await SaveConfig(file, conf, token);
+                }
+                else if (conf.ConfigLock != configHash)
+                    throw new InvalidOperationException("Configuration or software change detected. Either revert the configuration changes/software change or get a new plot id by running in normal mode (replace it in diode.json and remove the configLock)");
 
                 //for now we just assume the conf matches, but we might want to lock the related config,
                 //so that new changes to come into effect require a new plot id must be given
                 //(which could need us to post the proposed config to the server first).
                 var plotId = conf.PlotId;
-                CALog.LogData(LogID.A, $"Using diode.conf plotId {plotId}, IpEndPoint {conf.IPEndpoint}");
+                CALog.LogData(LogID.A, $"Using diode.json plotId {plotId}, IpEndPoint {conf.IPEndpoint}, ConfigLock {conf.ConfigLock}");
                 var gatewayIp = IPEndPoint.Parse(conf.IPEndpoint);
                 return new(NewClient(connectionInfo.Server, new SendViaUdpGatewayMessageHandler(gatewayIp)), plotId, default, false);
+
+                static async ValueTask<DiodeConf> ReadConfig(string file, CancellationToken token)
+                {
+                    using var openStream = File.OpenRead(file);
+                    return await JsonSerializer.DeserializeAsync<DiodeConf>(openStream, cancellationToken: token);
+                }
+
+                static async ValueTask SaveConfig(string file, DiodeConf conf, CancellationToken token)
+                {
+                    using var writeStream = File.OpenWrite(file);
+                    await JsonSerializer.SerializeAsync(writeStream, conf, cancellationToken: token);
+                }
             }
 
             private static async Task<(int plotId, string plotName)> GetPlotIDAsyncWithRetries(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription, CancellationToken cancellationToken)
