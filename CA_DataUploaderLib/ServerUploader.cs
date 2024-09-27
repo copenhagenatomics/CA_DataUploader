@@ -707,7 +707,11 @@ namespace CA_DataUploaderLib
                 byte[] descRelevantBytes = hashEncoding.GetBytes(desc.IOconf + desc.ToString() + desc.Software);
                 var configHash = Convert.ToHexString(hash.ComputeHash(descRelevantBytes));
                 if (conf.ConfigLock == null)
+                {
                     conf.ConfigLock = configHash;
+                    using var writeStream = File.OpenWrite(file);
+                    await JsonSerializer.SerializeAsync(writeStream, conf, cancellationToken: token);
+                }
                 else if (conf.ConfigLock != configHash)
                     throw new InvalidOperationException("Configuration or software change detected. Either revert the configuration changes/software change or get a new plot id by running in normal mode (replace it in diode.json and remove the configLock)");
 
