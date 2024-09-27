@@ -221,7 +221,7 @@ namespace CA_DataUploaderLib
             try
             {
                 var (_, uploadDesc) = Desc;
-                _plot = await PlotConnection.Establish(_ioconf.GetConnectionInfo(), SignInfo.GetPublicKey(), GetSignedVectorDescription(uploadDesc), _connectionEstablishedSource, token);
+                _plot = await PlotConnection.Establish(_ioconf.GetConnectionInfo(), SignInfo.GetPublicKey(), uploadDesc, GetSignedVectorDescription(uploadDesc), _connectionEstablishedSource, token);
 
                 var stateTracker = WithExceptionLogging(TrackUploadState(token), "upload state tracker");
                 var vectorsSender = WithExceptionLogging(VectorsSender(token), "upload vector sender");
@@ -662,12 +662,12 @@ namespace CA_DataUploaderLib
             public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token = default) => _client.SendAsync(request, token);
             internal Task<HttpResponseMessage> PutAsync(string requestUri, byte[] message, CancellationToken token = default)
                 => _client.PutAsJsonAsync(requestUri, message, token);
-            public static async Task<PlotConnection> Establish(ConnectionInfo connectionInfo, byte[] publicKey, byte[] signedVectorDescription, TaskCompletionSource<PlotConnection> connectionEstablishedSource, CancellationToken cancellationToken)
+            public static async Task<PlotConnection> Establish(ConnectionInfo connectionInfo, byte[] publicKey, VectorDescription vectorDescription, byte[] signedVectorDescription, TaskCompletionSource<PlotConnection> connectionEstablishedSource, CancellationToken cancellationToken)
             {
                 try
                 {
                     PlotConnection connection = 
-                        await TryGetConnectionViaUdpToHttpGateway(connectionInfo, cancellationToken) ?? 
+                        await TryGetConnectionViaUdpToHttpGateway(connectionInfo, vectorDescription, cancellationToken) ?? 
                         await GetDirectConnection(connectionInfo, publicKey, signedVectorDescription, cancellationToken);
                     connectionEstablishedSource.TrySetResult(connection);
                     return connection;
@@ -693,14 +693,19 @@ namespace CA_DataUploaderLib
                 return new PlotConnection(client, plotId, plotName, true);
             }
 
-            record struct DiodeConf(int PlotId, string IPEndpoint);
-            private static async Task<PlotConnection?> TryGetConnectionViaUdpToHttpGateway(ConnectionInfo connectionInfo, CancellationToken token)
+            record struct DiodeConf(int PlotId, string IPEndpoint, int? ConfigLock);
+            private static async Task<PlotConnection?> TryGetConnectionViaUdpToHttpGateway(ConnectionInfo connectionInfo, VectorDescription desc, CancellationToken token)
             {
                 const string file = "diode.json";
                 if (!File.Exists(file))
                     return null;
                 using FileStream openStream = File.OpenRead(file);
                 var conf = await JsonSerializer.DeserializeAsync<DiodeConf>(openStream, cancellationToken: token);
+                var configHash = HashCode.Combine(desc.IOconf, desc.ToString(), desc.Software);
+                if (conf.ConfigLock == null)
+                    conf.ConfigLock = configHash;
+                else if (conf.ConfigLock != configHash)
+                    throw new InvalidOperationException("Configuration or software change detected. Either revert the configuration changes/software change or get a new plot id by running in normal mode (replace it in diode.json and remove the configLock)");
 
                 //for now we just assume the conf matches, but we might want to lock the related config,
                 //so that new changes to come into effect require a new plot id must be given
