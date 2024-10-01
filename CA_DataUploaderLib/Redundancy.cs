@@ -146,6 +146,7 @@ namespace CA_DataUploaderLib
                 InvalidValueDelay = invalidValueDelay;
             }
 
+            public override string UniqueKey() => Type;
             protected override void ValidateName(string name) { } // no validation
         }
 
