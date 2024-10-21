@@ -448,6 +448,7 @@ namespace CA_DataUploaderLib
                     LogError(board, "Unexpected error on board read loop", ex);
                 }
             }
+        }
         
         protected void RunCustomCommand(MCUBoard board, string command)
         {
