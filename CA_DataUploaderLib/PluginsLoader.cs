@@ -40,7 +40,7 @@ namespace CA_DataUploaderLib
                 return;
             }
 
-            CALog.LogData(LogID.A, $"loaded plugins from {assemblyFullPath} - {string.Join(",", decisions.Select(e => e.GetType().Name))}");
+            CALog.LogData(LogID.A, $"Loaded plugins from {assemblyFullPath} - {string.Join(",", decisions.Select(e => e.GetType().Name))}");
             handler.AddDecisions(decisions);
         }
 

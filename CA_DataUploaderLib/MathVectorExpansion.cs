@@ -67,7 +67,7 @@ namespace CA_DataUploaderLib
             {
                 _fieldsByIndex = fieldsByIndex;
                 if (vector.Data.Length != _fieldsByIndex.Count)
-                    throw new ArgumentException($"the specified vector length does not match the fields received during initialize - {vector.Data.Length} vs {_fieldsByIndex.Count}", nameof(vector));
+                    throw new ArgumentException($"The specified vector length does not match the fields received during initialize - {vector.Data.Length} vs {_fieldsByIndex.Count}", nameof(vector));
                 _reusableDictionaryPool = reusableDictionaryPool;
                 Vector = vector;
                 _reusableFieldsDictionary = reusableDictionaryPool.Get();
