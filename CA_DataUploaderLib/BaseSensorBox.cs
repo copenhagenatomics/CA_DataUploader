@@ -83,16 +83,14 @@ namespace CA_DataUploaderLib
             {
                 if (!map.IsLocalBoard)
                 {//if the board is not local we register the command validation with an empty action
-                    cmd.AddMultinodeCommand("custom", a => a.Count >= 3 && a[1] == map.BoxName, _ => { });
+                    cmd.AddMultinodeCommand("custom", ValidateCommand, _ => { });
                     return;
                 }
 
                 if (map.McuBoard == null)
                 {
                     CALog.LogData(LogID.A, $"Missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
-                    cmd.AddMultinodeCommand(
-                        "custom", a => a.Count >= 3 && a[1] == map.BoxName,
-                        _ => { CALog.LogData(LogID.A, $"Custom command failed due to missing board: {map.BoxName}"); });
+                    cmd.AddMultinodeCommand("custom", ValidateCommand, _ => { CALog.LogData(LogID.A, $"Custom command failed due to missing board: {map.BoxName}"); });
                     return;
                 }
 
@@ -100,10 +98,19 @@ namespace CA_DataUploaderLib
                 var channel = Channel.CreateUnbounded<string>();
                 var channelWriter = channel.Writer; 
                 boardCustomCommands.Add(map.McuBoard, (channel.Reader, channelWriter));
-                cmd.AddMultinodeCommand(
-                    "custom",
-                    a => a.Count >= 3 && a[1] == map.BoxName,
-                    a => channelWriter.TryWrite(string.Join(' ', a.Skip(2))));
+                cmd.AddMultinodeCommand("custom", ValidateCommand, a => channelWriter.TryWrite(string.Join(' ', a.Skip(2))));
+
+                bool ValidateCommand(List<string> a)
+                {
+                    if (a.Count < 3 || a[1] != map.BoxName)
+                        return false;
+
+                    if (map.CustomWritesEnabled)
+                        return true;
+
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Custom writes is not enabled for board: {map.BoxName}");
+                    return false;
+                }
             }
             static void RegisterReconnectBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<string, TaskCompletionSource> reconnectTasks)
             {
@@ -193,23 +200,27 @@ namespace CA_DataUploaderLib
             else actions.Add((writeAction, exitAction));
         }
 
-        protected void RegisterBoardWriteActions(
-            MCUBoard board, IOconfOutput port, double defaultTarget, string targetFieldName,
-            Func<int, double, string> getCommand, int repeatMilliseconds = 2000)
+        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, double defaultTarget, string targetFieldName, Func<int, double, string> getCommand, int repeatMilliseconds = 2000)
         {
-            var lastAction = new LastAction(defaultTarget, repeatMilliseconds);
             var fieldIndex = -1;
             _cmd.FullVectorIndexesCreated += InitializeAction;
-            AddBuiltInWriteAction(board, WriteAction, ExitAction);
+            RegisterBoardWriteActions(board, port, GetTarget, getCommand, repeatMilliseconds);
 
             void InitializeAction(object? sender, IReadOnlyDictionary<string, int> indexes) =>
                 fieldIndex = indexes.TryGetValue(targetFieldName, out var index)
                     ? index
                     : throw new InvalidOperationException($"Missing target field: {targetFieldName}");
-            Task ExitAction(MCUBoard board, CancellationToken token) => Off(board, port, token);
-            Task WriteAction(DataVector? vector, MCUBoard board, CancellationToken token) => DoPortActions(vector, board, fieldIndex, lastAction, token);
+            double GetTarget(DataVector? vector) => vector == null ? defaultTarget : vector[fieldIndex];
+        }
 
-            async Task DoPortActions(DataVector? vector, MCUBoard board, int fieldIndex, LastAction lastAction, CancellationToken token)
+        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, Func<DataVector?, double> getTarget, Func<int, double, string> getCommand, int repeatMilliseconds = 2000)
+        {
+            double defaultTarget = getTarget(null);
+            var lastAction = new LastAction(defaultTarget, repeatMilliseconds);
+            AddBuiltInWriteAction(board, WriteAction, ExitAction);
+
+            Task ExitAction(MCUBoard board, CancellationToken token) => Off(board, port, token);
+            async Task WriteAction(DataVector? vector, MCUBoard board, CancellationToken token)
             {
                 if (vector == null)
                 {
@@ -218,7 +229,7 @@ namespace CA_DataUploaderLib
                     return;
                 }
 
-                var target = vector[fieldIndex];
+                var target = getTarget(vector);
                 if (!lastAction.ChangedOrExpired(target, vector.Timestamp))
                     return;
 
@@ -437,6 +448,13 @@ namespace CA_DataUploaderLib
                     LogError(board, "Unexpected error on board read loop", ex);
                 }
             }
+        }
+        
+        protected void RunCustomCommand(MCUBoard board, string command)
+        {
+            var (_, channelWriter) = _boardCustomCommands[board];
+            channelWriter.TryWrite(command);
+            return;
         }
 
         ///<returns><c>false</c> if a board disconnect was detected</returns>
