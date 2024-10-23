@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib
 
         public IOconfInput? Input { get; } = null;
         public string? Other { get; } = null;
-        public string Name { get { return Input?.Name ?? Other ?? throw new InvalidOperationException("failed to get the sensor name"); } }
+        public string Name { get { return Input?.Name ?? Other ?? throw new InvalidOperationException("Failed to get the sensor name"); } }
 
         private DateTime _timeStamp;
         public DateTime TimeStamp 
@@ -21,7 +21,7 @@ namespace CA_DataUploaderLib
             get { return _timeStamp; }
             set { ReadSensor_LoopTime = value.Subtract(_timeStamp).TotalMilliseconds; _timeStamp = value; }
         } 
-        public double ReadSensor_LoopTime { get; private set; }  // in miliseconds. 
+        public double ReadSensor_LoopTime { get; private set; }  // in milliseconds. 
         internal int InvalidReadsRemainingAttempts { get; set; } = 3000; //3k attempts = 5 (mins) x 60 (seconds) x 10 (cycles x second). The attempts are reset whenever we get valid values
 
         public SensorSample(IOconfInput input, double value = 0)

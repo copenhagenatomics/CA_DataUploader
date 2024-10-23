@@ -54,7 +54,7 @@ namespace CA_DataUploaderLib.IOconf
 
         private static void UpdatePortCalibration(BoardSettings settings, string delta, string coldJunctionDelta, int portNumber)
         { //see DefaultCalibrations for the format, spaces separate each port configuration section (first one is just "CAL ")
-            var currentPortsCal = (settings.Calibration ?? throw new InvalidOperationException("unexpected null calibration")).Split(" ");
+            var currentPortsCal = (settings.Calibration ?? throw new InvalidOperationException("Unexpected null calibration")).Split(" ");
             currentPortsCal[portNumber] = $"{portNumber},{delta},{coldJunctionDelta}";
             settings.Calibration = string.Join(' ', currentPortsCal);
         }

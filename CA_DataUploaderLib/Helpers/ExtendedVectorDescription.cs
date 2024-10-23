@@ -52,7 +52,7 @@ namespace CA_DataUploaderLib.Helpers
         {
             _filterVectorExpansion.ApplyLegacyFilters(inputs);
             if (inputs.Count != _inputsCount)
-                throw new ArgumentException($"wrong input vector length (input, expected): {inputs.Count} <> {_inputsCount}");
+                throw new ArgumentException($"Wrong input vector length (input, expected): {inputs.Count} <> {_inputsCount}");
 
             var data = vector.Data;
             for (int i = 0; i < inputs.Count; i++)

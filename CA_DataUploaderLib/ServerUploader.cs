@@ -429,7 +429,7 @@ namespace CA_DataUploaderLib
                 return;
             }
 
-            Console.WriteLine(message);
+            Console.WriteLine($"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} (UTC) - {message}");
             message = ex != null ? $"{message}{Environment.NewLine}{ex}" : message;
             SendEvent(this, new(message, EventType.LogError, DateTime.UtcNow));
             return;
@@ -441,7 +441,7 @@ namespace CA_DataUploaderLib
                 CALog.LogError(LogID.A, message, ex); //note we don't use LogErrorAndConsoleLn variation, as CALog.LoggerForUserOutput may be set to generate events that are only visible on the event log.
             else
                 CALog.LogData(LogID.A, message);
-            Console.WriteLine(message);
+            Console.WriteLine($"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} (UTC) - {message}");
         }
 
         private static void OnError(string message, string detailsForLog, Exception? ex = null)
@@ -451,7 +451,7 @@ namespace CA_DataUploaderLib
                 CALog.LogError(LogID.A, logMsg, ex); //note we don't use LogErrorAndConsoleLn variation, as CALog.LoggerForUserOutput may be set to generate events that are only visible on the event log.
             else
                 CALog.LogData(LogID.A, logMsg);
-            Console.WriteLine(message);
+            Console.WriteLine($"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} (UTC) - {message}");
         }
 
         private ValueTask<bool> PostQueuedVectorAsync(ChannelWriter<UploadState> stateWriter)
