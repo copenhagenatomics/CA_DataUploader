@@ -21,6 +21,8 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public virtual IEnumerable<IOconfInput> GetExpandedInputConf() => [];
+        protected IEnumerable<IOconfInput> GetExpandedInputConf(IEnumerable<string> suffixes) => 
+            suffixes.Select((s, i) => NewPortInput($"{Name}_{s}", PortNumber + i));
 
         public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
         {
