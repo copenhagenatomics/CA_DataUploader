@@ -2,7 +2,7 @@
 
 namespace CA_DataUploaderLib
 {
-    public interface ICALogger
+    public interface ILog
     {
         void LogData(LogID id, string msg);
         void LogError(LogID id, string msg, Exception ex);
