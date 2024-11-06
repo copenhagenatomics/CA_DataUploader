@@ -59,7 +59,7 @@ namespace CA_DataUploaderLib
         public TimeProvider Time { get; }
         public ICALogger Logger { get; }
 
-        public CommandHandler(IIOconf ioconf, SerialNumberMapper? mapper = null, ICommandRunner? runner = null, bool runCommandLoop = true, TimeProvider? time = null, ICALogger logger = null)
+        public CommandHandler(IIOconf ioconf, SerialNumberMapper? mapper = null, ICommandRunner? runner = null, bool runCommandLoop = true, TimeProvider? time = null, ICALogger? logger = null)
         {
             Time = time ?? TimeProvider.System;
             Logger = logger ?? CALog.Default;
