@@ -12,7 +12,7 @@ using Moq;
 
 namespace UnitTests
 {
-     [TestClass]
+    [TestClass]
     public class MCUBoardTests
     {
         [TestMethod]
@@ -214,14 +214,8 @@ namespace UnitTests
             await Write(writer, "Reconnected Reason: watchdog\n");
             await Write(writer, "1\n");
             var time = new FakeTimeProvider();
-            var log = string.Empty;
-            var header = new MCUBoard.Header(new(
-                time,
-                (_, msg) => Assert.Fail($"unexpected log info received: {msg}"),
-                (_, msg) => log += msg + Environment.NewLine,
-                (_, msg, ex) => Assert.Fail($"unexpected log exception received: {msg}{Environment.NewLine}{ex}"),
-                (_, msg) => log += msg + Environment.NewLine,
-                Mock.Of<MCUBoard.IConnectionManager>(MockBehavior.Strict)));
+            var logger = new StringBuilderLogger();
+            var header = new MCUBoard.Header(new(time, logger, Mock.Of<MCUBoard.IConnectionManager>(MockBehavior.Strict)));
             var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
             await Write(writer, "2\n");
             await Write(writer, "3\n");
@@ -234,7 +228,7 @@ namespace UnitTests
             Assert.IsTrue(await res, "unexpected not able to read response when the board is returning data");
             Assert.AreEqual("123", header.SerialNumber);
             var expectedLog =
-@"Partial board header detected from myport: timed out
+@"error-A-Partial board header detected from myport: timed out
 Reconnected Reason: watchdog
 1
 2
@@ -244,7 +238,7 @@ Some unexpected failure
 4:
 
 ";
-            Assert.AreEqual(expectedLog, log);
+            Assert.AreEqual(expectedLog, logger.ToString());
             
         }
 
@@ -289,5 +283,15 @@ Some unexpected failure
         }
 
         private static bool TryReadLine(ref ReadOnlySequence<byte> buffer, [NotNullWhen(true)] out string? line) => MCUBoard.TryReadAsciiLine(ref buffer, out line, '\n');
+
+        private class StringBuilderLogger : ILog
+        {
+            private readonly StringBuilder sb = new();
+            public void LogData(LogID id, string msg) => sb.AppendLine($"data-{id}-{msg}");
+            public void LogError(LogID id, string msg, Exception ex) => sb.AppendLine($"error-{id}-{msg}-{ex}");
+            public void LogError(LogID id, string msg) => sb.AppendLine($"error-{id}-{msg}");
+            public void LogInfo(LogID id, string msg) => sb.AppendLine($"info-{id}-{msg}");
+            public override string ToString() => sb.ToString();
+        }
     }
 }

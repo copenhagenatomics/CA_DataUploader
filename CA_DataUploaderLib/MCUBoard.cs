@@ -594,26 +594,17 @@ namespace CA_DataUploaderLib
             }
         }
 
-        public class Dependencies(
-            TimeProvider timeProvider, Action<LogID, string> logInfo, Action<LogID, string> logError, 
-            Action<LogID, string, Exception> logException, Action<LogID, string> logData,
-            IConnectionManager connectionManager)
+        public class Dependencies(TimeProvider timeProvider, ILog logger, IConnectionManager connectionManager)
         {
-            public Dependencies(TimeProvider timeProvider, Action<LogID, string> log, IConnectionManager connectionManager) :
-                this(timeProvider, log, log, (id, msg, ex) => log(id, $"{msg}{Environment.NewLine}{ex}"), log, connectionManager)
-            { 
-            }
-            public static Dependencies Default { get; } = new(
-                TimeProvider.System, CALog.LogInfoAndConsoleLn, CALog.LogErrorAndConsoleLn, CALog.LogErrorAndConsoleLn, CALog.LogData,
-                SerialPortConnectionManager.Default);
+            public static Dependencies Default { get; } = new(TimeProvider.System, CALog.Default, SerialPortConnectionManager.Default);
 
             public TimeProvider TimeProvider { get; } = timeProvider;
             public IConnectionManager ConnectionManager { get; } = connectionManager;
 
-            internal void LogError(LogID logId, string message) => logError(logId, message);
-            internal void LogException(LogID logId, string message, Exception exception) => logException(logId, message, exception);
-            internal void LogInfo(LogID logId, string message) => logInfo(logId, message);
-            internal void LogData(LogID logId, string message) => logData(logId, message);
+            internal void LogError(LogID logId, string message) => logger.LogError(logId, message);
+            internal void LogException(LogID logId, string message, Exception exception) => logger.LogError(logId, message, exception);
+            internal void LogInfo(LogID logId, string message) => logger.LogInfo(logId, message);
+            internal void LogData(LogID logId, string message) => logger.LogData(logId, message);
         }
 
         public interface IConnectionManager
