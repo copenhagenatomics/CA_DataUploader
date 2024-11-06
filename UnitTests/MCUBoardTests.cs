@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using CA_DataUploaderLib;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 
 namespace UnitTests
 {
@@ -215,10 +216,12 @@ namespace UnitTests
             var time = new FakeTimeProvider();
             var log = string.Empty;
             var header = new MCUBoard.Header(new(
-                time, 
-                (_, msg) => Assert.Fail($"unexpected log info received: {msg}"), 
+                time,
+                (_, msg) => Assert.Fail($"unexpected log info received: {msg}"),
                 (_, msg) => log += msg + Environment.NewLine,
-                (_, msg, ex) => Assert.Fail($"unexpected log exception received: {msg}{Environment.NewLine}{ex}")));
+                (_, msg, ex) => Assert.Fail($"unexpected log exception received: {msg}{Environment.NewLine}{ex}"),
+                (_, msg) => log += msg + Environment.NewLine,
+                Mock.Of<MCUBoard.IConnectionManager>(MockBehavior.Strict)));
             var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
             await Write(writer, "2\n");
             await Write(writer, "3\n");
@@ -275,7 +278,7 @@ Some unexpected failure
 
 
 
-        private static Task<string> ReadLine(PipeReader reader) => MCUBoard.ReadLine(reader, "abc", 16, TryReadLine);
+        private static Task<string> ReadLine(PipeReader reader) => MCUBoard.ReadLine(MCUBoard.Dependencies.Default, reader, "abc", 16, TryReadLine);
         private static ValueTask<FlushResult> Write(PipeWriter writer, string data) => Write(writer, Encoding.ASCII.GetBytes(data));
         private static ValueTask<FlushResult> Write(PipeWriter writer, byte[] bytes)
         {

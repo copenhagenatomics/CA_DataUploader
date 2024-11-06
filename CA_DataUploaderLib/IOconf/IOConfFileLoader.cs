@@ -26,7 +26,7 @@ namespace CA_DataUploaderLib.IOconf
             return (list, ParseLines(Loader, list));
         }
 
-        internal static IEnumerable<IOconfRow> ParseLines(IIOconfLoader loader, IEnumerable<string> lines)
+        public static IEnumerable<IOconfRow> ParseLines(IIOconfLoader loader, IEnumerable<string> lines)
         {
             IOconfNode.ResetIndex();
             IOconfCode.ResetIndex();

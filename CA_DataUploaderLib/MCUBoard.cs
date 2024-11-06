@@ -603,7 +603,7 @@ namespace CA_DataUploaderLib
                 this(timeProvider, log, log, (id, msg, ex) => log(id, $"{msg}{Environment.NewLine}{ex}"), log, connectionManager)
             { 
             }
-            internal static Dependencies Default { get; } = new(
+            public static Dependencies Default { get; } = new(
                 TimeProvider.System, CALog.LogInfoAndConsoleLn, CALog.LogErrorAndConsoleLn, CALog.LogErrorAndConsoleLn, CALog.LogData,
                 SerialPortConnectionManager.Default);
 
