@@ -4,7 +4,6 @@ using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -79,7 +78,7 @@ namespace CA_DataUploaderLib
                     throw new FormatException($"Can't map the same board to different IO.conf line types: {boxName}{Environment.NewLine}{usedRow}{Environment.NewLine}{newRow}");
                 _usedBoxNames[cmd].Add(boxName, newRow);
             }
-            static void RegisterCustomBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, (ChannelReader<string> reader, ChannelWriter<string> writer)> boardCustomCommands)
+            void RegisterCustomBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<MCUBoard, (ChannelReader<string> reader, ChannelWriter<string> writer)> boardCustomCommands)
             {
                 if (!map.IsLocalBoard)
                 {//if the board is not local we register the command validation with an empty action
@@ -89,8 +88,9 @@ namespace CA_DataUploaderLib
 
                 if (map.McuBoard == null)
                 {
-                    CALog.LogData(LogID.A, $"Missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
-                    cmd.AddMultinodeCommand("custom", ValidateCommand, _ => { CALog.LogData(LogID.A, $"Custom command failed due to missing board: {map.BoxName}"); });
+                    if (map.CustomWritesEnabled)
+                        _cmd.Logger.LogData(LogID.A, $"Missing local board detected with custom writes enabled: {map.BoxName}"); //the missing board will be already reported to the user later.
+                    cmd.AddMultinodeCommand("custom", ValidateCommand, _ => { _cmd.Logger.LogData(LogID.A, $"Custom command failed due to missing board: {map.BoxName}"); });
                     return;
                 }
 
@@ -108,11 +108,11 @@ namespace CA_DataUploaderLib
                     if (map.CustomWritesEnabled)
                         return true;
 
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Custom writes is not enabled for board: {map.BoxName}");
+                    _cmd.Logger.LogError(LogID.A, $"Custom writes is not enabled for board: {map.BoxName}");
                     return false;
                 }
             }
-            static void RegisterReconnectBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<string, TaskCompletionSource> reconnectTasks)
+            void RegisterReconnectBoardCommand(IOconfMap map, CommandHandler cmd, Dictionary<string, TaskCompletionSource> reconnectTasks)
             {
                 if (!map.IsLocalBoard)
                 {//if the board is not local we register the command validation with an empty action
@@ -124,7 +124,7 @@ namespace CA_DataUploaderLib
                 {
                     cmd.AddMultinodeCommand(
                         "reconnect", a => a.Count == 2 && a[1] == map.BoxName,
-                        _ => { CALog.LogData(LogID.A, $"Reconnect failed due to missing board: {map.BoxName}"); });
+                        _ => { _cmd.Logger.LogData(LogID.A, $"Reconnect failed due to missing board: {map.BoxName}"); });
                     return;
                 }
 
@@ -240,7 +240,7 @@ namespace CA_DataUploaderLib
             async Task Off(MCUBoard board, IOconfOutput port, CancellationToken token)
             {
                 await board.SafeWriteLine(getCommand(port.PortNumber, defaultTarget), token);
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Port has been set to default position ({defaultTarget:F2}): {port.Name}");
+                _cmd.Logger.LogInfo(LogID.A, $"Port has been set to default position ({defaultTarget:F2}): {port.Name}");
             }
         }
 
@@ -264,23 +264,23 @@ namespace CA_DataUploaderLib
                     sb.AppendLine($"{t.Input.Name,-22}={t.Value,9:N2}");
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, sb.ToString());
+            _cmd.Logger.LogInfo(LogID.A, sb.ToString());
         }
 
         private double GetAvgLoopTime() => _values.Average(x => x.ReadSensor_LoopTime);
         private async Task RunBoardLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
-            DateTime start = DateTime.UtcNow;
+            long start = _cmd.Time.GetTimestamp();
             try
             {
                 var loops = StartLoops(boards, token);
                 await Task.WhenAll(loops);
                 if (loops.Count > 0) //we only report the exit when we actually ran loops with detected boards. If a board was not detected StartReadLoops already reports the missing boards.
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Exiting {Title}.RunBoardLoops() " + DateTime.UtcNow.Subtract(start));
+                    _cmd.Logger.LogInfo(LogID.A, $"Exiting {Title}.RunBoardLoops() " + _cmd.Time.GetElapsedTime(start));
             }
             catch (Exception ex)
             {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} - unexpected error detected", ex);
+                _cmd.Logger.LogError(LogID.A, $"{Title} - unexpected error detected", ex);
             }
 
             Stopping?.Invoke(this, EventArgs.Empty);
@@ -288,7 +288,7 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    using var closeTimeoutToken = new CancellationTokenSource(5000);
+                    using var closeTimeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(5), _cmd.Time);
                     map.McuBoard?.SafeClose(closeTimeoutToken.Token);
                     _boardsState.SetDisconnectedState(map);
                 }
@@ -303,7 +303,7 @@ namespace CA_DataUploaderLib
         {
             var missingBoards = boards.Where(h => h.map.McuBoard == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
-                CALog.LogErrorAndConsoleLn(LogID.A, $"{Title} - missing boards detected {string.Join(",", missingBoards)}. Related sensors/actuators are disabled.");
+                _cmd.Logger.LogError(LogID.A, $"{Title} - missing boards detected {string.Join(",", missingBoards)}. Related sensors/actuators are disabled.");
 
             return boards
                 .Where(b => b.map.McuBoard != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
@@ -323,7 +323,7 @@ namespace CA_DataUploaderLib
             // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operation.
             // we might still get lots of entries for problems that alternate between normal and failed states, but for now is a good data point to know if that case is happening.
             var waitingBoardReconnect = false;
-            var tryingToRecoverAfterTimeoutWatch = new Stopwatch();
+            long timeSinceTimeoutsStarted = 0;
 
             while (!token.IsCancellationRequested)
             {
@@ -342,7 +342,7 @@ namespace CA_DataUploaderLib
                     DataVector? vector = null;
                     do
                     {
-                        vector = await vectorsChannel!.ReadWithSoftTimeout(2000, token);
+                        vector = await vectorsChannel!.ReadWithSoftTimeout(2000, _cmd.Time, token);
                         token.ThrowIfCancellationRequested(); //we are stopping, let's break of the top loop so the stop actions run
                         if (vector != null && !CheckConnectedStateInVector(board, boardStateIndexInFullVector, ref waitingBoardReconnect, vector))
                             continue; // no point trying to send commands while there is no connection to the board.
@@ -357,7 +357,7 @@ namespace CA_DataUploaderLib
                 catch (TimeoutException)
                 {
                     EnsureTimeoutIsReportedOnce();
-                    await Task.WhenAny(Task.Delay(500, token)); //reduce action frequency / the WhenAny avoids exceptions if the token is canceled
+                    await Task.WhenAny(Task.Delay(TimeSpan.FromMilliseconds(500), _cmd.Time, token)); //reduce action frequency / the WhenAny avoids exceptions if the token is canceled
                 }
                 catch (OperationCanceledException ex) when (ex.CancellationToken == token)
                 { }
@@ -368,7 +368,7 @@ namespace CA_DataUploaderLib
                 }
                 catch (Exception ex)
                 {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Error detected writing to board: {board.ToShortDescription()}", ex);
+                    LogError(board, "Error detected writing to board", ex);
                 }
             }
 
@@ -378,41 +378,41 @@ namespace CA_DataUploaderLib
             {
                 foreach (var (_, exitAction) in builtInActions!)
                 {
-                    using var timeoutToken = new CancellationTokenSource(3000);
+                    using var timeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(3), _cmd.Time);
                     await exitAction(board, timeoutToken.Token);
                 }
             }
             catch (Exception ex)
             {
-                CALog.LogErrorAndConsoleLn(LogID.A, $"Error running exit actions for board: {board.ToShortDescription()}", ex);
+                LogError(board, "Error running exit actions for board", ex);
             }
 
             void EnsureTimeoutIsReportedOnce()
             {
-                if (tryingToRecoverAfterTimeoutWatch.IsRunning) return;
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Timed out writing to board, reducing action frequency until reconnect - {board.ToShortDescription()}");
-                tryingToRecoverAfterTimeoutWatch.Restart();
+                if (timeSinceTimeoutsStarted != 0) return;
+                LogInfo(board, $"Timed out writing to board, reducing action frequency until reconnect");
+                timeSinceTimeoutsStarted = _cmd.Time.GetTimestamp();
             }
 
             void EnsureResumeAfterTimeoutIsReported()
             {
-                if (!tryingToRecoverAfterTimeoutWatch.IsRunning) return;
-                tryingToRecoverAfterTimeoutWatch.Stop();
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Wrote to board without time outs after {tryingToRecoverAfterTimeoutWatch.Elapsed}, resuming normal action frequency - {board.ToShortDescription()}");
+                if (timeSinceTimeoutsStarted == 0) return;
+                LogInfo(board, $"Wrote to board without time outs after {_cmd.Time.GetElapsedTime(timeSinceTimeoutsStarted)}, resuming normal action frequency");
+                timeSinceTimeoutsStarted = 0;
             }
 
-            static bool CheckConnectedStateInVector(MCUBoard board, int boardState, ref bool waitingBoardReconnect, DataVector vector)
+            bool CheckConnectedStateInVector(MCUBoard board, int boardState, ref bool waitingBoardReconnect, DataVector vector)
             {
                 var vectorState = (ConnectionState)(int)vector[boardState];
                 var connected = vectorState >= ConnectionState.Connected;
                 if (waitingBoardReconnect && connected)
                 {
-                    CALog.LogData(LogID.B, $"Resuming writes after reconnect on {board.ToShortDescription()}");
+                    LogData(board, $"Resuming writes after reconnect");
                     waitingBoardReconnect = false;
                 }
                 else if (!waitingBoardReconnect && !connected)
                 {
-                    CALog.LogData(LogID.B, $"Stopping writes until connection is reestablished (state: {vectorState}) on: - {board.ToShortDescription()}");
+                    LogData(board, $"Stopping writes until connection is reestablished (state: {vectorState})");
                     waitingBoardReconnect = true;
                 }
                 return connected;
@@ -425,13 +425,12 @@ namespace CA_DataUploaderLib
             {
                 try
                 {
-                    var stillConnected = await SafeReadSensors(board, boxName, targetSamples, token);
-                    if (!stillConnected)
-                        _boardsState.SetDisconnectedState(boxName);
+                    await ReadSensors(board, boxName, targetSamples, token);
+                    _boardsState.SetDisconnectedState(boxName);
                     if (board.Closed)
                         return;
-                    if (!stillConnected || CheckFails(board, targetSamples))
-                        await ReconnectBoard(board, boxName, token);
+                    token.ThrowIfCancellationRequested();
+                    await ReconnectBoard(board, boxName, token);
                 }
                 catch (OperationCanceledException ex)
                 { //if the token is canceled we are about to exit the loop so we do nothing. Otherwise we consider it like any other exception and log it.
@@ -442,7 +441,7 @@ namespace CA_DataUploaderLib
                     }
                 }
                 catch (Exception ex)
-                { // we expect most errors to be handled within SafeReadSensors and in the SafeReopen of the ReconnectBoard,
+                { // we expect most errors to be handled within ReadSensors and in the SafeReopen of the ReconnectBoard,
                   // so seeing this in the log is most likely a bug handling some error case.
                     _boardsState.SetReadSensorsExceptionState(boxName);
                     LogError(board, "Unexpected error on board read loop", ex);
@@ -458,52 +457,25 @@ namespace CA_DataUploaderLib
         }
 
         ///<returns><c>false</c> if a board disconnect was detected</returns>
-        private async Task<bool> SafeReadSensors(MCUBoard board, string boxName, SensorSample.InputBased[] targetSamples, CancellationToken token)
-        { //we use this to prevent read exceptions from interfering with failure checks and reconnects
-            try
-            {
-                return await ReadSensors(board, boxName, targetSamples, token);
-            }
-            catch (OperationCanceledException ex)
-            {
-                if (token.IsCancellationRequested)
-                    throw; // if the token is cancelled we bubble up the cancel so the caller can abort.
-                _boardsState.SetReadSensorsExceptionState(boxName);
-                LogError(board, "Error reading sensor data", ex);
-                return true; //ReadSensor normally should return false if the board is detected as disconnected, so we say the board is still connected here since the caller will still do stale values detection
-            }
-            catch (Exception ex)
-            { // seeing this is the log is not unexpected in cases where we have trouble communicating to a board.
-                _boardsState.SetReadSensorsExceptionState(boxName);
-                LogError(board, "Error reading sensor data", ex);
-                return true; //ReadSensor normally should return false if the board is detected as disconnected, so we say the board is still connected here since the caller will still do stale values detection
-            }
-        }
-
-        ///<returns><c>false</c> if a board disconnect was detected</returns>
-        private async Task<bool> ReadSensors(MCUBoard board, string boxName, SensorSample.InputBased[] targetSamples, CancellationToken token)
+        private async Task ReadSensors(MCUBoard board, string boxName, SensorSample.InputBased[] targetSamples, CancellationToken token)
         {
-            var timeSinceLastValidRead = Stopwatch.StartNew();
+            var lastValidReadTime = _cmd.Time.GetTimestamp();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
-            var msBetweenReads = (int)Math.Ceiling(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
-            Stopwatch timeSinceLastLogInfo = new(), timeSinceLastLogError = new(), timeSinceLastMultilineMessage = new();
+            var timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
+            long lastLogInfoTime = 0, lastLogErrorTime = new(), lastMultilineMessageTime = new();
             int logInfoSkipped = 0, logErrorSkipped = 0, multilineMessageSkipped = 0;
             MultilineMessageReceiver multilineMessageReceiver = new((message) => LowFrequencyMultilineMessage((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)));
             //We set the state early if we detect no data is being returned or if we received values,
-            //but we only set ReturningNonValues if it has passed msBetweenReads since the last valid read
-            while (true) // we only stop reading if a disconnect or timeout is detected
+            //but we only set ReturningNonValues if it has passed timeBetweenReads since the last valid read
+            while (!token.IsCancellationRequested) // we only stop reading if a disconnect/timeout is detected or the process is being stopped
             {
-                var (stillConnected, line) = await TryReadLineWithStallDetection(board, boxName, msBetweenReads, token);
-                if (!stillConnected)
-                {
-                    multilineMessageReceiver.LogPossibleIncompleteMessage();
-                    return false;  //board disconnect detected, let caller know 
-                }
+                var line = await TryReadLineWithStallDetection(board, boxName, timeBetweenReads, token);
                 if (line == default)
                 {
                     multilineMessageReceiver.LogPossibleIncompleteMessage();
-                    return true; //timed out reading from the board, TryReadLineWithStallDetection already updated the state after the first msBetweenReads / still considered connected
+                    return; //timed out/unexpected error reading from the board, let the caller run the reconnect flow
                 }
+
                 try
                 {
                     if (multilineMessageReceiver.HandleLine(line))
@@ -513,13 +485,13 @@ namespace CA_DataUploaderLib
                     if (numbers != null)
                     {
                         ProcessLine(numbers, board, targetSamples);
-                        timeSinceLastValidRead.Restart();
+                        lastValidReadTime = _cmd.Time.GetTimestamp();
                         _boardsState.SetState(boxName, ConnectionState.ReceivingValues);
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
                         LowFrequencyLogInfo((args, skipMessage) => LogInfo(args.board, $"Unexpected board response '{args.line.ToLiteral()}'{skipMessage}"), (board, line));
-                        if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
+                        if (_cmd.Time.GetElapsedTime(lastValidReadTime) > timeBetweenReads)
                             _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                     }
 
@@ -532,62 +504,62 @@ namespace CA_DataUploaderLib
                     _lastStatus = status;
                 }
                 catch (Exception ex)
-                { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in msBetweenReads
+                { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in timeBetweenReads
                     LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Failed handling board response '{args.line.ToLiteral()}'{skipMessage}", args.ex), (board, line, ex));
-                    if (timeSinceLastValidRead.ElapsedMilliseconds > msBetweenReads)
+                    if (_cmd.Time.GetElapsedTime(lastValidReadTime) > timeBetweenReads)
                         _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                 }
             }
 
-            void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastLogInfo, ref logInfoSkipped);
-            void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastLogError, ref logErrorSkipped);
-            void LowFrequencyMultilineMessage<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, timeSinceLastMultilineMessage, ref multilineMessageSkipped);
+            void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, lastLogInfoTime, ref logInfoSkipped);
+            void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, lastLogErrorTime, ref logErrorSkipped);
+            void LowFrequencyMultilineMessage<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, lastMultilineMessageTime, ref multilineMessageSkipped);
 
-            void LowFrequencyLog<T>(Action<T, string> logAction, T args, Stopwatch timeSinceLastLog, ref int logSkipped)
+            void LowFrequencyLog<T>(Action<T, string> logAction, T args, long lastLogTime, ref int logSkipped)
             {
-                if (timeSinceLastLog.IsRunning && timeSinceLastLog.ElapsedMilliseconds < 5 * 60000)
+                if (lastLogTime != 0 && _cmd.Time.GetElapsedTime(lastLogTime).TotalMinutes < 5)
                 {
                     if (logSkipped++ == 0)
                         logAction(args, $"{Environment.NewLine}Skipping further messages for this board (max 2 messages every 5 minutes)");
                     return;
                 }
 
-                timeSinceLastLog.Restart();
+                lastLogTime = _cmd.Time.GetTimestamp();
                 logAction(args, "");
                 logSkipped = 0;
             }
         }
 
-        ///<returns>(<c>false</c> if the board was explicitely detected as disconnected, the line, or null/default string if it exceeded the MCUBoard.ReadTimeout).</returns>
+        ///<returns>(<c>false</c> if the board was explicitly detected as disconnected, the line, or null/default string if it exceeded the MCUBoard.ReadTimeout).</returns>
         ///<remarks>
-        ///Notifies in _localBoardsState (which is reported to the next vector) if there is no data available within <param cref="msBetweenReads" /> 
+        ///Notifies in _localBoardsState (which is reported to the next vector) if there is no data available within <param cref="timeBetweenReads" /> 
         ///and when that happens it waits up to MCUBoard.ReadTimeout for the board to return data.
-        ///Both in the above case and when the MCUBoard.ReadTimeout is exceeded a message is written to the log (but not the console to reduce operational noise),
-        ///specially as it can now be observed on the graphs if board these events are happening + CheckFailure & reconnects will display relevant messages if appropiate.
+        ///If MCUBoard.ReadTimeout is exceeded a message is written to the event log, 
+        ///but a regular disconnect only writes to the local log as reconnects will display relevant messages.
         ///</remarks>
-        private async Task<(bool, string?)> TryReadLineWithStallDetection(MCUBoard board, string boxName, int msBetweenReads, CancellationToken token)
+        private async Task<string?> TryReadLineWithStallDetection(MCUBoard board, string boxName, TimeSpan timeBetweenReads, CancellationToken token)
         {
             var readLineTask = board.SafeReadLine(token);
-            var noDataAvailableTask = Task.Delay(msBetweenReads, token);
-            Stopwatch? sw = null;
+            var noDataAvailableTask = Task.Delay(timeBetweenReads, _cmd.Time, token);
+            long noDataDetectedTime = 0;
             if (await Task.WhenAny(readLineTask, noDataAvailableTask) == noDataAvailableTask)
             {
                 LogData(board, $"No data available ({readLineTask.IsCompleted})");
-                sw = Stopwatch.StartNew();
+                noDataDetectedTime = _cmd.Time.GetTimestamp();
                 _boardsState.SetState(boxName, ConnectionState.NoDataAvailable); //report the state early before waiting up to 2 seconds for the data (readLineTask)
             }
 
             try
             {
-                var task = await readLineTask; // waits up to 2 seconds for the read to complete, while we are here the state keeps being no data.
-                if (sw is not null && sw.IsRunning)
-                    LogData(board, $"Time from no data available to data available: {sw.Elapsed.TotalMilliseconds}ms");
-                return (true, task);
+                var line = await readLineTask; // waits up to 2 seconds for the read to complete, while we are here the state keeps being no data.
+                if (noDataDetectedTime != 0)
+                    LogData(board, $"Time from no data available to data available: {_cmd.Time.GetElapsedTime(noDataDetectedTime).TotalMilliseconds}ms");
+                return line;
             }
             catch (ObjectDisposedException)
             {
                 LogData(board, "Detected closed connection");
-                return (false, default);
+                return default;
             }
             catch (ArgumentOutOfRangeException ex)
             {
@@ -595,33 +567,24 @@ namespace CA_DataUploaderLib
                 //calling code is expected to handle the disconnected board returned by ObjectDisposedException so this is logged and displayed as an error.
                 //more testing is needed with switchboards, as potentially a write could get the ObjectDisposeException which might end up hitting this catch statement.
                 LogError(board, "Detected closed connection", ex);
-                return (false, default);
+                return default;
             }
             catch (TimeoutException)
             {
-                LogData(board, "Timed out reading data");
-                return (true, default);
+                LogInfo(board, "Timed out reading data");
+                return default;
+            }
+            catch (Exception ex)
+            {
+                //typically readline reports the earlier exception types, so we log an error to the event log for visibility in this case
+                LogError(board, "Error reading sensor data", ex);
+                return default;
             }
         }
 
         /// <returns>the list of doubles (<c>null</c> if failing to parse the line) and a status value</returns>
         protected virtual (List<double>?, uint) TryParseAsDoubleList(MCUBoard board, string line) =>
             board.ConfigSettings.Parser.TryParseAsDoubleList(line);
-
-        private bool CheckFails(MCUBoard board, SensorSample.InputBased[] values)
-        {
-            bool hasStaleValues = false;
-            foreach (var item in values)
-            {
-                var msSinceLastRead = DateTime.UtcNow.Subtract(item.TimeStamp).TotalMilliseconds;
-                if (msSinceLastRead <= board.ConfigSettings.MaxMillisecondsWithoutNewValues)
-                    continue;
-                hasStaleValues = true;
-                LogInfo(board, $"Stale sensor detected: {item.Input.Name}. {msSinceLastRead} milliseconds since last read");
-            }
-
-            return hasStaleValues;
-        }
 
         private async Task ReconnectBoard(MCUBoard board, string boxName, CancellationToken token)
         {
@@ -642,7 +605,7 @@ namespace CA_DataUploaderLib
                 Task reconnectTask;
                 lock (_reconnectTasks)
                     reconnectTask = _reconnectTasks[boxName].Task;
-                await Task.WhenAny(reconnectTask, Task.Delay(delayBetweenAttempts, token));
+                await Task.WhenAny(reconnectTask, Task.Delay(delayBetweenAttempts, _cmd.Time, token));
                 token.ThrowIfCancellationRequested();
                 _boardsState.SetAttemptingReconnectState(boxName);
                 (reconnected, reconnectResponse) = await board.SafeReopen(token);
@@ -667,7 +630,6 @@ namespace CA_DataUploaderLib
         public virtual void ProcessLine(IEnumerable<double> numbers, MCUBoard board, SensorSample.InputBased[] targetSamples)
         {
             int i = 1;
-            var timestamp = DateTime.UtcNow;
             foreach (var value in numbers)
             {
                 var sensor = targetSamples.SingleOrDefault(x => x.Input.PortNumber == i);
@@ -710,12 +672,12 @@ namespace CA_DataUploaderLib
             if (board.McuBoard != null)
                 LogError(board.McuBoard, message, ex);
             else
-                CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.BoxName} (missing)", ex);
+                _cmd.Logger.LogError(LogID.A, $"{message} - {Title} - {board.BoxName} (missing)", ex);
         }
-        private void LogError(Board board, string message, Exception ex) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}", ex);
-        private void LogError(Board board, string message) => CALog.LogErrorAndConsoleLn(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}");
-        private void LogData(Board board, string message) => CALog.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
-        private void LogInfo(Board board, string message) => CALog.LogInfoAndConsoleLn(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
+        private void LogError(Board board, string message, Exception ex) => _cmd.Logger.LogError(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}", ex);// CALog.LogErrorAndConsoleLn;
+        private void LogError(Board board, string message) => _cmd.Logger.LogError(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}");// CALog.LogErrorAndConsoleLn;
+        private void LogData(Board board, string message) => _cmd.Logger.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");//CALog.LogData
+        private void LogInfo(Board board, string message) => _cmd.Logger.LogInfo(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");//CALog.LogInfoAndConsoleLn
 
 
         /// <summary>

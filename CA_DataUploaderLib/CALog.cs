@@ -15,22 +15,21 @@ namespace CA_DataUploaderLib
         A, B, C, D, E, F, G, H
     }
 
-    public static class CALog
+    public class CALog : ICALogger
     {
         private static Dictionary<LogID, DateTime>? _nextSizeCheck;
         private static readonly string _logDir = Directory.GetCurrentDirectory();
+        internal static readonly ICALogger Default = new CALog();
 
         /// <remarks>any output before a custom logger is set is written to the console.</remarks>
         public static ISimpleLogger LoggerForUserOutput { get; set; } = new ConsoleLogger();
         public static int MaxLogSizeMB { get; set; } = 100;
 
+        void ICALogger.LogData(LogID id, string msg) => LogData(id, msg);
+        void ICALogger.LogError(LogID id, string msg, Exception ex) => LogErrorAndConsoleLn(id, msg, ex);
+        void ICALogger.LogError(LogID id, string msg) => LogErrorAndConsoleLn(id, msg);
+        void ICALogger.LogInfo(LogID id, string msg) => LogInfoAndConsoleLn(id, msg);
         public static void LogData(LogID logID, string msg) => WriteToFile(logID, msg);
-        public static void LogException(LogID logID, Exception ex)
-        {
-            var msg = ex.ToString();
-            LoggerForUserOutput.LogError(ex);
-            WriteToFile(logID, msg);
-        }
 
         public static void LogInfoAndConsoleLn(LogID logID, string msg)
         {

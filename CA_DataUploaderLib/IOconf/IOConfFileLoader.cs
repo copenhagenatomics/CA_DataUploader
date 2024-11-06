@@ -23,10 +23,10 @@ namespace CA_DataUploaderLib.IOconf
             }
 
             var list = File.ReadAllLines("IO.conf").ToList();
-            return (list, ParseLines(list));
+            return (list, ParseLines(Loader, list));
         }
 
-        public static IEnumerable<IOconfRow> ParseLines(IEnumerable<string> lines)
+        internal static IEnumerable<IOconfRow> ParseLines(IIOconfLoader loader, IEnumerable<string> lines)
         {
             IOconfNode.ResetIndex();
             IOconfCode.ResetIndex();
@@ -34,7 +34,7 @@ namespace CA_DataUploaderLib.IOconf
             var linesList = lines.Select(x => x.Trim()).ToList();
             // remove empty lines and commented out lines
             var lines2 = linesList.Where(x => !x.StartsWith("//") && x.Length > 2).ToList();
-            return lines2.Select(x => CreateType(x, linesList.IndexOf(x) + 1));
+            return lines2.Select(x => CreateType(loader, x, linesList.IndexOf(x) + 1));
         }
 
         /// <summary>
@@ -60,13 +60,13 @@ namespace CA_DataUploaderLib.IOconf
             File.WriteAllText(filename, ioconf);
         }
 
-        private static IOconfRow CreateType(string row, int lineNum)
+        private static IOconfRow CreateType(IIOconfLoader confLoader, string row, int lineNum)
         {
             try
             {
                 var separatorIndex = row.IndexOf(';');
                 var rowType = separatorIndex > -1 ? row.AsSpan()[..separatorIndex].Trim() : row;
-                var loader = Loader.GetLoader(rowType) ?? ((r, l) => new IOconfRow(r, l, "Unknown", true));
+                var loader = confLoader.GetLoader(rowType) ?? ((r, l) => new IOconfRow(r, l, "Unknown", true));
                 return loader(row, lineNum);
             }
             catch (Exception ex)
