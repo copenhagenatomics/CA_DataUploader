@@ -113,13 +113,21 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void LineConfirmationIsRecognizedAsExpectedNonValuesLine()
+        public void LineConfirmationOnPort6IsRecognizedAsExpectedNonValuesLine()
         {
-            string testString = "p1 on 60";
+            string testString = "p6 on 60";
             var value = IOconfOut230Vac.SwitchBoardResponseParser.Default.IsExpectedNonValuesLine(testString);
             Assert.IsTrue(value);
         }
-        
+
+        [TestMethod]
+        public void LineConfirmationOnPort10IsRecognizedAsExpectedNonValuesLine()
+        {
+            string testString = "p10 on 60";
+            var value = IOconfOut230Vac.SwitchBoardResponseParser.Default.IsExpectedNonValuesLine(testString);
+            Assert.IsTrue(value);
+        }
+
         [TestMethod]
         public void MisreadIsNotRecognizedAsExpectedNonValuesLine()
         {

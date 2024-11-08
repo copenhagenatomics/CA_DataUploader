@@ -38,7 +38,7 @@ namespace CA_DataUploaderLib.IOconf
             // the 4 switchboard on/off values will be ignored (non capturing groups) as we don't plan to use those moving forward
             private const string _oldSwitchBoxPattern = @"P1=(-?\d\.\d\d)A P2=(-?\d\.\d\d)A P3=(-?\d\.\d\d)A P4=(-?\d\.\d\d)A(?: [01], [01], [01], [01](?:, (-?\d+.\d\d))?)?";
             private static readonly Regex _oldswitchBoxCurrentsRegex = new(_oldSwitchBoxPattern);
-            private const string _commandConfirmationPattern = @"^\s*p[1-4] (?:(?:auto off)|(?:off)|(?:on(?: \d+)?))\s*$";
+            private const string _commandConfirmationPattern = @"^\s*p[1-9]|10 (?:(?:auto off)|(?:off)|(?:on(?: \d+)?))\s*$";
             private static readonly Regex _commandConfirmationRegex = new(_commandConfirmationPattern);
             private readonly bool _expectCommandConfirmations;
 
