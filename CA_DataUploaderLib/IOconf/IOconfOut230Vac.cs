@@ -1,13 +1,11 @@
 ﻿#nullable enable
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
-using CA_DataUploaderLib.Extensions;
 
 namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfOut230Vac : IOconfOutput
     {
-        public IOconfOut230Vac(string row, int lineNum, string type) : base(row, lineNum, type, true, GetNewSwitchboardBoardSettings(row)) 
+        public IOconfOut230Vac(string row, int lineNum, string type) : base(row, lineNum, type, true, GetSwitchboardBoardSettings()) 
         {
             CurrentSensorName = Name + "_current";
         }
@@ -28,39 +26,20 @@ namespace CA_DataUploaderLib.IOconf
 
         /// <remarks>This config is general for the board, so caller must make sure to use a single instance x board</remarks>
         public IOconfInput GetBoardTemperatureInputConf() => NewPortInput(Map.BoxName + "_temperature", 5);
-        public static BoardSettings GetNewSwitchboardBoardSettings(string row) => 
-            new() { Parser = new SwitchBoardResponseParser(!row.Contains("showConfirmations")), ValuesEndOfLineChar = '\r' };
+        public static BoardSettings GetSwitchboardBoardSettings() => 
+            new() { Parser = SwitchBoardResponseParser.Default, ValuesEndOfLineChar = '\r' };
         public class SwitchBoardResponseParser : BoardSettings.LineParser
         {
-            // old response format "P1=0.06A P2=0.05A P3=0.05A P4=0.06A 0, 1, 0, 1, 25.87"
-            // first 4 are currents, then comes 4 switchboard on/off values and then temperature. 
-            // some versions of the old switchboards did not return the last 5 values
-            // the 4 switchboard on/off values will be ignored (non capturing groups) as we don't plan to use those moving forward
-            private const string _oldSwitchBoxPattern = @"P1=(-?\d\.\d\d)A P2=(-?\d\.\d\d)A P3=(-?\d\.\d\d)A P4=(-?\d\.\d\d)A(?: [01], [01], [01], [01](?:, (-?\d+.\d\d))?)?";
-            private static readonly Regex _oldswitchBoxCurrentsRegex = new(_oldSwitchBoxPattern);
-            private const string _commandConfirmationPattern = @"^\s*p[1-9]|10 (?:(?:auto off)|(?:off)|(?:on(?: \d+)?))\s*$";
-            private static readonly Regex _commandConfirmationRegex = new(_commandConfirmationPattern);
-            private readonly bool _expectCommandConfirmations;
-
-            public new static SwitchBoardResponseParser Default { get; } = new SwitchBoardResponseParser(true);
-            // setting it to *not* expect command confirmations will normally cause them to be shown in the console + logs,
-            // which is mostly useful for debugging purposes.
-            public SwitchBoardResponseParser (bool expectCommandConfirmations)
-            {
-                _expectCommandConfirmations = expectCommandConfirmations;
-            }
+            public new static SwitchBoardResponseParser Default { get; } = new SwitchBoardResponseParser();
 
             // returns currents 0-3, board temperature (, sensorport_rms, sensorport_max)
             public override (List<double>?, uint) TryParseAsDoubleList(string line)
             {
-                var match = _oldswitchBoxCurrentsRegex.Match(line);
-                if (!match.Success) 
-                    return TryParseOnlyNumbersAsDoubleList(line);
-                return (GetValuesFromGroups(match.Groups), 0);
+                return TryParseOnlyNumbersAsDoubleList(line);
             }
 
             // returns currents 0-3, board temperature (, sensorport_rms, sensorport_max)
-            //      or currents 0-6
+            //      or currents 0-5(/9)
             public (List<double>?, uint) TryParseOnlyNumbersAsDoubleList(string line)
             {
                 var (numbers, status) = base.TryParseAsDoubleList(line); //the base implementation deals with any amount of simple numbers separated by commas.
@@ -71,24 +50,6 @@ namespace CA_DataUploaderLib.IOconf
                 if (numbers.Count == 4)
                     numbers.Add(10000);//some versions did not report temperature
                 return (numbers, status);
-            }
-
-            public override bool MatchesValuesFormat(string line) => _oldswitchBoxCurrentsRegex.IsMatch(line) || base.MatchesValuesFormat(line);
-
-            // returns currents 0-3, board temperature
-            private static List<double> GetValuesFromGroups(GroupCollection groups)
-            {
-                var data = new List<double>(5);
-                for (int i = 1; i < 6; i++)
-                    data.Add(groups[i].Success ? groups[i].Value.ToDouble() : 10000d);
-                return data;
-            }
-            /// <summary>for now consider all command confirmations expected</summary>
-            public override bool IsExpectedNonValuesLine(string line)
-            {
-                if (line == "\n")
-                    return true; // the switchboard is currently sending \r\n\r at the end of a command confirmation (the last \r is being printed before the next current line)
-                return _expectCommandConfirmations && _commandConfirmationRegex.IsMatch(line); // note unlike for value lines where we only get \r, in these lines we get \n\r and this also ignores those
             }
         }
     }
