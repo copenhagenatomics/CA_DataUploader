@@ -7,7 +7,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         private readonly string Subsystem;
 
-        public IOconfSwitchboardSensor(string row, int lineNum) : base(row, lineNum, "SwitchboardSensor", false, IOconfOut230Vac.GetNewSwitchboardBoardSettings(row))
+        public IOconfSwitchboardSensor(string row, int lineNum) : base(row, lineNum, "SwitchboardSensor", false, IOconfOut230Vac.GetSwitchboardBoardSettings())
         {
             Format = "SwitchboardSensor;Name;BoxName;[SubsystemName]";
             var list = ToList();
