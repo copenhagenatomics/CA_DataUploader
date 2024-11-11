@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Pipelines;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using CA_DataUploaderLib;
 using Microsoft.Extensions.Time.Testing;
@@ -272,7 +273,7 @@ Some unexpected failure
 
 
 
-        private static Task<string> ReadLine(PipeReader reader) => MCUBoard.ReadLine(MCUBoard.Dependencies.Default, reader, "abc", 16, TryReadLine);
+        private static Task<string> ReadLine(PipeReader reader) => MCUBoard.ReadLine(MCUBoard.Dependencies.Default, reader, "abc", 16, TryReadLine, CancellationToken.None);
         private static ValueTask<FlushResult> Write(PipeWriter writer, string data) => Write(writer, Encoding.ASCII.GetBytes(data));
         private static ValueTask<FlushResult> Write(PipeWriter writer, byte[] bytes)
         {

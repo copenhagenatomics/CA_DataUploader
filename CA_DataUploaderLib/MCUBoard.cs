@@ -133,7 +133,7 @@ namespace CA_DataUploaderLib
         }
 
         public async Task<string> SafeReadLine(CancellationToken token) => await RunWaitingForAnyOngoingReconnect(ReadLine, token);
-        public Task SafeWriteLine(string msg, CancellationToken token) => RunWaitingForAnyOngoingReconnect(() => { if (port.IsOpen) port.WriteLine(msg); else throw new ObjectDisposedException("Closed connection detected (port is closed)"); } , token);
+        public Task SafeWriteLine(string msg, CancellationToken token) => RunWaitingForAnyOngoingReconnect(_ => { if (port.IsOpen) port.WriteLine(msg); else throw new ObjectDisposedException("Closed connection detected (port is closed)"); } , token);
 
         public async Task SafeClose(CancellationToken token)
         {
@@ -178,7 +178,7 @@ namespace CA_DataUploaderLib
                 dependencies.LogData(LogID.B, $"(Reopen) opening port {PortName} {ProductType} {SerialNumber}");
                 pipeReader = port.GetPipeReader();
                 reconnectedLine = await ReadOptionalNonEmptyLine(
-                    dependencies, pipeReader, PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine, l => l.StartsWith("reconnected", StringComparison.OrdinalIgnoreCase));
+                    dependencies, pipeReader, PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine, l => l.StartsWith("reconnected", StringComparison.OrdinalIgnoreCase), token);
             }
             catch (Exception ex)
             {
@@ -310,14 +310,15 @@ namespace CA_DataUploaderLib
             return default;
         }
 
-        private Task<string> ReadLine() =>
-            ReadLine(dependencies, pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine);
+        private Task<string> ReadLine(CancellationToken token) =>
+            ReadLine(dependencies, pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine, token);
         //exposing this one for testing purposes
         public static async Task<string> ReadLine(
-            Dependencies dependencies, PipeReader pipeReader, string portName, int millisecondsTimeout, TryReadLineDelegate tryReadLine)
+            Dependencies dependencies, PipeReader pipeReader, string portName, int millisecondsTimeout, TryReadLineDelegate tryReadLine, CancellationToken cancellationToken)
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(millisecondsTimeout), dependencies.TimeProvider);
-            var token = cts.Token;
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, cancellationToken);
+            var token = linkedCts.Token;
             try
             {
                 while (!token.IsCancellationRequested)
@@ -386,9 +387,9 @@ namespace CA_DataUploaderLib
 
         /// <summary>advances the reader past any empty lines and returns + advances the next line if it <paramref name="matches"/> returns <c>true</c>.</summary>
         /// <remarks>returns <c>string.Empty</c> if <paramref name="matches"/> returns <c>false</c>.</remarks>
-        static Task<string> ReadOptionalNonEmptyLine(Dependencies dependencies, PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine, Func<string, bool> matches)
+        static Task<string> ReadOptionalNonEmptyLine(Dependencies dependencies, PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine, Func<string, bool> matches, CancellationToken token)
         {
-            return ReadLine(dependencies, pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), portName, timeoutMilliseconds, TryOptionalRead);
+            return ReadLine(dependencies, pipeReader ?? throw new ObjectDisposedException("Closed connection detected (null pipeReader)"), portName, timeoutMilliseconds, TryOptionalRead, token);
 
             bool TryOptionalRead(ref ReadOnlySequence<byte> buffer, out string matchingLine) => TryReadOptionalNonEmptyLine(ref buffer, tryReadLine, matches, out matchingLine);
         }
@@ -416,23 +417,20 @@ namespace CA_DataUploaderLib
             return true;
         }
 
-        static Task<string> SkipEmptyLines(Dependencies dependencies, PipeReader? pipeReader, string portName, int timeoutMilliseconds, TryReadLineDelegate tryReadLine) => ReadOptionalNonEmptyLine(dependencies, pipeReader, portName, timeoutMilliseconds, tryReadLine, _ => false);
-        ///<returns>true if a non empty line was found, or false if more data is needed</returns>
-
-        private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<TResult> action, CancellationToken token)
+        private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<CancellationToken, TResult> action, CancellationToken token)
         {
             using var _ = await _reconnectionLock.AcquireReaderLock(token);
-            return action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.
+            return action(token); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.
         }
 
-        private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<Task<TResult>> action, CancellationToken token)
+        private async Task<TResult> RunWaitingForAnyOngoingReconnect<TResult>(Func<CancellationToken, Task<TResult>> action, CancellationToken token)
         {
             using var _ = await _reconnectionLock.AcquireReaderLock(token);
-            return await action(); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.
+            return await action(token); // the built actions like ReadLine, etc are documented to throw InvalidOperationException if the connection is not opened.
         }
 
-        private Task RunWaitingForAnyOngoingReconnect(Action action, CancellationToken token) =>
-            RunWaitingForAnyOngoingReconnect(() => { action(); return true; }, token);
+        private Task RunWaitingForAnyOngoingReconnect(Action<CancellationToken> action, CancellationToken token) =>
+            RunWaitingForAnyOngoingReconnect(t => { action(t); return true; }, token);
 
         public class BoardInfo
         {
@@ -561,7 +559,7 @@ namespace CA_DataUploaderLib
                     }
                 }
 
-                await SkipEmptyLines(Dependencies, pipeReader, port, 2000, tryReadLine);//avoid any extra empty lines just after the full header from getting read by callers
+                await ReadOptionalNonEmptyLine(Dependencies, pipeReader, port, 2000, tryReadLine, _ => false, CancellationToken.None);//avoid any extra empty lines just after the full header from getting read by callers
                 return true;
 
                 void LogMissingHeader(string reason) => 
