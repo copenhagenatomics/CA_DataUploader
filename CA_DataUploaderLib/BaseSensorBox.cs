@@ -542,7 +542,7 @@ namespace CA_DataUploaderLib
             var readLineTask = board.SafeReadLine(token);
             var noDataAvailableTask = Task.Delay(timeBetweenReads, _cmd.Time, token);
             long noDataDetectedTime = 0;
-            if (await Task.WhenAny(readLineTask, noDataAvailableTask) == noDataAvailableTask)
+            if (await Task.WhenAny(readLineTask, noDataAvailableTask) == noDataAvailableTask && !readLineTask.IsCompleted && !token.IsCancellationRequested)
             {
                 LogData(board, $"No data available ({readLineTask.IsCompleted})");
                 noDataDetectedTime = _cmd.Time.GetTimestamp();
@@ -555,6 +555,10 @@ namespace CA_DataUploaderLib
                 if (noDataDetectedTime != 0)
                     LogData(board, $"Time from no data available to data available: {_cmd.Time.GetElapsedTime(noDataDetectedTime).TotalMilliseconds}ms");
                 return line;
+            }
+            catch (OperationCanceledException ex) when (ex.CancellationToken == token) 
+            {
+                throw;
             }
             catch (ObjectDisposedException)
             {
