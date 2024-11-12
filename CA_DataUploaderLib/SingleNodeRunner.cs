@@ -25,9 +25,9 @@ namespace CA_DataUploaderLib
                     var commands = events?.Where(e => e.EventType == (byte)EventType.Command);
                     var stringCommands = commands is not null && commands.Any() ? commands.Select(e => e.Data).ToList() : emptyCommands;
                     cmdHandler.MakeDecision(cmdHandler.GetNodeInputs().Concat(cmdHandler.GetGlobalInputs()).ToList(), DateTime.UtcNow, ref vector, stringCommands);
-                    vector = new([.. vector.Data], vector.Timestamp, events);
                     cmdHandler.OnNewVectorReceived(vector);
-                    await Task.WhenAny(sendThrottle.WaitForNextTickAsync(token).AsTask());//whenany for no exceptions on cancel
+                    vector = new([.. vector.Data], vector.Timestamp, events); //we take a copy so no further changes are done to the vector shared via OnNewVectorReceived
+                    await Task.WhenAny(sendThrottle.WaitForNextTickAsync(token).AsTask());//Task.WhenAny for no exceptions on cancel
                 }
 
                 CALog.LogInfoAndConsoleLn(LogID.A, "Waiting for subsystems to stop");
