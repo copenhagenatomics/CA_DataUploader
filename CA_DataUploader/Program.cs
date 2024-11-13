@@ -68,7 +68,7 @@ namespace CA_DataUploader
             }
             else
             {
-                CALog.LogException(LogID.A, ex);
+                CALog.LogErrorAndConsoleLn(LogID.A, $"Stopping due to unexpected error: {ex.Message}.", ex);
             }
         }
     }

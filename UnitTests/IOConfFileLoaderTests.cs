@@ -1,16 +1,19 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using CA_DataUploaderLib.IOconf;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace UnitTests
 {
     [TestClass]
     public class IOconfFileLoaderTests
     {
+        private static IEnumerable<IOconfRow> ParseLines(string[] lines) => IOconfFileLoader.ParseLines(IOconfFileLoader.Loader, lines);
+
         [TestMethod]
         public void CanLoadAccountLine()
         {
-            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "Account;john;john.doe@example.com;johndoepass" });
+            var rowsEnum = ParseLines(["Account;john;john.doe@example.com;johndoepass"]);
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
             Assert.IsInstanceOfType(rows[0], typeof(IOconfAccount));
@@ -21,7 +24,7 @@ namespace UnitTests
         [TestMethod]
         public void CanLoadMathLine()
         {
-            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "Math;mymath;heater1 + 5" });
+            var rowsEnum = ParseLines(["Math;mymath;heater1 + 5"]);
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
             Assert.IsInstanceOfType(rows[0], typeof(IOconfMath));
@@ -33,7 +36,7 @@ namespace UnitTests
         [TestMethod]
         public void CanLoadGenericOutputLine()
         {
-            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "GenericOutput;generic_ac_on;realacbox2;0;p1 $heater1_onoff 3" });
+            var rowsEnum = ParseLines(["GenericOutput;generic_ac_on;realacbox2;0;p1 $heater1_onoff 3"]);
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
             Assert.IsInstanceOfType(rows[0], typeof(IOconfGenericOutput));
@@ -47,7 +50,7 @@ namespace UnitTests
         [TestMethod]
         public void CanLoadGenericOutputLineWithBraces()
         {
-            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "GenericOutput;generic_ac_on;realacbox2;0;p1 on 3 ${heater1_onoff}00%" });
+            var rowsEnum = ParseLines(["GenericOutput;generic_ac_on;realacbox2;0;p1 on 3 ${heater1_onoff}00%"]);
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
             Assert.IsInstanceOfType(rows[0], typeof(IOconfGenericOutput));
@@ -62,7 +65,7 @@ namespace UnitTests
         public void CanLoadCustomConfigWithoutMixingPrefix()
         {
             IOconfFileLoader.Loader.AddLoader("Mathing", (row, lineIndex) => new IOConfMathing(row, lineIndex));
-            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "Mathing;mymath;heater1 + 5" });
+            var rowsEnum = ParseLines(["Mathing;mymath;heater1 + 5"]);
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
             Assert.IsInstanceOfType(rows[0], typeof(IOConfMathing));
@@ -71,7 +74,7 @@ namespace UnitTests
         [TestMethod]
         public void CanLoadCurrentLine()
         {
-            var rowsEnum = IOconfFileLoader.ParseLines(new[] { "Current;current_ct01;ct01;2;300" });
+            var rowsEnum = ParseLines(["Current;current_ct01;ct01;2;300"]);
             var rows = rowsEnum.ToArray();
             Assert.AreEqual(1, rows.Length);
             Assert.IsInstanceOfType(rows[0], typeof(IOconfCurrent));

@@ -56,9 +56,13 @@ namespace CA_DataUploaderLib
         public CancellationToken StopToken => _exitCts.Token;
         public Task RunningTask => _runningTaskTcs.Task;
         public IReadOnlyList<LoopControlDecision> Decisions => _decisions;
+        public TimeProvider Time { get; }
+        public ILog Logger { get; }
 
-        public CommandHandler(IIOconf ioconf, SerialNumberMapper? mapper = null, ICommandRunner? runner = null, bool runCommandLoop = true)
+        public CommandHandler(IIOconf ioconf, SerialNumberMapper? mapper = null, ICommandRunner? runner = null, bool runCommandLoop = true, TimeProvider? time = null, ILog? logger = null)
         {
+            Time = time ?? TimeProvider.System;
+            Logger = logger ?? CALog.Default;
             _exitCts.Token.Register(() =>
             {
                 _runningTaskTcs.TrySetCanceled();
@@ -113,7 +117,7 @@ namespace CA_DataUploaderLib
                     }
                     catch (Exception ex)
                     {
-                        CALog.LogErrorAndConsoleLn(LogID.A, $"Error running command: {e.Data}", ex);
+                        Logger.LogError(LogID.A, $"Error running command: {e.Data}", ex);
                     }
                 }
             });
@@ -206,7 +210,7 @@ namespace CA_DataUploaderLib
             OrderDecisionsBasedOnIOconf(_decisions);
             var decisions = _decisions.Concat(_safetydecisions);
             SetConfigBasedOnIOconf(decisions);
-            CALog.LogData(LogID.A, $"Decisions order: {string.Join(',', decisions.Select(d => d.Name))}");
+            Logger.LogData(LogID.A, $"Decisions order: {string.Join(',', decisions.Select(d => d.Name))}");
             var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type) { Upload = f.Upload })).ToList();
             var desc = new ExtendedVectorDescription(_ioconf, inputsPerNode, globalInputs, outputs);
             CA.LoopControlPluginBase.VectorDescription inmutableVectorDesc = new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray());
@@ -312,11 +316,11 @@ namespace CA_DataUploaderLib
                 }
                 catch (Exception ex)
                 {
-                    CALog.LogErrorAndConsoleLn(LogID.A, ex.ToString());
+                    Logger.LogError(LogID.A, ex.ToString());
                 }
             }
 
-            CALog.LogInfoAndConsoleLn(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.UtcNow.Subtract(_start));
+            Logger.LogInfo(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.UtcNow.Subtract(_start));
         }
 
         private void HandleCommand(string cmdString, bool isUserCommand)
@@ -353,7 +357,7 @@ namespace CA_DataUploaderLib
                     var confirmedStop = Console.ReadKey().KeyChar == 'y';
                     var msg = confirmedStop ? "Stop sequence initiated" : "Stop sequence aborted";
                     Console.WriteLine(msg); //ensure there is console output for this interactive local action regardless of the logger
-                    CALog.LogData(LogID.A, msg); //no need to write the line to the screen again + no need to show it in remote logging, as confirmed stops show as the "escape" command.
+                    Logger.LogData(LogID.A, msg); //no need to write the line to the screen again + no need to show it in remote logging, as confirmed stops show as the "escape" command.
                     if (confirmedStop)
                         return "escape";
                 }
@@ -406,22 +410,22 @@ namespace CA_DataUploaderLib
 
         private bool HelpMenu(List<string> args)
         {
-            CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");
-            CALog.LogInfoAndConsoleLn(LogID.A, "Commands: ");
-            CALog.LogInfoAndConsoleLn(LogID.A, "Esc                       - press Esc key to shut down");
-            CALog.LogInfoAndConsoleLn(LogID.A, "help                      - print the full list of available commands");
-            CALog.LogInfoAndConsoleLn(LogID.A, "up                        - print how long the service has been running");
-            CALog.LogInfoAndConsoleLn(LogID.A, "version                   - print the software version and hardware of this system");
+            Logger.LogInfo(LogID.A, "-------------------------------------");
+            Logger.LogInfo(LogID.A, "Commands: ");
+            Logger.LogInfo(LogID.A, "Esc                       - press Esc key to shut down");
+            Logger.LogInfo(LogID.A, "help                      - print the full list of available commands");
+            Logger.LogInfo(LogID.A, "up                        - print how long the service has been running");
+            Logger.LogInfo(LogID.A, "version                   - print the software version and hardware of this system");
             return true;
         }
 
         public void Uptime(List<string> _) => 
-            CALog.LogInfoAndConsoleLn(LogID.A, $"{DateTime.UtcNow.Subtract(_start)}");
+            Logger.LogInfo(LogID.A, $"{DateTime.UtcNow.Subtract(_start)}");
 
         public void GetVersion(List<string> _)
         {
             var connInfo = _ioconf.GetConnectionInfo();
-            CALog.LogInfoAndConsoleLn(LogID.A, 
+            Logger.LogInfo(LogID.A, 
 $@"{RpiVersion.GetSoftware()}
 {RpiVersion.GetHardware()}
 {connInfo.LoopName} - {connInfo.Email}

@@ -20,8 +20,10 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public IOconfFile(List<string> rawLines, bool performCheck = true)
+            : this(IOconfFileLoader.Loader, rawLines, performCheck) { }
+        public IOconfFile(IIOconfLoader loader, List<string> rawLines, bool performCheck = true)
         {
-            Table.AddRange(IOconfFileLoader.ParseLines(rawLines));
+            Table.AddRange(IOconfFileLoader.ParseLines(loader, rawLines));
             RawLines = rawLines;
             EnsureRPiTempEntry();
             if (performCheck)
