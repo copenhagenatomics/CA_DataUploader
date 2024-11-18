@@ -9,7 +9,7 @@ using System.Linq;
 namespace UnitTests
 {
     [TestClass]
-    public class TriangelFilterTests
+    public class TriangleFilterTests
     {
         public static LegacyFilter NewLegacyFilter(string filter) => IOconfFilter.LegacyFilters([new IOconfFilter(filter, 0)]).First();
         [TestMethod]
