@@ -487,6 +487,18 @@ namespace CA_DataUploaderLib
                         ProcessLine(numbers, board, targetSamples);
                         lastValidReadTime = _cmd.Time.GetTimestamp();
                         _boardsState.SetState(boxName, ConnectionState.ReceivingValues);
+
+                        if (status != _lastStatus && (status & 0x01000000) != 0) // Flash ongoing?
+                            timeBetweenReads = TimeSpan.FromSeconds(1.5);
+                        if (status != _lastStatus && (status & 0x01000000) == 0 && (_lastStatus & 0x01000000) != 0) // Flash done?
+                            timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
+                        if (status != _lastStatus && (status & 0x80000000) != 0) // Error?
+                        {
+                            LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Board responded with error status 0x{args.status:X}{skipMessage}"), (board, status));
+                            if (_boardCustomCommands.TryGetValue(board, out var customCommandsChannel))
+                                customCommandsChannel.Writer.TryWrite("Status");
+                        }
+                        _lastStatus = status;
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
@@ -494,14 +506,6 @@ namespace CA_DataUploaderLib
                         if (_cmd.Time.GetElapsedTime(lastValidReadTime) > timeBetweenReads)
                             _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                     }
-
-                    if (status != _lastStatus && (status & 0x80000000) != 0) //Was there a change in status and is the most significant bit set?
-                    {
-                        LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Board responded with error status 0x{args.status:X}{skipMessage}"), (board, status));
-                        if (_boardCustomCommands.TryGetValue(board, out var customCommandsChannel))
-                            customCommandsChannel.Writer.TryWrite("Status");
-                    }
-                    _lastStatus = status;
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in timeBetweenReads
@@ -678,10 +682,10 @@ namespace CA_DataUploaderLib
             else
                 _cmd.Logger.LogError(LogID.A, $"{message} - {Title} - {board.BoxName} (missing)", ex);
         }
-        private void LogError(Board board, string message, Exception ex) => _cmd.Logger.LogError(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}", ex);// CALog.LogErrorAndConsoleLn;
-        private void LogError(Board board, string message) => _cmd.Logger.LogError(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}");// CALog.LogErrorAndConsoleLn;
-        private void LogData(Board board, string message) => _cmd.Logger.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");//CALog.LogData
-        private void LogInfo(Board board, string message) => _cmd.Logger.LogInfo(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");//CALog.LogInfoAndConsoleLn
+        private void LogError(Board board, string message, Exception ex) => _cmd.Logger.LogError(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}", ex);
+        private void LogError(Board board, string message) => _cmd.Logger.LogError(LogID.A, $"{message} - {Title} - {board.ToShortDescription()}");
+        private void LogData(Board board, string message) => _cmd.Logger.LogData(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
+        private void LogInfo(Board board, string message) => _cmd.Logger.LogInfo(LogID.B, $"{message} - {Title} - {board.ToShortDescription()}");
 
 
         /// <summary>
