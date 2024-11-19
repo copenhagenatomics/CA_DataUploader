@@ -18,7 +18,8 @@ namespace CA_DataUploaderLib.IOconf
             var list = ToList();
             if (!isUnknown && list[0] != type) throw new Exception("IOconfRow: wrong format: " + row);
             Type = list[0];
-            Name = list[1]; // could be overwritten elsewhere. 
+            if (list.Count >= 2)
+                Name = list[1]; // could be overwritten elsewhere. 
         }
 
         public string Row { get; }
