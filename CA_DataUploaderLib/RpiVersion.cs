@@ -1,10 +1,8 @@
 ﻿using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.Helpers;
-using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Ports;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -56,7 +54,7 @@ namespace CA_DataUploaderLib
             Assembly asm = typeof(RpiVersion).Assembly;
             var copyright = asm.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright;
             var version = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-            return 
+            return
 $@"{hostAssembly?.GetName()}
     FileVersion {hostVersion}
 {asm.GetName()}
@@ -69,7 +67,7 @@ $@"{hostAssembly?.GetName()}
         {
             var dic = GetVersions();
             var key = GetHardwareKey();
-            if(dic.TryGetValue(key, out var value))
+            if (dic.TryGetValue(key, out var value))
                 return value;
 
             return "Unknown hardware" + Environment.NewLine;
@@ -81,8 +79,8 @@ $@"{hostAssembly?.GetName()}
             // originate here:  http://elinux.org/RPi_HardwareHistory
 
             var assembly = Assembly.GetExecutingAssembly();
-            using Stream stream = assembly.GetManifestResourceStream("CA_DataUploaderLib.RPi_versions.csv") 
-                ?? throw new InvalidOperationException("failed to get rpi versions");
+            using Stream stream = assembly.GetManifestResourceStream("CA_DataUploaderLib.RPi_versions.csv")
+                ?? throw new InvalidOperationException("Failed to get rpi versions");
             using var reader = new StreamReader(stream);
             var lines = reader.ReadToEnd().SplitNewLine();
             var header = lines.First().Split(';').Select(x => x.PadRight(15) + ": ").ToArray();
@@ -92,7 +90,7 @@ $@"{hostAssembly?.GetName()}
         private static string FormatString(string[] header, string[] values)
         {
             var result = new StringBuilder();
-            for(int i=0; i<6; i++)
+            for (int i = 0; i < 6; i++)
             {
                 var str = header[i] + values[i];
                 result.AppendLine(str);
@@ -141,7 +139,7 @@ $@"{hostAssembly?.GetName()}
 
             return "unknown";
         }
-        
+
 
         public static string GetFreeDisk()
         {
@@ -175,7 +173,7 @@ $@"{hostAssembly?.GetName()}
 
         private static string GetKernelVersion()
         {
-            if(_OS.Platform == PlatformID.Unix)
+            if (_OS.Platform == PlatformID.Unix)
                 return DULutil.ExecuteShellCommand("uname -r").Trim();
 
             return _OS.VersionString;
@@ -183,13 +181,14 @@ $@"{hostAssembly?.GetName()}
 
         private static int GetNumberOfCores()
         {
-            if(_OS.Platform == PlatformID.Unix)
+            if (_OS.Platform == PlatformID.Unix)
                 return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").SplitNewLine().Count;
 
             return Environment.ProcessorCount;
         }
 
         public static bool IsRpi() => !GetHardwareInfo().StartsWith("Unknown hardware");
+        public static bool IsComputeModule() => GetHardwareInfo().Contains("Compute Module", StringComparison.InvariantCultureIgnoreCase);
         public static bool IsWindows() => OperatingSystem.IsWindows();
     }
 }
