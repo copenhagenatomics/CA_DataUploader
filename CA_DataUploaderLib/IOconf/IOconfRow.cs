@@ -10,7 +10,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         private string _name = string.Empty;
 
-        public IOconfRow(string row, int lineNum, string type, bool isUnknown = false)
+        public IOconfRow(string row, int lineNum, string type, bool isUnknown = false, bool requireName = true)
         {
             Row = row;
             LineNumber = lineNum;
@@ -18,8 +18,9 @@ namespace CA_DataUploaderLib.IOconf
             var list = ToList();
             if (!isUnknown && list[0] != type) throw new Exception("IOconfRow: wrong format: " + row);
             Type = list[0];
-            if (list.Count >= 2)
-                Name = list[1]; // could be overwritten elsewhere. 
+            Name = list.Count >= 2  // could be overwritten elsewhere. 
+                ? list[1]
+                : requireName ? throw new Exception("IOconfRow: missing Name") : string.Empty;
         }
 
         public string Row { get; }
