@@ -182,7 +182,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                dependencies.LogException(LogID.B, $"Failure reopening port {PortName} {ProductType} {SerialNumber}.",ex);
+                dependencies.LogData(LogID.B, $"Failure reopening port {PortName} {ProductType} {SerialNumber}:{Environment.NewLine}{ex}");
                 return (false, string.Empty);
             }
 
