@@ -360,13 +360,15 @@ namespace CA_DataUploaderLib
             }
             catch (OperationCanceledException ex)
             {
-                if (cts.IsCancellationRequested)
-                    throw new TimeoutException("Timed out (while reading)");
                 if (cancellationToken.IsCancellationRequested)
                     throw new OperationCanceledException("The read operation has been canceled", ex, cancellationToken);
+                if (cts.IsCancellationRequested)
+                    throw new TimeoutException("Timed out (while reading)");
                 throw;
             }
 
+            if (cancellationToken.IsCancellationRequested)
+                throw new OperationCanceledException("The read operation has been canceled (idle)", cancellationToken);
             throw new TimeoutException("Timed out (idle)");
         }
 
