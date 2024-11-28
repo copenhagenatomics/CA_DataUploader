@@ -462,7 +462,7 @@ namespace CA_DataUploaderLib
             var lastValidReadTime = _cmd.Time.GetTimestamp();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
             var timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
-            long lastLogInfoTime = 0, lastLogErrorTime = new(), lastMultilineMessageTime = new();
+            long lastLogInfoTime = 0, lastLogErrorTime = 0, lastMultilineMessageTime = 0;
             int logInfoSkipped = 0, logErrorSkipped = 0, multilineMessageSkipped = 0;
             MultilineMessageReceiver multilineMessageReceiver = new((message) => LowFrequencyMultilineMessage((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)));
             //We set the state early if we detect no data is being returned or if we received values,
@@ -515,11 +515,11 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, lastLogInfoTime, ref logInfoSkipped);
-            void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, lastLogErrorTime, ref logErrorSkipped);
-            void LowFrequencyMultilineMessage<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, lastMultilineMessageTime, ref multilineMessageSkipped);
+            void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, ref lastLogInfoTime, ref logInfoSkipped);
+            void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, ref lastLogErrorTime, ref logErrorSkipped);
+            void LowFrequencyMultilineMessage<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, ref lastMultilineMessageTime, ref multilineMessageSkipped);
 
-            void LowFrequencyLog<T>(Action<T, string> logAction, T args, long lastLogTime, ref int logSkipped)
+            void LowFrequencyLog<T>(Action<T, string> logAction, T args, ref long lastLogTime, ref int logSkipped)
             {
                 if (lastLogTime != 0 && _cmd.Time.GetElapsedTime(lastLogTime).TotalMinutes < 5)
                 {
