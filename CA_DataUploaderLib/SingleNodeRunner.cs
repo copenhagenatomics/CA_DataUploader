@@ -15,7 +15,7 @@ namespace CA_DataUploaderLib
             {
                 var alerts = new Alerts(ioconf, cmdHandler);
                 var subsystemsTask = Task.Run(() => cmdHandler.RunSubsystems(token), token);
-                var sendThrottle = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+                var sendThrottle = new PeriodicTimer(TimeSpan.FromMilliseconds(ioconf.GetMainLoopDelay()));
                 DataVector? vector = null;
                 var emptyCommands = new List<string>(0);
 
@@ -38,7 +38,7 @@ namespace CA_DataUploaderLib
                 uploader.SendEvent(uploader, new EventFiredArgs("User initiated uploader stop", EventType.Log, DateTime.UtcNow));
                 if (ex is not OperationCanceledException)
                 {
-                    CALog.LoggerForUserOutput = new CALog.ConsoleLogger(); //we are about to stop the uploader, so we change inmediately to the console logger so the below already shows in the screen.
+                    CALog.LoggerForUserOutput = new CALog.ConsoleLogger(); //we are about to stop the uploader, so we change immediately to the console logger so the below already shows in the screen.
                     CALog.LogErrorAndConsoleLn(LogID.B, "Error detected while stopping uploader", ex);
                 }
             }

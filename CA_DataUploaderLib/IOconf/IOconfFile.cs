@@ -100,7 +100,7 @@ namespace CA_DataUploaderLib.IOconf
         public string GetLoopServer() => GetLoopConfig().Server;
 
         public int GetVectorUploadDelay() => GetEntries<IOconfSamplingRates>().SingleOrDefault()?.VectorUploadDelay ?? 1000;
-        public int GetMainLoopDelay() => GetEntries<IOconfSamplingRates>().SingleOrDefault()?.MainLoopDelay ?? 200;
+        public int GetMainLoopDelay() => GetEntries<IOconfSamplingRates>().SingleOrDefault()?.MainLoopDelay ?? 100;
         public CALogLevel GetOutputLevel() => GetLoopConfig().LogLevel;
         public IEnumerable<IOconfMap> GetMap() => GetEntries<IOconfMap>();
         public IEnumerable<IOconfGeneric> GetGeneric() => GetEntries<IOconfGeneric>();
