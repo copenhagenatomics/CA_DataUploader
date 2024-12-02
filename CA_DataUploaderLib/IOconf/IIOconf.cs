@@ -10,6 +10,7 @@ namespace CA_DataUploaderLib.IOconf
         public string GetLoopName();
         public string GetLoopServer();
         public int GetVectorUploadDelay();
+        public int GetMainLoopDelay();
         public CALogLevel GetOutputLevel();
         public IEnumerable<IOconfMap> GetMap();
         public IEnumerable<IOconfGeneric> GetGeneric();
