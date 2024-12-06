@@ -6,6 +6,7 @@ using CA_DataUploaderLib.Helpers;
 using System;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Runtime.InteropServices;
 
 namespace CA_DataUploaderLib
 {
@@ -35,8 +36,12 @@ namespace CA_DataUploaderLib
                 try
                 {
                     await Task.Delay(msBetweenReads, token);
-                    gpuSample.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
-                    cpuSample.Value = DULutil.ExecuteShellCommand("cat /sys/class/thermal/thermal_zone0/temp").ToDouble() / 1000;
+                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        gpuSample.Value = DULutil.ExecuteShellCommand("vcgencmd measure_temp").Replace("temp=", "").Replace("'C", "").ToDouble();
+                        cpuSample.Value = DULutil.ExecuteShellCommand("cat /sys/class/thermal/thermal_zone0/temp").ToDouble() / 1000;
+                    }
+                    
                 }
                 catch (TaskCanceledException ex)
                 {
