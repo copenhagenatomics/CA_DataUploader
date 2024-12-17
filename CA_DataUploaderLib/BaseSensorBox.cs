@@ -494,9 +494,13 @@ namespace CA_DataUploaderLib
                             timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
                         if (status != _lastStatus && (status & 0x80000000) != 0) // Error?
                         {
-                            LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Board responded with error status 0x{args.status:X}{skipMessage}"), (board, status));
-                            if (_boardCustomCommands.TryGetValue(board, out var customCommandsChannel))
-                                customCommandsChannel.Writer.TryWrite("Status");
+                            LowFrequencyLogError((args, skipMessage) =>
+                            { 
+                                LogError(args.board, $"Board responded with error status 0x{args.status:X}{skipMessage}");
+                                if (_boardCustomCommands.TryGetValue(board, out var customCommandsChannel))
+                                    customCommandsChannel.Writer.TryWrite("Status");
+                            }, (board, status));
+                            
                         }
                         _lastStatus = status;
                     }
