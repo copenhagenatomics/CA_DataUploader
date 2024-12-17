@@ -515,16 +515,16 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, ref lastLogInfoTime, ref logInfoSkipped);
-            void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, ref lastLogErrorTime, ref logErrorSkipped);
-            void LowFrequencyMultilineMessage<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, args, ref lastMultilineMessageTime, ref multilineMessageSkipped);
+            void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "info", args, ref lastLogInfoTime, ref logInfoSkipped);
+            void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "error", args, ref lastLogErrorTime, ref logErrorSkipped);
+            void LowFrequencyMultilineMessage<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "multiline", args, ref lastMultilineMessageTime, ref multilineMessageSkipped);
 
-            void LowFrequencyLog<T>(Action<T, string> logAction, T args, ref long lastLogTime, ref int logSkipped)
+            void LowFrequencyLog<T>(Action<T, string> logAction, string logType, T args, ref long lastLogTime, ref int logSkipped)
             {
                 if (lastLogTime != 0 && _cmd.Time.GetElapsedTime(lastLogTime).TotalMinutes < 5)
                 {
                     if (logSkipped++ == 0)
-                        logAction(args, $"{Environment.NewLine}Skipping further messages for this board (max 2 messages every 5 minutes)");
+                        logAction(args, $"{Environment.NewLine}Skipping further messages for this board (max 2 {logType} messages every 5 minutes)");
                     return;
                 }
 

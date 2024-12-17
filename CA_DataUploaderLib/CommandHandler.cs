@@ -33,8 +33,8 @@ namespace CA_DataUploaderLib
         private readonly TaskCompletionSource _runningTaskTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly bool _isMultipi;
         private readonly List<ChannelWriter<DataVector>> _receivedVectorsWriters = [];
-        private readonly Queue<EventFiredArgs> _locallyFiredEvents = new();
-
+        private readonly Channel<EventFiredArgs> _locallyFiredEvents = Channel.CreateBounded<EventFiredArgs>(
+            new BoundedChannelOptions(200) { FullMode = BoundedChannelFullMode.DropOldest });
         /// <remarks>
         /// This method is not thread safe, so in general call it from the main thread/async flow before the program cycles are started.
         /// The only additional cycle that is allowed to call it is the decision cycle *before* the first decision.
@@ -280,20 +280,24 @@ namespace CA_DataUploaderLib
         public void FireCustomEvent(string msg, DateTime timespan, byte eventType) 
         {
             EventFired?.Invoke(this, new EventFiredArgs(msg, eventType, timespan));
-            lock (_locallyFiredEvents)
-                _locallyFiredEvents.Enqueue(new EventFiredArgs(msg, eventType, timespan));
+            _locallyFiredEvents.Writer.TryWrite(new(msg, eventType, timespan));
         }
 
         /// <summary>
         /// Returns a (new) list of dequeued events.
         /// </summary>
         /// <param name="max">The maximum number of events to dequeue.</param>
+        /// <remarks>
+        /// If events are created at a higher rate than the host processes some events will never been returned by this method.
+        /// Subsystems normally throttle the error generation rate, but if some code path not doing that
+        /// sees repeating errors that causes more than 1k to be pending, the oldest events are dropped/skipped.
+        /// </remarks>
         public List<EventFiredArgs>? DequeueEvents(int max = int.MaxValue)
         {
             List<EventFiredArgs>? list = null; // delayed initialization to avoid creating lists when there is no data.
-            lock (_locallyFiredEvents)
-                for (int i = 0; i < max && _locallyFiredEvents.TryDequeue(out var e); i++)
-                    (list ??= []).Add(e);
+            var reader = _locallyFiredEvents.Reader;
+            for (int i = 0; i < max && reader.TryRead(out var e); i++)
+                (list ??= []).Add(e);
             return list;
         }
 
