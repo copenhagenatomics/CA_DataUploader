@@ -165,6 +165,9 @@ $@"{hostAssembly?.GetName()}
 
         private static string? GetCPU()
         {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                return DULutil.ExecuteShellCommand("sysctl -n machdep.cpu.brand_string").Trim();
+
             if (_OS.Platform == PlatformID.Unix)
                 return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").SplitNewLine().First().Substring(18).Trim();
 
