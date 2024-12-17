@@ -290,7 +290,7 @@ namespace CA_DataUploaderLib
         /// <remarks>
         /// If events are created at a higher rate than the host processes some events will never been returned by this method.
         /// Subsystems normally throttle the error generation rate, but if some code path not doing that
-        /// sees repeating errors that causes more than 1k to be pending, the oldest events are dropped/skipped.
+        /// sees repeating errors that causes more than 200 events to be pending, the oldest events are dropped/skipped.
         /// </remarks>
         public List<EventFiredArgs>? DequeueEvents(int max = int.MaxValue)
         {
