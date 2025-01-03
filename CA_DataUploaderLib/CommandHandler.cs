@@ -210,12 +210,12 @@ namespace CA_DataUploaderLib
             OrderDecisionsBasedOnIOconf(_decisions);
             var decisions = _decisions.Concat(_safetydecisions);
             SetConfigBasedOnIOconf(decisions);
-            Logger.LogData(LogID.A, $"Decisions order: {string.Join(',', decisions.Select(d => d.Name))}");
+            Logger.LogData(LogID.A, $"Decisions order: {string.Join(", ", decisions.Select(d => d.Name))}");
             var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type) { Upload = f.Upload })).ToList();
             var desc = new ExtendedVectorDescription(_ioconf, inputsPerNode, globalInputs, outputs);
-            CA.LoopControlPluginBase.VectorDescription inmutableVectorDesc = new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray());
+            CA.LoopControlPluginBase.VectorDescription immutableVectorDesc = new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray());
             foreach (var decision in decisions)
-                decision.Initialize(inmutableVectorDesc);
+                decision.Initialize(immutableVectorDesc);
             FullVectorDescriptionCreated?.Invoke(this, desc.VectorDescription);
             FullVectorIndexesCreated?.Invoke(
                 this, desc.VectorDescription._items.Select((f, i) => (name: f.Descriptor, i)).ToDictionary(f => f.name, f => f.i));
