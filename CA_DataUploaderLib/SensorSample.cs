@@ -18,7 +18,7 @@ namespace CA_DataUploaderLib
         private DateTime _timeStamp;
         public DateTime TimeStamp 
         { 
-            get { return _timeStamp; }
+            get => _timeStamp;
             set { ReadSensor_LoopTime = value.Subtract(_timeStamp).TotalMilliseconds; _timeStamp = value; }
         } 
         public double ReadSensor_LoopTime { get; private set; }  // in milliseconds. 
@@ -45,14 +45,7 @@ namespace CA_DataUploaderLib
             public new IOconfInput Input => base.Input!;
 
             public bool HasSpecialDisconnectValue() => Input.IsSpecialDisconnectValue(Value);
-            public InputBased Clone()
-            {
-                return new InputBased(Input, Value)
-                {
-                    _timeStamp = TimeStamp,
-                    ReadSensor_LoopTime = ReadSensor_LoopTime
-                };
-            }
+            public InputBased Clone() => new(Input, Value);
         }
     }
 }
