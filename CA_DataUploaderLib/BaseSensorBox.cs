@@ -248,14 +248,7 @@ namespace CA_DataUploaderLib
         {
             var subsystem = args[0].ToLower();
             var isMainCommand = subsystem == mainSubsystem;
-            StringBuilder sb;
-            if (isMainCommand)
-            {
-                sb = new StringBuilder($"NAME      {GetAvgLoopTime(),4:N0}           ");
-                sb.AppendLine();
-            }
-            else
-                sb = new StringBuilder();
+            StringBuilder sb = new();
             foreach (var t in _localValues)
             {
                 string? subsystemOverride = t.Input.SubsystemOverride;
@@ -267,7 +260,6 @@ namespace CA_DataUploaderLib
             _cmd.Logger.LogInfo(LogID.A, sb.ToString());
         }
 
-        private double GetAvgLoopTime() => _values.Average(x => x.ReadSensor_LoopTime);
         private async Task RunBoardLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             long start = _cmd.Time.GetTimestamp();
@@ -790,7 +782,7 @@ namespace CA_DataUploaderLib
             NodeUnreachable = -1, // can be used by distributed deployments to indicate the node that has the board is unreachable
             Disconnected = 0, // we are not currently connected to the board
             Connecting = 1, // we are attempting to reconnect to the board
-            Connected = 2, // we have succesfully connected to the board and will soon be attempting to read from it
+            Connected = 2, // we have successfully connected to the board and will soon be attempting to read from it
             ReadError = 3, // there are unexpected exceptions communicating with the board
             NoDataAvailable = 4, // we are connected to the box, but we have not received for 150ms+
             ReturningNonValues = 5, // we are getting data from the box, but these are not values lines
