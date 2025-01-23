@@ -248,14 +248,7 @@ namespace CA_DataUploaderLib
         {
             var subsystem = args[0].ToLower();
             var isMainCommand = subsystem == mainSubsystem;
-            StringBuilder sb;
-            if (isMainCommand)
-            {
-                sb = new StringBuilder($"NAME      {GetAvgLoopTime(),4:N0}           ");
-                sb.AppendLine();
-            }
-            else
-                sb = new StringBuilder();
+            StringBuilder sb = new();
             foreach (var t in _localValues)
             {
                 string? subsystemOverride = t.Input.SubsystemOverride;
@@ -267,7 +260,6 @@ namespace CA_DataUploaderLib
             _cmd.Logger.LogInfo(LogID.A, sb.ToString());
         }
 
-        private double GetAvgLoopTime() => _values.Average(x => x.ReadSensor_LoopTime);
         private async Task RunBoardLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             long start = _cmd.Time.GetTimestamp();
