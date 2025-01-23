@@ -21,7 +21,6 @@ namespace CA_DataUploaderLib
             get => _timeStamp;
             set => _timeStamp = value;
         } 
-        public double ReadSensor_LoopTime { get; private set; }  // in milliseconds. 
         internal int InvalidReadsRemainingAttempts { get; set; } = 3000; //3k attempts = 5 (mins) x 60 (seconds) x 10 (cycles x second). The attempts are reset whenever we get valid values
 
         public SensorSample(IOconfInput input, double value = 0)
