@@ -15,8 +15,7 @@ namespace CA_DataUploaderLib
             .Concat(ioconf.GetEntries<IOconfOut230Vac>()
                 .GroupBy(p => p.BoxName)
                 .Where(g => !g.Any(p => p.PortNumber > 4)) //avoid port 5 board temperature conflict with boards that support 5 or more ports (without temperatures)
-                .Select(g => g.First().GetBoardTemperatureInputConf()))
-            .Concat(ioconf.GetEntries<IOconfSwitchboardSensor>().SelectMany(i => i.GetExpandedConf())))
+                .Select(g => g.First().GetBoardTemperatureInputConf())))
         {
             //we ignore remote boards and boards missing during the start sequence (as we don't have auto reconnect logic yet for those). Note the BaseSensorBox already reports the missing local boards.
             foreach (var port in ioconf.GetEntries<IOconfOut230Vac>().Where(p => p.Map.IsLocalBoard && p.Map.McuBoard != null))

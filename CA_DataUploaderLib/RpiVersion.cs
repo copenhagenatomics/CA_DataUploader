@@ -166,7 +166,7 @@ $@"{hostAssembly?.GetName()}
         private static string? GetCPU()
         {
             if (_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").SplitNewLine().First().Substring(18).Trim();
+                return DULutil.ExecuteShellCommand("lscpu | grep 'Model name'").SplitNewLine().First().Substring(18).Trim();
 
             return Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE");
         }
@@ -182,7 +182,7 @@ $@"{hostAssembly?.GetName()}
         private static int GetNumberOfCores()
         {
             if (_OS.Platform == PlatformID.Unix)
-                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'model name'").SplitNewLine().Count;
+                return DULutil.ExecuteShellCommand("cat /proc/cpuinfo | grep 'processor'").SplitNewLine().Count;
 
             return Environment.ProcessorCount;
         }
