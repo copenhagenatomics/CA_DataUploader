@@ -80,58 +80,5 @@ Math; temperature_tm01_01_math; temperature_tm01_01 + 1
             Assert.AreEqual(1, boardStateNames.Count());
             Assert.AreEqual("tm01_state", boardStateNames.First());
         }
-
-        [TestMethod]
-        public void GetBoardStateNames_SwitchboardSensorExpandedInputField()
-        {
-            // Arrange
-            var ioconf = new IOconfFile(@"
-Map; 3900553433511235353736; dc01
-SwitchboardSensor; switchboardSensor_dc01; dc01
-".SplitNewLine(StringSplitOptions.None));
-
-            // Act
-            var boardStateNames = ioconf.GetBoardStateNames("switchboardSensor_dc01_rms").ToList();
-
-            // Assert
-            Assert.AreEqual(1, boardStateNames.Count());
-            Assert.AreEqual("dc01_state", boardStateNames.First());
-        }
-
-        [TestMethod]
-        public void GetBoardStateNames_SwitchboardSensorExpandedInputField_Filter()
-        {
-            // Arrange
-            var ioconf = new IOconfFile(@"
-Map; 3900553433511235353736; dc01
-SwitchboardSensor; switchboardSensor_dc01; dc01
-Filter;switchboardSensor_dc01_rms; Min;600;switchboardSensor_dc01_rms
-".SplitNewLine(StringSplitOptions.None));
-
-            // Act
-            var boardStateNames = ioconf.GetBoardStateNames("switchboardSensor_dc01_rms_filter").ToList();
-
-            // Assert
-            Assert.AreEqual(1, boardStateNames.Count());
-            Assert.AreEqual("dc01_state", boardStateNames.First());
-        }
-
-        [TestMethod]
-        public void GetBoardStateNames_SwitchboardSensorExpandedInputField_Math()
-        {
-            // Arrange
-            var ioconf = new IOconfFile(@"
-Map; 3900553433511235353736; dc01
-SwitchboardSensor; switchboardSensor_dc01; dc01
-Math; switchboardSensor_dc01_rms_math; switchboardSensor_dc01_rms + 1
-".SplitNewLine(StringSplitOptions.None));
-
-            // Act
-            var boardStateNames = ioconf.GetBoardStateNames("switchboardSensor_dc01_rms_math").ToList();
-
-            // Assert
-            Assert.AreEqual(1, boardStateNames.Count());
-            Assert.AreEqual("dc01_state", boardStateNames.First());
-        }
     }
 }

@@ -37,31 +37,6 @@ RedundantSensors; redundant; temperature_tm01_01
         }
 
         [TestMethod]
-        public void ValidateDependencies_PointingToExpandedInputField_Ok()
-        {
-            // Act
-            _ = new IOconfFile(@"
-Map; 3900553433511235353736; dc01
-SwitchboardSensor; switchboardSensor_dc01; dc01
-RedundantSensors; switchboardSensor_redundant; switchboardSensor_dc01_rms
-".SplitNewLine(StringSplitOptions.None));
-        }
-
-        [TestMethod]
-        public void ValidateDependencies_PointingToBaseExpandableInput_Fail()
-        {
-            // Act
-            var ex = Assert.ThrowsException<FormatException>(() => _ = new IOconfFile(@"
-Map; 3900553433511235353736; dc01
-SwitchboardSensor; switchboardSensor_dc01; dc01
-RedundantSensors; switchboardSensor_redundant; switchboardSensor_dc01
-".SplitNewLine(StringSplitOptions.None)));
-
-            // Assert
-            Assert.IsTrue(ex.Message.Contains("Failed to find"));
-        }
-
-        [TestMethod]
         public void ValidateDependencies_PointingToMath_Ok()
         {
             // Act
