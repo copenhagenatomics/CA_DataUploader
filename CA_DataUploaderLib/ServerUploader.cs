@@ -210,7 +210,7 @@ namespace CA_DataUploaderLib
             var client = new HttpClient
             {
                 BaseAddress = new Uri(loopServer),
-                Timeout = TimeSpan.FromSeconds(5)
+                Timeout = TimeSpan.FromSeconds(10)
             };
             var response = await client.GetAsync("/api/v1/LoopControl/PingTest", token);
             return response.IsSuccessStatusCode;
