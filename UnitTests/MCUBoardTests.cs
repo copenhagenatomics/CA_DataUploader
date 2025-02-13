@@ -88,13 +88,11 @@ namespace UnitTests
             var pipe = new Pipe();
             var (reader, writer) = (pipe.Reader, pipe.Writer);
             await Write(writer, "1\n");
-            var expectSerialCommand = false;
             var header = new MCUBoard.Header();
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.IsTrue(expectSerialCommand,"unexpected Serial"), "myport");
+            var serialCallsReceived = 0;
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
             await Write(writer, "2\n");
-            expectSerialCommand = true;
             await Write(writer, "3\n");
-            expectSerialCommand = false;
             await Write(writer, "Serial Number: 1234\n");
             await Write(writer, "Product Type: Custom Board\n");
             await Write(writer, "Sub Product Type: 0\n");
@@ -113,6 +111,7 @@ namespace UnitTests
             Assert.AreEqual("1-1-2023", header.SoftwareCompileDate);
             Assert.AreEqual("abcd", header.GitSha);
             Assert.AreEqual("1.2", header.PcbVersion);
+            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
         }
 
         [TestMethod]
@@ -121,13 +120,11 @@ namespace UnitTests
             var pipe = new Pipe();
             var (reader, writer) = (pipe.Reader, pipe.Writer);
             await Write(writer, "1\n");
-            var expectSerialCommand = false;
             var header = new MCUBoard.Header();
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.IsTrue(expectSerialCommand,"unexpected Serial"), "myport");
+            var serialCallsReceived = 0;
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
             await Write(writer, "2\n");
-            expectSerialCommand = true;
             await Write(writer, "3\n");
-            expectSerialCommand = false;
             await Write(writer, "Serial Number: 1234\n");
             await Write(writer, "Product Type: Custom Board\n");
             await Write(writer, "Sub Product Type: 0\n");
@@ -148,6 +145,7 @@ namespace UnitTests
             Assert.AreEqual("abcd", header.GitSha);
             Assert.AreEqual("1.2", header.PcbVersion);
             Assert.AreEqual("abc", header.Calibration);
+            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
         }
 
         [TestMethod]
@@ -156,13 +154,11 @@ namespace UnitTests
             var pipe = new Pipe();
             var (reader, writer) = (pipe.Reader, pipe.Writer);
             await Write(writer, "1\n");
-            var expectSerialCommand = false;
             var header = new MCUBoard.Header();
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.IsTrue(expectSerialCommand,"unexpected Serial"), "myport");
+            var serialCallsReceived = 0;
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
             await Write(writer, "2\n");
-            expectSerialCommand = true;
             await Write(writer, "3\n");
-            expectSerialCommand = false;
             await Write(writer, "Serial Number: 1234\n");
             await Write(writer, "Product Type: Custom Board\n");
             await Write(writer, "Sub Product Type: 0\n");
@@ -184,6 +180,7 @@ namespace UnitTests
             Assert.AreEqual("abcd", header.GitSha);
             Assert.AreEqual("1.2", header.PcbVersion);
             Assert.AreEqual("abc", header.Calibration);
+            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
         }
 
         [TestMethod]
@@ -192,13 +189,11 @@ namespace UnitTests
             var pipe = new Pipe();
             var (reader, writer) = (pipe.Reader, pipe.Writer);
             await Write(writer, "1\n");
-            var expectSerialCommand = false;
             var header = new MCUBoard.Header();
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.IsTrue(expectSerialCommand,"unexpected Serial"), "myport");
+            var serialCallsReceived = 0;
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
             await Write(writer, "2\n");
-            expectSerialCommand = true;
             await Write(writer, "3\n");
-            expectSerialCommand = false;
             await Write(writer, "Serial Number:\n");
             await Write(writer, "Product Type:\n");
             await Write(writer, "Sub Product Type:\n");
@@ -217,6 +212,7 @@ namespace UnitTests
             Assert.AreEqual("", header.SoftwareCompileDate);
             Assert.AreEqual("", header.GitSha);
             Assert.AreEqual("", header.PcbVersion);
+            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
         }
 
         [TestMethod]
@@ -228,13 +224,11 @@ namespace UnitTests
             await Write(writer, "1\n");
             var time = new FakeTimeProvider();
             var logger = new StringBuilderLogger();
-            var expectSerialCommand = false;
             var header = new MCUBoard.Header(new(time, logger, Mock.Of<MCUBoard.IConnectionManager>(MockBehavior.Strict)));
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.IsTrue(expectSerialCommand,"unexpected Serial"), "myport");
+            var serialCallsReceived = 0;
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
             await Write(writer, "2\n");
-            expectSerialCommand = true;
             await Write(writer, "3\n");
-            expectSerialCommand = false;
             await Write(writer, "Serial Number: 123\n");
             await Write(writer, "Some unexpected failure\n");
             await Write(writer, "4:\n");
@@ -255,7 +249,7 @@ Some unexpected failure
 
 ";
             Assert.AreEqual(expectedLog, logger.ToString());
-            
+            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
         }
 
         [TestMethod]
@@ -264,13 +258,11 @@ Some unexpected failure
             var pipe = new Pipe();
             var (reader, writer) = (pipe.Reader, pipe.Writer);
             await Write(writer, "1\n");
-            var expectSerialCommand = false;
             var header = new MCUBoard.Header();
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.IsTrue(expectSerialCommand,"unexpected Serial"), "myport");
+            var serialCallsReceived = 0;
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
             await Write(writer, "2\n");
-            expectSerialCommand = true;
             await Write(writer, "3\n");
-            expectSerialCommand = false;
             await Write(writer, "Serial Number: 1234\n");
             await Write(writer, "Product Type: Custom Board\n");
             await Write(writer, "Sub Product Type: 0\n");
@@ -287,6 +279,7 @@ Some unexpected failure
             await Write(writer, "4\n");
             Assert.IsTrue(await res);
             Assert.AreEqual("4", await ReadLine(reader));
+            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
         }
 
 

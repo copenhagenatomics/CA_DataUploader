@@ -472,7 +472,7 @@ namespace CA_DataUploaderLib
 
             public async Task<bool> DetectBoardHeader(PipeReader pipeReader, TryReadLineDelegate tryReadLine, Action resendSerial, string port)
             {
-                var (sentSerialCommandTwice, ableToRead, finishedReadingHeader) = (false, false, false);
+                var (sentSerial, sentSerialCommandTwice, ableToRead, finishedReadingHeader) = (false, false, false, false);
                 var (readSerialNumber, readProductType, readSoftwareVersion, readPcbVersion) = (false, false, false, false);
                 using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(5000), Dependencies.TimeProvider); // we use a cancellation token for the timeout as ReadAsync can otherwise hang if a device never sends a line
                 var token = cts.Token;
@@ -497,8 +497,9 @@ namespace CA_DataUploaderLib
                         {
                             linesRead.AppendLine(input);
                             ableToRead |= input.Length >= 2;
-                            if (linesRead.Length == 2)
+                            if (linesRead.Length > 2 && !sentSerial)
                             {
+                                sentSerial = true;
                                 //the boards clear the usb buffers around the time they send out the first line,
                                 //by waiting for the second line of output before sending the Serial command, we remove the risk of it being lost during that reset.
                                 resendSerial();
