@@ -251,7 +251,6 @@ namespace CA_DataUploaderLib
                 return true;
             }
 
-            port.WriteLine("Serial");
             var header = new Header(dependencies);
             var ableToRead = await header.DetectBoardHeader(pipeReader, TryReadLine, () => port.WriteLine("Serial"), $"{PortName} ({port.BaudRate})");
             header.CopyTo(this);
@@ -498,6 +497,13 @@ namespace CA_DataUploaderLib
                         {
                             linesRead.AppendLine(input);
                             ableToRead |= input.Length >= 2;
+                            if (linesRead.Length == 2)
+                            {
+                                //the boards clear the usb buffers around the time they send out the first line,
+                                //by waiting for the second line of output before sending the Serial command, we remove the risk of it being lost during that reset.
+                                resendSerial();
+                            }
+
                             input = input.Trim();
                             if (input.StartsWith(serialNumberHeader))
                                 (readSerialNumber, SerialNumber) = (true, input[(input.IndexOf(serialNumberHeader) + serialNumberHeader.Length)..].Trim());
@@ -654,9 +660,7 @@ namespace CA_DataUploaderLib
                 public PipeReader GetPipeReader()
                 {
                     port.Open();
-                    var reader = PipeReader.Create(port.BaseStream);
-                    Thread.Sleep(100); // it needs to wait that the board registers that the COM port has been opened before sending commands (work arounds issue when first opening the connection and sending serial).
-                    return reader;
+                    return PipeReader.Create(port.BaseStream);
                 }
 
                 public void WriteLine(string msg) => port.WriteLine(msg);
