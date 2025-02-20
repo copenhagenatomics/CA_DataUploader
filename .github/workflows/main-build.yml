@@ -19,7 +19,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0'
+        dotnet-version: '9.0'
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
@@ -46,7 +46,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0'
+        dotnet-version: '9.0'
     - name: Generate DataUploader - linux-x64
       run: dotnet publish CA_DataUploader -c Release -o out/linux-x64/uploader -r linux-x64 -p:PublishSingleFile=true
     - name: Generate DataUploader - linux-arm
