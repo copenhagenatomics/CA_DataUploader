@@ -27,8 +27,8 @@ namespace CA_DataUploaderLib
         private readonly List<ISubsystemWithVectorData> _subsystems = [];
         private int AcceptedCommandsIndex = -1;
         private readonly List<LoopControlDecision> _decisions = [];
-        private readonly List<LoopControlDecision> _safetydecisions = [];
-        private readonly Lazy<ExtendedVectorDescription> _fullsystemFilterAndMath;
+        private readonly List<LoopControlDecision> _safetyDecisions = [];
+        private readonly Lazy<ExtendedVectorDescription> _fullSystemFilterAndMath;
         private readonly CancellationTokenSource _exitCts = new();
         private readonly TaskCompletionSource _runningTaskTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly bool _isMultipi;
@@ -72,7 +72,7 @@ namespace CA_DataUploaderLib
             _commandRunner = runner ?? new DefaultCommandRunner();
             _ioconf = ioconf;
             _mapper = mapper;
-            _fullsystemFilterAndMath = new Lazy<ExtendedVectorDescription>(GetFullSystemFilterAndMath);
+            _fullSystemFilterAndMath = new Lazy<ExtendedVectorDescription>(GetFullSystemFilterAndMath);
             if (runCommandLoop)
                 _ = Task.Run(LoopForever);
             AddCommand("escape", _ => Stop());
@@ -124,7 +124,7 @@ namespace CA_DataUploaderLib
         }
         /// <remarks>all decisions must be added before running any subsystem, making decisions or getting vector descriptions i.e. add these early on</remarks>
         public void AddDecisions<T>(List<T> decisions) where T: LoopControlDecision => AddDecisions(decisions, _decisions);
-        public void AddSafetyDecisions<T>(List<T> decisions) where T : LoopControlDecision => AddDecisions(decisions, _safetydecisions);
+        public void AddSafetyDecisions<T>(List<T> decisions) where T : LoopControlDecision => AddDecisions(decisions, _safetyDecisions);
         private void AddDecisions<T>(List<T> decisions, List<LoopControlDecision> targetList) where T : LoopControlDecision
         {
             //This just avoids the commands being reported as rejected for now, but the way to go about in the long run is to add detection of the executed commands by looking at the vectors.
@@ -140,12 +140,12 @@ namespace CA_DataUploaderLib
         public void Execute(string command, bool isUserCommand = false) => HandleCommand(command, isUserCommand);
         public void AddSubsystem(ISubsystemWithVectorData subsystem) => _subsystems.Add(subsystem);
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
-        public ExtendedVectorDescription GetExtendedVectorDescription() => _fullsystemFilterAndMath.Value;
+        public ExtendedVectorDescription GetExtendedVectorDescription() => _fullSystemFilterAndMath.Value;
         public IEnumerable<SensorSample> GetNodeInputs() => _subsystems.SelectMany(s => s.GetInputValues());
         public IEnumerable<SensorSample> GetGlobalInputs() => _subsystems.SelectMany(s => s.GetGlobalInputValues());
         public void MakeDecision(List<SensorSample> inputs, DateTime vectorTime, [NotNull] ref DataVector? vector, List<string> commands)
         {
-            var extendedDesc = _fullsystemFilterAndMath.Value;
+            var extendedDesc = _fullSystemFilterAndMath.Value;
             DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, vectorTime);
             extendedDesc.ApplyInputsTo(inputs, vector);
             MakeDecisionsAfterInputs(vector, commands, extendedDesc);
@@ -153,7 +153,7 @@ namespace CA_DataUploaderLib
 
         public void MakeDecisionUsingInputsFromNewVector(DataVector newVector, DataVector vector, List<string> events)
         {
-            var extendedDesc = _fullsystemFilterAndMath.Value;
+            var extendedDesc = _fullSystemFilterAndMath.Value;
             DataVector.InitializeOrUpdateTime(ref vector, extendedDesc.VectorDescription.Length, newVector.Timestamp);
             extendedDesc.CopyInputsTo(newVector, vector);
             MakeDecisionsAfterInputs(vector, events, extendedDesc);
@@ -165,7 +165,7 @@ namespace CA_DataUploaderLib
             var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.Timestamp, vector.Data);
             foreach (var decision in _decisions)
                 decision.MakeDecision(decisionsVector, commands);
-            foreach (var decision in _safetydecisions)
+            foreach (var decision in _safetyDecisions)
                 decision.MakeDecision(decisionsVector, commands);
         }
 
@@ -208,14 +208,14 @@ namespace CA_DataUploaderLib
                 .ToList();
             var globalInputs = descItemsPerSubsystem.SelectMany(s => s.GlobalInputs).ToList();
             OrderDecisionsBasedOnIOconf(_decisions);
-            var decisions = _decisions.Concat(_safetydecisions);
+            var decisions = _decisions.Concat(_safetyDecisions);
             SetConfigBasedOnIOconf(decisions);
-            Logger.LogData(LogID.A, $"Decisions order: {string.Join(',', decisions.Select(d => d.Name))}");
+            Logger.LogData(LogID.A, $"Decisions order: {string.Join(", ", decisions.Select(d => d.Name))}");
             var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type) { Upload = f.Upload })).ToList();
             var desc = new ExtendedVectorDescription(_ioconf, inputsPerNode, globalInputs, outputs);
-            CA.LoopControlPluginBase.VectorDescription inmutableVectorDesc = new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray());
+            CA.LoopControlPluginBase.VectorDescription immutableVectorDesc = new(desc.VectorDescription._items.Select(i => i.Descriptor).ToArray());
             foreach (var decision in decisions)
-                decision.Initialize(inmutableVectorDesc);
+                decision.Initialize(immutableVectorDesc);
             FullVectorDescriptionCreated?.Invoke(this, desc.VectorDescription);
             FullVectorIndexesCreated?.Invoke(
                 this, desc.VectorDescription._items.Select((f, i) => (name: f.Descriptor, i)).ToDictionary(f => f.name, f => f.i));
