@@ -454,8 +454,8 @@ namespace CA_DataUploaderLib
             var lastValidReadTime = _cmd.Time.GetTimestamp();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
             var timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
-            long lastLogInfoTime = 0, lastLogErrorTime = 0, lastMultilineMessageTime = 0;
-            int logInfoSkipped = 0, logErrorSkipped = 0, multilineMessageSkipped = 0;
+            long lastLogInfoTime = 0, lastLogErrorTime = 0, lastLogBoardErrorTime = 0, lastLogBoardOkTime = 0, lastMultilineMessageTime = 0;
+            int logInfoSkipped = 0, logErrorSkipped = 0, logBoardErrorSkipped = 0, logBoardOkSkipped = 0, multilineMessageSkipped = 0;
             MultilineMessageReceiver multilineMessageReceiver = new((message) => LowFrequencyMultilineMessage((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)));
             //We set the state early if we detect no data is being returned or if we received values,
             //but we only set ReturningNonValues if it has passed timeBetweenReads since the last valid read
@@ -482,17 +482,20 @@ namespace CA_DataUploaderLib
 
                         if (status != _lastStatus && (status & 0x01000000) != 0) // Flash ongoing?
                             timeBetweenReads = TimeSpan.FromSeconds(1.5);
-                        if (status != _lastStatus && (status & 0x01000000) == 0 && (_lastStatus & 0x01000000) != 0) // Flash done?
+                        if ((status & 0x01000000) == 0 && (_lastStatus & 0x01000000) != 0) // Flash done?
                             timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
-                        if (status != _lastStatus && (status & 0x80000000) != 0) // Error?
+                        if ((status & 0x80000000) != 0 && (_lastStatus & 0x80000000) == 0) // Error?
                         {
-                            LowFrequencyLogError((args, skipMessage) =>
-                            { 
+                            LowFrequencyLogBoardError((args, skipMessage) =>
+                            {
                                 LogError(args.board, $"Board responded with error status 0x{args.status:X}{skipMessage}");
                                 if (_boardCustomCommands.TryGetValue(board, out var customCommandsChannel))
                                     customCommandsChannel.Writer.TryWrite("Status");
                             }, (board, status));
-                            
+                        }
+                        if ((status & 0x80000000) == 0 && (_lastStatus & 0x80000000) != 0) // Error gone?
+                        {
+                            LowFrequencyLogBoardOk((args, skipMessage) => LogError(args.board, $"Board responded with ok status 0x{args.status:X}{skipMessage}"), (board, status));
                         }
                         _lastStatus = status;
                     }
@@ -513,6 +516,8 @@ namespace CA_DataUploaderLib
 
             void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "info", args, ref lastLogInfoTime, ref logInfoSkipped);
             void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "error", args, ref lastLogErrorTime, ref logErrorSkipped);
+            void LowFrequencyLogBoardError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "board error", args, ref lastLogBoardErrorTime, ref logBoardErrorSkipped);
+            void LowFrequencyLogBoardOk<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "board ok", args, ref lastLogBoardOkTime, ref logBoardOkSkipped);
             void LowFrequencyMultilineMessage<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "multiline", args, ref lastMultilineMessageTime, ref multilineMessageSkipped);
 
             void LowFrequencyLog<T>(Action<T, string> logAction, string logType, T args, ref long lastLogTime, ref int logSkipped)
