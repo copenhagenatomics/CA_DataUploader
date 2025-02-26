@@ -89,8 +89,7 @@ namespace UnitTests
             var (reader, writer) = (pipe.Reader, pipe.Writer);
             await Write(writer, "1\n");
             var header = new MCUBoard.Header();
-            var serialCallsReceived = 0;
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
             await Write(writer, "2\n");
             await Write(writer, "3\n");
             await Write(writer, "Serial Number: 1234\n");
@@ -111,7 +110,6 @@ namespace UnitTests
             Assert.AreEqual("1-1-2023", header.SoftwareCompileDate);
             Assert.AreEqual("abcd", header.GitSha);
             Assert.AreEqual("1.2", header.PcbVersion);
-            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
         }
 
         [TestMethod]
@@ -121,8 +119,7 @@ namespace UnitTests
             var (reader, writer) = (pipe.Reader, pipe.Writer);
             await Write(writer, "1\n");
             var header = new MCUBoard.Header();
-            var serialCallsReceived = 0;
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
             await Write(writer, "2\n");
             await Write(writer, "3\n");
             await Write(writer, "Serial Number: 1234\n");
@@ -145,7 +142,6 @@ namespace UnitTests
             Assert.AreEqual("abcd", header.GitSha);
             Assert.AreEqual("1.2", header.PcbVersion);
             Assert.AreEqual("abc", header.Calibration);
-            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
         }
 
         [TestMethod]
@@ -155,8 +151,7 @@ namespace UnitTests
             var (reader, writer) = (pipe.Reader, pipe.Writer);
             await Write(writer, "1\n");
             var header = new MCUBoard.Header();
-            var serialCallsReceived = 0;
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
             await Write(writer, "2\n");
             await Write(writer, "3\n");
             await Write(writer, "Serial Number: 1234\n");
@@ -180,7 +175,6 @@ namespace UnitTests
             Assert.AreEqual("abcd", header.GitSha);
             Assert.AreEqual("1.2", header.PcbVersion);
             Assert.AreEqual("abc", header.Calibration);
-            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
         }
 
         [TestMethod]
@@ -190,8 +184,7 @@ namespace UnitTests
             var (reader, writer) = (pipe.Reader, pipe.Writer);
             await Write(writer, "1\n");
             var header = new MCUBoard.Header();
-            var serialCallsReceived = 0;
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
             await Write(writer, "2\n");
             await Write(writer, "3\n");
             await Write(writer, "Serial Number:\n");
@@ -212,7 +205,6 @@ namespace UnitTests
             Assert.AreEqual("", header.SoftwareCompileDate);
             Assert.AreEqual("", header.GitSha);
             Assert.AreEqual("", header.PcbVersion);
-            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
         }
 
         [TestMethod]
@@ -225,8 +217,7 @@ namespace UnitTests
             var time = new FakeTimeProvider();
             var logger = new StringBuilderLogger();
             var header = new MCUBoard.Header(new(time, logger, Mock.Of<MCUBoard.IConnectionManager>(MockBehavior.Strict)));
-            var serialCallsReceived = 0;
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
             await Write(writer, "2\n");
             await Write(writer, "3\n");
             await Write(writer, "Serial Number: 123\n");
@@ -249,7 +240,7 @@ Some unexpected failure
 
 ";
             Assert.AreEqual(expectedLog, logger.ToString());
-            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
+            
         }
 
         [TestMethod]
@@ -259,8 +250,7 @@ Some unexpected failure
             var (reader, writer) = (pipe.Reader, pipe.Writer);
             await Write(writer, "1\n");
             var header = new MCUBoard.Header();
-            var serialCallsReceived = 0;
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => serialCallsReceived++, "myport");
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
             await Write(writer, "2\n");
             await Write(writer, "3\n");
             await Write(writer, "Serial Number: 1234\n");
@@ -279,7 +269,6 @@ Some unexpected failure
             await Write(writer, "4\n");
             Assert.IsTrue(await res);
             Assert.AreEqual("4", await ReadLine(reader));
-            Assert.AreEqual(1, serialCallsReceived, "Serial calls received");
         }
 
 
