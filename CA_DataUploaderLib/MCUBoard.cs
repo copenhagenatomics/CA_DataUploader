@@ -155,7 +155,7 @@ namespace CA_DataUploaderLib
         /// </summary>
         /// <returns><c>false</c> if the reconnect attempt failed.</returns>
         /// <remarks>
-        /// The reconnection is only considered succesfull after the board returns the first non empty line within <see cref="BoardSettings.MaxMillisecondsWithoutNewValues"/>.
+        /// The reconnection is only considered successful after the board returns the first non empty line within <see cref="BoardSettings.MaxMillisecondsWithoutNewValues"/>.
         /// Any initial empty lines returned by the board are skipped.
         /// 
         /// Log entries about te attempt to reopen the connection are added to <see cref="LogID.B"/>, but not to the console / event log.
@@ -289,7 +289,7 @@ namespace CA_DataUploaderLib
                         if (finishedDetection && detectedInfo != default)
                             return detectedInfo; //confirmed it is a third party, leave pipeReader data not examined so next read processes data available right away
                         if (finishedDetection && detectedInfo == default)
-                            break; //move to next third party. Note data is not set as examined in the pipeReader so ReadAsync returns inmediately with already read data.
+                            break; //move to next third party. Note data is not set as examined in the pipeReader so ReadAsync returns immediately with already read data.
 
                         // set all data as examined as we need more data to finish detection
                         pipeReader.AdvanceTo(buffer.Start, buffer.End);
@@ -341,8 +341,8 @@ namespace CA_DataUploaderLib
                         if (readLine)
                         {
                             //after reading a line, the call to tryReadLine above updates the buffer reference to start at the next line
-                            //by pointing examined to it, we are signaling we can inmediately use the data in the buffer 
-                            //so the first ReadAsync in the next ReadLine call does not wait for more data but returns inmediately.
+                            //by pointing examined to it, we are signaling we can immediately use the data in the buffer 
+                            //so the first ReadAsync in the next ReadLine call does not wait for more data but returns immediately.
                             //not doing this would be a memory leak if we already had a full line in the buffer (as we keep waiting for an extra line and over time the buffer keeps accumulating extra lines).
                             examined = buffer.Start;
                             return line ?? throw new InvalidOperationException("Unexpected null line returned by TryReadLineDelegate (probably from a custom read implementation)"); //we return a single line for now to keep a similar API before introducing the pipe reader, but would be fine to explore changing the API shape in the future
@@ -547,7 +547,7 @@ namespace CA_DataUploaderLib
                         {
                             finishedReadingHeader = true;
                             Calibration = UpdatedCalibration = calibration;
-                            buffer = buffer.Slice(0, 0);//don't advance the reader beyond the optional calibration line, so the next read does not unnecesarily fetches more data
+                            buffer = buffer.Slice(0, 0);//don't advance the reader beyond the optional calibration line, so the next read does not unnecessarily fetches more data
                         }
 
                         // Tell the PipeReader how much of the buffer has been consumed.
@@ -575,7 +575,7 @@ namespace CA_DataUploaderLib
 
                 void LogMissingHeader(string reason) => 
                     Dependencies.LogError(LogID.A, linesRead.Length > 0 ? $"Partial board header detected from {port}: {reason}{Environment.NewLine}{linesRead}" : $"Unable to read from {port}: {reason}");
-                // pcbVersion is included in this list because at the time of writting is the last value in the readEEPROM header, which avoids the rest of the header being treated as "values".
+                // pcbVersion is included in this list because at the time of writing is the last value in the readEEPROM header, which avoids the rest of the header being treated as "values".
                 bool ReadFullHeader() => readSerialNumber && readProductType && readSoftwareVersion && readPcbVersion;
                 ///<returns>true if it finished attempting to read the optional calibration, or false if more data is needed</returns>
                 bool TryReadOptionalCalibration(ref ReadOnlySequence<byte> buffer, out string? calibration)
