@@ -36,7 +36,7 @@ namespace CA_DataUploaderLib.IOconf
             Map = GetMap(ioconf, BoxName, _boardSettings, Skip);
         }
 
-        public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
+        public override IEnumerable<string> GetExpandedSensorNames()
         {
             yield return Name;
         }
@@ -107,12 +107,11 @@ namespace CA_DataUploaderLib.IOconf
                 Map = GetMap(ioconf, BoxName, _boardSettings, false);
             }
 
-            public virtual IEnumerable<IOconfInput> GetExpandedConf() => [];
-
-            public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
+            public virtual IEnumerable<IOconfInput> GetExpandedConf()
             {
-                foreach (var input in GetExpandedConf())
-                    yield return input.Name;
+                var portNumber = PortNumber;
+                foreach (var input in GetExpandedSensorNames())
+                    yield return NewInput(input, portNumber++);
             }
 
             public string BoxName { get; }

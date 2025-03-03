@@ -69,7 +69,7 @@ namespace CA_DataUploaderLib.IOconf
         public static List<LegacyFilter> LegacyFilters(IEnumerable<IOconfFilter> filters) => filters.Select(f => f._legacyFilter).OfType<LegacyFilter>().ToList();
         public static List<DecisionFilter> DecisionFilters(IEnumerable<IOconfFilter> filters) => filters.Select(f => f._decisionFilter).OfType<DecisionFilter>().ToList();
 
-        public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
+        public override IEnumerable<string> GetExpandedSensorNames()
         {
             yield return NameInVector;
         }

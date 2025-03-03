@@ -9,9 +9,9 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfMath : IOconfRow
     {
-        /// <summary>gets the sources (other vector values) listed explicitely in the math expression</summary>
+        /// <summary>gets the sources (other vector values) listed explicitly in the math expression</summary>
         /// <remarks>
-        /// Note the sources may include the math expression itself, which is the expression refering to its value in the previous cycle.
+        /// Note the sources may include the math expression itself, which is the expression referring to its value in the previous cycle.
         /// Also note that the sources returned may also refer to the math expression.
         /// </remarks>
         public List<string> SourceNames { get; }
@@ -42,7 +42,7 @@ namespace CA_DataUploaderLib.IOconf
             return (compiledExpression, sourceNames);
         }
 
-        public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
+        public override IEnumerable<string> GetExpandedSensorNames()
         {
             yield return Name;
         }
