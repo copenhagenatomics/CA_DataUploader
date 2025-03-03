@@ -76,17 +76,14 @@ namespace CA_DataUploaderLib.IOconf
         /// <summary>
         /// Returns the list of expanded vector field names from this class.
         /// </summary>
-        public virtual IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
-        {
-            return [];
-        }
+        public virtual IEnumerable<string> GetExpandedSensorNames() => [];
 
         /// <summary>
         /// Returns the full list of expanded vector field names from this class and it's associated decisions.
         /// </summary>
         public virtual IEnumerable<string> GetExpandedNames(IIOconf ioconf) 
         {
-            foreach (var name in GetExpandedSensorNames(ioconf))
+            foreach (var name in GetExpandedSensorNames())
                 yield return name;
             if (this is IIOconfRowWithDecision entryWithDecision)
             {

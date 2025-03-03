@@ -30,6 +30,8 @@ namespace CA_DataUploaderLib
         {
             protected IOconfRedundant(string row, int lineNum, string type) : base(row, lineNum, type) { }
 
+            public override IEnumerable<string> GetExpandedSensorNames() => [Name];
+
             public static IEnumerable<Decision.Config> ToDecisionConfigs(IEnumerable<IOconfRedundant> redundants, IIOconf ioconf)
             {
                 var invalidValueDelay = redundants.OfType<IOconfRedundantInvalidValueDelay>().SingleOrDefault()?.InvalidValueDelay ?? 0;
@@ -63,7 +65,7 @@ namespace CA_DataUploaderLib
             public override void ValidateDependencies(IIOconf ioconf)
             {
                 foreach (var sensor in Sensors)
-                    if (!ioconf.GetEntries<IOconfRow>().Any(e => e.GetExpandedSensorNames(ioconf).Contains(sensor)))
+                    if (!ioconf.GetEntries<IOconfRow>().Any(e => e.GetExpandedSensorNames().Contains(sensor)))
                         throw new FormatException($"Failed to find {sensor} for {RowType}: {Row}");
             }
 

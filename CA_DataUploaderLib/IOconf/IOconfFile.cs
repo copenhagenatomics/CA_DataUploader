@@ -134,7 +134,7 @@ namespace CA_DataUploaderLib.IOconf
                 sensorsChecked.UnionWith(sensors);
                 foreach (var input in GetEntries<IOconfRow>().Where(e => e is IIOconfRowWithBoardState))
                 {
-                    if (newSensors.Intersect(input.GetExpandedSensorNames(this)).Any())
+                    if (newSensors.Intersect(input.GetExpandedSensorNames()).Any())
                         yield return ((IIOconfRowWithBoardState)input).BoardStateName;
                 }
 

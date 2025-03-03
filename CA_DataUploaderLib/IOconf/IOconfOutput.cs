@@ -20,14 +20,11 @@ namespace CA_DataUploaderLib.IOconf
             if (PortNumber < 1) throw new Exception($"{type}: port numbers must start at 1 {row}");
         }
 
-        public virtual IEnumerable<IOconfInput> GetExpandedInputConf() => [];
-        protected IEnumerable<IOconfInput> GetExpandedInputConf(IEnumerable<string> suffixes) => 
-            suffixes.Select((s, i) => NewPortInput($"{Name}_{s}", PortNumber + i));
-
-        public override IEnumerable<string> GetExpandedSensorNames(IIOconf ioconf)
+        public virtual IEnumerable<IOconfInput> GetExpandedInputConf()
         {
-            foreach (var input in GetExpandedInputConf())
-                yield return input.Name;
+            var portNumber = PortNumber;
+            foreach (var input in GetExpandedSensorNames())
+                yield return NewPortInput(input, portNumber++);
         }
 
         public override void ValidateDependencies(IIOconf ioconf)
