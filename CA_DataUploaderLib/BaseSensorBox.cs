@@ -200,7 +200,7 @@ namespace CA_DataUploaderLib
             else actions.Add((writeAction, exitAction));
         }
 
-        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, double defaultTarget, string targetFieldName, Func<int, double, string> getCommand, int repeatMilliseconds = 2000)
+        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, double defaultTarget, string targetFieldName, Func<int, double, string> getCommand, int repeatMilliseconds = 1000)
         {
             var fieldIndex = -1;
             _cmd.FullVectorIndexesCreated += InitializeAction;
@@ -213,7 +213,7 @@ namespace CA_DataUploaderLib
             double GetTarget(DataVector? vector) => vector == null ? defaultTarget : vector[fieldIndex];
         }
 
-        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, Func<DataVector?, double> getTarget, Func<int, double, string> getCommand, int repeatMilliseconds = 2000)
+        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, Func<DataVector?, double> getTarget, Func<int, double, string> getCommand, int repeatMilliseconds = 1000)
         {
             double defaultTarget = getTarget(null);
             var lastAction = new LastAction(defaultTarget, repeatMilliseconds);
