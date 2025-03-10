@@ -32,7 +32,7 @@ namespace CA_DataUploaderLib.IOconf
                 throw new FormatException($"Failed to find command $field in {Row}. Expected format: {Format}");
 
             RepeatMilliseconds = values.Count < 6 
-                ? 2000 
+                ? 1000 
                 : int.TryParse(values[5], out var repeatMs) ? repeatMs : throw new FormatException($"Failed to parse repeat milliseconds {Row}. Expected format: {Format}");
         }
         public double DefaultValue { get; }

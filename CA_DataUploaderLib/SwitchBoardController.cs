@@ -21,7 +21,7 @@ namespace CA_DataUploaderLib
             foreach (var port in ioconf.GetEntries<IOconfOut230Vac>().Where(p => p.Map.IsLocalBoard && p.Map.McuBoard != null))
                 RegisterBoardWriteActions(port.Map.McuBoard!, port, 0, port.Name + "_onoff", GetCommand);
 
-            static string GetCommand(int portNumber, double target) => target > 0.0 ? $"p{portNumber} on 3 {target:0%}" : $"p{portNumber} off";
+            static string GetCommand(int portNumber, double target) => target > 0.0 ? $"p{portNumber} on 2 {target:0%}" : $"p{portNumber} off";
         }
 
         public static void Initialize(IIOconf ioconf, CommandHandler cmd)
