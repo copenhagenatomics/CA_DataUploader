@@ -1,9 +1,10 @@
-﻿using CA_DataUploaderLib.IOconf;
-using CA_DataUploaderLib.Extensions;
+﻿using CA_DataUploaderLib.Extensions;
+using CA_DataUploaderLib.Helpers;
+using CA_DataUploaderLib.IOconf;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using CA_DataUploaderLib.Helpers;
-using System;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Threading;
 
@@ -22,7 +23,7 @@ namespace CA_DataUploaderLib
         protected override List<Task> StartLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             var loops = base.StartLoops(boards, token);
-            if (_rpiGpuSample != null && _rpiCpuSample != null && !OperatingSystem.IsWindows()) 
+            if (_rpiGpuSample != null && _rpiCpuSample != null && !OperatingSystem.IsWindows() && !RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) 
                 loops.Add(ReadRpiTemperaturesLoop(_rpiGpuSample, _rpiCpuSample, token));
             return loops;
         }
