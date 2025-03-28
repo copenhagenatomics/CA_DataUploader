@@ -312,7 +312,7 @@ namespace CA_DataUploaderLib
                 ? (_receivedVectors ?? throw new InvalidOperationException("Built-in actions detected without receiving vectors channel being initialized"))
                 : null;
 
-            // we use the next 2 booleans to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operation.
+            // we use the next 2 variables to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operation.
             // we might still get lots of entries for problems that alternate between normal and failed states, but for now is a good data point to know if that case is happening.
             var waitingBoardReconnect = false;
             long timeSinceTimeoutsStarted = 0;
@@ -495,7 +495,7 @@ namespace CA_DataUploaderLib
                         }
                         if ((status & 0x80000000) == 0 && (_lastStatus & 0x80000000) != 0) // Error gone?
                         {
-                            LowFrequencyLogBoardOk((args, skipMessage) => LogError(args.board, $"Board responded with ok status 0x{args.status:X}{skipMessage}"), (board, status));
+                            LowFrequencyLogBoardOk((args, skipMessage) => LogError(args.board, $"Board responded with OK status 0x{args.status:X}{skipMessage}"), (board, status));
                         }
                         _lastStatus = status;
                     }

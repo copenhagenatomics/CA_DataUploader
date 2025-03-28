@@ -77,6 +77,7 @@ namespace CA_DataUploaderLib
             try
             {
                 var port = dependencies.ConnectionManager.NewConnection(name, baudrate, enableDtrRts);
+                await port.Open(CancellationToken.None);
                 board = new MCUBoard(port, name, dependencies);
                 board.pipeReader = port.GetPipeReader();
                 board.ProductType = "NA";
@@ -101,7 +102,7 @@ namespace CA_DataUploaderLib
             }
             catch (Exception ex)
             {
-                dependencies.LogException(LogID.A, $"Unexpected error connecting to {name}({baudrate})", ex);
+                dependencies.LogException(LogID.A, $"Unexpected error connecting to {name} ({baudrate})", ex);
             }
 
             if (board != null && !board.InitialConnectionSucceeded)
@@ -176,6 +177,7 @@ namespace CA_DataUploaderLib
                 }
 
                 dependencies.LogData(LogID.B, $"(Reopen) opening port {PortName} {ProductType} {SerialNumber}");
+                await port.Open(token);
                 pipeReader = port.GetPipeReader();
                 reconnectedLine = await ReadOptionalNonEmptyLine(
                     dependencies, pipeReader, PortName, ConfigSettings.MaxMillisecondsWithoutNewValues, TryReadLine, l => l.StartsWith("reconnected", StringComparison.OrdinalIgnoreCase), token);
@@ -199,7 +201,7 @@ namespace CA_DataUploaderLib
             var isVport = IOconfMap.IsVirtualPortName(name);
             bool skipAutoDetection = isVport || (map?.BoardSettings ?? BoardSettings.Default).SkipBoardAutoDetection;
             if (skipAutoDetection)
-                dependencies.LogInfo(LogID.A, $"Device detection disabled for {name}({map})");
+                dependencies.LogInfo(LogID.A, $"Device detection disabled for {name} ({map})");
             var mcu = await Create(dependencies, ioconf, name, initialBaudrate, skipAutoDetection, !isVport);
             if (mcu == null || !mcu.InitialConnectionSucceeded)
                 mcu = await OpenWithAutoDetection(dependencies, ioconf, name, initialBaudrate);
@@ -620,6 +622,7 @@ namespace CA_DataUploaderLib
             bool IsOpen { get; }
             int BaudRate { get; }
 
+            Task Open(CancellationToken token);
             void Close();
             PipeReader GetPipeReader();
             void WriteLine(string msg);
@@ -650,6 +653,7 @@ namespace CA_DataUploaderLib
                 public bool IsOpen => port.IsOpen;
                 public int BaudRate => port.BaudRate;
 
+                public Task Open(CancellationToken token) => Task.CompletedTask;
                 public void Close() => port.Close();
                 public PipeReader GetPipeReader()
                 {
