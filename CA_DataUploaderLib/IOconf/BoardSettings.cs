@@ -8,7 +8,7 @@ using CA_DataUploaderLib.Extensions;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public class BoardSettings
+    public partial class BoardSettings
     {
         public static BoardSettings Default { get; } = new BoardSettings();
 
@@ -33,10 +33,10 @@ namespace CA_DataUploaderLib.IOconf
             });
         }
 
-        public class LineParser
+        public partial class LineParser
         {
             public static LineParser Default { get; } = new LineParser();
-            private static readonly Regex _hasCommaSeparatedNumbers = new(@"^\s*(?<Values>[+-]?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*[+-]?(?:[0-9]*[.])?[0-9]+\s*)*)(?:,\s*0x(?<Status>[0-9a-fA-F]+))?,?\s*$");
+            protected static readonly Regex _hasCommaSeparatedNumbers = HasCommaSeparatedNumbersRegex();
 
             /// <returns>the list of doubles, or null when the line did not match the expected format</returns>
             public virtual (List<double>?, uint) TryParseAsDoubleList(string line)
@@ -57,6 +57,9 @@ namespace CA_DataUploaderLib.IOconf
             public virtual bool MatchesValuesFormat(string line) => _hasCommaSeparatedNumbers.IsMatch(line);
 
             public virtual bool IsExpectedNonValuesLine(string line) => false;
+
+            [GeneratedRegex(@"^\s*(?<Values>[+-]?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*[+-]?(?:[0-9]*[.])?[0-9]+\s*)*)(?:,\s*0x(?<Status>[0-9a-fA-F]+))?,?\s*$")]
+            private static partial Regex HasCommaSeparatedNumbersRegex();
         }
     }
 }

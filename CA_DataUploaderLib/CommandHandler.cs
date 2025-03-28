@@ -41,9 +41,9 @@ namespace CA_DataUploaderLib
         /// 
         /// For subsystems, this is usually the constructor of the subsystem or on a handler of <see cref="FullVectorIndexesCreated"/>.
         /// </remarks>
-        public ChannelReader<DataVector> GetReceivedVectorsReader()
+        public ChannelReader<DataVector> GetReceivedVectorsReader(int capacity = int.MaxValue)
         {
-            var channel = Channel.CreateUnbounded<DataVector>();
+            var channel = capacity == int.MaxValue ? Channel.CreateUnbounded<DataVector>() : Channel.CreateBounded<DataVector>(new BoundedChannelOptions(capacity) { FullMode = BoundedChannelFullMode.DropOldest });
             _receivedVectorsWriters.Add(channel.Writer);
             return channel.Reader;
         }
