@@ -77,8 +77,8 @@ namespace CA_DataUploaderLib
             try
             {
                 var port = dependencies.ConnectionManager.NewConnection(name, baudrate, enableDtrRts);
-                await port.Open(CancellationToken.None);
                 board = new MCUBoard(port, name, dependencies);
+                await port.Open(CancellationToken.None);
                 board.pipeReader = port.GetPipeReader();
                 board.ProductType = "NA";
                 board.InitialConnectionSucceeded = skipBoardAutoDetection || await board.ReadSerialNumber(board.pipeReader);
@@ -653,11 +653,14 @@ namespace CA_DataUploaderLib
                 public bool IsOpen => port.IsOpen;
                 public int BaudRate => port.BaudRate;
 
-                public Task Open(CancellationToken token) => Task.CompletedTask;
+                public Task Open(CancellationToken token) 
+                {
+                    port.Open(); 
+                    return Task.CompletedTask;
+                }
                 public void Close() => port.Close();
                 public PipeReader GetPipeReader()
                 {
-                    port.Open();
                     var reader = PipeReader.Create(port.BaseStream);
                     Thread.Sleep(100); // it needs to wait that the board registers that the COM port has been opened before sending commands (work arounds issue when first opening the connection and sending serial).
                     return reader;
