@@ -21,13 +21,12 @@ namespace CA_DataUploaderLib
         private readonly CommandHandler _cmd;
         protected readonly List<SensorSample.InputBased> _values;
         protected readonly List<SensorSample.InputBased> _localValues;
-        private readonly (IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] _boards = [];
+        private readonly (IOconfMap map, SensorSample.InputBased[] values, ChannelReader<DataVector>? vectorReader, int boardStateIndexInFullVector)[] _boards = [];
         protected readonly AllBoardsState _boardsState = new([]);
         private readonly Dictionary<MCUBoard, SensorSample.InputBased[]> _boardSamplesLookup = [];
         private readonly string mainSubsystem;
         private readonly Dictionary<MCUBoard, List<(Func<DataVector?, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _builtInWriteActions = [];
         private readonly Dictionary<MCUBoard, (ChannelReader<string> Reader, ChannelWriter<string> Writer)> _boardCustomCommands = [];
-        private ChannelReader<DataVector>? _receivedVectors;
         private static readonly Dictionary<CommandHandler, Dictionary<string, string>> _usedBoxNames = []; //Dictionary of used board names tied to a specific CommandHandler-instance
         private readonly Dictionary<string, TaskCompletionSource> _reconnectTasks = [];
         private uint _lastStatus = 0U;
@@ -55,7 +54,7 @@ namespace CA_DataUploaderLib
                 EnforceNoDuplicatePorts(board.map.BoxName, board.values);
             }
 
-            _boards = allBoards.Where(b => b.map.IsLocalBoard).ToArray();
+            _boards = allBoards.Where(b => b.map.IsLocalBoard).Select(b => (b.map, b.values, vectorReader: (ChannelReader<DataVector>?)null, boardStateIndexInFullVector: -1)).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
 
 
@@ -146,18 +145,14 @@ namespace CA_DataUploaderLib
 
         private void InitializeBuiltInActionsIndexesAndVectorsChannel(object? _, IReadOnlyDictionary<string, int> indexes)
         {
-            bool hasBoardWithBuiltInActions = false;
             for (int i = 0; i < _boards.Length; i++)
             {
-                var (map, values, _) = _boards[i];
+                var (map, values, _, _) = _boards[i];
                 string name = GetBoxStateName(map.BoxName);
                 if (!indexes.TryGetValue(name, out var index)) throw new ArgumentException($"Failed to find box state in full vector: {name}");
-                _boards[i] = (map, values, index);
-                hasBoardWithBuiltInActions |= map.McuBoard != null && _builtInWriteActions.TryGetValue(map.McuBoard, out var _);
+                var vectorReader = map.McuBoard != null && _builtInWriteActions.TryGetValue(map.McuBoard, out var _) ? _cmd.GetReceivedVectorsReader(1) : null;
+                _boards[i] = (map, values, vectorReader, index);
             }
-
-            if (hasBoardWithBuiltInActions)
-                _receivedVectors = _cmd.GetReceivedVectorsReader();
         }
 
         public Task Run(CancellationToken token) => RunBoardLoops(_boards, token);
@@ -260,7 +255,7 @@ namespace CA_DataUploaderLib
             _cmd.Logger.LogInfo(LogID.A, sb.ToString());
         }
 
-        private async Task RunBoardLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
+        private async Task RunBoardLoops((IOconfMap map, SensorSample.InputBased[] values, ChannelReader<DataVector>? vectorReader, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             long start = _cmd.Time.GetTimestamp();
             try
@@ -276,7 +271,7 @@ namespace CA_DataUploaderLib
             }
 
             Stopping?.Invoke(this, EventArgs.Empty);
-            foreach (var (map, _, _) in boards)
+            foreach (var (map, _, _, _) in boards)
             {
                 try
                 {
@@ -291,7 +286,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected virtual List<Task> StartLoops((IOconfMap map, SensorSample.InputBased[] values, int boardStateIndexInFullVector)[] boards, CancellationToken token)
+        protected virtual List<Task> StartLoops((IOconfMap map, SensorSample.InputBased[] values, ChannelReader<DataVector>? vectorReader, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             var missingBoards = boards.Where(h => h.map.McuBoard == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
@@ -299,17 +294,17 @@ namespace CA_DataUploaderLib
 
             return boards
                 .Where(b => b.map.McuBoard != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
-                .SelectMany(b => new[] { BoardReadLoop(b.map.McuBoard!, b.map.BoxName, b.values, token), BoardWriteLoop(b.map.McuBoard!, b.boardStateIndexInFullVector, token) })
+                .SelectMany(b => new[] { BoardReadLoop(b.map.McuBoard!, b.map.BoxName, b.values, token), BoardWriteLoop(b.map.McuBoard!, b.vectorReader, b.boardStateIndexInFullVector, token) })
                 .ToList();
         }
 
-        private async Task BoardWriteLoop(MCUBoard board, int boardStateIndexInFullVector, CancellationToken token)
+        private async Task BoardWriteLoop(MCUBoard board, ChannelReader<DataVector>? vectorReader, int boardStateIndexInFullVector, CancellationToken token)
         {
             var customWritesEnabled = _boardCustomCommands.TryGetValue(board, out var customCommandsChannel);
             var builtInActionsEnabled = _builtInWriteActions.TryGetValue(board, out var builtInActions);
             if (!builtInActionsEnabled && !customWritesEnabled) return;
             ChannelReader<DataVector>? vectorsChannel = builtInActionsEnabled
-                ? (_receivedVectors ?? throw new InvalidOperationException("Built-in actions detected without receiving vectors channel being initialized"))
+                ? (vectorReader ?? throw new InvalidOperationException("Built-in actions detected without receiving vectors channel being initialized"))
                 : null;
 
             // we use the next 2 variables to avoid spamming logs/display with an ongoing problem, so we only notify at the beginning and when we resume normal operation.
