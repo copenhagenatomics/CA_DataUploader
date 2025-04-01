@@ -38,6 +38,7 @@ namespace CA_DataUploader
                 var cloud = new ServerUploader(ioconf, cmd);
                 _ = new Redundancy(ioconf, cmd);
                 _ = new ThermocoupleBox(ioconf, cmd);
+                _ = new Alerts(ioconf, cmd);
                 await SingleNodeRunner.Run(ioconf, cmd, cloud, cmd.StopToken);
             }
             catch (Exception ex)
