@@ -13,7 +13,6 @@ namespace CA_DataUploaderLib
         {
             try
             {
-                var alerts = new Alerts(ioconf, cmdHandler);
                 var subsystemsTask = Task.Run(() => cmdHandler.RunSubsystems(token), token);
                 var sendThrottle = new PeriodicTimer(TimeSpan.FromMilliseconds(ioconf.GetMainLoopDelay()));
                 DataVector? vector = null;
