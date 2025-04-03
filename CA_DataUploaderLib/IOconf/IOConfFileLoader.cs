@@ -33,8 +33,12 @@ namespace CA_DataUploaderLib.IOconf
 
             var linesList = lines.Select(x => x.Trim()).ToList();
             // remove empty lines and commented out lines
-            var lines2 = linesList.Where(x => !x.StartsWith("//") && x.Length > 2).ToList();
-            return lines2.Select(x => CreateType(loader, x, linesList.IndexOf(x) + 1));
+            var lines2 = linesList.Where(x => !x.StartsWith("//") && x.Length > 2).Select((x,i) => (row: x,line: i)).ToList();
+            var rows = lines2.Select(x => CreateType(loader, x.row, x.line + 1)).ToList();
+            var tags = rows.SelectMany(r => r.Tags.Select(t => (tag: t, rowname: r.Name))).ToLookup(r => r.tag, r=> r.rowname);
+            foreach (var row in rows)
+                row.UseTags(tags);
+            return rows.Concat(rows.SelectMany(r => r.GetExpandedConf().Select(l => CreateType(loader, l, r.LineNumber))));
         }
 
         /// <summary>
