@@ -38,7 +38,7 @@ namespace CA_DataUploaderLib.IOconf
             var tags = rows.SelectMany(r => r.Tags.Select(t => (tag: t, rowname: r.Name))).ToLookup(r => r.tag, r=> r.rowname);
             foreach (var row in rows)
                 row.UseTags(tags);
-            return rows.Concat(rows.SelectMany(r => r.GetExpandedConf().Select(l => CreateType(loader, l, r.LineNumber))));
+            return rows.Concat(rows.SelectMany(r => r.GetExpandedConfRows().Select(l => CreateType(loader, l, r.LineNumber))));
         }
 
         /// <summary>

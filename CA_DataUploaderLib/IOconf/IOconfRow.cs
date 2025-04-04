@@ -31,13 +31,13 @@ namespace CA_DataUploaderLib.IOconf
                 Name = list.Count >= 2 // could be overwritten elsewhere. 
                 ? list[1]
                 : throw new Exception("IOconfRow: missing Name");
-            ExpandsTags = isUnknown;
+            ExpandsTags = isUnknown; //We do this so that plugin fields lists (related to Code lines) are expanded e.g. Code;myplugin;1.0.0 \n myplugin;mylistfield;tagfields:mytag
         }
 
         /// <summary>
         /// Derived classes can set this to true to enable list expansions for that type of configuration row.
         /// </summary>
-        public bool ExpandsTags { get; protected set; }
+        public bool ExpandsTags { get; protected init; }
         public string Row { get; }
         public string Type { get; }
         /// <summary>
@@ -141,6 +141,6 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        protected internal virtual IEnumerable<string> GetExpandedConf() => [];
+        protected internal virtual IEnumerable<string> GetExpandedConfRows() => [];
     }
 }
