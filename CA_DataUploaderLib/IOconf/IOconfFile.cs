@@ -15,6 +15,12 @@ namespace CA_DataUploaderLib.IOconf
         public static IIOconf Instance => lazy.Value;
         public static IIOconfLoader DefaultLoader { get; } = new IOconfLoader();
         public static bool FileExists() => IOconfFileLoader.FileExists();
+        /// <summary>
+        /// Writes the supplied contents to a file IO.conf on disk.
+        /// Renames any existing configuration to IO.conf.backup1 (trailing number increasing).
+        /// </summary>
+        /// <param name="ioconf"></param>
+        public static void WriteToDisk(string conf) => IOconfFileLoader.WriteToDisk(conf);
 
         public IOconfFile()
         {
