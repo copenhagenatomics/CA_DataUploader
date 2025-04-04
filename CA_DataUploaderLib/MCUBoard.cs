@@ -217,7 +217,7 @@ namespace CA_DataUploaderLib
 
         public static string[] GetUSBports() => Environment.OSVersion.Platform == PlatformID.Unix
                 //notice we check both /dev/USB and vports & we ignore missing when vports is missing (via the error redirect to /dev/null)
-                ? DULutil.ExecuteShellCommand("ls -1a vports/* /dev/USB* 2>/dev/null").Split("\n".ToCharArray(), StringSplitOptions.RemoveEmptyEntries).Select(x => x.Replace("\r", "").Trim()).ToArray()
+                ? DULutil.ExecuteShellCommand("ls -1a vports/* /dev/USB* 2>/dev/null").Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Replace("\r", "").Trim()).ToArray()
                 : SerialPort.GetPortNames();
 
         private static string? GetStringFromDmesg(string portName)
