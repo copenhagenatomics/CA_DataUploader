@@ -6,16 +6,14 @@ using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
-    public static class IOconfFileLoader
+    internal static class IOconfFileLoader
     {
-        public static IIOconfLoader Loader { get; } = new IOconfLoader();
-
         public static bool FileExists()
         {
             return File.Exists("IO.conf");
         }
 
-        public static (List<string>, IEnumerable<IOconfRow>) Load()
+        public static (List<string>, IEnumerable<IOconfRow>) Load(IIOconfLoader loader)
         {
             if (!FileExists())
             {
@@ -23,7 +21,7 @@ namespace CA_DataUploaderLib.IOconf
             }
 
             var list = File.ReadAllLines("IO.conf").ToList();
-            return (list, ParseLines(Loader, list));
+            return (list, ParseLines(loader, list));
         }
 
         public static IEnumerable<IOconfRow> ParseLines(IIOconfLoader loader, IEnumerable<string> lines)

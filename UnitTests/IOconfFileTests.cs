@@ -4,12 +4,15 @@ using CA_DataUploaderLib.IOconf;
 using System;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Collections.Generic;
 
 namespace UnitTests
 {
     [TestClass]
     public class IOconfFileTests
     {
+        private static IEnumerable<IOconfRow> ParseLines(List<string> lines) 
+            => new IOconfFile(lines).GetEntries<IOconfRow>().Where(r => r is not IOconfRPiTemp); //we exclude rpi temp, as tests using this dont expect that to be added automatically
         [TestMethod]
         public void WhenTwoRowsInDifferentGroupsHaveTheSameName_ThenNoExceptionIsThrown()
         {
@@ -131,6 +134,84 @@ Expand;tagfields:phase2;suffix:sampledcurrent;Math;$name;$name // Creates a new 
                     (conf.GetEntries<IOconfRow>().SingleOrDefault(predicate.Compile()) 
                         ?? throw new ArgumentException($"Row not found: {msg}"))
                     .ToList()[2..]);
+        }
+
+        [TestMethod]
+        public void CanLoadAccountLine()
+        {
+            var rowsEnum = ParseLines(["Account;john;john.doe@example.com;johndoepass"]);
+            var rows = rowsEnum.ToArray();
+            Assert.AreEqual(1, rows.Length);
+            Assert.IsInstanceOfType(rows[0], typeof(IOconfAccount));
+            var account = (IOconfAccount)rows[0];
+            Assert.AreEqual("john-john.doe@example.com-johndoepass", $"{account.Name}-{account.Email}-{account.Password}");
+        }
+
+        [TestMethod]
+        public void CanLoadMathLine()
+        {
+            var rowsEnum = ParseLines(["Math;mymath;heater1 + 5"]);
+            var rows = rowsEnum.ToArray();
+            Assert.AreEqual(1, rows.Length);
+            Assert.IsInstanceOfType(rows[0], typeof(IOconfMath));
+            var math = (IOconfMath)rows[0];
+            Assert.AreEqual("mymath", math.Name);
+            Assert.AreEqual(405, math.Calculate(new() { { "heater1", 400 } }));
+        }
+
+        [TestMethod]
+        public void CanLoadGenericOutputLine()
+        {
+            var rowsEnum = ParseLines(["Map;fakeserial;realacbox2","GenericOutput;generic_ac_on;realacbox2;0;p1 $heater1_onoff 3"]);
+            var rows = rowsEnum.ToArray();
+            Assert.AreEqual(2, rows.Length);
+            Assert.IsInstanceOfType(rows[1], typeof(IOconfGenericOutput));
+            var output = (IOconfGenericOutput)rows[1];
+            Assert.AreEqual("generic_ac_on", output.Name);
+            Assert.AreEqual(0, output.DefaultValue);
+            Assert.AreEqual("heater1_onoff", output.TargetField);
+            Assert.AreEqual("p1 5 3", output.GetCommand(5));
+        }
+
+        [TestMethod]
+        public void CanLoadGenericOutputLineWithBraces()
+        {
+            var rowsEnum = ParseLines(["GenericOutput;generic_ac_on;realacbox2;0;p1 on 3 ${heater1_onoff}00%","Map;fake1;realacbox2"]);
+            var rows = rowsEnum.ToArray();
+            Assert.AreEqual(2, rows.Length);
+            Assert.IsInstanceOfType(rows[0], typeof(IOconfGenericOutput));
+            var output = (IOconfGenericOutput)rows[0];
+            Assert.AreEqual("generic_ac_on", output.Name);
+            Assert.AreEqual(0, output.DefaultValue);
+            Assert.AreEqual("heater1_onoff", output.TargetField);
+            Assert.AreEqual("p1 on 3 100%", output.GetCommand(1));
+        }
+
+        [TestMethod]
+        public void CanLoadCustomConfigWithoutMixingPrefix()
+        {
+            var loader = new IOconfLoader();
+            loader.AddLoader("Mathing", (row, lineIndex) => new IOConfMathing(row, lineIndex));
+            var ioconf = new IOconfFile(loader, ["Mathing;mymath;heater1 + 5"]);
+            var rows = ioconf.GetEntries<IOconfRow>().ToArray();
+            Assert.AreEqual(2, rows.Length);
+            Assert.IsInstanceOfType(rows[0], typeof(IOConfMathing));
+        }
+
+        [TestMethod]
+        public void CanLoadCurrentLine()
+        {
+            var rowsEnum = ParseLines(["Current;current_ct01;ct01;2;300","Map;fakeserial;ct01"]);
+            var rows = rowsEnum.ToArray();
+            Assert.AreEqual(2, rows.Length);
+            Assert.IsInstanceOfType(rows[0], typeof(IOconfCurrent));
+            var current = (IOconfCurrent)rows[0];
+            Assert.AreEqual("current_ct01", current.Name);
+            Assert.AreEqual(2, current.PortNumber);
+        }
+
+        private class IOConfMathing(string row, int lineIndex) : IOconfRow(row, lineIndex, "Mathing")
+        {
         }
 
         public sealed class IOconfRowWithListArgument : IOconfRow

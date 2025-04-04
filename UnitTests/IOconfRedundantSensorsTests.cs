@@ -10,7 +10,7 @@ namespace UnitTests
     public class IOconfRedundantSensorsTests
     {
         [ClassInitialize]
-        public static void ClassInitialize(TestContext _) => Redundancy.RegisterSystemExtensions(IOconfFileLoader.Loader);
+        public static void ClassInitialize(TestContext _) => Redundancy.RegisterSystemExtensions(IOconfFile.DefaultLoader);
 
         [TestMethod]
         public void ValidateDependencies_PointingToNonexistentSensor_Fail()

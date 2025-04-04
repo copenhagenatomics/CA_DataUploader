@@ -13,6 +13,8 @@ namespace CA_DataUploaderLib.IOconf
 
         private static readonly Lazy<IOconfFile> lazy = new(() => new IOconfFile());
         public static IIOconf Instance => lazy.Value;
+        public static IIOconfLoader DefaultLoader { get; } = new IOconfLoader();
+        public static bool FileExists() => IOconfFileLoader.FileExists();
 
         public IOconfFile()
         {
@@ -20,7 +22,7 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public IOconfFile(List<string> rawLines, bool performCheck = true)
-            : this(IOconfFileLoader.Loader, rawLines, performCheck) { }
+            : this(DefaultLoader, rawLines, performCheck) { }
         public IOconfFile(IIOconfLoader loader, List<string> rawLines, bool performCheck = true)
         {
             Table.AddRange(IOconfFileLoader.ParseLines(loader, rawLines));
@@ -34,7 +36,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization rejects the custom entries.
             Table.Clear();
-            var (rawLines, entries) = IOconfFileLoader.Load();
+            var (rawLines, entries) = IOconfFileLoader.Load(DefaultLoader);
             Table.AddRange(entries);
             RawLines = rawLines;
             EnsureRPiTempEntry();
