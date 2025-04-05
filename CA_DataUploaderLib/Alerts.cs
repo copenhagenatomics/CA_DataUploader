@@ -33,16 +33,21 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private readonly (IOconfAlert alert, int sensorIndex)[] _alerts;
+        private (IOconfAlert alert, int sensorIndex)[] _alerts = [];
         private readonly CommandHandler _cmd;
         private bool disabled;
 
         public Alerts(IIOconf ioconf, CommandHandler cmd) : base()
         {
             _cmd = cmd;
-            _alerts = [.. GetAlerts(cmd.GetFullSystemVectorDescription(), ioconf, cmd)];
-            var reader = _cmd.GetReceivedVectorsReader();
-            _ = Task.Run(() => CheckAlertsOnReceivedVectors(reader));
+            cmd.FullVectorDescriptionCreated += DescriptionCreated;
+
+            void DescriptionCreated(object? sender, VectorDescription desc)
+            {
+                _alerts = [.. GetAlerts(desc, ioconf, _cmd)];
+                var reader = _cmd.GetReceivedVectorsReader();
+                _ = Task.Run(() => CheckAlertsOnReceivedVectors(reader));
+            }
         }
 
         private async void CheckAlertsOnReceivedVectors(ChannelReader<DataVector> reader)
