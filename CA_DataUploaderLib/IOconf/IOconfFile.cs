@@ -8,7 +8,8 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfFile : IIOconf
     {
-        private readonly List<IOconfRow> Table = [];
+        private List<IOconfRow> Table = [];
+        private List<IOconfRow> OriginalRows = [];
         public List<string> RawLines { get; private set; } = [];
 
         private static readonly Lazy<IOconfFile> lazy = new(() => new IOconfFile());
@@ -31,7 +32,7 @@ namespace CA_DataUploaderLib.IOconf
             : this(DefaultLoader, rawLines, performCheck) { }
         public IOconfFile(IIOconfLoader loader, List<string> rawLines, bool performCheck = true)
         {
-            Table.AddRange(IOconfFileLoader.ParseLines(loader, rawLines));
+            (OriginalRows, Table) = IOconfFileLoader.ParseLines(loader, rawLines);
             RawLines = rawLines;
             EnsureRPiTempEntry();
             if (performCheck)
@@ -41,10 +42,7 @@ namespace CA_DataUploaderLib.IOconf
         public void Reload()
         {
             // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization rejects the custom entries.
-            Table.Clear();
-            var (rawLines, entries) = IOconfFileLoader.Load(DefaultLoader);
-            Table.AddRange(entries);
-            RawLines = rawLines;
+            (RawLines, OriginalRows, Table) = IOconfFileLoader.Load(DefaultLoader);
             EnsureRPiTempEntry();
             CheckConfig();
         }
@@ -59,7 +57,7 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         private void EnsureRPiTempEntry()
-        {
+        {//this is mostly here to ease rename support for hosts that support renaming the rows in the configuration.
             if (Table.OfType<IOconfRPiTemp>().Any())
                 return;
             Table.Add(IOconfRPiTemp.Default);
@@ -124,6 +122,7 @@ namespace CA_DataUploaderLib.IOconf
         public IEnumerable<IOconfState> GetStates() => GetEntries<IOconfState>();
         public IEnumerable<IOconfInput> GetInputs() => GetEntries<IOconfInput>();
         public IEnumerable<T> GetEntries<T>() => Table.OfType<T>();
+        public IEnumerable<T> GetEntriesWithoutExpansion<T>() => OriginalRows.OfType<T>();
         public string GetRawFile() => string.Join(Environment.NewLine, RawLines);
 
         ///<remarks> 

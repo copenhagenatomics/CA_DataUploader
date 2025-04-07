@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib.IOconf
             return File.Exists("IO.conf");
         }
 
-        public static (List<string>, IEnumerable<IOconfRow>) Load(IIOconfLoader loader)
+        public static (List<string>, List<IOconfRow> original, List<IOconfRow> expanded) Load(IIOconfLoader loader)
         {
             if (!FileExists())
             {
@@ -21,10 +21,11 @@ namespace CA_DataUploaderLib.IOconf
             }
 
             var list = File.ReadAllLines("IO.conf").ToList();
-            return (list, ParseLines(loader, list));
+            var (original, expanded) = ParseLines(loader, list);
+            return (list, original, expanded);
         }
 
-        public static IEnumerable<IOconfRow> ParseLines(IIOconfLoader loader, IEnumerable<string> lines)
+        public static (List<IOconfRow> original, List<IOconfRow> expanded) ParseLines(IIOconfLoader loader, IEnumerable<string> lines)
         {
             IOconfNode.ResetIndex();
             IOconfCode.ResetIndex();
@@ -36,7 +37,10 @@ namespace CA_DataUploaderLib.IOconf
             var tags = rows.SelectMany(r => r.Tags.Select(t => (tag: t, rowname: r.Name))).ToLookup(r => r.tag, r=> r.rowname);
             foreach (var row in rows)
                 row.UseTags(tags);
-            return rows.Concat(rows.SelectMany(r => r.GetExpandedConfRows().Select(l => CreateType(loader, l, r.LineNumber))));
+            var expanded = rows.Concat(
+                rows.SelectMany(r => r.GetExpandedConfRows().Select(l => CreateType(loader, l, r.LineNumber))))
+                .ToList();
+            return (rows, expanded);
         }
 
         /// <summary>
