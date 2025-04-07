@@ -58,8 +58,9 @@ namespace CA_DataUploaderLib.IOconf
 
         private void EnsureRPiTempEntry()
         {//this is mostly here to ease rename support for hosts that support renaming the rows in the configuration.
-            if (Table.OfType<IOconfRPiTemp>().Any())
+            if (OriginalRows.OfType<IOconfRPiTemp>().Any())
                 return;
+            OriginalRows.Add(IOconfRPiTemp.Default);
             Table.Add(IOconfRPiTemp.Default);
             RawLines.Add(IOconfRPiTemp.Default.Row);
         }
