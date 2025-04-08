@@ -114,6 +114,7 @@ RowWithList; mylist3; tagfields:ovenheaters;picktag:phase1 phase2 phase3//simila
 Expand;math1;math2;math3;-;Math;$name;$name // Creates a new line for all labels (the empty - separates the list from the command)
 Expand;tagfields:phase2;suffix:sampledcurrent;Math;$name;$name // Creates a new line for each tag, generating lines like: 
 Expand;tagfields:phase2;Math;$name_math;$name_ing // Creates a new line for each tag, with diff suffixes
+Expand;tagfields:ovenheaters;suffix:current;separator:+;Math;bigsum;12 + $name
 ".SplitNewLine(StringSplitOptions.None));
             AssertRowValuesByNameAndType("LeftHeater17_onoff,LeftHeater18_onoff", ioconf, "pc2", "Heaters_onoff");
             AssertRowValuesByNameAndType("LeftHeater17_onoff,LeftHeater18_onoff", ioconf, "pcs2", "Heaters_onoff");
@@ -129,6 +130,7 @@ Expand;tagfields:phase2;Math;$name_math;$name_ing // Creates a new line for each
             AssertRowValuesByNameAndType("LeftHeater18_sampledcurrent", ioconf, "Math", "LeftHeater18_sampledcurrent");
             AssertRowValuesByNameAndType("LeftHeater17_ing", ioconf, "Math", "LeftHeater17_math");
             AssertRowValuesByNameAndType("LeftHeater18_ing", ioconf, "Math", "LeftHeater18_math");
+            AssertRowValuesByNameAndType("12 + LeftHeater16_current+LeftHeater17_current+LeftHeater18_current", ioconf, "Math", "bigsum");
 
             static void AssertRowValuesByNameAndType(string values, IOconfFile conf, string type, string name) =>
                 Assert.AreEqual(values,GetRowValues(conf, r => r.Type == type && r.Name == name, $"{type}-{name}"));

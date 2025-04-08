@@ -142,6 +142,13 @@ namespace CA_DataUploaderLib.IOconf
                     outputs = outputs.Select(t => t + "_" + suffix);
                 }
 
+                if (i < _parsedList.Count && _parsedList[i].StartsWith("separator:"))
+                {
+                    var separator = _parsedList[i][10..];
+                    _parsedList.RemoveAt(i);
+                    outputs = [string.Join(separator, outputs)];
+                }
+
                 if (i + 1 < _parsedList.Count)
                     outputs = outputs.Append("-");//add delimiter if the list is not the last value in the line.
 
