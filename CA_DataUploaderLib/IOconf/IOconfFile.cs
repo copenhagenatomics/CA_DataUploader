@@ -8,11 +8,20 @@ namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfFile : IIOconf
     {
-        private readonly List<IOconfRow> Table = [];
+        private List<IOconfRow> Table = [];
+        private List<IOconfRow> OriginalRows = [];
         public List<string> RawLines { get; private set; } = [];
 
         private static readonly Lazy<IOconfFile> lazy = new(() => new IOconfFile());
         public static IIOconf Instance => lazy.Value;
+        public static IIOconfLoader DefaultLoader { get; } = new IOconfLoader();
+        public static bool FileExists() => IOconfFileLoader.FileExists();
+        /// <summary>
+        /// Writes the supplied contents to a file IO.conf on disk.
+        /// Renames any existing configuration to IO.conf.backup1 (trailing number increasing).
+        /// </summary>
+        /// <param name="ioconf"></param>
+        public static void WriteToDisk(string conf) => IOconfFileLoader.WriteToDisk(conf);
 
         public IOconfFile()
         {
@@ -20,10 +29,10 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public IOconfFile(List<string> rawLines, bool performCheck = true)
-            : this(IOconfFileLoader.Loader, rawLines, performCheck) { }
+            : this(DefaultLoader, rawLines, performCheck) { }
         public IOconfFile(IIOconfLoader loader, List<string> rawLines, bool performCheck = true)
         {
-            Table.AddRange(IOconfFileLoader.ParseLines(loader, rawLines));
+            (OriginalRows, Table) = IOconfFileLoader.ParseLines(loader, rawLines);
             RawLines = rawLines;
             EnsureRPiTempEntry();
             if (performCheck)
@@ -33,10 +42,7 @@ namespace CA_DataUploaderLib.IOconf
         public void Reload()
         {
             // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization rejects the custom entries.
-            Table.Clear();
-            var (rawLines, entries) = IOconfFileLoader.Load();
-            Table.AddRange(entries);
-            RawLines = rawLines;
+            (RawLines, OriginalRows, Table) = IOconfFileLoader.Load(DefaultLoader);
             EnsureRPiTempEntry();
             CheckConfig();
         }
@@ -51,9 +57,10 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         private void EnsureRPiTempEntry()
-        {
-            if (Table.OfType<IOconfRPiTemp>().Any())
+        {//this is mostly here to ease rename support for hosts that support renaming the rows in the configuration.
+            if (OriginalRows.OfType<IOconfRPiTemp>().Any())
                 return;
+            OriginalRows.Add(IOconfRPiTemp.Default);
             Table.Add(IOconfRPiTemp.Default);
             RawLines.Add(IOconfRPiTemp.Default.Row);
         }
@@ -116,6 +123,7 @@ namespace CA_DataUploaderLib.IOconf
         public IEnumerable<IOconfState> GetStates() => GetEntries<IOconfState>();
         public IEnumerable<IOconfInput> GetInputs() => GetEntries<IOconfInput>();
         public IEnumerable<T> GetEntries<T>() => Table.OfType<T>();
+        public IEnumerable<T> GetEntriesWithoutExpansion<T>() => OriginalRows.OfType<T>();
         public string GetRawFile() => string.Join(Environment.NewLine, RawLines);
 
         ///<remarks> 

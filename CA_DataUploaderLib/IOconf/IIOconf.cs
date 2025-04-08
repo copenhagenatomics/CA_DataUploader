@@ -26,6 +26,7 @@ namespace CA_DataUploaderLib.IOconf
         public IEnumerable<IOconfState> GetStates();
         public IEnumerable<IOconfInput> GetInputs();
         public IEnumerable<T> GetEntries<T>();
+        public IEnumerable<T> GetEntriesWithoutExpansion<T>();
         public string GetRawFile();
         public IEnumerable<string> GetBoardStateNames(string sensor);
     }
