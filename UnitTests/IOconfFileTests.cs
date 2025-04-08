@@ -109,6 +109,7 @@ pcs2; Heaters_currentsampled; tagfields:phase2;suffix:sampledcurrent
 
 RowWithList; mylist; LeftHeater16;LeftHeater17;LeftHeater18
 RowWithList; mylist2; tagfields:ovenheaters //should be equivalent to the previous one
+RowWithList; mylist3; tagfields:ovenheaters;picktag:phase1 phase2 phase3//similar to tag fields but instead of the name, it outputs whichever output tag the item has
 
 Expand;math1;math2;math3;-;Math;$name;$name // Creates a new line for all labels (the empty - separates the list from the command)
 Expand;tagfields:phase2;suffix:sampledcurrent;Math;$name;$name // Creates a new line for each tag, generating lines like: 
@@ -120,6 +121,7 @@ Expand;tagfields:phase2;Math;$name_math;$name_ing // Creates a new line for each
             AssertRowValuesByNameAndType("LeftHeater17_sampledcurrent,LeftHeater18_sampledcurrent", ioconf, "pcs2", "Heaters_currentsampled");
             AssertRowValuesByName("LeftHeater16,LeftHeater17,LeftHeater18", ioconf, "mylist");
             AssertRowValuesByName("LeftHeater16,LeftHeater17,LeftHeater18", ioconf, "mylist2");
+            AssertRowValuesByName("phase1,phase2,phase2", ioconf, "mylist3");
             AssertRowValuesByNameAndType("math1", ioconf, "Math", "math1");
             AssertRowValuesByNameAndType("math2", ioconf, "Math", "math2");
             AssertRowValuesByNameAndType("math3", ioconf, "Math", "math3");

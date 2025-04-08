@@ -34,7 +34,7 @@ namespace CA_DataUploaderLib.IOconf
             // remove empty lines and commented out lines
             var lines2 = linesList.Where(x => !x.StartsWith("//") && x.Length > 2).Select((x,i) => (row: x,line: i)).ToList();
             var rows = lines2.Select(x => CreateType(loader, x.row, x.line + 1)).ToList();
-            var tags = rows.SelectMany(r => r.Tags.Select(t => (tag: t, rowname: r.Name))).ToLookup(r => r.tag, r=> r.rowname);
+            var tags = rows.SelectMany(r => r.Tags.Select(t => (tag: t, row: r))).ToLookup(r => r.tag, r=> r.row);
             foreach (var row in rows)
                 row.UseTags(tags);
             var expanded = rows.Concat(

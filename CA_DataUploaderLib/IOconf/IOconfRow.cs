@@ -110,7 +110,7 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        protected internal void UseTags(ILookup<string, string> tags)
+        protected internal void UseTags(ILookup<string, IOconfRow> rowsByTag)
         {
             if (!ExpandsTags)
                 return;
@@ -121,23 +121,33 @@ namespace CA_DataUploaderLib.IOconf
                 
                 var tag = _parsedList[i][10..];
                 _parsedList.RemoveAt(i);
-                if (!tags.Contains(tag))
+                if (!rowsByTag.Contains(tag))
                     throw new FormatException($"Tag not found: {tag}. Row: {Row}");
 
-                var tagFields = tags[tag];
+                var rows = rowsByTag[tag];
+                IEnumerable<string> outputs = rows.Select(t => t.Name);
+                if (i < _parsedList.Count && _parsedList[i].StartsWith("picktag:"))
+                {
+                    var picktagString = _parsedList[i][8..];
+                    var pickTags = picktagString.Split(' ');
+                    outputs = rows.Select(r => 
+                        r.Tags.FirstOrDefault(t => Array.IndexOf(pickTags, t) > -1) ?? throw new FormatException($"picktag not found. Tag: {tag}. Picktag: {picktagString}. Row: {Row}"));
+                    _parsedList.RemoveAt(i);
+                }
+
                 if (i < _parsedList.Count && _parsedList[i].StartsWith("suffix:"))
                 {
                     var suffix = _parsedList[i][7..];
                     _parsedList.RemoveAt(i);
-                    tagFields = tagFields.Select(t => t + "_" + suffix);
+                    outputs = outputs.Select(t => t + "_" + suffix);
                 }
 
                 if (i + 1 < _parsedList.Count)
-                    tagFields = tagFields.Append("-");//add delimiter if the list is not the last value in the line.
+                    outputs = outputs.Append("-");//add delimiter if the list is not the last value in the line.
 
-                var tagFieldsList = tagFields.ToList();
-                _parsedList.InsertRange(i, tagFieldsList);
-                i += tagFieldsList.Count - 1;
+                var outputsList = outputs.ToList();
+                _parsedList.InsertRange(i, outputsList);
+                i += outputsList.Count - 1;
             }
         }
 
