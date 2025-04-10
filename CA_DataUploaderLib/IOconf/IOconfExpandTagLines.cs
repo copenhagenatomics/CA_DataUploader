@@ -6,7 +6,7 @@ namespace CA_DataUploaderLib.IOconf
 {
     internal sealed class IOconfExpandTagLines : IOconfRow
     {
-        public const string ConfigName = "Expandtaglines";
+        public const string ConfigName = "ExpandTagLines";
         private readonly string _tag;
         private readonly string _expression;
         private readonly List<string> expandedLines = [];
@@ -18,7 +18,7 @@ namespace CA_DataUploaderLib.IOconf
                 throw new FormatException($"Wrong format: {Row}.{Environment.NewLine}{Format}");
             _tag = list[1];
             _expression = string.Join(';', list.Skip(2));
-            Name = $"Expandtaglines{Guid.NewGuid():N}"; //we give it a unique temporary name to avoid duplicate conflicts.
+            Name = $"{ConfigName}{Guid.NewGuid():N}"; //we give it a unique temporary name to avoid duplicate conflicts.
         }
 
         protected internal override void UseTags(ILookup<string, IOconfRow> rowsByTag)

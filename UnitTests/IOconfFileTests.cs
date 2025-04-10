@@ -111,9 +111,9 @@ RowWithList; mylist; LeftHeater16;LeftHeater17;LeftHeater18
 RowWithList; mylist2; expandtag{ovenheaters} //should be equivalent to the previous one (note it uses the default expression $name)
 RowWithList; mylist3; expandtag{ovenheaters,$name_$matchingtag(phase1 phase2 phase3)}//each matchingtag outputs whichever of those tags the item has e.g. LeftHeater16_phase1, LeftHeater17_phase2, LeftHeater18_phase2
 
-Expandlines;math1,math2,math3;Math;$name;$name // Creates a new line for all labels (the empty - separates the list from the command)
-Expandtaglines;phase2;Math;$name_sampledcurrent;$name_sampledcurrent //also creates multiple math lines
-Expandtaglines;phase2;Math;$name_math;$name_ing //same, but diff suffixes
+ExpandLines;math1,math2,math3;Math;$name;$name // Creates a new line for all labels (the empty - separates the list from the command)
+ExpandTagLines;phase2;Math;$name_sampledcurrent;$name_sampledcurrent //also creates multiple math lines
+ExpandTagLines;phase2;Math;$name_math;$name_ing //same, but diff suffixes
 Math;bigsum;12 + expandtag{ovenheaters,separator:+,$name_current} // 12 + sum of currents
 Math;bigsum2;12 + expandtag{ovenheaters,separator:+,($name_current + 2*$name_onoff)} // 12 + sum of (current + 2*onoff)
 Math;bigsum3;12 + expandtag{ovenheaters,separator:+,(2*$name_current*$name_onoff)} // 12 + sum of (2*current*onoff)
