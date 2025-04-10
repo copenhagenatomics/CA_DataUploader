@@ -11,7 +11,7 @@ namespace CA_DataUploaderLib.IOconf
         private readonly string _expression;
         public IOconfExpandLines(string row, int lineNum) : base(row, lineNum, ConfigName, false, false)
         {
-            Format = $"{ConfigName};name1,name2,...;namen;row with $name";
+            Format = $"{ConfigName};name1,name2,...,namen;row with $name";
             var list = ToList();
             if (list.Count < 3 || string.IsNullOrEmpty(list[2]))
                 throw new FormatException($"Wrong format: {Row}.{Environment.NewLine}{Format}");
