@@ -90,6 +90,10 @@ namespace CA_DataUploaderLib.IOconf
         protected static readonly Regex ValidateNameRegex = NameRegex();
         [GeneratedRegex(@"^[a-zA-Z_]+[a-zA-Z0-9_]*$")]
         private static partial Regex NameRegex();
+        [GeneratedRegex(@"\bexpandtag{\s*(?<tag>[^,}\s]+)\s*(?:,\s*separator:(?<separator>[^,}]+))?(?:,(?<expression>[^}]+))?(?<closing>}|$)")]
+        private static partial Regex ExpandTagRegex();
+        [GeneratedRegex(@"\$matchingtag\((?:\s*(?<tag>[^)\s]+))*\s*\)")]
+        private static partial Regex MatchingTagRegex();
 
         /// <summary>
         /// Returns the list of expanded vector field names from this class.
@@ -110,53 +114,60 @@ namespace CA_DataUploaderLib.IOconf
             }
         }
 
-        protected internal void UseTags(ILookup<string, IOconfRow> rowsByTag)
+        protected virtual internal void UseTags(ILookup<string, IOconfRow> rowsByTag)
         {
             if (!ExpandsTags)
                 return;
 
             for (int i = 0; i < _parsedList.Count; i++)
             {
-                if (!_parsedList[i].StartsWith("tagfields:")) continue;
-                
-                var tag = _parsedList[i][10..];
-                _parsedList.RemoveAt(i);
-                if (!rowsByTag.Contains(tag))
-                    throw new FormatException($"Tag not found: {tag}. Row: {Row}");
-
-                var rows = rowsByTag[tag];
-                IEnumerable<string> outputs = rows.Select(t => t.Name);
-                if (i < _parsedList.Count && _parsedList[i].StartsWith("picktag:"))
+                var needsSplitBySemicolon = false;
+                var missingClosing = false;
+                var newValue = ExpandTagRegex().Replace(_parsedList[i], match =>
                 {
-                    var picktagString = _parsedList[i][8..];
-                    var pickTags = picktagString.Split(' ');
-                    outputs = rows.Select(r => 
-                        r.Tags.FirstOrDefault(t => Array.IndexOf(pickTags, t) > -1) ?? throw new FormatException($"picktag not found. Tag: {tag}. Picktag: {picktagString}. Row: {Row}"));
-                    _parsedList.RemoveAt(i);
+                    if (match.Groups["closing"].Value != "}")
+                    {
+                        missingClosing = true;
+                        return match.Value;//no change as we need more data
+                    }
+
+                    var tag = match.Groups["tag"].Value;
+                    var separatorGroup = match.Groups["separator"];
+                    var separator = separatorGroup.Success ? separatorGroup.Value : ";";
+                    needsSplitBySemicolon |= separator == ";";
+                    var expressionGroup = match.Groups["expression"];
+                    var expression = expressionGroup.Success ? expressionGroup.Value : "$name";
+                    if (!rowsByTag.Contains(tag))
+                        throw new FormatException($"Tag not found: {tag}. Row: {Row}");
+                    return string.Join(
+                        separator,
+                        rowsByTag[tag].Select(r => ExpandTagExpression(expression, r)).ToList());
+                });
+                if (missingClosing && i + 1 >= _parsedList.Count)
+                    throw new FormatException($"Missing closing }} for expandtag. Row: {Row}");
+                if (missingClosing)
+                {//assuming the expandtag has ; in it, so we merge the next entry after the ; and try again.
+                    _parsedList[i] = _parsedList[i] + _parsedList[i + 1];
+                    i--;
+                    continue;
                 }
 
-                if (i < _parsedList.Count && _parsedList[i].StartsWith("suffix:"))
+                if (!needsSplitBySemicolon)
+                    _parsedList[i] = newValue;
+                else
                 {
-                    var suffix = _parsedList[i][7..];
                     _parsedList.RemoveAt(i);
-                    outputs = outputs.Select(t => t + "_" + suffix);
+                    var outputsList = newValue.Split(';').ToList();
+                    _parsedList.InsertRange(i, outputsList);
+                    i += outputsList.Count - 1;
                 }
-
-                if (i < _parsedList.Count && _parsedList[i].StartsWith("separator:"))
-                {
-                    var separator = _parsedList[i][10..];
-                    _parsedList.RemoveAt(i);
-                    outputs = [string.Join(separator, outputs)];
-                }
-
-                if (i + 1 < _parsedList.Count)
-                    outputs = outputs.Append("-");//add delimiter if the list is not the last value in the line.
-
-                var outputsList = outputs.ToList();
-                _parsedList.InsertRange(i, outputsList);
-                i += outputsList.Count - 1;
             }
         }
+
+        protected string ExpandTagExpression(string expression, IOconfRow row) => 
+            MatchingTagRegex().Replace(expression.Replace("$name", row.Name), m =>
+                row.Tags.FirstOrDefault(t => m.Groups["tag"].Captures.Any(c => t == c.Value))
+                    ?? throw new FormatException($"matchingtag not found. Row: {Row}"));
 
         protected internal virtual IEnumerable<string> GetExpandedConfRows() => [];
     }

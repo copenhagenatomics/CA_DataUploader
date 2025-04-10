@@ -100,21 +100,29 @@ Heater; LeftHeater18; ac02;02;850; tags:phase2 ovenarea4 ovenheaters
 Heater; ExternalHeater01; ac03;01;850; tags:phase3 bsarea
 
 Code;power_control;0.1190.0;pc2
-pc2; Heaters_onoff; tagfields:phase2;suffix:onoff // Expands entries for tag `phase2`, generating entries like `LeftHeater17_onoff, LeftHeater18_onoff, ...`
-pc2; Heaters_currentsampled; tagfields:phase2;suffix:sampledcurrent // Expands entries with `sampledcurrent` suffix
+pc2; Heaters_onoff; expandtag{phase2,$name_onoff} // Expands entries for tag `phase2`, generating entries like `LeftHeater17_onoff, LeftHeater18_onoff, ...`
+pc2; Heaters_currentsampled; expandtag{phase2,$name_sampledcurrent} // Expands entries with `sampledcurrent` suffix
 
 Code; power_control_sampling; 0.1190.0; pcs2
-pcs2; Heaters_onoff; tagfields:phase2;suffix:onoff
-pcs2; Heaters_currentsampled; tagfields:phase2;suffix:sampledcurrent
+pcs2; Heaters_onoff; expandtag{phase2,$name_onoff}
+pcs2; Heaters_currentsampled; expandtag{phase2,$name_sampledcurrent}
 
 RowWithList; mylist; LeftHeater16;LeftHeater17;LeftHeater18
-RowWithList; mylist2; tagfields:ovenheaters //should be equivalent to the previous one
-RowWithList; mylist3; tagfields:ovenheaters;picktag:phase1 phase2 phase3//similar to tag fields but instead of the name, it outputs whichever pick tag the item has
+RowWithList; mylist2; expandtag{ovenheaters} //should be equivalent to the previous one (note it uses the default expression $name)
+RowWithList; mylist3; expandtag{ovenheaters,$name_$matchingtag(phase1 phase2 phase3)}//each matchingtag outputs whichever of those tags the item has e.g. LeftHeater16_phase1, LeftHeater17_phase2, LeftHeater18_phase2
 
-Expand;math1;math2;math3;-;Math;$name;$name // Creates a new line for all labels (the empty - separates the list from the command)
-Expand;tagfields:phase2;suffix:sampledcurrent;Math;$name;$name // Creates a new line for each tag, generating lines like: 
-Expand;tagfields:phase2;Math;$name_math;$name_ing // Creates a new line for each tag, with diff suffixes
-Expand;tagfields:ovenheaters;suffix:current;separator:+;Math;bigsum;12 + $name
+Expandlines;math1,math2,math3;Math;$name;$name // Creates a new line for all labels (the empty - separates the list from the command)
+Expandtaglines;phase2;Math;$name_sampledcurrent;$name_sampledcurrent //also creates multiple math lines
+Expandtaglines;phase2;Math;$name_math;$name_ing //same, but diff suffixes
+Math;bigsum;12 + expandtag{ovenheaters,separator:+,$name_current} // 12 + sum of currents
+Math;bigsum2;12 + expandtag{ovenheaters,separator:+,($name_current + 2*$name_onoff)} // 12 + sum of (current + 2*onoff)
+Math;bigsum3;12 + expandtag{ovenheaters,separator:+,(2*$name_current*$name_onoff)} // 12 + sum of (2*current*onoff)
+Math;bigsum4;12 + 2*(expandtag{ovenheaters,separator:+,$name_current})*(expandtag{ovenheaters,separator:+,$name_onoff}) // 12 + 2*sum of (current)*sum of(onoff)
+Math;bigsum5;12 + expandtag{ovenheaters,separator:+,(2*$name_current*$name_onoff)} * 1282 // 12 + sum of (2*current*onoff) * 1282
+Math;bigsum6;if(expandtag{ovenheaters,separator: && ,(2*$name_current*$name_onoff > 2)},ac03_state,ac02_state) // equivalent to if (all(2*current*onoff > 2),a,b)
+RedundantSensors;redundant;expandtag{ovenheaters}
+
+//later one could add syntatic suggar for some, like expandtagsum (similar to how expandtaglines skips the need of the separator)
 ".SplitNewLine(StringSplitOptions.None));
             AssertRowValuesByNameAndType("LeftHeater17_onoff,LeftHeater18_onoff", ioconf, "pc2", "Heaters_onoff");
             AssertRowValuesByNameAndType("LeftHeater17_onoff,LeftHeater18_onoff", ioconf, "pcs2", "Heaters_onoff");
@@ -122,7 +130,7 @@ Expand;tagfields:ovenheaters;suffix:current;separator:+;Math;bigsum;12 + $name
             AssertRowValuesByNameAndType("LeftHeater17_sampledcurrent,LeftHeater18_sampledcurrent", ioconf, "pcs2", "Heaters_currentsampled");
             AssertRowValuesByName("LeftHeater16,LeftHeater17,LeftHeater18", ioconf, "mylist");
             AssertRowValuesByName("LeftHeater16,LeftHeater17,LeftHeater18", ioconf, "mylist2");
-            AssertRowValuesByName("phase1,phase2,phase2", ioconf, "mylist3");
+            AssertRowValuesByName("LeftHeater16_phase1,LeftHeater17_phase2,LeftHeater18_phase2", ioconf, "mylist3");
             AssertRowValuesByNameAndType("math1", ioconf, "Math", "math1");
             AssertRowValuesByNameAndType("math2", ioconf, "Math", "math2");
             AssertRowValuesByNameAndType("math3", ioconf, "Math", "math3");
@@ -130,7 +138,12 @@ Expand;tagfields:ovenheaters;suffix:current;separator:+;Math;bigsum;12 + $name
             AssertRowValuesByNameAndType("LeftHeater18_sampledcurrent", ioconf, "Math", "LeftHeater18_sampledcurrent");
             AssertRowValuesByNameAndType("LeftHeater17_ing", ioconf, "Math", "LeftHeater17_math");
             AssertRowValuesByNameAndType("LeftHeater18_ing", ioconf, "Math", "LeftHeater18_math");
-            AssertRowValuesByNameAndType("12 + LeftHeater16_current+LeftHeater17_current+LeftHeater18_current", ioconf, "Math", "bigsum");
+            AssertRowValuesByNameAndType("12 + (LeftHeater16_current + 2*LeftHeater16_onoff)+(LeftHeater17_current + 2*LeftHeater17_onoff)+(LeftHeater18_current + 2*LeftHeater18_onoff)", ioconf, "Math", "bigsum2");
+            AssertRowValuesByNameAndType("12 + (2*LeftHeater16_current*LeftHeater16_onoff)+(2*LeftHeater17_current*LeftHeater17_onoff)+(2*LeftHeater18_current*LeftHeater18_onoff)", ioconf, "Math", "bigsum3");
+            AssertRowValuesByNameAndType("12 + 2*(LeftHeater16_current+LeftHeater17_current+LeftHeater18_current)*(LeftHeater16_onoff+LeftHeater17_onoff+LeftHeater18_onoff)", ioconf, "Math", "bigsum4");
+            AssertRowValuesByNameAndType("12 + (2*LeftHeater16_current*LeftHeater16_onoff)+(2*LeftHeater17_current*LeftHeater17_onoff)+(2*LeftHeater18_current*LeftHeater18_onoff) * 1282", ioconf, "Math", "bigsum5");
+            AssertRowValuesByNameAndType("if((2*LeftHeater16_current*LeftHeater16_onoff > 2) && (2*LeftHeater17_current*LeftHeater17_onoff > 2) && (2*LeftHeater18_current*LeftHeater18_onoff > 2),ac03_state,ac02_state)", ioconf, "Math", "bigsum6");
+            AssertRowValuesByNameAndType("LeftHeater16,LeftHeater17,LeftHeater18", ioconf, "RedundantSensors", "redundant");
 
             static void AssertRowValuesByNameAndType(string values, IOconfFile conf, string type, string name) =>
                 Assert.AreEqual(values,GetRowValues(conf, r => r.Type == type && r.Name == name, $"{type}-{name}"));

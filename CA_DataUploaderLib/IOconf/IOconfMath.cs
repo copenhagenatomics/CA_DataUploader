@@ -14,25 +14,15 @@ namespace CA_DataUploaderLib.IOconf
         /// Note the sources may include the math expression itself, which is the expression referring to its value in the previous cycle.
         /// Also note that the sources returned may also refer to the math expression.
         /// </remarks>
-        public List<string> SourceNames { get; }
+        public List<string> SourceNames { get; private set; } = [];
+        private string _expression;
         public IOconfMath(string row, int lineNum) : base(row, lineNum, "Math")
         {
             Format = "Math;Name;math expression";
-
-            try
-            {
-                (compiledExpression, SourceNames) = CompileExpression(ToList()[2]);
-                // Perform test calculation using default input values
-                Convert.ToDouble(Calculate(SourceNames.ToDictionary(s => s, s => (object)0), compiledExpression));
-            }
-            catch (OverflowException ex)
-            {
-                throw new OverflowException("IOconfMath: expression causes integer overflow: " + row, ex);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("IOconfMath: wrong format - expression: " + row, ex);
-            }
+            ExpandsTags = true;
+            if (ToList().Count < 3)
+                throw new FormatException("Missing math expression: " + row);
+            _expression = ToList()[2];
         }
 
         public static (LogicalExpression expression, List<string> sources) CompileExpression(string expression)
@@ -42,12 +32,35 @@ namespace CA_DataUploaderLib.IOconf
             return (compiledExpression, sourceNames);
         }
 
+        protected internal override void UseTags(ILookup<string, IOconfRow> rowsByTag)
+        {
+            base.UseTags(rowsByTag);
+            _expression = ToList()[2]; //Update the expression with any expanded tags
+        }
+
+        public override void ValidateDependencies(IIOconf ioconf)
+        {
+            try
+            {
+                (compiledExpression, SourceNames) = CompileExpression(_expression);
+                // Perform test calculation using default input values
+                Convert.ToDouble(Calculate(SourceNames.ToDictionary(s => s, s => (object)0), compiledExpression));
+            }
+            catch (OverflowException ex)
+            {
+                throw new OverflowException("IOconfMath: expression causes integer overflow: " + Row, ex);
+            }
+            catch (Exception ex)
+            {
+                throw new FormatException($"IOconfMath: wrong format - expression: {_expression}. Row: {Row}", ex);
+            }
+        }
         public override IEnumerable<string> GetExpandedSensorNames()
         {
             yield return Name;
         }
 
-        private readonly LogicalExpression compiledExpression;
+        private LogicalExpression? compiledExpression;
 
         // https://www.codeproject.com/Articles/18880/State-of-the-Art-Expression-Evaluation
         // uses NCalc 2 for .NET core. 
@@ -60,7 +73,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             try
             {
-                return Convert.ToDouble(Calculate(values, compiledExpression));
+                return Convert.ToDouble(Calculate(values, compiledExpression ?? throw new InvalidOperationException($"Missing compile expression for {Row}")));
             }
             catch
             {
