@@ -2,6 +2,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace UnitTests
 {
@@ -33,7 +34,7 @@ namespace UnitTests
         [DataTestMethod]
         public void CalculatesExpectedValue(string row, double value, double expectedResult) 
         {
-            var math = new IOconfMath(row, 0);
+            var math = new IOconfFile([row]).GetMath().Single();
             Assert.AreEqual(expectedResult, math.Calculate(new Dictionary<string, object> { { "MyValue", value }, { "PI", Math.PI} }));
         }
 
@@ -42,15 +43,15 @@ namespace UnitTests
         [DataTestMethod]
         public void CanUseComparisons(string row, double value, double expectedResult)
         {
-            var math = new IOconfMath(row, 0);
+            var math = new IOconfFile([row]).GetMath().Single();
             Assert.AreEqual(expectedResult, math.Calculate(new Dictionary<string, object> { { "MyValue", value }}));
         }
 
         [TestMethod]
         public void RejectsExpressionWithThousandsSeparator()
         {
-            var ex = Assert.ThrowsException<Exception>(() => new IOconfMath("Math;MyName;MyValue + 123,222", 0));
-            Assert.AreEqual("IOconfMath: wrong format - expression: Math;MyName;MyValue + 123,222", ex.Message);
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile(["Math;MyName;MyValue + 123,222"]));
+            Assert.AreEqual("IOconfMath: wrong format - expression: MyValue + 123,222. Row: Math;MyName;MyValue + 123,222", ex.Message);
         }
 
         [DataRow("Math;MyName;MyValue + 123", "MyValue")]
@@ -74,14 +75,14 @@ namespace UnitTests
         [DataTestMethod]
         public void CanParseSources(string row, params string[] expectedSources) 
         {
-            var math = new IOconfMath(row, 0);
+            var math = new IOconfFile([row]).GetMath().Single();
             CollectionAssert.AreEqual(expectedSources, math.SourceNames);
         }
 
         [TestMethod]
         public void CanParseLinesWithComments()
         {
-            var math = new IOconfMath("Math;MyName;2 / MyValue   // This is a comment", 0);
+            var math = new IOconfFile(["Math;MyName;2 / MyValue   // This is a comment"]).GetMath().Single();
             Assert.AreEqual(0.5d, math.Calculate(new Dictionary<string, object> { { "MyValue", 4 } }));
         }
 
@@ -100,20 +101,20 @@ namespace UnitTests
         [DataTestMethod]
         public void RejectsExpressionIfIncorrectNumberOfArgumentsGivenToBuiltInFunction(string row)
         {
-            var ex = Assert.ThrowsException<Exception>(() => new IOconfMath(row, 0));
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([row]));
             Assert.IsTrue(ex.Message.StartsWith("IOconfMath: wrong format - expression:"));
         }
 
         [TestMethod]
         public void IntegerOverflowCheckAtConstruction()
         {
-            Assert.ThrowsException<OverflowException>(() => new IOconfMath("Math; overflowTest; 298*200*200*200*decimalNumber", 0));
+            Assert.ThrowsException<OverflowException>(() => new IOconfFile(["Math; overflowTest; 298*200*200*200*decimalNumber"]));
         }
 
         [TestMethod]
         public void IntegerUnderflowCheckAtConstruction()
         {
-            Assert.ThrowsException<OverflowException>(() => new IOconfMath("Math; overflowTest; -298*200*200*200*decimalNumber", 0));
+            Assert.ThrowsException<OverflowException>(() => new IOconfFile(["Math; overflowTest; -298*200*200*200*decimalNumber"]));
         }
     }
 }

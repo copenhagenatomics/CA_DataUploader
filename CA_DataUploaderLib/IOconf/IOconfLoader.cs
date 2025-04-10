@@ -27,7 +27,8 @@ namespace CA_DataUploaderLib.IOconf
             ("Code", (r, l) => new IOconfCode(r, l)),
             (IOconfCurrent.TypeName, (r, l) => new IOconfCurrent(r, l)),
             (IOconfCurrentFault.TypeName, (r, l) => new IOconfCurrentFault(r, l)),
-            (IOconfExpand.ConfigName, (r, loader) => new IOconfExpand(r, loader)),
+            (IOconfExpandLines.ConfigName, (r, loader) => new IOconfExpandLines(r, loader)),
+            (IOconfExpandTagLines.ConfigName, (r, loader) => new IOconfExpandTagLines(r, loader)),
         ];
 
         public void AddLoader(string rowType, Func<string, int, IOconfRow> loader)

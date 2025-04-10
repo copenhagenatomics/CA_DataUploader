@@ -53,13 +53,20 @@ namespace CA_DataUploaderLib
         {
             public const string RowType = "RedundantSensors";
 
-            public List<string> Sensors { get; }
+            public List<string> Sensors { get; private set; }
 
             public IOconfRedundantSensors(string row, int lineNum) : base(row, lineNum, RowType)
             {
+                ExpandsTags = true;
                 Sensors = ToList().Skip(2).ToList();
                 if (Sensors.Count < 1)
                     throw new FormatException($"Missing sensors. Format: {RowType};Name;Sensor1;Sensor2...;Sensorn. Line: {Row}");
+            }
+
+            protected internal override void UseTags(ILookup<string, IOconfRow> rowsByTag)
+            {
+                base.UseTags(rowsByTag);
+                Sensors = ToList().Skip(2).ToList(); //Update the sensors list with any expanded tags
             }
 
             public override void ValidateDependencies(IIOconf ioconf)
