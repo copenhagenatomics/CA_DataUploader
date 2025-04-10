@@ -147,7 +147,8 @@ namespace CA_DataUploaderLib.IOconf
                     throw new FormatException($"Missing closing }} for expandtag. Row: {Row}");
                 if (missingClosing)
                 {//assuming the expandtag has ; in it, so we merge the next entry after the ; and try again.
-                    _parsedList[i] = _parsedList[i] + _parsedList[i + 1];
+                    _parsedList[i] = _parsedList[i] + ';' + _parsedList[i + 1];
+                    _parsedList.RemoveAt(i + 1);
                     i--;
                     continue;
                 }
