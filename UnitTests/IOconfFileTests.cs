@@ -124,36 +124,35 @@ RedundantSensors;redundant;expandtag{ovenheaters}
 
 //later one could add syntatic suggar for some, like expandtagsum (similar to how expandtaglines skips the need of the separator)
 ".SplitNewLine(StringSplitOptions.None));
-            AssertRowValuesByNameAndType("LeftHeater17_onoff,LeftHeater18_onoff", ioconf, "pc2", "Heaters_onoff");
-            AssertRowValuesByNameAndType("LeftHeater17_onoff,LeftHeater18_onoff", ioconf, "pcs2", "Heaters_onoff");
-            AssertRowValuesByNameAndType("LeftHeater17_sampledcurrent,LeftHeater18_sampledcurrent", ioconf, "pc2", "Heaters_currentsampled");
-            AssertRowValuesByNameAndType("LeftHeater17_sampledcurrent,LeftHeater18_sampledcurrent", ioconf, "pcs2", "Heaters_currentsampled");
-            AssertRowValuesByName("LeftHeater16,LeftHeater17,LeftHeater18", ioconf, "mylist");
-            AssertRowValuesByName("LeftHeater16,LeftHeater17,LeftHeater18", ioconf, "mylist2");
-            AssertRowValuesByName("LeftHeater16_phase1,LeftHeater17_phase2,LeftHeater18_phase2", ioconf, "mylist3");
-            AssertRowValuesByNameAndType("math1", ioconf, "Math", "math1");
-            AssertRowValuesByNameAndType("math2", ioconf, "Math", "math2");
-            AssertRowValuesByNameAndType("math3", ioconf, "Math", "math3");
-            AssertRowValuesByNameAndType("LeftHeater17_sampledcurrent", ioconf, "Math", "LeftHeater17_sampledcurrent");
-            AssertRowValuesByNameAndType("LeftHeater18_sampledcurrent", ioconf, "Math", "LeftHeater18_sampledcurrent");
-            AssertRowValuesByNameAndType("LeftHeater17_ing", ioconf, "Math", "LeftHeater17_math");
-            AssertRowValuesByNameAndType("LeftHeater18_ing", ioconf, "Math", "LeftHeater18_math");
-            AssertRowValuesByNameAndType("12 + (LeftHeater16_current + 2*LeftHeater16_onoff)+(LeftHeater17_current + 2*LeftHeater17_onoff)+(LeftHeater18_current + 2*LeftHeater18_onoff)", ioconf, "Math", "bigsum2");
-            AssertRowValuesByNameAndType("12 + (2*LeftHeater16_current*LeftHeater16_onoff)+(2*LeftHeater17_current*LeftHeater17_onoff)+(2*LeftHeater18_current*LeftHeater18_onoff)", ioconf, "Math", "bigsum3");
-            AssertRowValuesByNameAndType("12 + 2*(LeftHeater16_current+LeftHeater17_current+LeftHeater18_current)*(LeftHeater16_onoff+LeftHeater17_onoff+LeftHeater18_onoff)", ioconf, "Math", "bigsum4");
-            AssertRowValuesByNameAndType("12 + (2*LeftHeater16_current*LeftHeater16_onoff)+(2*LeftHeater17_current*LeftHeater17_onoff)+(2*LeftHeater18_current*LeftHeater18_onoff) * 1282", ioconf, "Math", "bigsum5");
-            AssertRowValuesByNameAndType("if((2*LeftHeater16_current*LeftHeater16_onoff > 2) && (2*LeftHeater17_current*LeftHeater17_onoff > 2) && (2*LeftHeater18_current*LeftHeater18_onoff > 2),ac03_state,ac02_state)", ioconf, "Math", "bigsum6");
-            AssertRowValuesByNameAndType("LeftHeater16,LeftHeater17,LeftHeater18", ioconf, "RedundantSensors", "redundant");
+            AssertRowValuesByNameAndType(ioconf, "pc2", "Heaters_onoff", "LeftHeater17_onoff,LeftHeater18_onoff");
+            AssertRowValuesByNameAndType(ioconf, "pcs2", "Heaters_onoff", "LeftHeater17_onoff,LeftHeater18_onoff");
+            AssertRowValuesByNameAndType(ioconf, "pc2", "Heaters_currentsampled", "LeftHeater17_sampledcurrent,LeftHeater18_sampledcurrent");
+            AssertRowValuesByNameAndType(ioconf, "pcs2", "Heaters_currentsampled", "LeftHeater17_sampledcurrent,LeftHeater18_sampledcurrent");
+            AssertRowValuesByName(ioconf, "mylist", "LeftHeater16,LeftHeater17,LeftHeater18");
+            AssertRowValuesByName(ioconf, "mylist2", "LeftHeater16,LeftHeater17,LeftHeater18");
+            AssertRowValuesByName(ioconf, "mylist3", "LeftHeater16_phase1,LeftHeater17_phase2,LeftHeater18_phase2");
+            AssertRowValuesByNameAndType(ioconf, "Math", "math1", "math1");
+            AssertRowValuesByNameAndType(ioconf, "Math", "math2", "math2");
+            AssertRowValuesByNameAndType(ioconf, "Math", "math3", "math3");
+            AssertRowValuesByNameAndType(ioconf, "Math", "LeftHeater17_sampledcurrent", "LeftHeater17_sampledcurrent");
+            AssertRowValuesByNameAndType(ioconf, "Math", "LeftHeater18_sampledcurrent", "LeftHeater18_sampledcurrent");
+            AssertRowValuesByNameAndType(ioconf, "Math", "LeftHeater17_math", "LeftHeater17_ing");
+            AssertRowValuesByNameAndType(ioconf, "Math", "LeftHeater18_math", "LeftHeater18_ing");
+            AssertRowValuesByNameAndType(ioconf, "Math", "bigsum2", "12 + (LeftHeater16_current + 2*LeftHeater16_onoff)+(LeftHeater17_current + 2*LeftHeater17_onoff)+(LeftHeater18_current + 2*LeftHeater18_onoff)");
+            AssertRowValuesByNameAndType(ioconf, "Math", "bigsum3", "12 + (2*LeftHeater16_current*LeftHeater16_onoff)+(2*LeftHeater17_current*LeftHeater17_onoff)+(2*LeftHeater18_current*LeftHeater18_onoff)");
+            AssertRowValuesByNameAndType(ioconf, "Math", "bigsum4", "12 + 2*(LeftHeater16_current+LeftHeater17_current+LeftHeater18_current)*(LeftHeater16_onoff+LeftHeater17_onoff+LeftHeater18_onoff)");
+            AssertRowValuesByNameAndType(ioconf, "Math", "bigsum5", "12 + (2*LeftHeater16_current*LeftHeater16_onoff)+(2*LeftHeater17_current*LeftHeater17_onoff)+(2*LeftHeater18_current*LeftHeater18_onoff) * 1282");
+            AssertRowValuesByNameAndType(ioconf, "Math", "bigsum6", "if((2*LeftHeater16_current*LeftHeater16_onoff > 2) && (2*LeftHeater17_current*LeftHeater17_onoff > 2) && (2*LeftHeater18_current*LeftHeater18_onoff > 2),ac03_state,ac02_state)");
+            AssertRowValuesByNameAndType(ioconf, "RedundantSensors", "redundant", "LeftHeater16,LeftHeater17,LeftHeater18");
 
-            static void AssertRowValuesByNameAndType(string values, IOconfFile conf, string type, string name) =>
+            static void AssertRowValuesByNameAndType(IOconfFile conf, string type, string name, string values) =>
                 Assert.AreEqual(values,GetRowValues(conf, r => r.Type == type && r.Name == name, $"{type}-{name}"));
-            static void AssertRowValuesByName(string values, IOconfFile conf, string name) =>
+            static void AssertRowValuesByName(IOconfFile conf, string name, string values) =>
                 Assert.AreEqual(values, GetRowValues(conf, r => r.Name == name, name));
             static string GetRowValues(IOconfFile conf, Expression<Func<IOconfRow, bool>> predicate, string msg) => 
-                string.Join(',', 
-                    (conf.GetEntries<IOconfRow>().SingleOrDefault(predicate.Compile()) 
-                        ?? throw new ArgumentException($"Row not found: {msg}"))
-                    .ToList()[2..]);
+                string.Join(',', GetRequiredRow(conf, predicate, msg).ToList()[2..]);
+            static IOconfRow GetRequiredRow(IOconfFile conf, Expression<Func<IOconfRow, bool>> predicate, string msg) =>
+                conf.GetEntries<IOconfRow>().SingleOrDefault(predicate.Compile()) ?? throw new ArgumentException($"Row not found: {msg}");
         }
 
         [TestMethod]
