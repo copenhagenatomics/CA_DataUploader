@@ -85,7 +85,7 @@ namespace UnitTests
         private static (CommandHandler cmd, VectorDescription desc, IOconfFile conf) NewConf(params string[] lines)
         {
             var conf = new IOconfFile([.. lines]);
-            var cmd = new CommandHandler(conf);
+            var cmd = new CommandHandler(conf, runCommandLoop: false);
             var desc = cmd.GetFullSystemVectorDescription();
             return (cmd, desc, conf);
         }

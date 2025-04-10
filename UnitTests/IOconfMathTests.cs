@@ -50,8 +50,8 @@ namespace UnitTests
         [TestMethod]
         public void RejectsExpressionWithThousandsSeparator()
         {
-            var ex = Assert.ThrowsException<Exception>(() => new IOconfFile(["Math;MyName;MyValue + 123,222"]));
-            Assert.AreEqual("IOconfMath: wrong format - expression: Math;MyName;MyValue + 123,222", ex.Message);
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile(["Math;MyName;MyValue + 123,222"]));
+            Assert.AreEqual("IOconfMath: wrong format - expression: MyValue + 123,222. Row: Math;MyName;MyValue + 123,222", ex.Message);
         }
 
         [DataRow("Math;MyName;MyValue + 123", "MyValue")]
@@ -101,7 +101,7 @@ namespace UnitTests
         [DataTestMethod]
         public void RejectsExpressionIfIncorrectNumberOfArgumentsGivenToBuiltInFunction(string row)
         {
-            var ex = Assert.ThrowsException<Exception>(() => new IOconfFile([row]));
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([row]));
             Assert.IsTrue(ex.Message.StartsWith("IOconfMath: wrong format - expression:"));
         }
 
