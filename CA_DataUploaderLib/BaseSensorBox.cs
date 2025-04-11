@@ -483,14 +483,14 @@ namespace CA_DataUploaderLib
                         {
                             LowFrequencyLogBoardError((args, skipMessage) =>
                             {
-                                LogError(args.board, $"Board responded with error status 0x{args.status:X}{skipMessage}");
+                                LogError(args.board, $"Board entered error state with 0x{args.status:X}{skipMessage}");
                                 if (_boardCustomCommands.TryGetValue(board, out var customCommandsChannel))
                                     customCommandsChannel.Writer.TryWrite("Status");
                             }, (board, status));
                         }
                         if ((status & 0x80000000) == 0 && (_lastStatus & 0x80000000) != 0) // Error gone?
                         {
-                            LowFrequencyLogBoardOk((args, skipMessage) => LogError(args.board, $"Board responded with OK status 0x{args.status:X}{skipMessage}"), (board, status));
+                            LowFrequencyLogBoardOk((args, skipMessage) => LogError(args.board, $"Board resumed normal state with 0x{args.status:X}{skipMessage}"), (board, status));
                         }
                         _lastStatus = status;
                     }
