@@ -20,6 +20,7 @@ namespace CA_DataUploaderLib
         private static Dictionary<LogID, DateTime>? _nextSizeCheck;
         private static readonly string _logDir = Directory.GetCurrentDirectory();
         internal static readonly ILog Default = new CALog();
+        private static readonly ILog _localLogger = new LocalLogger();
 
         /// <remarks>any output before a custom logger is set is written to the console.</remarks>
         public static ISimpleLogger LoggerForUserOutput { get; set; } = new ConsoleLogger();
@@ -29,78 +30,28 @@ namespace CA_DataUploaderLib
         void ILog.LogError(LogID id, string msg, Exception ex) => LogErrorAndConsoleLn(id, msg, ex);
         void ILog.LogError(LogID id, string msg) => LogErrorAndConsoleLn(id, msg);
         void ILog.LogInfo(LogID id, string msg) => LogInfoAndConsoleLn(id, msg);
-        public static void LogData(LogID logID, string msg) => WriteToFile(logID, msg);
+        public static void LogData(LogID logID, string msg) => _localLogger.LogData(logID, msg);
 
         public static void LogInfoAndConsoleLn(LogID logID, string msg)
         {
             LoggerForUserOutput.LogInfo(msg);
-            WriteToFile(logID, msg);
+            _localLogger.LogInfo(logID, msg);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error)
         {
             LoggerForUserOutput.LogError(error);
-            WriteToFile(logID, error);
+            _localLogger.LogInfo(logID, error);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error, Exception ex)
         {
             LoggerForUserOutput.LogError(error);
-            WriteToFile(logID, error + Environment.NewLine + ex.ToString());
+            _localLogger.LogError(logID, error, ex);
         }
 
-        public static void LogError(LogID logID, string error, Exception ex) => WriteToFile(logID, error + Environment.NewLine + ex.ToString());
-        private static void WriteToFile(LogID logID, string msg)
-        {
-            try
-            {
-                lock (_logDir)
-                {
-                    // allways add timestamp and a NewLine
-                    msg = $"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} - {msg}{Environment.NewLine}";
-                    File.AppendAllText(GetFilename(logID), msg);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.ToString());
-                Console.WriteLine(msg);
-            }
-        }
+        public static void LogError(LogID logID, string error, Exception ex) => _localLogger.LogError(logID, error, ex);
 
-        private static string GetFilename(LogID logID)
-        {
-            if (_nextSizeCheck == null)
-                InitDictionary(ref _nextSizeCheck);
-
-            var filepath = Path.Combine(_logDir, logID.ToString() + ".log");
-            if (DateTime.UtcNow > _nextSizeCheck[logID] && File.Exists(filepath))
-            {
-                if (new FileInfo(filepath).Length > MaxLogSizeMB * 1024 * 1024)
-                    File.Delete(filepath);
-
-                _nextSizeCheck[logID] = DateTime.UtcNow.AddMinutes(1);
-            }
-
-            return filepath;
-        }
-
-        private static void InitDictionary([NotNull]ref Dictionary<LogID, DateTime>? dictionary)
-        {
-            if (dictionary != null) return;
-
-            dictionary = new Dictionary<LogID, DateTime>
-            {
-                { LogID.A, DateTime.UtcNow },
-                { LogID.B, DateTime.UtcNow },
-                { LogID.C, DateTime.UtcNow },
-                { LogID.D, DateTime.UtcNow },
-                { LogID.E, DateTime.UtcNow },
-                { LogID.F, DateTime.UtcNow },
-                { LogID.G, DateTime.UtcNow },
-                { LogID.H, DateTime.UtcNow }
-            };
-        }
 
         public class ConsoleLogger : ISimpleLogger
         {
@@ -126,7 +77,7 @@ namespace CA_DataUploaderLib
             private readonly CommandHandler handler;
             private readonly IDictionary<byte, string>? nodeIdToName;
 
-            public EventsLogger(IIOconf ioconf, CommandHandler handler) 
+            public EventsLogger(IIOconf ioconf, CommandHandler handler)
             {
                 this.handler = handler;
                 nodeIdToName = ioconf.GetEntries<IOconfNode>().ToDictionary(n => n.NodeIndex, n => n.Name);
@@ -195,6 +146,69 @@ namespace CA_DataUploaderLib
                             enabledCallback();
                     }
                 }
+            }
+        }
+
+        public class LocalLogger : ILog
+        {
+            public void LogData(LogID id, string msg) => WriteToFile(id, msg);
+
+            public void LogError(LogID id, string msg, Exception ex) => WriteToFile(id, msg + Environment.NewLine + ex.ToString());
+
+            public void LogError(LogID id, string msg) => WriteToFile(id, msg);
+
+            public void LogInfo(LogID id, string msg) => WriteToFile(id, msg);
+
+            private static void WriteToFile(LogID logID, string msg)
+            {
+                try
+                {
+                    lock (_logDir)
+                    {
+                        // always add timestamp and a NewLine
+                        msg = $"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} - {msg}{Environment.NewLine}";
+                        File.AppendAllText(GetFilename(logID), msg);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                    Console.WriteLine(msg);
+                }
+            }
+
+            private static string GetFilename(LogID logID)
+            {
+                if (_nextSizeCheck == null)
+                    InitDictionary(ref _nextSizeCheck);
+
+                var filepath = Path.Combine(_logDir, logID.ToString() + ".log");
+                if (DateTime.UtcNow > _nextSizeCheck[logID] && File.Exists(filepath))
+                {
+                    if (new FileInfo(filepath).Length > MaxLogSizeMB * 1024 * 1024)
+                        File.Delete(filepath);
+
+                    _nextSizeCheck[logID] = DateTime.UtcNow.AddMinutes(1);
+                }
+
+                return filepath;
+            }
+
+            private static void InitDictionary([NotNull] ref Dictionary<LogID, DateTime>? dictionary)
+            {
+                if (dictionary != null) return;
+
+                dictionary = new Dictionary<LogID, DateTime>
+                {
+                    { LogID.A, DateTime.UtcNow },
+                    { LogID.B, DateTime.UtcNow },
+                    { LogID.C, DateTime.UtcNow },
+                    { LogID.D, DateTime.UtcNow },
+                    { LogID.E, DateTime.UtcNow },
+                    { LogID.F, DateTime.UtcNow },
+                    { LogID.G, DateTime.UtcNow },
+                    { LogID.H, DateTime.UtcNow }
+                };
             }
         }
     }
