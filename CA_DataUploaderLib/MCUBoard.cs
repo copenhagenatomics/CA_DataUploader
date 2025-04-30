@@ -193,7 +193,7 @@ namespace CA_DataUploaderLib
         }
 
         public static Task<MCUBoard?> OpenDeviceConnection(IIOconf? ioconf, string name) => OpenDeviceConnection(Dependencies.Default, SerialPortConnectionManager.Default, ioconf, name, true);
-        public async static Task<MCUBoard?> OpenDeviceConnection(Dependencies dependencies, IConnectionManager connectionManager, IIOconf? ioconf, string name, bool useDmsgIfTypeUnknown)
+        public async static Task<MCUBoard?> OpenDeviceConnection(Dependencies dependencies, IConnectionManager connectionManager, IIOconf? ioconf, string name, bool useDmesgIfTypeUnknown)
         {
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
             var map = ioconf?.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name);
@@ -211,7 +211,7 @@ namespace CA_DataUploaderLib
                 mcu.SerialNumber = "unknown" + Interlocked.Increment(ref _detectedUnknownBoards);
             if (mcu.InitialConnectionSucceeded && map != null && map.BaudRate != 0 && mcu.port.BaudRate != map.BaudRate)
                 dependencies.LogError(LogID.A, $"Unexpected baud rate for {map}. Board info {mcu}");
-            mcu.ProductType ??= useDmsgIfTypeUnknown ? GetStringFromDmesg(mcu.PortName) : mcu.ProductType;
+            mcu.ProductType ??= useDmesgIfTypeUnknown ? GetStringFromDmesg(mcu.PortName) : mcu.ProductType;
             return mcu;
         }
 
