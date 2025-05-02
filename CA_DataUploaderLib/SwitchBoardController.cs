@@ -19,9 +19,9 @@ namespace CA_DataUploaderLib
         {
             //we ignore remote boards and boards missing during the start sequence (as we don't have auto reconnect logic yet for those). Note the BaseSensorBox already reports the missing local boards.
             foreach (var port in ioconf.GetEntries<IOconfOut230Vac>().Where(p => p.Map.IsLocalBoard && p.Map.McuBoard != null))
-                RegisterBoardWriteActions(port.Map.McuBoard!, port, 0, port.Name + "_onoff", GetCommand);
+                RegisterBoardWriteActions(port.Map.McuBoard!, port, 0, [port.Name + "_onoff"], GetCommand);
 
-            static string GetCommand(int portNumber, double target) => target > 0.0 ? $"p{portNumber} on 2 {target:0%}" : $"p{portNumber} off";
+            static string GetCommand(int portNumber, List<double> targets) => targets[0] > 0.0 ? $"p{portNumber} on 2 {targets[0]:0%}" : $"p{portNumber} off";
         }
 
         public static void Initialize(IIOconf ioconf, CommandHandler cmd)

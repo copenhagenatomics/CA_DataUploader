@@ -195,23 +195,23 @@ namespace CA_DataUploaderLib
             else actions.Add((writeAction, exitAction));
         }
 
-        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, double defaultTarget, string targetFieldName, Func<int, double, string> getCommand, int repeatMilliseconds = 1000)
+        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, double defaultTarget, IEnumerable<string> targetFieldNames, Func<int, List<double>, string> getCommand, int repeatMilliseconds = 1000)
         {
-            var fieldIndex = -1;
+            IEnumerable<int> fieldIndices = [];
             _cmd.FullVectorIndexesCreated += InitializeAction;
-            RegisterBoardWriteActions(board, port, GetTarget, getCommand, repeatMilliseconds);
+            RegisterBoardWriteActions(board, port, GetTargets, getCommand, repeatMilliseconds);
 
             void InitializeAction(object? sender, IReadOnlyDictionary<string, int> indexes) =>
-                fieldIndex = indexes.TryGetValue(targetFieldName, out var index)
+                fieldIndices = targetFieldNames.Select(n => indexes.TryGetValue(n, out var index)
                     ? index
-                    : throw new InvalidOperationException($"Missing target field: {targetFieldName}");
-            double GetTarget(DataVector? vector) => vector == null ? defaultTarget : vector[fieldIndex];
+                    : throw new InvalidOperationException($"Missing target field: {n}"));
+            IEnumerable<double> GetTargets(DataVector? vector) => fieldIndices.Select(i => vector == null ? defaultTarget : vector[i]);
         }
 
-        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, Func<DataVector?, double> getTarget, Func<int, double, string> getCommand, int repeatMilliseconds = 1000)
+        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, Func<DataVector?, IEnumerable<double>> getTargets, Func<int, List<double>, string> getCommand, int repeatMilliseconds = 1000)
         {
-            double defaultTarget = getTarget(null);
-            var lastAction = new LastAction(defaultTarget, repeatMilliseconds);
+            List<double> defaultTargets = [.. getTargets(null)];
+            var lastAction = new LastAction(defaultTargets, repeatMilliseconds);
             AddBuiltInWriteAction(board, WriteAction, ExitAction);
 
             Task ExitAction(MCUBoard board, CancellationToken token) => Off(board, port, token);
@@ -219,23 +219,23 @@ namespace CA_DataUploaderLib
             {
                 if (vector == null)
                 {
-                    await board.SafeWriteLine(getCommand(port.PortNumber, defaultTarget), token);
-                    lastAction.TimedOutWaitingForDecision(defaultTarget);
+                    await board.SafeWriteLine(getCommand(port.PortNumber, defaultTargets), token);
+                    lastAction.TimedOutWaitingForDecision(defaultTargets);
                     return;
                 }
 
-                var target = getTarget(vector);
-                if (!lastAction.ChangedOrExpired(target, vector.Timestamp))
+                var targets = getTargets(vector);
+                if (!lastAction.ChangedOrExpired(targets, vector.Timestamp))
                     return;
 
-                await board.SafeWriteLine(getCommand(port.PortNumber, target), token);
-                lastAction.ExecutedNewAction(target, vector.Timestamp);
+                await board.SafeWriteLine(getCommand(port.PortNumber, [.. targets]), token);
+                lastAction.ExecutedNewAction(targets, vector.Timestamp);
             }
 
             async Task Off(MCUBoard board, IOconfOutput port, CancellationToken token)
             {
-                await board.SafeWriteLine(getCommand(port.PortNumber, defaultTarget), token);
-                _cmd.Logger.LogInfo(LogID.A, $"Port has been set to default position ({defaultTarget:F2}): {port.Name}");
+                await board.SafeWriteLine(getCommand(port.PortNumber, defaultTargets), token);
+                _cmd.Logger.LogInfo(LogID.A, $"Port has been set to default position ({string.Join(", ", defaultTargets.Select(t => $"{t:F2}"))}): {port.Name}");
             }
         }
 

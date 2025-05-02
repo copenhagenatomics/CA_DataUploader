@@ -60,6 +60,23 @@ namespace UnitTests
         }
 
         [TestMethod()]
+        public void VectorOnlyMultipleTargetsNoRepeatTest()
+        {
+            var now = DateTime.UtcNow;
+            var action = new LastAction([0.1, 0.2, 0.3], -1);
+            Assert.IsTrue(action.ChangedOrExpired([0.1, 0.2, 0.3], now), "expiration is expected before executing the first action");
+            now = now.AddSeconds(1);
+            action.ExecutedNewAction([0.2, 0.3, 0.4], now);
+            Assert.IsFalse(action.ChangedOrExpired([0.2, 0.3, 0.4], now), "2: no expiration expected at 0s");
+            Assert.IsFalse(action.ChangedOrExpired([0.2, 0.3, 0.4], now.AddYears(10)), "2: no expiration expected at 10 years");
+            Assert.IsTrue(action.ChangedOrExpired([0.3, 0.4, 0.5], now.AddMilliseconds(100)), "2: target change must be detected");
+            action.ExecutedNewAction([0.3, 0.4, 0.5], now);
+            Assert.IsFalse(action.ChangedOrExpired([0.3, 0.4, 0.5], now), "3: no expiration expected at 0s");
+            Assert.IsFalse(action.ChangedOrExpired([0.3, 0.4, 0.5], now.AddDays(30)), "3: no expiration expected at 30 days");
+            Assert.IsTrue(action.ChangedOrExpired([0.4, 0.5, 0.6], now.AddMilliseconds(100)), "3: target change must be detected");
+        }
+
+        [TestMethod()]
         public void TimedOutWaitingForDecisionTest()
         {
             var now = DateTime.UtcNow;
