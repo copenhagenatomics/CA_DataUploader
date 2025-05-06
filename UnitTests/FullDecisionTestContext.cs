@@ -24,7 +24,7 @@ namespace UnitTests
             Subsystems.RegisterIOConfAndThirdPartyBoardsProtocols(loader);
             var ioconf = new IOconfFile(loader, config.SplitNewLine());
             var logger = new ChannelLogger();
-            cmd = new CommandHandler(ioconf, runCommandLoop: false, logger: logger);//TODO: time provider and logging?
+            cmd = new CommandHandler(ioconf, runCommandLoop: false, logger: logger);
             logs = logger.Log;
             Subsystems.AddSubsystemsTo(ioconf, cmd);
             var extDesc = cmd.GetExtendedVectorDescription();
@@ -57,14 +57,14 @@ namespace UnitTests
         }
 
         public void MakeDecisions(string? @event = null, double secondsSinceStart = 0) => MakeDecisions(@event != null ? [@event] : [], secondsSinceStart);
-        public void MakeDecisions(List<string> events, double secondsSinceStart = 0) => MakeDecisions(events, new DataVector(vectorData, InitialTime.AddSeconds(secondsSinceStart)));//TODO: do we need to copy the events here?
+        public void MakeDecisions(List<string> events, double secondsSinceStart = 0) => MakeDecisions(events, new DataVector(vectorData, InitialTime.AddSeconds(secondsSinceStart)));
         private void MakeDecisions(List<string> events, DataVector vector)
         {
             foreach (var e in events)
                 cmd.Execute(e, true);
 
             var acceptedEvents = cmd.DequeueEvents() ?? [];
-            cmd.MakeDecisionUsingInputsFromNewVector(vector, vector, acceptedEvents.Select(e => e.Data).ToList()); //TODO: can we just use the normal call??
+            cmd.MakeDecisionUsingInputsFromNewVector(vector, vector, acceptedEvents.Select(e => e.Data).ToList());
         }
 
         private class ChannelLogger : ILog
