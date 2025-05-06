@@ -60,21 +60,19 @@ namespace CA_DataUploaderLib
 
             private static Config ToConfig(IOconfHeater heater, IOconfOven? oven, IIOconf ioconf)
             {
-                if (oven == null)
-                {
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heater.Name}");
-                    return new(heater.Name, new List<string>().AsReadOnly());//notice we don't set the maxtemperature configured at the heater level, as there is no way to enforce as the oven config owns the temperature sensor
-                }
-
-                return new(heater.Name, oven.GetBoardStateNames(ioconf))
-                {
-                    MaxTemperature = heater.MaxTemperature,
-                    Area = oven.OvenArea,
-                    OvenSensor = oven.TemperatureSensorName,
-                    ProportionalGain = oven.ProportionalGain,
-                    ControlPeriod = oven.ControlPeriod,
-                    MaxOutputPercentage = oven.MaxOutputPercentage
-                };
+                if (oven == null && heater.MaxTemperature != null)
+                    CALog.LogErrorAndConsoleLn(LogID.A, "IOconfHeater: max temperature is not used for heaters without oven lines: " + heater.Row);
+                return (oven == null)
+                    ? new(heater.Name, new List<string>().AsReadOnly())
+                    : new(heater.Name, oven.GetBoardStateNames(ioconf))
+                    {
+                        MaxTemperature = heater.MaxTemperature ?? throw new FormatException($"IOconfHeater: missing max temperature: " + heater.Row),
+                        Area = oven.OvenArea,
+                        OvenSensor = oven.TemperatureSensorName,
+                        ProportionalGain = oven.ProportionalGain,
+                        ControlPeriod = oven.ControlPeriod,
+                        MaxOutputPercentage = oven.MaxOutputPercentage
+                    };
             }
 
             public class Config

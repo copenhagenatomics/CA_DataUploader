@@ -69,7 +69,7 @@ namespace CA_DataUploaderLib
                 foreach (var writer in _receivedVectorsWriters)                
                     writer.TryComplete();
             });
-            _commandRunner = runner ?? new DefaultCommandRunner();
+            _commandRunner = runner ?? new DefaultCommandRunner(Logger);
             _ioconf = ioconf;
             _mapper = mapper;
             _fullSystemFilterAndMath = new Lazy<ExtendedVectorDescription>(GetFullSystemFilterAndMath);
