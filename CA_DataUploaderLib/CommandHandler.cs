@@ -257,10 +257,10 @@ namespace CA_DataUploaderLib
         }
 
         private IOconfNode GetCurrentNode() => GetNodes().Single(n => n.IsCurrentSystem);
-        private List<IOconfNode> GetNodes()
+        public List<IOconfNode> GetNodes()
         {
             var nodes = _ioconf.GetEntries<IOconfNode>().ToList();
-            return nodes.Count > 0 ? nodes : [IOconfNode.GetSingleNode(_ioconf.GetLoopName())];
+            return nodes.Count > 0 ? nodes : [IOconfNode.GetSingleNode(_ioconf)];
         }
 
         public void OnNewVectorReceived(DataVector args)

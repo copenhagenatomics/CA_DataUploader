@@ -27,9 +27,6 @@ namespace CA_DataUploaderLib.IOconf
 
         public static (List<IOconfRow> original, List<IOconfRow> expanded) ParseLines(IIOconfLoader loader, IEnumerable<string> lines)
         {
-            IOconfNode.ResetIndex();
-            IOconfCode.ResetIndex();
-
             var linesList = lines.Select(x => x.Trim()).ToList();
             // remove empty lines and commented out lines
             var lines2 = linesList.Where(x => !x.StartsWith("//") && x.Length > 2).Select((x,i) => (row: x,line: i)).ToList();
