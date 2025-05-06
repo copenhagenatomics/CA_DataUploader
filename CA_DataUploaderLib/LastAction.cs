@@ -10,42 +10,42 @@ namespace CA_DataUploaderLib
         private readonly TimeProvider timeProvider;
         private long lastActionExecutedTime;
 
-        public LastAction(double target, int repeatMilliseconds) : this(target, repeatMilliseconds, TimeProvider.System) { }
-        public LastAction(double target, int repeatMilliseconds, TimeProvider timeProvider) : this([target], repeatMilliseconds, timeProvider) { }
-        public LastAction(IEnumerable<double> targets, int repeatMilliseconds) : this(targets, repeatMilliseconds, TimeProvider.System) { }
-        public LastAction(IEnumerable<double> targets, int repeatMilliseconds, TimeProvider timeProvider)
+        public LastAction(int targetIndex, double defaultValue, int repeatMilliseconds) : this(targetIndex, defaultValue, repeatMilliseconds, TimeProvider.System) { }
+        public LastAction(int targetIndex, double defaultValue, int repeatMilliseconds, TimeProvider timeProvider) : this([targetIndex], defaultValue, repeatMilliseconds, timeProvider) { }
+        public LastAction(IEnumerable<int> targetIndices, double defaultValue, int repeatMilliseconds) : this(targetIndices, defaultValue, repeatMilliseconds, TimeProvider.System) { }
+        public LastAction(IEnumerable<int> targetIndices, double defaultValue, int repeatMilliseconds, TimeProvider timeProvider)
         {
-            Targets = targets;
+            Indices = targetIndices;
+            Vector = [.. targetIndices.Select(i => defaultValue)];
             this.repeatMilliseconds = repeatMilliseconds;
             this.timeProvider = timeProvider;
         }
 
-        public IEnumerable<double> Targets { get; private set; }
-        public DateTime TimeToRepeat { get; private set; }
-        
+        private double[] Vector { get; set; }
+        private IEnumerable<int> Indices { get; set; }
+        private DateTime TimeToRepeat { get; set; }
+
+        public IEnumerable<double> Targets => Indices.Select(i => Vector[i]);
+
         /// <remarks>
         /// We determine whether the last action has expired (should be repeated) by checking the time passed in 2 different ways,
         /// one based purely on the vector times and another based on the local system time. We do this to avoid the related 
         /// actuator from stopping if either of these 2 mechanisms and related fields are affected by a radiation caused bit flip.
         /// Note however that there are many other ways that bit flips could affect related actuations and also the functioning of this very class.
         /// </remarks>
-        public bool ChangedOrExpired(double newTarget, DateTime currentVectorTime) => ChangedOrExpired([newTarget], currentVectorTime);
-        public bool ChangedOrExpired(IEnumerable<double> newTargets, DateTime currentVectorTime) =>
-            !Targets.SequenceEqual(newTargets) || (repeatMilliseconds > -1 && timeProvider.GetElapsedTime(lastActionExecutedTime).TotalMilliseconds >= repeatMilliseconds) || currentVectorTime >= TimeToRepeat;
-        
-        public void ExecutedNewAction(double target, DateTime currentVectorTime) => ExecutedNewAction([target], currentVectorTime);
-        public void ExecutedNewAction(IEnumerable<double> targets, DateTime currentVectorTime)
+        public bool ChangedOrExpired(double[] newVector, DateTime currentVectorTime) =>
+            Indices.Any(i => Vector[i] != newVector[i]) || (repeatMilliseconds > -1 && timeProvider.GetElapsedTime(lastActionExecutedTime).TotalMilliseconds >= repeatMilliseconds) || currentVectorTime >= TimeToRepeat;
+
+        public void ExecutedNewAction(double[] newVector, DateTime currentVectorTime)
         {
-            Targets = targets;
+            Vector = newVector;
             TimeToRepeat = repeatMilliseconds > -1 ? currentVectorTime.AddMilliseconds(repeatMilliseconds) : DateTime.MaxValue;
             lastActionExecutedTime = timeProvider.GetTimestamp();
         }
 
-        public void TimedOutWaitingForDecision(double target) => TimedOutWaitingForDecision([target]);
-        public void TimedOutWaitingForDecision(IEnumerable<double> targets)
+        public void TimedOutWaitingForDecision()
         {
             //DateTime.MinValue forces execution on the next vector / also note we don't restart time running for the same reason.
-            Targets = targets;
             TimeToRepeat = DateTime.MinValue;
         }
 

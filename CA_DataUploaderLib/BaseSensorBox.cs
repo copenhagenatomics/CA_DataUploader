@@ -195,45 +195,52 @@ namespace CA_DataUploaderLib
             else actions.Add((writeAction, exitAction));
         }
 
-        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, double defaultTarget, IEnumerable<string> targetFieldNames, Func<int, List<double>, string> getCommand, int repeatMilliseconds = 1000)
+        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, double defaultTarget, IEnumerable<string> targetFieldNames, Func<int, IEnumerable<double>, string> getCommand, int repeatMilliseconds = 1000)
         {
             IEnumerable<int> fieldIndices = [];
             _cmd.FullVectorIndexesCreated += InitializeAction;
-            RegisterBoardWriteActions(board, port, GetTargets, getCommand, repeatMilliseconds);
+            RegisterBoardWriteActions(board, port, defaultTarget, GetIndices, getCommand, repeatMilliseconds);
 
             void InitializeAction(object? sender, IReadOnlyDictionary<string, int> indexes) =>
                 fieldIndices = targetFieldNames.Select(n => indexes.TryGetValue(n, out var index)
                     ? index
                     : throw new InvalidOperationException($"Missing target field: {n}"));
-            IEnumerable<double> GetTargets(DataVector? vector) => fieldIndices.Select(i => vector == null ? defaultTarget : vector[i]);
+            IEnumerable<int> GetIndices() => fieldIndices;
         }
 
-        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, Func<DataVector?, IEnumerable<double>> getTargets, Func<int, List<double>, string> getCommand, int repeatMilliseconds = 1000)
+        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, double defaultTarget, Func<IEnumerable<int>> getIndices, Func<int, IEnumerable<double>, string> getCommand, int repeatMilliseconds = 1000)
         {
-            List<double> defaultTargets = [.. getTargets(null)];
-            var lastAction = new LastAction(defaultTargets, repeatMilliseconds);
+            List<double>? defaultTargets = null;
+            IEnumerable<int>? vectorIndices = null;
+            LastAction? lastAction = null;
             AddBuiltInWriteAction(board, WriteAction, ExitAction);
 
             Task ExitAction(MCUBoard board, CancellationToken token) => Off(board, port, token);
             async Task WriteAction(DataVector? vector, MCUBoard board, CancellationToken token)
             {
+                vectorIndices ??= getIndices();
+                lastAction ??= new LastAction(vectorIndices, defaultTarget, repeatMilliseconds);
+                defaultTargets ??= vectorIndices.Select(i => defaultTarget).ToList();
+
                 if (vector == null)
                 {
                     await board.SafeWriteLine(getCommand(port.PortNumber, defaultTargets), token);
-                    lastAction.TimedOutWaitingForDecision(defaultTargets);
+                    lastAction.TimedOutWaitingForDecision();
                     return;
                 }
 
-                var targets = getTargets(vector);
-                if (!lastAction.ChangedOrExpired(targets, vector.Timestamp))
+                if (!lastAction.ChangedOrExpired(vector.Data, vector.Timestamp))
                     return;
 
-                await board.SafeWriteLine(getCommand(port.PortNumber, [.. targets]), token);
-                lastAction.ExecutedNewAction(targets, vector.Timestamp);
+                lastAction.ExecutedNewAction(vector.Data, vector.Timestamp);
+                await board.SafeWriteLine(getCommand(port.PortNumber, lastAction.Targets), token);
             }
 
             async Task Off(MCUBoard board, IOconfOutput port, CancellationToken token)
             {
+                vectorIndices ??= getIndices();
+                defaultTargets ??= vectorIndices.Select(i => defaultTarget).ToList();
+
                 await board.SafeWriteLine(getCommand(port.PortNumber, defaultTargets), token);
                 _cmd.Logger.LogInfo(LogID.A, $"Port has been set to default position ({string.Join(", ", defaultTargets.Select(t => $"{t:F2}"))}): {port.Name}");
             }

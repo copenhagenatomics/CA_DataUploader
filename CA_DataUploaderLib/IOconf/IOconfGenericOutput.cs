@@ -40,11 +40,8 @@ namespace CA_DataUploaderLib.IOconf
         /// </summary>
         /// <param name="values">A list of values - the order corresponding to the order of TargetFields/TargetFieldsWithPrefix.</param>
         /// <returns>The generated command string.</returns>
-        public string GetCommand(List<double> values)
+        public string GetCommand(IEnumerable<double> values)
         {
-            if (TargetFieldsWithPrefix.Count != values.Count)
-                throw new ArgumentException($"Mismatch between number of target fields and values. Expected {TargetFieldsWithPrefix.Count}, got {values.Count}.");
-
             var command = CommandTemplate;
             var index = 0;
             foreach (var value in values)
