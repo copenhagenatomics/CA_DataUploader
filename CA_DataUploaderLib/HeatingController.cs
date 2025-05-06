@@ -17,10 +17,12 @@ namespace CA_DataUploaderLib
             if (heatersConfigs.Count == 0)
                 return;
 
+            var ovenAreas = ioconf.GetEntries<IOconfOvenArea>().ToList();
             var ovens = ioconf.GetOven().ToList();
+            var additionalOvenAreas = ovens.GroupBy(x => x.OvenArea).Where(g => !ovenAreas.Any(a => a.OvenArea == g.Key)).Select(a => a.First()).ToList();
 
             //notice that the decisions states and outputs are handled by the registered decisions, while the switchboard inputs and actuations are handled by the switchboard controller
-            cmd.AddDecisions(ovens.GroupBy(x => x.OvenArea).Select(og => og.First().CreateDecision(ioconf)).ToList());
+            cmd.AddDecisions(ovenAreas.Select(a => a.CreateDecision(ioconf)).Concat(additionalOvenAreas.Select(og => og.CreateDecision(ioconf))).ToList());
             cmd.AddDecisions(heatersConfigs.Select(h => h.CreateDecision(ioconf)).ToList());
             SwitchBoardController.Initialize(ioconf, cmd);
         }

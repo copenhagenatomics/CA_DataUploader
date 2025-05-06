@@ -18,10 +18,8 @@ namespace UnitTests
         private void ReplaceConfig(HeaterDecisionConfigBuilder? config = null, string extraLines = "") => 
             testContext = new(
                 @$"{(config ?? NewConfig).Build()}
-                Math;faketemp;100
-                Heater;heater2;ac01;2;850
-                Oven;2;heater2;faketemp
-                {extraLines}",//TODO: above should just use a new ovenarea config line, as the test was doing that although it was not supported in config
+                OvenArea;2
+                {extraLines}",
                 new()
                 {
                     { "temperature_state", (int)BaseSensorBox.ConnectionState.ReceivingValues },
@@ -29,6 +27,13 @@ namespace UnitTests
                 });
         [TestInitialize]
         public void Setup() => ReplaceConfig(NewConfig);
+
+        [TestMethod]
+        public void RejectsExtraOvenArea() => Assert.ThrowsException<FormatException>(() => ReplaceConfig(extraLines: "OvenArea;2"));
+        [TestMethod]
+        public void RejectsExtraMixingOvenAreaWithRegularOven() => Assert.ThrowsException<FormatException>(() => ReplaceConfig(extraLines: "Oven;2;heater;temp"));
+        [TestMethod]
+        public void RejectsExtraOvenForSameHeater() => Assert.ThrowsException<FormatException>(() => ReplaceConfig(extraLines: $"Math;fake;123{Environment.NewLine}Oven;1;heater;fake"));
 
         [TestMethod]
         public void WhenHeaterIsOffCanTurnOn()
@@ -57,6 +62,7 @@ namespace UnitTests
         {
             MakeDecisions("ovenarea 2 54");
             Assert.AreEqual(0.0, Field("heater_onoff"));
+            Assert.AreEqual(54, Field("ovenarea2_target"));
         }
 
         [TestMethod]

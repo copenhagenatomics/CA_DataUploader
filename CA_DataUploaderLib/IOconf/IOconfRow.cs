@@ -25,12 +25,12 @@ namespace CA_DataUploaderLib.IOconf
                 list.RemoveAt(list.Count - 1);
             }
 
-            if (!isUnknown && list[0] != type) throw new Exception("IOconfRow: wrong format: " + row);
+            if (!isUnknown && list[0] != type) throw new FormatException("IOconfRow: wrong format: " + row);
             Type = list[0];
             if (requireName)
                 Name = list.Count >= 2 // could be overwritten elsewhere. 
                 ? list[1]
-                : throw new Exception("IOconfRow: missing Name");
+                : throw new FormatException("IOconfRow: missing Name");
             ExpandsTags = isUnknown; //We do this so that plugin fields lists (related to Code lines) are expanded e.g. Code;myplugin;1.0.0 \n myplugin;mylistfield;tagfields:mytag
         }
 
@@ -84,7 +84,7 @@ namespace CA_DataUploaderLib.IOconf
         protected virtual void ValidateName(string name)
         {
             if (!ValidateNameRegex.IsMatch(name))
-                throw new Exception($"Invalid name: {name}. Name can only contain letters, numbers (except as the first character) and underscore.");
+                throw new FormatException($"Invalid name: {name}. Name can only contain letters, numbers (except as the first character) and underscore.");
         }
 
         protected static readonly Regex ValidateNameRegex = NameRegex();
