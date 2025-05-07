@@ -10,18 +10,17 @@ namespace CA_DataUploaderLib
         private readonly TimeProvider timeProvider;
         private long lastActionExecutedTime;
 
-        public LastAction(int targetIndex, double defaultValue, int repeatMilliseconds) : this(targetIndex, defaultValue, repeatMilliseconds, TimeProvider.System) { }
-        public LastAction(int targetIndex, double defaultValue, int repeatMilliseconds, TimeProvider timeProvider) : this([targetIndex], defaultValue, repeatMilliseconds, timeProvider) { }
-        public LastAction(IEnumerable<int> targetIndices, double defaultValue, int repeatMilliseconds) : this(targetIndices, defaultValue, repeatMilliseconds, TimeProvider.System) { }
-        public LastAction(IEnumerable<int> targetIndices, double defaultValue, int repeatMilliseconds, TimeProvider timeProvider)
+        public LastAction(int targetIndex, int repeatMilliseconds) : this(targetIndex, repeatMilliseconds, TimeProvider.System) { }
+        public LastAction(int targetIndex, int repeatMilliseconds, TimeProvider timeProvider) : this([targetIndex], repeatMilliseconds, timeProvider) { }
+        public LastAction(IEnumerable<int> targetIndices, int repeatMilliseconds) : this(targetIndices, repeatMilliseconds, TimeProvider.System) { }
+        public LastAction(IEnumerable<int> targetIndices, int repeatMilliseconds, TimeProvider timeProvider)
         {
             Indices = [.. targetIndices];
-            Vector = [.. targetIndices.Select(i => defaultValue)];
             this.repeatMilliseconds = repeatMilliseconds;
             this.timeProvider = timeProvider;
         }
 
-        private double[] Vector { get; set; }
+        private double[] Vector { get; set; } = [];
         private int[] Indices { get; set; }
         private DateTime TimeToRepeat { get; set; }
 
@@ -34,7 +33,7 @@ namespace CA_DataUploaderLib
         /// Note however that there are many other ways that bit flips could affect related actuations and also the functioning of this very class.
         /// </remarks>
         public bool ChangedOrExpired(double[] newVector, DateTime currentVectorTime) =>
-            Indices.Any(i => Vector[i] != newVector[i]) || (repeatMilliseconds > -1 && timeProvider.GetElapsedTime(lastActionExecutedTime).TotalMilliseconds >= repeatMilliseconds) || currentVectorTime >= TimeToRepeat;
+            Indices.Any(i => Vector.Length == 0 || Vector[i] != newVector[i]) || (repeatMilliseconds > -1 && timeProvider.GetElapsedTime(lastActionExecutedTime).TotalMilliseconds >= repeatMilliseconds) || currentVectorTime >= TimeToRepeat;
 
         public void ExecutedNewAction(double[] newVector, DateTime currentVectorTime)
         {
