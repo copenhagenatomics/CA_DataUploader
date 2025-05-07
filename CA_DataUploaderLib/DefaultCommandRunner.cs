@@ -7,7 +7,7 @@ namespace CA_DataUploaderLib
     /// runs the registered commands directly on the calling thread (the input handling thread),
     /// showing accept/reject messages on the screen and A.log.
     /// </remarks>
-    public class DefaultCommandRunner : ICommandRunner
+    public class DefaultCommandRunner(ILog logger) : ICommandRunner
     {
         private readonly Dictionary<string, List<Func<List<string>, bool>>> _commands = new(StringComparer.OrdinalIgnoreCase);
         public Action AddCommand(string name, Func<List<string>, bool> func)
@@ -34,17 +34,17 @@ namespace CA_DataUploaderLib
             string commandName = cmd[0];
             if (!_commands.TryGetValue(commandName, out var commandFunctions))
             {
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - unknown command");
+                logger.LogInfo(LogID.A, $"Command: {cmdString} - unknown command");
                 return false;
             }
 
             var res = RunCommandFunctions(cmdString, cmd, commandFunctions);
             if (commandName.Equals("help", StringComparison.OrdinalIgnoreCase))
-                CALog.LogInfoAndConsoleLn(LogID.A, "-------------------------------------");  // end help menu divider
+                logger.LogInfo(LogID.A, "-------------------------------------");  // end help menu divider
             else if (!res)
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - bad command");
+                logger.LogError(LogID.A, $"Command: {cmdString} - bad command");
             else
-                CALog.LogInfoAndConsoleLn(LogID.A, $"Command: {cmdString} - command accepted");
+                logger.LogInfo(LogID.A, $"Command: {cmdString} - command accepted");
 
             return res;
         }
@@ -54,7 +54,7 @@ namespace CA_DataUploaderLib
 
         /// <returns><c>true</c> if at least one function accepted the command, otherwise <c>false</c></returns>
         /// <remarks>If a command returns false or throws an ArgumentException we still run the other commands.</remarks>
-        private static bool RunCommandFunctions(string cmdString, List<string> cmd, List<Func<List<string>, bool>> commandFunctions)
+        private bool RunCommandFunctions(string cmdString, List<string> cmd, List<Func<List<string>, bool>> commandFunctions)
         {
             bool accepted = false;
             for (int i = 0; i < commandFunctions.Count; i++)
@@ -65,7 +65,7 @@ namespace CA_DataUploaderLib
                 }
                 catch (ArgumentException ex)
                 {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Command: {cmdString} - invalid arguments", ex);
+                    logger.LogError(LogID.A, $"Command: {cmdString} - invalid arguments", ex);
                 }
             }
 

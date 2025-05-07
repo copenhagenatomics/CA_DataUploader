@@ -18,7 +18,7 @@ namespace CA_DataUploader
         {
             try
             {
-                Redundancy.RegisterSystemExtensions(IOconfFile.DefaultLoader);
+                Subsystems.RegisterIOConfAndThirdPartyBoardsProtocols(IOconfFile.DefaultLoader);
                 var conf = IOconfFile.FileExists() ? IOconfFile.Instance : null;
                 var loglevel = conf?.GetOutputLevel() ?? IOconfLoopName.Default.LogLevel;
                 CALog.LogInfoAndConsoleLn(LogID.A, RpiVersion.GetWelcomeMessage($"Upload temperature data to cloud", loglevel));
@@ -36,11 +36,8 @@ namespace CA_DataUploader
 
                 var ioconf = IOconfFile.Instance;
                 using var cmd = new CommandHandler(ioconf, serial);
-                var cloud = new ServerUploader(ioconf, cmd);
-                _ = new Redundancy(ioconf, cmd);
-                _ = new ThermocoupleBox(ioconf, cmd);
-                _ = new Alerts(ioconf, cmd);
-                await SingleNodeRunner.Run(ioconf, cmd, cloud, cmd.StopToken);
+                Subsystems.AddSubsystemsTo(ioconf, cmd);
+                await SingleNodeRunner.Run(ioconf, cmd, Subsystems.Uploader, cmd.StopToken);
             }
             catch (Exception ex)
             {

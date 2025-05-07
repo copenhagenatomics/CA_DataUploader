@@ -23,13 +23,13 @@ namespace UnitTests
         }
 
         [TestMethod]
-        [ExpectedException(typeof(Exception), "An exception should have been thrown but was not.")]
+        [ExpectedException(typeof(FormatException), "An exception should have been thrown but was not.")]
         public void WhenTwoRowsInTheSameGroupHaveTheSameName_ThenAnExceptionIsThrown()
         {
-            var _ = new IOconfFile(new(){
+            var _ = new IOconfFile([
                 "Map; 1234567890; tm01",
                 "TypeJ; sameName; tm01; 1",
-                "TypeJ; sameName; tm01; 2" });
+                "TypeJ; sameName; tm01; 2" ]);
         }
 
         [TestMethod]

@@ -17,10 +17,12 @@ namespace CA_DataUploaderLib
             if (heatersConfigs.Count == 0)
                 return;
 
+            var ovenAreas = ioconf.GetEntries<IOconfOvenArea>().ToList();
             var ovens = ioconf.GetOven().ToList();
+            var additionalOvenAreas = ovens.GroupBy(x => x.OvenArea).Where(g => !ovenAreas.Any(a => a.OvenArea == g.Key)).Select(a => a.First()).ToList();
 
             //notice that the decisions states and outputs are handled by the registered decisions, while the switchboard inputs and actuations are handled by the switchboard controller
-            cmd.AddDecisions(ovens.GroupBy(x => x.OvenArea).Select(og => og.First().CreateDecision(ioconf)).ToList());
+            cmd.AddDecisions(ovenAreas.Select(a => a.CreateDecision(ioconf)).Concat(additionalOvenAreas.Select(og => og.CreateDecision(ioconf))).ToList());
             cmd.AddDecisions(heatersConfigs.Select(h => h.CreateDecision(ioconf)).ToList());
             SwitchBoardController.Initialize(ioconf, cmd);
         }
@@ -60,21 +62,19 @@ namespace CA_DataUploaderLib
 
             private static Config ToConfig(IOconfHeater heater, IOconfOven? oven, IIOconf ioconf)
             {
-                if (oven == null)
-                {
-                    CALog.LogInfoAndConsoleLn(LogID.A, $"Warn: no oven configured for heater {heater.Name}");
-                    return new(heater.Name, new List<string>().AsReadOnly());//notice we don't set the maxtemperature configured at the heater level, as there is no way to enforce as the oven config owns the temperature sensor
-                }
-
-                return new(heater.Name, oven.GetBoardStateNames(ioconf))
-                {
-                    MaxTemperature = heater.MaxTemperature,
-                    Area = oven.OvenArea,
-                    OvenSensor = oven.TemperatureSensorName,
-                    ProportionalGain = oven.ProportionalGain,
-                    ControlPeriod = oven.ControlPeriod,
-                    MaxOutputPercentage = oven.MaxOutputPercentage
-                };
+                if (oven == null && heater.MaxTemperature != null)
+                    CALog.LogErrorAndConsoleLn(LogID.A, "IOconfHeater: max temperature is not used for heaters without oven lines: " + heater.Row);
+                return (oven == null)
+                    ? new(heater.Name, new List<string>().AsReadOnly())
+                    : new(heater.Name, oven.GetBoardStateNames(ioconf))
+                    {
+                        MaxTemperature = heater.MaxTemperature ?? throw new FormatException($"IOconfHeater: missing max temperature: " + heater.Row),
+                        Area = oven.OvenArea,
+                        OvenSensor = oven.TemperatureSensorName,
+                        ProportionalGain = oven.ProportionalGain,
+                        ControlPeriod = oven.ControlPeriod,
+                        MaxOutputPercentage = oven.MaxOutputPercentage
+                    };
             }
 
             public class Config

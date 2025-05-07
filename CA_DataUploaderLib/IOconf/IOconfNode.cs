@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Runtime.CompilerServices;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -12,8 +13,8 @@ namespace CA_DataUploaderLib.IOconf
     public class IOconfNode : IOconfRow
     {
         private readonly IPEndPoint? _endPoint;
-        private static IOconfNode? _singleNode;
-        private static byte _nodeInstances;
+        private static readonly ConditionalWeakTable<IIOconf,IOconfNode> _singleNode = [];
+        private static readonly ConditionalWeakTable<IIOconf, object> _nodeInstances = []; //using object to work around reference only limitations for the ConditionalWeakTable value
 
         public IOconfNode(string row, int lineNum) : base(row, lineNum, "Node")
         {
@@ -25,23 +26,34 @@ namespace CA_DataUploaderLib.IOconf
             if (!IPEndPoint.TryParse(list[2], out var endPoint))
                 throw new Exception($"IOconfNode: failed to parse the passed ip address. format: {row} {Format}");
             _endPoint = endPoint;
-            NodeIndex = _nodeInstances++;
             if (list.Count > 3)
                 Role = list[3];
             IsUploader = Role == "uploader";
         }
 
         private IOconfNode(string name) : base($"Node;{name}", 0, "Node") { }
-        
 
-        /// <summary>Resets the node instance count used to determine the node index, used for testing purposes</summary>
-        public static void ResetIndex() => _nodeInstances = 0;
-        public static IOconfNode GetSingleNode(string loopName) => _singleNode ??= new IOconfNode(loopName) { IsCurrentSystem = true, IsUploader = true };
+        public override void ValidateDependencies(IIOconf ioconf)
+        {
+            NodeIndex = _nodeInstances.TryGetValue(ioconf, out var instances) ? (byte)instances : (byte)0;
+            _nodeInstances.AddOrUpdate(ioconf, (byte)(NodeIndex + 1));
+            base.ValidateDependencies(ioconf);
+        }
+
+        internal static IOconfNode GetSingleNode(IIOconf conf)
+        {
+            if (_singleNode.TryGetValue(conf, out var node))
+                return node;
+
+            node = new IOconfNode(conf.GetLoopName()) { IsCurrentSystem = true, IsUploader = true };
+            _singleNode.Add(conf, node);
+            return node;
+        }
 
         public IPEndPoint EndPoint => _endPoint ?? throw new InvalidOperationException($"Endpoint is only supported when running with distributed configuration");
         public bool IsCurrentSystem { get; set; }
         /// <summary>position of the node in the config (starting at 0)</summary>
-        public byte NodeIndex { get; }
+        public byte NodeIndex { get; private set; }
         public string? Role { get; }
         public bool IsUploader { get; private init; }
         public static bool IsCurrentSystemAnUploader(IReadOnlyCollection<IOconfNode> allNodes) => 

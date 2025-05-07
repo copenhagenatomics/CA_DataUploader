@@ -37,7 +37,7 @@ namespace UnitTests
         [DataTestMethod]
         public void InvalidName_Constructor(string name) 
         {
-            var ex = Assert.ThrowsException<Exception>(() => new IOconfRow($"TestType; {name}", 0, "TestType"));
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfRow($"TestType; {name}", 0, "TestType"));
             Assert.IsTrue(ex.Message.StartsWith($"Invalid name: {name}"), ex.Message);
         }
 
@@ -71,7 +71,7 @@ namespace UnitTests
         [DataTestMethod]
         public void InvalidName_NameSetter(string name)
         {
-            var ex = Assert.ThrowsException<Exception>(() => new IOconfRow($"TestType; allowedName", 0, "TestType") { Name = name });
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfRow($"TestType; allowedName", 0, "TestType") { Name = name });
             Assert.IsTrue(ex.Message.StartsWith($"Invalid name: {name}"), ex.Message);
         }
 

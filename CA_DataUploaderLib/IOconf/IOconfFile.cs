@@ -71,9 +71,9 @@ namespace CA_DataUploaderLib.IOconf
             var groups = Table.GroupBy(x => x.UniqueKey());
             var errorMessage = string.Empty;
             foreach (var g in groups.Where(x => x.Count() > 1))
-                errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"ERROR in IO.conf: Name: {g.First().ToList()[1]} occurred {g.Count()} times in this group: {g.First().ToList()[0]}";
+                errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"Duplicate configuration key {g.Key} detected. Lines involved:{Environment.NewLine}{string.Join(Environment.NewLine, g.Select(r => r.Row).ToList())}";
             if (!string.IsNullOrEmpty(errorMessage))
-                throw new Exception(errorMessage);
+                throw new FormatException(errorMessage);
         }
 
         private void CheckOvenHeaterRelationshipRule()
@@ -81,10 +81,10 @@ namespace CA_DataUploaderLib.IOconf
             // no heater can be in several oven areas
             var heaters = GetOven().Where(x => x.OvenArea > 0).GroupBy(x => x.HeatingElement);
             var errorMessage = string.Empty;
-            foreach (var heater in heaters.Where(x => x.Select(y => y.OvenArea).Distinct().Count() > 1))
-                errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"ERROR in IO.conf: Heater: {heater.Key.Name} occurred in several oven areas : {string.Join(", ", heater.Select(y => y.OvenArea).Distinct())}";
+            foreach (var heater in heaters.Where(x => x.Count() > 1))
+                errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"Duplicate Oven lines detected for the same heater. Lines involved:{Environment.NewLine}{string.Join(Environment.NewLine, heater.Select(y => y.Row))}";
             if (!string.IsNullOrEmpty(errorMessage))
-                throw new Exception(errorMessage);
+                throw new FormatException(errorMessage);
         }
 
         private IOconfLoopName GetLoopConfig() => GetEntries<IOconfLoopName>().SingleOrDefault() ?? IOconfLoopName.Default;
