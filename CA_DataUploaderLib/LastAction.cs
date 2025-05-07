@@ -15,14 +15,14 @@ namespace CA_DataUploaderLib
         public LastAction(IEnumerable<int> targetIndices, double defaultValue, int repeatMilliseconds) : this(targetIndices, defaultValue, repeatMilliseconds, TimeProvider.System) { }
         public LastAction(IEnumerable<int> targetIndices, double defaultValue, int repeatMilliseconds, TimeProvider timeProvider)
         {
-            Indices = targetIndices;
+            Indices = [.. targetIndices];
             Vector = [.. targetIndices.Select(i => defaultValue)];
             this.repeatMilliseconds = repeatMilliseconds;
             this.timeProvider = timeProvider;
         }
 
         private double[] Vector { get; set; }
-        private IEnumerable<int> Indices { get; set; }
+        private int[] Indices { get; set; }
         private DateTime TimeToRepeat { get; set; }
 
         public IEnumerable<double> Targets => Indices.Select(i => Vector[i]);
