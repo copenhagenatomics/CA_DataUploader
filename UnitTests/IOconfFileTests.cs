@@ -190,8 +190,8 @@ RedundantSensors;redundant;expandtag{ovenheaters}
             var output = (IOconfGenericOutput)rows[1];
             Assert.AreEqual("generic_ac_on", output.Name);
             Assert.AreEqual(0, output.DefaultValue);
-            Assert.AreEqual("heater1_onoff", output.TargetField);
-            Assert.AreEqual("p1 5 3", output.GetCommand(5));
+            CollectionAssert.AreEqual(new List<string> { "heater1_onoff" }, output.TargetFields);
+            Assert.AreEqual("p1 5 3", output.GetCommand([5]));
         }
 
         [TestMethod]
@@ -204,8 +204,8 @@ RedundantSensors;redundant;expandtag{ovenheaters}
             var output = (IOconfGenericOutput)rows[0];
             Assert.AreEqual("generic_ac_on", output.Name);
             Assert.AreEqual(0, output.DefaultValue);
-            Assert.AreEqual("heater1_onoff", output.TargetField);
-            Assert.AreEqual("p1 on 3 100%", output.GetCommand(1));
+            CollectionAssert.AreEqual(new List<string> { "heater1_onoff" }, output.TargetFields);
+            Assert.AreEqual("p1 on 3 100%", output.GetCommand([1]));
         }
 
         [TestMethod]

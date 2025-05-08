@@ -10,7 +10,7 @@ namespace CA_DataUploaderLib
             var outputs = ioconf.GetGenericOutputs();
             foreach (var output in outputs.Where(o => o.Map.IsLocalBoard && o.Map.McuBoard != null))
                 RegisterBoardWriteActions(
-                    output.Map.McuBoard!, output, output.DefaultValue, output.TargetField, (_, v) => output.GetCommand(v), output.RepeatMilliseconds);
+                    output.Map.McuBoard!, output, output.DefaultValue, output.TargetFields, (_, v) => output.GetCommand(v), output.RepeatMilliseconds);
         }
     }
 }

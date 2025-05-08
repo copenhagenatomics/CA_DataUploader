@@ -195,47 +195,54 @@ namespace CA_DataUploaderLib
             else actions.Add((writeAction, exitAction));
         }
 
-        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, double defaultTarget, string targetFieldName, Func<int, double, string> getCommand, int repeatMilliseconds = 1000)
+        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, double defaultTarget, IEnumerable<string> targetFieldNames, Func<int, IEnumerable<double>, string> getCommand, int repeatMilliseconds = 1000)
         {
-            var fieldIndex = -1;
+            IEnumerable<int> fieldIndices = [];
             _cmd.FullVectorIndexesCreated += InitializeAction;
-            RegisterBoardWriteActions(board, port, GetTarget, getCommand, repeatMilliseconds);
+            RegisterBoardWriteActions(board, port, defaultTarget, GetIndices, getCommand, repeatMilliseconds);
 
             void InitializeAction(object? sender, IReadOnlyDictionary<string, int> indexes) =>
-                fieldIndex = indexes.TryGetValue(targetFieldName, out var index)
+                fieldIndices = targetFieldNames.Select(n => indexes.TryGetValue(n, out var index)
                     ? index
-                    : throw new InvalidOperationException($"Missing target field: {targetFieldName}");
-            double GetTarget(DataVector? vector) => vector == null ? defaultTarget : vector[fieldIndex];
+                    : throw new InvalidOperationException($"Missing target field: {n}"));
+            IEnumerable<int> GetIndices() => fieldIndices;
         }
 
-        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, Func<DataVector?, double> getTarget, Func<int, double, string> getCommand, int repeatMilliseconds = 1000)
+        protected void RegisterBoardWriteActions(MCUBoard board, IOconfOutput port, double defaultTarget, Func<IEnumerable<int>> getIndices, Func<int, IEnumerable<double>, string> getCommand, int repeatMilliseconds = 1000)
         {
-            double defaultTarget = getTarget(null);
-            var lastAction = new LastAction(defaultTarget, repeatMilliseconds);
+            List<double>? defaultTargets = null;
+            IEnumerable<int>? vectorIndices = null;
+            LastAction? lastAction = null;
             AddBuiltInWriteAction(board, WriteAction, ExitAction);
 
             Task ExitAction(MCUBoard board, CancellationToken token) => Off(board, port, token);
             async Task WriteAction(DataVector? vector, MCUBoard board, CancellationToken token)
             {
+                vectorIndices ??= getIndices();
+                lastAction ??= new LastAction(vectorIndices, repeatMilliseconds);
+                defaultTargets ??= vectorIndices.Select(i => defaultTarget).ToList();
+
                 if (vector == null)
                 {
-                    await board.SafeWriteLine(getCommand(port.PortNumber, defaultTarget), token);
-                    lastAction.TimedOutWaitingForDecision(defaultTarget);
+                    await board.SafeWriteLine(getCommand(port.PortNumber, defaultTargets), token);
+                    lastAction.TimedOutWaitingForDecision();
                     return;
                 }
 
-                var target = getTarget(vector);
-                if (!lastAction.ChangedOrExpired(target, vector.Timestamp))
+                if (!lastAction.ChangedOrExpired(vector.Data, vector.Timestamp))
                     return;
 
-                await board.SafeWriteLine(getCommand(port.PortNumber, target), token);
-                lastAction.ExecutedNewAction(target, vector.Timestamp);
+                lastAction.ExecutedNewAction(vector.Data, vector.Timestamp);
+                await board.SafeWriteLine(getCommand(port.PortNumber, lastAction.Targets), token);
             }
 
             async Task Off(MCUBoard board, IOconfOutput port, CancellationToken token)
             {
-                await board.SafeWriteLine(getCommand(port.PortNumber, defaultTarget), token);
-                _cmd.Logger.LogInfo(LogID.A, $"Port has been set to default position ({defaultTarget:F2}): {port.Name}");
+                vectorIndices ??= getIndices();
+                defaultTargets ??= vectorIndices.Select(i => defaultTarget).ToList();
+
+                await board.SafeWriteLine(getCommand(port.PortNumber, defaultTargets), token);
+                _cmd.Logger.LogInfo(LogID.A, $"Port has been set to default position ({string.Join(", ", defaultTargets.Select(t => $"{t:F2}"))}): {port.Name}");
             }
         }
 
