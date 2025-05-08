@@ -16,9 +16,9 @@ namespace CA_DataUploaderLib.IOconf
 
             var list = ToList();
             if (!int.TryParse(list[1], out OvenArea)) 
-                throw new Exception($"IOconfOven: wrong OvenArea number: {row} {Format}");
+                throw new Exception($"Oven area must be a number: {row} {Format}");
             if (OvenArea < 1)
-                throw new Exception("Oven area must be a number bigger or equal to 1");
+                throw new Exception("Oven area must be a number bigger than or equal to 1");
 
             HeaterName = list[2];
             TemperatureSensorName = list[3];

@@ -1,39 +1,39 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using CA.LoopControlPluginBase;
 using CA_DataUploaderLib;
 using CA_DataUploaderLib.Extensions;
-using CA_DataUploaderLib.IOconf;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using static System.FormattableString;
 
 namespace UnitTests
 {
     [TestClass]
     public class HeaterDecisionTests
     {
-        DecisionTestContext testContext = new(new());
+        FullDecisionTestContext testContext = new("");
         private ref double Field(string field) => ref testContext.Field(field);
         private void MakeDecisions(string? @event = null, double time = 0) => testContext.MakeDecisions(@event, time);
         private void MakeDecisions(List<string> @event, double time = 0) => testContext.MakeDecisions(@event, time);
         private static HeaterDecisionConfigBuilder NewConfig => new();
-        private void ReplaceHeaterDecisionConfig(HeatingController.HeaterDecision.Config config) =>
-            testContext = testContext.WithReplacedDecision(new HeatingController.HeaterDecision(config));
-        private void ReplaceOvenAreaDecisionConfig(HeatingController.OvenAreaDecision.Config config) =>
-            testContext = testContext.WithReplacedDecision(new HeatingController.OvenAreaDecision(config));
-
+        private void ReplaceConfig(HeaterDecisionConfigBuilder? config = null, string extraLines = "") => 
+            testContext = new(
+                @$"{(config ?? NewConfig).Build()}
+                OvenArea;2
+                {extraLines}",
+                new()
+                {
+                    { "temperature_state", (int)BaseSensorBox.ConnectionState.ReceivingValues },
+                    { "temp", 44 }
+                });
         [TestInitialize]
-        public void Setup() => testContext = new DecisionTestContext(
-            new List<LoopControlDecision>() {
-                new HeatingController.OvenAreaDecision(new ($"ovenarea0", 0)),
-                new HeatingController.OvenAreaDecision(new ($"ovenarea1", 1)),
-                new HeatingController.HeaterDecision(NewConfig.Build()) },
-            new()
-            {
-                { "temperature_state", (int)BaseSensorBox.ConnectionState.ReceivingValues },
-                { "temp", 44 }
-            });
+        public void Setup() => ReplaceConfig(NewConfig);
+
+        [TestMethod]
+        public void RejectsExtraOvenArea() => Assert.ThrowsException<FormatException>(() => ReplaceConfig(extraLines: "OvenArea;2"));
+        [TestMethod]
+        public void RejectsExtraMixingOvenAreaWithRegularOven() => Assert.ThrowsException<FormatException>(() => ReplaceConfig(extraLines: "Oven;2;heater;temp"));
+        [TestMethod]
+        public void RejectsExtraOvenForSameHeater() => Assert.ThrowsException<FormatException>(() => ReplaceConfig(extraLines: $"Math;fake;123{Environment.NewLine}Oven;1;heater;fake"));
 
         [TestMethod]
         public void WhenHeaterIsOffCanTurnOn()
@@ -53,19 +53,24 @@ namespace UnitTests
         [TestMethod]
         public void WhenHeaterIsOffCanTurnOnWithOvenArea()
         {
-            MakeDecisions("ovenarea 0 54");
+            MakeDecisions("ovenarea 1 54");
             Assert.AreEqual(1.0, Field("heater_onoff"));
         }
 
         [TestMethod]
         public void WhenHeaterIsOffIgnoresUnrelatedArea()
         {
-            MakeDecisions("ovenarea 1 54");
+            MakeDecisions("ovenarea 2 54");
             Assert.AreEqual(0.0, Field("heater_onoff"));
+            Assert.AreEqual(54, Field("ovenarea2_target"));
         }
 
         [TestMethod]
-        public void OvenWithMultipleAreasIsRejected() => Assert.ThrowsException<ArgumentException>(() => MakeDecisions("oven 54 42"));
+        public void OvenWithMultipleAreasIsRejected()
+        {
+            MakeDecisions("oven 54 42");
+            StringAssert.Contains(testContext.GetAllLogs(), "error-A-Command: oven 54 42 - bad command");
+        }
 
         [TestMethod]
         public void WhenHeaterIsOverHalfDegreeAboveTempKeepsOff()
@@ -95,11 +100,11 @@ namespace UnitTests
         [TestMethod]
         public void WhenHeaterIsOnCanTurnOffBeforeReachingTargetTemperatureBasedOnProportionalGain()
         {
-            ReplaceHeaterDecisionConfig(NewConfig.WithProportionalGain(2).Build());
+            ReplaceConfig(NewConfig.WithProportionalGain(2));
             CheckDecisionsBehaviorMatchesAProportionalGainOf2();
         }
 
-        private void CheckDecisionsBehaviorMatchesAProportionalGainOf2(string initialCommands) => CheckDecisionsBehaviorMatchesAProportionalGainOf2(new[] { initialCommands });
+        private void CheckDecisionsBehaviorMatchesAProportionalGainOf2(string initialCommands) => CheckDecisionsBehaviorMatchesAProportionalGainOf2([initialCommands]);
         private void CheckDecisionsBehaviorMatchesAProportionalGainOf2(string[]? initialCommands = null)
         {
             //in this test we are 6 degrees below the target temperature when first actuating (so it turns on)
@@ -128,7 +133,7 @@ namespace UnitTests
             //In this test we are 500 degrees below the target temperature so that it will actuate at max output for a long time.
             //Because we are using time based power control, this means it should turn on for 80% of the control period
             //the gain of 2 means there should pass 2 seconds for every 1C to gain, so the proportional control alone would normally turn it on for the whole control period.
-            ReplaceHeaterDecisionConfig(NewConfig.WithProportionalGain(2).WithMaxOutput(0.8d).Build());
+            ReplaceConfig(NewConfig.WithProportionalGain(2).WithMaxOutput(0.8d));
             MakeDecisions("oven 544");
             MakeDecisions(time: 5);
             Assert.AreEqual(1.0, Field("heater_onoff"), "should still be on after 5 seconds");
@@ -196,18 +201,18 @@ namespace UnitTests
         public void StateReflectLatestChangesDoneWithTheOvenCommand()
         {
             MakeDecisions("oven 200");
-            Assert.AreEqual(200, Field("ovenarea0_target"));
+            Assert.AreEqual(200, Field("ovenarea1_target"));
             Assert.AreEqual(HeatingController.HeaterDecision.States.InControlPeriod, (HeatingController.HeaterDecision.States)Field("heater_state"));
             Assert.AreEqual(testContext.InitialTime.AddSeconds(30), Field("heater_nextcontrolperiod").ToVectorDate());
             Assert.AreEqual(testContext.InitialTime.AddSeconds(30), Field("heater_controlperiodtimeoff").ToVectorDate());
             MakeDecisions("oven 94", 1);
-            Assert.AreEqual(94, Field("ovenarea0_target"));
+            Assert.AreEqual(94, Field("ovenarea1_target"));
             Assert.AreEqual(HeatingController.HeaterDecision.States.InControlPeriod, (HeatingController.HeaterDecision.States)Field("heater_state"));
             Assert.AreEqual(testContext.InitialTime.AddSeconds(30), Field("heater_nextcontrolperiod").ToVectorDate());
             Assert.AreEqual(testContext.InitialTime.AddSeconds(10), Field("heater_controlperiodtimeoff").ToVectorDate(), "time off not as expected after a temp change (10 seconds after the cycle started)");
             Field("temp") = 150; //setting temp higher than last target to ensure we show the heater stays on regardless
             MakeDecisions("heater heater on", time: 31);
-            Assert.AreEqual(94, Field("ovenarea0_target"), "target unexpectedly changed when specifying manual mode");
+            Assert.AreEqual(94, Field("ovenarea1_target"), "target unexpectedly changed when specifying manual mode");
             Assert.AreEqual(HeatingController.HeaterDecision.States.ManualOn, (HeatingController.HeaterDecision.States)Field("heater_state"), "manual on not reflected on state");
             Assert.AreEqual(1.0, Field("heater_onoff"), "heater not on on manual mode");
             MakeDecisions("heater heater off", time: 32);
@@ -229,7 +234,7 @@ namespace UnitTests
         [TestMethod]
         public void CanRunWithoutOven()
         {
-            ReplaceHeaterDecisionConfig(NewConfig.WithoutOven().Build());
+            ReplaceConfig(NewConfig.WithoutOven());
             MakeDecisions();
             Assert.AreEqual(0.0, Field("heater_onoff"));
             MakeDecisions("heater heater on", 5);
@@ -241,7 +246,7 @@ namespace UnitTests
         [TestMethod]
         public void CanEmergencyShutdownWithoutOven()
         {
-            ReplaceHeaterDecisionConfig(NewConfig.WithoutOven().Build());
+            ReplaceConfig(NewConfig.WithoutOven());
             MakeDecisions("heater heater on", 5);
             Assert.AreEqual(1.0, Field("heater_onoff"));
             MakeDecisions("emergencyshutdown", 10);
@@ -251,29 +256,24 @@ namespace UnitTests
         [TestMethod]
         public void PControlFieldsAreNotAddedByDefault()
         {
-            Assert.ThrowsException<ArgumentOutOfRangeException>(() => Field("ovenarea0_pgain"));
-            Assert.ThrowsException<ArgumentOutOfRangeException>(() => Field("ovenarea0_controlperiod"));
-            Assert.ThrowsException<ArgumentOutOfRangeException>(() => Field("ovenarea0_maxoutput"));
+            Assert.ThrowsException<ArgumentOutOfRangeException>(() => Field("ovenarea1_pgain"));
+            Assert.ThrowsException<ArgumentOutOfRangeException>(() => Field("ovenarea1_controlperiod"));
+            Assert.ThrowsException<ArgumentOutOfRangeException>(() => Field("ovenarea1_maxoutput"));
         }
 
         [TestMethod]
         public void PControlUsesConfigValuesByDefault()
         {
-            var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;5;00:02:00;100", 0);
-            ReplaceOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
-            ReplaceOvenAreaDecisionConfig(new("ovenarea1", 1, ovenProportionalControlUpdatesConf));
-            ReplaceHeaterDecisionConfig(NewConfig.WithProportionalGain(2).Build());
+            ReplaceConfig(NewConfig.WithProportionalGain(2), extraLines: "OvenProportionalControlUpdates;5;00:02:00;100");
             CheckDecisionsBehaviorMatchesAProportionalGainOf2();
         }
 
         [TestMethod]
         public void PControlUsesMaxConfigurationForCommandValuesAboveAllowedRange()
         {
-            var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;2;00:00:30;100", 0);
-            ReplaceOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
-            ReplaceOvenAreaDecisionConfig(new("ovenarea1", 1, ovenProportionalControlUpdatesConf));
-            ReplaceHeaterDecisionConfig(NewConfig.WithProportionalGain(1).WithMaxOutput(0.5).WithControlPeriodSeconds(15).Build());
-            CheckDecisionsBehaviorMatchesAProportionalGainOf2(new[] { "ovenarea 0 pgain 10", "ovenarea 0 maxoutput 150", "ovenarea 0 controlperiodseconds 120" });
+            ReplaceConfig(
+                NewConfig.WithProportionalGain(1).WithMaxOutput(0.5).WithControlPeriodSeconds(15), extraLines: "OvenProportionalControlUpdates;2;00:00:30;100");
+            CheckDecisionsBehaviorMatchesAProportionalGainOf2(["ovenarea 1 pgain 10", "ovenarea 1 maxoutput 150", "ovenarea 1 controlperiodseconds 120"]);
         }
 
         [DataRow(-1, 2, false)]
@@ -287,18 +287,16 @@ namespace UnitTests
         [DataTestMethod]//note we don't include 0 above, as that is the default vector value which is interpreted as the field not being set
         public void PControlDoesNotTurnOnWithMaxOutputAndOrPGainValuesBelow0(int maxoutput, int pgain, bool useVector)
         {
-            var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;2;00:00:30;100", 0);
-            ReplaceOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
-            ReplaceOvenAreaDecisionConfig(new("ovenarea1", 1, ovenProportionalControlUpdatesConf));
-            MakeDecisions(new List<string>() { "ovenarea 0 maxoutput -1", "oven 50" });
+            ReplaceConfig(extraLines: "OvenProportionalControlUpdates;2;00:00:30;100");
+            MakeDecisions(["ovenarea 1 maxoutput -1", "oven 50"]);
             if (useVector)
             {
-                Field("ovenarea0_maxoutput") = maxoutput;
-                Field("ovenarea0_pgain") = pgain;
+                Field("ovenarea1_maxoutput") = maxoutput;
+                Field("ovenarea1_pgain") = pgain;
                 MakeDecisions("oven 50");
             }
             else
-                MakeDecisions(new List<string>() { $"ovenarea 0 maxoutput {maxoutput}", $"ovenarea 0 pgain {pgain}", "oven 50" });
+                MakeDecisions([$"ovenarea 0 maxoutput {maxoutput}", $"ovenarea 1 pgain {pgain}", "oven 50"]);
 
             Assert.AreEqual(0.0, Field("heater_onoff"), "should be off");
             Field("temp") = 10;
@@ -320,17 +318,14 @@ namespace UnitTests
         [DataTestMethod] //note we don't include 0 above, as that is the default vector value which is interpreted as the field not being set
         public void PControlReactsImmediatelyWhenControlPeriodIsBelowOrEqual100Ms(double controlperiodseconds, bool useVector)
         {
-            var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;2;00:00:30;100", 0);
-            ReplaceOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
-            ReplaceOvenAreaDecisionConfig(new("ovenarea1", 1, ovenProportionalControlUpdatesConf));
-            ReplaceHeaterDecisionConfig(NewConfig.WithProportionalGain(2).Build());
+            ReplaceConfig(NewConfig.WithProportionalGain(2), extraLines: "OvenProportionalControlUpdates;2;00:00:30;100");
             if (useVector)
             {
-                Field("ovenarea0_controlperiodseconds") = controlperiodseconds;
+                Field("ovenarea1_controlperiodseconds") = controlperiodseconds;
                 MakeDecisions("oven 50");
             }
             else
-                MakeDecisions(new List<string>() { $"ovenarea 0 controlperiodseconds {controlperiodseconds.ToString(CultureInfo.InvariantCulture)}", "oven 50" });
+                MakeDecisions([Invariant($"ovenarea 1 controlperiodseconds {controlperiodseconds}"), "oven 50"]);
             Assert.AreEqual(1.0, Field("heater_onoff"), "should be on as we are below the target");
             Field("temp") = 49;
             MakeDecisions(time: 0.1);
@@ -353,44 +348,34 @@ namespace UnitTests
         [TestMethod]
         public void PControlUsesMaxConfigurationForVectorValuesAboveAllowedRange()
         {
-            var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;2;00:00:30;100", 0);
-            ReplaceOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
-            ReplaceOvenAreaDecisionConfig(new("ovenarea1", 1, ovenProportionalControlUpdatesConf));
-            ReplaceHeaterDecisionConfig(NewConfig.WithProportionalGain(1).WithMaxOutput(0.5).WithControlPeriodSeconds(15).Build());
-            Field("ovenarea0_pgain") = 10;
-            Field("ovenarea0_maxoutput") = 1.5;
-            Field("ovenarea0_controlperiodseconds") = 120;
+            ReplaceConfig(
+                NewConfig.WithProportionalGain(1).WithMaxOutput(0.5).WithControlPeriodSeconds(15), 
+                extraLines: "OvenProportionalControlUpdates;2;00:00:30;100");
+            Field("ovenarea1_pgain") = 10;
+            Field("ovenarea1_maxoutput") = 1.5;
+            Field("ovenarea1_controlperiodseconds") = 120;
             CheckDecisionsBehaviorMatchesAProportionalGainOf2();
         }
 
         [TestMethod]
         public void PControlUsesUpdatedGainField()
         {
-            var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;5;00:02:00;100", 0);
-            ReplaceOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
-            ReplaceOvenAreaDecisionConfig(new("ovenarea1", 1, ovenProportionalControlUpdatesConf));
-            ReplaceHeaterDecisionConfig(NewConfig.WithProportionalGain(3).Build());
-            CheckDecisionsBehaviorMatchesAProportionalGainOf2("ovenarea 0 pgain 2");
+            ReplaceConfig(NewConfig.WithProportionalGain(3), extraLines: "OvenProportionalControlUpdates;5;00:02:00;100");
+            CheckDecisionsBehaviorMatchesAProportionalGainOf2("ovenarea 1 pgain 2");
         }
 
         [TestMethod]
         public void PControlUsesUpdatedMaxOutputField()
         {
-            var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;5;00:02:00;100", 0);
-            ReplaceOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
-            ReplaceOvenAreaDecisionConfig(new("ovenarea1", 1, ovenProportionalControlUpdatesConf));
-            ReplaceHeaterDecisionConfig(NewConfig.WithProportionalGain(2).WithMaxOutput(0.2).Build());
-            CheckDecisionsBehaviorMatchesAProportionalGainOf2("ovenarea 0 maxoutput 100");
+            ReplaceConfig(NewConfig.WithProportionalGain(2).WithMaxOutput(0.2), extraLines: "OvenProportionalControlUpdates;5;00:02:00;100");
+            CheckDecisionsBehaviorMatchesAProportionalGainOf2("ovenarea 1 maxoutput 100");
         }
 
         [TestMethod]
         public void PControlUsesUpdatedControlPeriod()
         {
-            var ovenProportionalControlUpdatesConf = new IOconfOvenProportionalControlUpdates("OvenProportionalControlUpdates;5;00:02:00;100", 0);
-            ReplaceOvenAreaDecisionConfig(new("ovenarea0", 0, ovenProportionalControlUpdatesConf));
-            ReplaceOvenAreaDecisionConfig(new("ovenarea1", 1, ovenProportionalControlUpdatesConf));
-            ReplaceHeaterDecisionConfig(NewConfig.WithProportionalGain(2).WithControlPeriodSeconds(10).Build());
-            CheckDecisionsBehaviorMatchesAProportionalGainOf2("ovenarea 0 controlperiodseconds 30");
+            ReplaceConfig(NewConfig.WithProportionalGain(2).WithControlPeriodSeconds(10), extraLines: ("OvenProportionalControlUpdates;5;00:02:00;100"));
+            CheckDecisionsBehaviorMatchesAProportionalGainOf2("ovenarea 1 controlperiodseconds 30");
         }
 
         private class HeaterDecisionConfigBuilder
@@ -424,17 +409,14 @@ namespace UnitTests
                 return this;
             }
 
-            public HeatingController.HeaterDecision.Config Build() => _ovenDisabled
-                ? new("heater", new List<string>().AsReadOnly())
-                : new("heater", new List<string>() { "temperature_state" }.AsReadOnly())
-                {
-                    ProportionalGain = _proportionalGain,
-                    ControlPeriod = TimeSpan.FromSeconds(_controlPeriodSeconds),
-                    Area = 0,
-                    MaxTemperature = 800,
-                    OvenSensor = "temp",
-                    MaxOutputPercentage = _maxOutput
-                };
+            public string Build() => _ovenDisabled
+? @"Map;fakeac;ac01
+Heater;heater;ac01;1"
+: Invariant(@$"Map;fakeac;ac01
+Heater;heater;ac01;1;800
+Oven;1;heater;temp;{_proportionalGain};{TimeSpan.FromSeconds(_controlPeriodSeconds)};{_maxOutput * 100}
+Map;fakeserial2;temperature
+TypeK;temp;temperature;1");
         }
     }
 }

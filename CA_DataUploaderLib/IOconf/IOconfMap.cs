@@ -59,7 +59,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             DistributedNode = _distributedNodeName != default 
                 ? ioconf.GetEntries<IOconfNode>().SingleOrDefault(n => n.Name == _distributedNodeName) ?? throw new Exception($"Failed to find node in configuration for Map: {Row}. Format: {Format}")
-                : !ioconf.GetEntries<IOconfNode>().Any() ? IOconfNode.GetSingleNode(ioconf.GetLoopName()) : throw new Exception($"The node name is not optional for distributed deployments: {Row}. Format: {Format}");
+                : !ioconf.GetEntries<IOconfNode>().Any() ? IOconfNode.GetSingleNode(ioconf) : throw new Exception($"The node name is not optional for distributed deployments: {Row}. Format: {Format}");
         }
 
         public event EventHandler<EventArgs>? OnBoardDetected;

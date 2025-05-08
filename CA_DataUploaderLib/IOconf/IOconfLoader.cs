@@ -1,5 +1,4 @@
-﻿#nullable enable
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace CA_DataUploaderLib.IOconf
@@ -18,6 +17,7 @@ namespace CA_DataUploaderLib.IOconf
             (IOconfTemp.TypeJName, IOconfTemp.NewTypeJ),
             ("Heater", (r, l) => new IOconfHeater(r, l)),
             ("Oven", (r, l) => new IOconfOven(r, l)),
+            ("OvenArea", (r, l) => new IOconfOvenArea(r, l)),
             (IOconfOvenProportionalControlUpdates.TypeName, (r, l) => new IOconfOvenProportionalControlUpdates(r, l)),
             ("Filter", (r, l) => new IOconfFilter(r, l)),
             ("RPiTemp", (r, l) => new IOconfRPiTemp(r, l)),
