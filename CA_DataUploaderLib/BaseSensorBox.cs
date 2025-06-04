@@ -29,7 +29,6 @@ namespace CA_DataUploaderLib
         private readonly Dictionary<MCUBoard, (ChannelReader<string> Reader, ChannelWriter<string> Writer)> _boardCustomCommands = [];
         private static readonly Dictionary<CommandHandler, Dictionary<string, string>> _usedBoxNames = []; //Dictionary of used board names tied to a specific CommandHandler-instance
         private readonly Dictionary<string, TaskCompletionSource> _reconnectTasks = [];
-        private uint _lastStatus = 0U;
 
         public BaseSensorBox(CommandHandler cmd, string commandName, IEnumerable<IOconfInput> values)
         {
@@ -458,6 +457,7 @@ namespace CA_DataUploaderLib
             var timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
             long lastLogInfoTime = 0, lastLogErrorTime = 0, lastLogBoardErrorTime = 0, lastLogBoardOkTime = 0, lastMultilineMessageTime = 0;
             int logInfoSkipped = 0, logErrorSkipped = 0, logBoardErrorSkipped = 0, logBoardOkSkipped = 0, multilineMessageSkipped = 0;
+            uint lastStatus = 0;
             MultilineMessageReceiver multilineMessageReceiver = new((message) => LowFrequencyMultilineMessage((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)));
             //We set the state early if we detect no data is being returned or if we received values,
             //but we only set ReturningNonValues if it has passed timeBetweenReads since the last valid read
@@ -482,11 +482,11 @@ namespace CA_DataUploaderLib
                         lastValidReadTime = _cmd.Time.GetTimestamp();
                         _boardsState.SetState(boxName, ConnectionState.ReceivingValues);
 
-                        if (status != _lastStatus && (status & 0x01000000) != 0) // Flash ongoing?
+                        if (status != lastStatus && (status & 0x01000000) != 0) // Flash ongoing?
                             timeBetweenReads = TimeSpan.FromSeconds(1.5);
-                        if ((status & 0x01000000) == 0 && (_lastStatus & 0x01000000) != 0) // Flash done?
+                        if ((status & 0x01000000) == 0 && (lastStatus & 0x01000000) != 0) // Flash done?
                             timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
-                        if ((status & 0x80000000) != 0 && (_lastStatus & 0x80000000) == 0) // Error?
+                        if ((status & 0x80000000) != 0 && (lastStatus & 0x80000000) == 0) // Error?
                         {
                             LowFrequencyLogBoardError((args, skipMessage) =>
                             {
@@ -495,11 +495,11 @@ namespace CA_DataUploaderLib
                                     customCommandsChannel.Writer.TryWrite("Status");
                             }, (board, status));
                         }
-                        if ((status & 0x80000000) == 0 && (_lastStatus & 0x80000000) != 0) // Error gone?
+                        if ((status & 0x80000000) == 0 && (lastStatus & 0x80000000) != 0) // Error gone?
                         {
                             LowFrequencyLogBoardOk((args, skipMessage) => LogInfo(args.board, $"Board resumed normal state with 0x{args.status:X}{skipMessage}"), (board, status));
                         }
-                        _lastStatus = status;
+                        lastStatus = status;
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
