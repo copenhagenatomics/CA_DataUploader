@@ -423,13 +423,11 @@ namespace CA_DataUploaderLib
 
         private void OnError(string message, bool addToEventLog, Exception? ex = null)
         {
+            OnError(message, ex);
+            
             if (!addToEventLog)
-            {
-                OnError(message, ex);
                 return;
-            }
 
-            Console.WriteLine($"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} (UTC) - {message}");
             message = ex != null ? $"{message}{Environment.NewLine}{ex}" : message;
             SendEvent(this, new(message, EventType.LogError, DateTime.UtcNow));
             return;
