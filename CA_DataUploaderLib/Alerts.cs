@@ -50,7 +50,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private async void CheckAlertsOnReceivedVectors(ChannelReader<DataVector> reader)
+        private async void CheckAlertsOnReceivedVectors(DataVectorReader reader)
         {
             try
             {

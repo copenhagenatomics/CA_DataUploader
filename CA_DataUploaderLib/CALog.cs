@@ -104,7 +104,7 @@ namespace CA_DataUploaderLib
                     var reader = cmd.GetReceivedVectorsReader();
                     _ = Task.Run(async () =>
                     {
-                        await foreach (var vector in reader.ReadAllAsync())
+                        await foreach (var vector in reader.ReadAllAsync(cmd.StopToken))
                         {
                             if (Interlocked.CompareExchange(ref enabled, 0, 0) == 0)
                                 continue;
