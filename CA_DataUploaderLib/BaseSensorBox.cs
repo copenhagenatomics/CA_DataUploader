@@ -240,8 +240,9 @@ namespace CA_DataUploaderLib
                 vectorIndices ??= getIndices();
                 defaultTargets ??= vectorIndices.Select(i => defaultTarget).ToList();
 
-                await board.SafeWriteLine(getCommand(port.PortNumber, defaultTargets), token);
-                _cmd.Logger.LogInfo(LogID.A, $"Port has been set to default position ({string.Join(", ", defaultTargets.Select(t => $"{t:F2}"))}): {port.Name}");
+                string msg = getCommand(port.PortNumber, defaultTargets);
+                await board.SafeWriteLine(msg, token);
+                _cmd.Logger.LogInfo(LogID.A, $"Port has been set to default position ({string.Join(", ", defaultTargets.Select(t => $"{t:F2}"))}): {port.Name}. Command: {msg}");
             }
         }
 
