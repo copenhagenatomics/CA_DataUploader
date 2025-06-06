@@ -28,6 +28,7 @@ namespace CA_DataUploaderLib
 
         public static void RegisterIOConfAndThirdPartyBoardsProtocols(IIOconfLoader loader)
         {
+            ServerUploader.RegisterSystemExtensions(loader);
             Redundancy.RegisterSystemExtensions(loader);
         }
 

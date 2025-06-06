@@ -55,7 +55,7 @@ namespace CA_DataUploaderLib
             _cmd = cmd;
             _loopname = ioconf.GetLoopName();
             var nodes = ioconf.GetEntries<IOconfNode>().ToList();
-            IsEnabled = IOconfNode.IsCurrentSystemAnUploader(nodes);
+            IsEnabled = IOconfNode.IsCurrentSystemAnUploader(ioconf);
             if (!IsEnabled)
                 return;
             _nodeIdToName = nodes.ToDictionary(n => n.NodeIndex, n => n.Name);
@@ -77,6 +77,7 @@ namespace CA_DataUploaderLib
             }
         }
 
+        public static void RegisterSystemExtensions(IIOconfLoader loader) => loader.AddLoader(IOconfDisableUploader.RowType, (row, lineNumber) => new IOconfDisableUploader(row, lineNumber));
         public SubsystemDescriptionItems GetVectorDescriptionItems() => new([]);
         public IEnumerable<SensorSample> GetInputValues() => [];
         public void SendEvent(object? sender, EventFiredArgs e) => _eventsChannel.Writer.TryWrite(e);
@@ -868,6 +869,19 @@ namespace CA_DataUploaderLib
             VectorUpload,
             CheckState,
             EventUpload
+        }
+
+        internal static bool IsUploaderDisabled(IIOconf conf) => conf.GetEntries<IOconfDisableUploader>().Any();
+        private class IOconfDisableUploader : IOconfRow
+        {
+            public const string RowType = "DisableUploader";
+            public IOconfDisableUploader(string row, int lineNum, string configName = RowType) : base(row, lineNum, configName, requireName: false)
+            {
+                Format = $"{RowType}";
+            }
+
+            public override string UniqueKey() => Type;
+            protected override void ValidateName(string name) { } // no validation
         }
     }
 }
