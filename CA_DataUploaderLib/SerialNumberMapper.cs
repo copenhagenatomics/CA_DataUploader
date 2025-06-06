@@ -23,9 +23,10 @@ namespace CA_DataUploaderLib
             this.ioconf = ioconf;
         }
 
-        public async Task DetectDevices()
+        public Task DetectDevices() => DetectDevices(MCUBoard.GetUSBports(), MCUBoard.Dependencies.Default, ioconf, true);
+        public async Task DetectDevices(string[] usbPorts, MCUBoard.Dependencies dependencies, IIOconf? ioconf, bool useDmsgIfTypeUnknown = false)
         {
-            var boards = await Task.WhenAll(MCUBoard.GetUSBports().Select(name => AttemptToOpenDeviceConnection(ioconf, name)));
+            var boards = await Task.WhenAll(usbPorts.Select(name => AttemptToOpenDeviceConnection(dependencies, ioconf, name, useDmsgIfTypeUnknown)));
             McuBoards.AddRange(boards.OfType<Board>());
         }
 
@@ -43,7 +44,7 @@ namespace CA_DataUploaderLib
         /// An alternative for boards with a terminal like interface, supported by <see cref="BaseSensorBox"/>, is to use <see cref="MCUBoard.AddCustomProtocol(MCUBoard.CustomProtocolDetectionDelegate)"/>.
         /// </remarks>
         public static void RegisterCustomDetection(Func<IIOconf?, string, Board?> detectionFunction) => CustomDetections.Add(detectionFunction);
-        private static async Task<Board?> AttemptToOpenDeviceConnection(IIOconf? ioconf, string name)
+        private static async Task<Board?> AttemptToOpenDeviceConnection(MCUBoard.Dependencies dependencies, IIOconf? ioconf, string name, bool useDmsgIfTypeUnknown)
         {
             try
             {
@@ -53,7 +54,7 @@ namespace CA_DataUploaderLib
                         LogToLocalLogAndConsole(board.ToString());
                         return board;
                     }
-                var mcu = await MCUBoard.OpenDeviceConnection(ioconf, name);
+                var mcu = await MCUBoard.OpenDeviceConnection(dependencies, ioconf, name, useDmsgIfTypeUnknown);
                 if (mcu == null)
                 {
                     CALog.LogErrorAndConsoleLn(LogID.A, $"Unable to open {name}");

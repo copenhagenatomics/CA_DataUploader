@@ -192,8 +192,7 @@ namespace CA_DataUploaderLib
             return (true, reconnectedLine);
         }
 
-        public static Task<MCUBoard?> OpenDeviceConnection(IIOconf? ioconf, string name) => OpenDeviceConnection(Dependencies.Default, SerialPortConnectionManager.Default, ioconf, name, true);
-        public async static Task<MCUBoard?> OpenDeviceConnection(Dependencies dependencies, IConnectionManager connectionManager, IIOconf? ioconf, string name, bool useDmsgIfTypeUnknown)
+        internal async static Task<MCUBoard?> OpenDeviceConnection(Dependencies dependencies, IIOconf? ioconf, string name, bool useDmsgIfTypeUnknown)
         {
             // note this map is only found by usb, for map entries configured by serial we use auto detection with standard baud rates instead.
             var map = ioconf?.GetMap().SingleOrDefault(m => m.IsLocalBoard && m.USBPort == name);
@@ -215,7 +214,7 @@ namespace CA_DataUploaderLib
             return mcu;
         }
 
-        public static string[] GetUSBports() => Environment.OSVersion.Platform == PlatformID.Unix
+        internal static string[] GetUSBports() => Environment.OSVersion.Platform == PlatformID.Unix
                 //notice we check both /dev/USB and vports & we ignore missing when vports is missing (via the error redirect to /dev/null)
                 ? DULutil.ExecuteShellCommand("ls -1a vports/* /dev/USB* 2>/dev/null").Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Replace("\r", "").Trim()).ToArray()
                 : SerialPort.GetPortNames();
