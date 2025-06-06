@@ -56,8 +56,12 @@ namespace CA_DataUploaderLib.IOconf
         public byte NodeIndex { get; private set; }
         public string? Role { get; }
         public bool IsUploader { get; private init; }
-        public static bool IsCurrentSystemAnUploader(IReadOnlyCollection<IOconfNode> allNodes) => 
-            allNodes.SingleOrDefault(n => n.IsCurrentSystem)?.IsUploader ?? allNodes.Count == 0;
+        public static bool IsCurrentSystemAnUploader(IIOconf conf)
+        {
+            var allNodes = conf.GetEntries<IOconfNode>().ToList();
+            return allNodes.SingleOrDefault(n => n.IsCurrentSystem)?.IsUploader ?? 
+                (allNodes.Count == 0 && !ServerUploader.IsUploaderDisabled(conf));
+        }
 
         protected override void ValidateName(string name) { } // no validation
     }

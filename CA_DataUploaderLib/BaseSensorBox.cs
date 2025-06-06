@@ -21,7 +21,7 @@ namespace CA_DataUploaderLib
         private readonly CommandHandler _cmd;
         protected readonly List<SensorSample.InputBased> _values;
         protected readonly List<SensorSample.InputBased> _localValues;
-        private readonly (IOconfMap map, SensorSample.InputBased[] values, ChannelReader<DataVector>? vectorReader, int boardStateIndexInFullVector)[] _boards = [];
+        private readonly (IOconfMap map, SensorSample.InputBased[] values, DataVectorReader? vectorReader, int boardStateIndexInFullVector)[] _boards = [];
         protected readonly AllBoardsState _boardsState = new([]);
         private readonly Dictionary<MCUBoard, SensorSample.InputBased[]> _boardSamplesLookup = [];
         private readonly string mainSubsystem;
@@ -53,7 +53,7 @@ namespace CA_DataUploaderLib
                 EnforceNoDuplicatePorts(board.map.BoxName, board.values);
             }
 
-            _boards = allBoards.Where(b => b.map.IsLocalBoard).Select(b => (b.map, b.values, vectorReader: (ChannelReader<DataVector>?)null, boardStateIndexInFullVector: -1)).ToArray();
+            _boards = allBoards.Where(b => b.map.IsLocalBoard).Select(b => (b.map, b.values, vectorReader: (DataVectorReader?)null, boardStateIndexInFullVector: -1)).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
 
 
@@ -240,8 +240,9 @@ namespace CA_DataUploaderLib
                 vectorIndices ??= getIndices();
                 defaultTargets ??= vectorIndices.Select(i => defaultTarget).ToList();
 
-                await board.SafeWriteLine(getCommand(port.PortNumber, defaultTargets), token);
-                _cmd.Logger.LogInfo(LogID.A, $"Port has been set to default position ({string.Join(", ", defaultTargets.Select(t => $"{t:F2}"))}): {port.Name}");
+                string msg = getCommand(port.PortNumber, defaultTargets);
+                await board.SafeWriteLine(msg, token);
+                _cmd.Logger.LogInfo(LogID.A, $"Port has been set to default position ({string.Join(", ", defaultTargets.Select(t => $"{t:F2}"))}): {port.Name}. Command: {msg}");
             }
         }
 
@@ -261,7 +262,7 @@ namespace CA_DataUploaderLib
             _cmd.Logger.LogInfo(LogID.A, sb.ToString());
         }
 
-        private async Task RunBoardLoops((IOconfMap map, SensorSample.InputBased[] values, ChannelReader<DataVector>? vectorReader, int boardStateIndexInFullVector)[] boards, CancellationToken token)
+        private async Task RunBoardLoops((IOconfMap map, SensorSample.InputBased[] values, DataVectorReader? vectorReader, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             long start = _cmd.Time.GetTimestamp();
             try
@@ -292,7 +293,7 @@ namespace CA_DataUploaderLib
             }
         }
 
-        protected virtual List<Task> StartLoops((IOconfMap map, SensorSample.InputBased[] values, ChannelReader<DataVector>? vectorReader, int boardStateIndexInFullVector)[] boards, CancellationToken token)
+        protected virtual List<Task> StartLoops((IOconfMap map, SensorSample.InputBased[] values, DataVectorReader? vectorReader, int boardStateIndexInFullVector)[] boards, CancellationToken token)
         {
             var missingBoards = boards.Where(h => h.map.McuBoard == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
@@ -304,12 +305,12 @@ namespace CA_DataUploaderLib
                 .ToList();
         }
 
-        private async Task BoardWriteLoop(MCUBoard board, ChannelReader<DataVector>? vectorReader, int boardStateIndexInFullVector, CancellationToken token)
+        private async Task BoardWriteLoop(MCUBoard board, DataVectorReader? vectorReader, int boardStateIndexInFullVector, CancellationToken token)
         {
             var customWritesEnabled = _boardCustomCommands.TryGetValue(board, out var customCommandsChannel);
             var builtInActionsEnabled = _builtInWriteActions.TryGetValue(board, out var builtInActions);
             if (!builtInActionsEnabled && !customWritesEnabled) return;
-            ChannelReader<DataVector>? vectorsChannel = builtInActionsEnabled
+            DataVectorReader? vectorsChannel = builtInActionsEnabled
                 ? (vectorReader ?? throw new InvalidOperationException("Built-in actions detected without receiving vectors channel being initialized"))
                 : null;
 

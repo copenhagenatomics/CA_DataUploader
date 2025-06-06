@@ -33,6 +33,7 @@ namespace CA_DataUploaderLib
         private readonly TaskCompletionSource _runningTaskTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly bool _isMultipi;
         private readonly List<ChannelWriter<DataVector>> _receivedVectorsWriters = [];
+        private readonly List<DataVectorReader> _receivedVectorsReaders = [];
         private readonly Channel<EventFiredArgs> _locallyFiredEvents = Channel.CreateBounded<EventFiredArgs>(
             new BoundedChannelOptions(200) { FullMode = BoundedChannelFullMode.DropOldest });
         /// <remarks>
@@ -41,12 +42,16 @@ namespace CA_DataUploaderLib
         /// 
         /// For subsystems, this is usually the constructor of the subsystem or on a handler of <see cref="FullVectorIndexesCreated"/>.
         /// </remarks>
-        public ChannelReader<DataVector> GetReceivedVectorsReader(int capacity = int.MaxValue)
+        public DataVectorReader GetReceivedVectorsReader(int capacity = int.MaxValue)
         {
             var channel = capacity == int.MaxValue ? Channel.CreateUnbounded<DataVector>() : Channel.CreateBounded<DataVector>(new BoundedChannelOptions(capacity) { FullMode = BoundedChannelFullMode.DropOldest });
             _receivedVectorsWriters.Add(channel.Writer);
-            return channel.Reader;
+            var reader = new DataVectorReader(channel.Reader);
+            _receivedVectorsReaders.Add(reader); //kept only to be able to report the latest processed vector times
+            return reader;
         }
+
+        public DateTime? LatestVectorTimeProcessedByAllReaders () => _receivedVectorsReaders.Count > 0 ? _receivedVectorsReaders.Min(r => r.LastVectorTimeProcessed) : null;
 
         public event EventHandler<EventFiredArgs>? EventFired;
         public event EventHandler<EventFiredArgs>? UserCommandReceived;
