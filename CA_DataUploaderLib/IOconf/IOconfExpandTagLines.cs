@@ -12,7 +12,7 @@ namespace CA_DataUploaderLib.IOconf
         private readonly List<string> expandedLines = [];
         public IOconfExpandTagLines(string row, int lineNum) : base(row, lineNum, ConfigName, false, false)
         {
-            Format = $"{ConfigName};mytag;row with $name or $matchingtag(tag1 tag2 tag3)";
+            Format = $"{ConfigName};mytag;row with $name or $tagvalue(othertag)";
             var list = ToList();
             if (list.Count < 3 || string.IsNullOrEmpty(list[2]))
                 throw new FormatException($"Wrong format: {Row}.{Environment.NewLine}{Format}");
