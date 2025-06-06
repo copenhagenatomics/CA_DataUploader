@@ -51,8 +51,7 @@ namespace CA_DataUploaderLib
             return reader;
         }
 
-        public DateTime? LatestVectorTimeProcessedByAllReaders () => 
-            _receivedVectorsReaders.OrderBy(r => r.LastVectorTimeProcessed).Select(r => (DateTime?) r.LastVectorTimeProcessed).FirstOrDefault();
+        public DateTime? LatestVectorTimeProcessedByAllReaders () => _receivedVectorsReaders.Count > 0 ? _receivedVectorsReaders.Min(r => r.LastVectorTimeProcessed) : null;
 
         public event EventHandler<EventFiredArgs>? EventFired;
         public event EventHandler<EventFiredArgs>? UserCommandReceived;
