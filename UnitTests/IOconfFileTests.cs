@@ -94,9 +94,9 @@ Math; temperature_tm01_01_math; temperature_tm01_01 + 1
 Map;fakeserial;ac01
 Map;fakeserial;ac02
 Map;fakeserial;ac03
-Heater; LeftHeater16; ac01;01;850; tags:phase1 ovenarea4 ovenheaters // Freely choose tags to assign config entries to groups
-Heater; LeftHeater17; ac02;01;850; tags:phase2 ovenarea4 ovenheaters
-Heater; LeftHeater18; ac02;02;850; tags:phase2 ovenarea4 ovenheaters
+Heater; LeftHeater16; ac01;01;850; tags:phase1 ovenarea4 ovenheaters area=2 // Freely choose tags to assign config entries to groups
+Heater; LeftHeater17; ac02;01;850; tags:phase2 ovenarea4 ovenheaters area=4
+Heater; LeftHeater18; ac02;02;850; tags:phase2 ovenarea4 ovenheaters area=5
 Heater; ExternalHeater01; ac03;01;850; tags:phase3 bsarea
 
 Code;power_control;0.1190.0;pc2
@@ -111,6 +111,7 @@ RowWithList; mylist; LeftHeater16;LeftHeater17;LeftHeater18
 RowWithList; mylist2; expandtag{ovenheaters} //should be equivalent to the previous one (note it uses the default expression $name)
 RowWithList; mylist3; expandtag{ovenheaters,$name_$matchingtag(phase1 phase2 phase3)}//each matchingtag outputs whichever of those tags the item has e.g. LeftHeater16_phase1, LeftHeater17_phase2, LeftHeater18_phase2
 RowWithList; mylist4; expandtag{ovenheaters,$name_current;$name_onoff} //should be equivalent to the previous one (note it uses the default expression $name)
+RowWithList; mylist5; expandtag{ovenheaters,prefix$tagvalue(area)suffix} //produces prefix2suffix,prefix4suffix,prefix5suffix
 
 ExpandLines;math1,math2,math3;Math;$name;$name // Creates a new line for all labels (the empty - separates the list from the command)
 ExpandTagLines;phase2;Math;$name_sampledcurrent;$name_sampledcurrent //also creates multiple math lines
@@ -133,6 +134,7 @@ RedundantSensors;redundant;expandtag{ovenheaters}
             AssertRowValuesByName(ioconf, "mylist2", "LeftHeater16,LeftHeater17,LeftHeater18");
             AssertRowValuesByName(ioconf, "mylist3", "LeftHeater16_phase1,LeftHeater17_phase2,LeftHeater18_phase2");
             AssertRowValuesByName(ioconf, "mylist4", "LeftHeater16_current,LeftHeater16_onoff,LeftHeater17_current,LeftHeater17_onoff,LeftHeater18_current,LeftHeater18_onoff");
+            AssertRowValuesByName(ioconf, "mylist5", "prefix2suffix,prefix4suffix,prefix5suffix");
             AssertRowValuesByNameAndType(ioconf, "Math", "math1", "math1");
             AssertRowValuesByNameAndType(ioconf, "Math", "math2", "math2");
             AssertRowValuesByNameAndType(ioconf, "Math", "math3", "math3");

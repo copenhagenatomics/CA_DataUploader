@@ -21,7 +21,9 @@ namespace CA_DataUploaderLib.IOconf
                 .ToList();
             if (list[^1].StartsWith("tags:"))
             {
-                Tags.AddRange(list[^1][5..].Split(' ').Select(x => x.Trim()));
+                Tags.AddRange(list[^1][5..]
+                    .Split(' ', StringSplitOptions.TrimEntries)
+                    .Select(ParseTag));
                 list.RemoveAt(list.Count - 1);
             }
 
@@ -32,6 +34,16 @@ namespace CA_DataUploaderLib.IOconf
                 ? list[1]
                 : throw new FormatException("IOconfRow: missing Name");
             ExpandsTags = isUnknown; //We do this so that plugin fields lists (related to Code lines) are expanded e.g. Code;myplugin;1.0.0 \n myplugin;mylistfield;tagfields:mytag
+
+            static (string name, string value) ParseTag(string tag)
+            {
+                var pos = tag.IndexOf('=');
+                if (pos < 0)
+                    return (tag, tag);
+                if (pos == 0)
+                    throw new FormatException($"Invalid tag format: {tag}. Expected format: name=value.");
+                return (tag[..pos], tag[(pos + 1)..]);
+            }
         }
 
         /// <summary>
@@ -55,7 +67,7 @@ namespace CA_DataUploaderLib.IOconf
         }
         protected string Format { get; init; } = string.Empty;
         public bool IsUnknown { get; }
-        public List<string> Tags { get; } = [];
+        public List<(string name, string value)> Tags { get; } = [];
 
         public List<string> ToList() => _parsedList;
 
@@ -94,6 +106,8 @@ namespace CA_DataUploaderLib.IOconf
         private static partial Regex ExpandTagRegex();
         [GeneratedRegex(@"\$matchingtag\((?:\s*(?<tag>[^)\s]+))*\s*\)")]
         private static partial Regex MatchingTagRegex();
+        [GeneratedRegex(@"\$tagvalue\(\s*(?<tag>[^)\s]+)\s*\)")]
+        private static partial Regex TagValueRegex();
 
         /// <summary>
         /// Returns the list of expanded vector field names from this class.
@@ -166,9 +180,20 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         protected string ExpandTagExpression(string expression, IOconfRow row) => 
-            MatchingTagRegex().Replace(expression.Replace("$name", row.Name), m =>
-                row.Tags.FirstOrDefault(t => m.Groups["tag"].Captures.Any(c => t == c.Value))
-                    ?? throw new FormatException($"matchingtag not found. Row: {Row}"));
+            TagValueRegex().Replace(
+                MatchingTagRegex().Replace(
+                    expression.Replace("$name", row.Name), 
+                    m => row.Tags
+                        .FirstOrDefault(t => m.Groups["tag"].Captures.Any(c => t.name == c.Value)) 
+                        is var tag && tag != default
+                            ? tag.name
+                            : throw new FormatException($"matchingtag not found. Row: {Row}")),
+                m => (row.Tags
+                    .FirstOrDefault(t => m.Groups["tag"].Captures.Any(c => t.name == c.Value)) 
+                    is var tag && tag != default 
+                        ? tag.value 
+                        : throw new FormatException($"tagvalue not found. Row: {Row}")
+                    ));
 
         protected internal virtual IEnumerable<string> GetExpandedConfRows() => [];
     }
