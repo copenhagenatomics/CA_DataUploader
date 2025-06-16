@@ -31,7 +31,6 @@ namespace UnitTests
             await writer.WriteLineAsync("header1,header2", default);
             await writer.WriteLineAsync("1,2", default);
             await writer.StopAsync(default);
-            await Task.Delay(10); // Ensure some time for file creation
 
             // Assert
             var zipFiles = Directory.GetFiles(tempDir, $"HighResolution_{name}_*.zip");
@@ -75,9 +74,9 @@ namespace UnitTests
             // Act - Write and stop twice
             await writer.WriteLineAsync("header1,header2", default);
             await writer.StopAsync(default);
+            await Task.Delay(5); // Ensure some time for file creation
             await writer.WriteLineAsync("header1,header2", default);
             await writer.StopAsync(default);
-            await Task.Delay(10); // Ensure some time for file creation
 
             // Assert - Should create two files
             var zipFiles = Directory.GetFiles(tempDir, $"HighResolution_{name}_*.zip");
@@ -97,7 +96,7 @@ namespace UnitTests
             {
                 await writer.WriteLineAsync($"header{i}", default);
                 await writer.StopAsync(default);
-                await Task.Delay(10); // Ensure some time for file creation
+                await Task.Delay(5); // Ensure some time for file creation
             }
 
             // Assert
