@@ -489,13 +489,13 @@ namespace CA_DataUploaderLib
                         lastValidReadTime = _cmd.Time.GetTimestamp();
                         _boardsState.SetState(boxName, ConnectionState.ReceivingValues);
 
-                        if (!highResolutionMode && (status & 0x02000000) != 0) // High resolution mode started?
+                        if (!highResolutionMode && (status & 0x00800000) != 0) // High resolution mode started?
                         {
                             highResolutionMode = true;
                             timeBetweenReads = TimeSpan.FromMilliseconds(10 * 1.5);
                             await highResolutionWriter.Value.WriteLineAsync(string.Join(", ", targetSamples.Select(s => s.Input.Name)), token);
                         }
-                        if (highResolutionMode && (status & 0x02000000) == 0) // High resolution mode ended?
+                        if (highResolutionMode && (status & 0x00800000) == 0) // High resolution mode ended?
                         {
                             highResolutionMode = false;
                             timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
