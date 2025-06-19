@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Time.Testing;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using static CA_DataUploaderLib.BaseSensorBox;
 
@@ -69,12 +70,13 @@ namespace UnitTests
             // Arrange
             string tempDir = CreateTempDirectory();
             string name = "testBoard3";
-            var writer = new HighResolutionWriter(tempDir, name, s => { });
+            var timeProvider = new FakeTimeProvider(DateTime.Now);
+            var writer = new HighResolutionWriter(tempDir, name, s => { }, timeProvider);
 
             // Act - Write and stop twice
             await writer.WriteLineAsync("header1,header2", default);
             await writer.StopAsync(default);
-            await Task.Delay(5); // Ensure some time for file creation
+            timeProvider.Advance(TimeSpan.FromSeconds(1)); // Simulate time passing
             await writer.WriteLineAsync("header1,header2", default);
             await writer.StopAsync(default);
 
@@ -89,14 +91,15 @@ namespace UnitTests
             // Arrange
             string tempDir = CreateTempDirectory();
             string name = "testBoard4";
-            var writer = new HighResolutionWriter(tempDir, name, s => { });
+            var timeProvider = new FakeTimeProvider(DateTime.Now);
+            var writer = new HighResolutionWriter(tempDir, name, s => { }, timeProvider);
 
             // Act
             for (int i = 0; i < HighResolutionWriter.MaxFilesInFolder + 5; i++)
             {
                 await writer.WriteLineAsync($"header{i}", default);
                 await writer.StopAsync(default);
-                await Task.Delay(5); // Ensure some time for file creation
+                timeProvider.Advance(TimeSpan.FromSeconds(1)); // Simulate time passing
             }
 
             // Assert

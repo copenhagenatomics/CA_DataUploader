@@ -776,14 +776,16 @@ namespace CA_DataUploaderLib
             private readonly StreamWriter writer;
             private readonly string path, name;
             private readonly Action<string> log;
+            private readonly TimeProvider timeProvider;
 
-            public HighResolutionWriter(string path, string name, Action<string> log)
+            public HighResolutionWriter(string path, string name, Action<string> log, TimeProvider? timeProvider = null)
             {
                 stream = new MemoryStream(1_000_000);
                 writer = new StreamWriter(stream, Encoding.ASCII, 1_000);
                 this.path = path;
                 this.name = name;
                 this.log = log;
+                this.timeProvider = timeProvider ?? TimeProvider.System;
             }
 
             /// <summary>
@@ -797,7 +799,7 @@ namespace CA_DataUploaderLib
                 if (Directory.GetFiles(path, $"HighResolution_{name}_*.zip", SearchOption.AllDirectories).Length < MaxFilesInFolder)
                 {
                     stream.Position = 0; // Reset stream position for reading
-                    var fileName = $"HighResolution_{name}_{DateTime.UtcNow:yyyy-MM-dd_HH-mm-ss-fff}";
+                    var fileName = $"HighResolution_{name}_{timeProvider.GetUtcNow():yyyy-MM-dd_HH-mm-ss}";
                     using var fileStream = new FileStream(Path.Combine(path, fileName + ".zip"), FileMode.Create, FileAccess.Write);
                     using var archive = new ZipArchive(fileStream, ZipArchiveMode.Create);
                     var entry = archive.CreateEntry(fileName + ".csv");
