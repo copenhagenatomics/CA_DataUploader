@@ -462,7 +462,7 @@ namespace CA_DataUploaderLib
             int logInfoSkipped = 0, logErrorSkipped = 0, logBoardErrorSkipped = 0, logBoardOkSkipped = 0, multilineMessageSkipped = 0, highResolutionErrorSkipped = 0;
             uint lastStatus = 0;
             bool highResolutionMode = false;
-            Lazy<HighResolutionWriter> highResolutionWriter = new(new HighResolutionWriter(Path.Combine("..", "recordings"), boxName, (message) => LowFrequencyHighResolutionError((args, skipMessage) => LogError(args.board, $"{args.message}{skipMessage}"), (board, message))));
+            Lazy<HighResolutionWriter> highResolutionWriter = new(new HighResolutionWriter(Path.Combine("..", "recordings"), boxName, string.Join(", ", targetSamples.Select(s => s.Input.Name)), (message) => LowFrequencyHighResolutionError((args, skipMessage) => LogError(args.board, $"{args.message}{skipMessage}"), (board, message))));
             MultilineMessageReceiver multilineMessageReceiver = new((message) => LowFrequencyMultilineMessage((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)));
             //We set the state early if we detect no data is being returned or if we received values,
             //but we only set ReturningNonValues if it has passed timeBetweenReads since the last valid read
@@ -493,7 +493,6 @@ namespace CA_DataUploaderLib
                         {
                             highResolutionMode = true;
                             timeBetweenReads = TimeSpan.FromMilliseconds(10 * 1.5);
-                            await highResolutionWriter.Value.WriteLineAsync(string.Join(", ", targetSamples.Select(s => s.Input.Name)), token);
                         }
                         if (highResolutionMode && (status & 0x00800000) == 0) // High resolution mode ended?
                         {
@@ -775,15 +774,17 @@ namespace CA_DataUploaderLib
             private readonly MemoryStream stream;
             private readonly StreamWriter writer;
             private readonly string path, name;
+            private readonly string header;
             private readonly Action<string> log;
             private readonly TimeProvider timeProvider;
 
-            public HighResolutionWriter(string path, string name, Action<string> log, TimeProvider? timeProvider = null)
+            public HighResolutionWriter(string path, string name, string header, Action<string> log, TimeProvider? timeProvider = null)
             {
                 stream = new MemoryStream(1_000_000);
                 writer = new StreamWriter(stream, Encoding.ASCII, 1_000);
                 this.path = path;
                 this.name = name;
+                this.header = header;
                 this.log = log;
                 this.timeProvider = timeProvider ?? TimeProvider.System;
             }
@@ -813,6 +814,8 @@ namespace CA_DataUploaderLib
 
             public async Task WriteLineAsync(string line, CancellationToken token)
             {
+                if (stream.Position == 0)
+                    await writer.WriteLineAsync(header);
                 await writer.WriteLineAsync(line);
                 if (stream.Length > 900_000) // Flush if the stream is getting too large
                     await StopAsync(token);

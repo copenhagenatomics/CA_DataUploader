@@ -26,11 +26,10 @@ namespace UnitTests
             // Arrange
             string tempDir = CreateTempDirectory();
             string name = "testBoard";
-            var writer = new HighResolutionWriter(tempDir, name, s => { });
+            var writer = new HighResolutionWriter(tempDir, name, "header1, header2", s => { });
 
             // Act
-            await writer.WriteLineAsync("header1,header2", default);
-            await writer.WriteLineAsync("1,2", default);
+            await writer.WriteLineAsync("1, 2", default);
             await writer.StopAsync(default);
 
             // Assert
@@ -42,8 +41,8 @@ namespace UnitTests
             using var entryStream = entry.Open();
             using var reader = new StreamReader(entryStream);
             string content = reader.ReadToEnd();
-            Assert.IsTrue(content.Contains("header1,header2"));
-            Assert.IsTrue(content.Contains("1,2"));
+            Assert.IsTrue(content.StartsWith("header1, header2"));
+            Assert.IsTrue(content.Contains("1, 2"));
         }
 
         [TestMethod]
@@ -52,7 +51,7 @@ namespace UnitTests
             // Arrange
             string tempDir = CreateTempDirectory();
             string name = "testBoard2";
-            var writer = new HighResolutionWriter(tempDir, name, s => {});
+            var writer = new HighResolutionWriter(tempDir, name, "", s => {});
 
             // Act - Write enough lines to exceed 900,000 bytes
             var longLine = new string('A', 10000);
@@ -71,18 +70,28 @@ namespace UnitTests
             string tempDir = CreateTempDirectory();
             string name = "testBoard3";
             var timeProvider = new FakeTimeProvider(DateTime.Now);
-            var writer = new HighResolutionWriter(tempDir, name, s => { }, timeProvider);
+            var writer = new HighResolutionWriter(tempDir, name, "header1, header2", s => { }, timeProvider);
 
             // Act - Write and stop twice
-            await writer.WriteLineAsync("header1,header2", default);
+            await writer.WriteLineAsync("1, 2", default);
             await writer.StopAsync(default);
             timeProvider.Advance(TimeSpan.FromSeconds(1)); // Simulate time passing
-            await writer.WriteLineAsync("header1,header2", default);
+            await writer.WriteLineAsync("1, 2", default);
             await writer.StopAsync(default);
 
             // Assert - Should create two files
             var zipFiles = Directory.GetFiles(tempDir, $"HighResolution_{name}_*.zip");
             Assert.IsTrue(zipFiles.Length == 2, $"Expected two zip files after two stops, but seeing {zipFiles.Length}.");
+            foreach (var zipFile in Directory.GetFiles(tempDir, $"HighResolution_{name}_*.zip"))
+            {
+                using var archive = ZipFile.OpenRead(zipFiles[0]);
+                var entry = archive.Entries.FirstOrDefault(e => e.FullName.EndsWith(".csv"));
+                using var entryStream = entry!.Open();
+                using var reader = new StreamReader(entryStream);
+                string content = reader.ReadToEnd();
+                Assert.IsTrue(content.StartsWith("header1, header2"));
+                Assert.IsTrue(content.Contains("1, 2"));
+            }
         }
 
         [TestMethod]
@@ -92,12 +101,12 @@ namespace UnitTests
             string tempDir = CreateTempDirectory();
             string name = "testBoard4";
             var timeProvider = new FakeTimeProvider(DateTime.Now);
-            var writer = new HighResolutionWriter(tempDir, name, s => { }, timeProvider);
+            var writer = new HighResolutionWriter(tempDir, name, "header", s => { }, timeProvider);
 
             // Act
             for (int i = 0; i < HighResolutionWriter.MaxFilesInFolder + 5; i++)
             {
-                await writer.WriteLineAsync($"header{i}", default);
+                await writer.WriteLineAsync($"{i}", default);
                 await writer.StopAsync(default);
                 timeProvider.Advance(TimeSpan.FromSeconds(1)); // Simulate time passing
             }
