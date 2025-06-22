@@ -798,6 +798,7 @@ namespace CA_DataUploaderLib
                 await writer.FlushAsync(token);
                 if (stream.Position == 0)
                     return;
+                Directory.CreateDirectory(path); // Ensure the directory exists
                 if (Directory.GetFiles(path, $"HighResolution_{name}_*.zip", SearchOption.AllDirectories).Length < MaxFilesInFolder)
                 {
                     stream.Position = 0; // Reset stream position for reading
