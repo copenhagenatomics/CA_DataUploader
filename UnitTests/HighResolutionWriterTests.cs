@@ -88,7 +88,7 @@ namespace UnitTests
             Assert.IsTrue(zipFiles.Length == 2, $"Expected two zip files after two stops, but seeing {zipFiles.Length}.");
             foreach (var zipFile in Directory.GetFiles(tempDir, $"HighResolution_{name}_*.zip"))
             {
-                using var archive = ZipFile.OpenRead(zipFiles[0]);
+                using var archive = ZipFile.OpenRead(zipFile);
                 var entry = archive.Entries.FirstOrDefault(e => e.FullName.EndsWith(".csv"));
                 using var entryStream = entry!.Open();
                 using var reader = new StreamReader(entryStream);
