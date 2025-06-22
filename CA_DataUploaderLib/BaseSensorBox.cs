@@ -799,7 +799,7 @@ namespace CA_DataUploaderLib
                 if (stream.Position == 0)
                     return;
                 Directory.CreateDirectory(path); // Ensure the directory exists
-                if (Directory.GetFiles(path, $"HighResolution_{name}_*.zip", SearchOption.AllDirectories).Length < MaxFilesInFolder)
+                if (Directory.GetFiles(path, $"HighResolution_{name}_*.zip", SearchOption.TopDirectoryOnly).Length < MaxFilesInFolder)
                 {
                     stream.Position = 0; // Reset stream position for reading
                     var fileName = $"HighResolution_{name}_{timeProvider.GetUtcNow():yyyy-MM-dd_HH-mm-ss}";
