@@ -1,11 +1,12 @@
 #nullable enable
+using Microsoft.Extensions.Time.Testing;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Time.Testing;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using static CA_DataUploaderLib.BaseSensorBox;
 
 namespace UnitTests
@@ -30,6 +31,8 @@ namespace UnitTests
 
             // Act
             await writer.WriteLineAsync("1, 2", default);
+            await writer.WriteLineAsync("2, 3", default);
+            await writer.WriteLineAsync("3, 4", default);
             await writer.StopAsync(default);
 
             // Assert
@@ -42,7 +45,8 @@ namespace UnitTests
             using var reader = new StreamReader(entryStream);
             string content = reader.ReadToEnd();
             Assert.IsTrue(content.StartsWith("header1, header2"));
-            Assert.IsTrue(content.Contains("1, 2"));
+            Assert.AreEqual(1, Regex.Matches(content, "header1, header2").Count);
+            Assert.IsTrue(content.Contains($"1, 2{Environment.NewLine}2, 3{Environment.NewLine}3, 4"));
         }
 
         [TestMethod]

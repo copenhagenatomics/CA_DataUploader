@@ -777,6 +777,7 @@ namespace CA_DataUploaderLib
             private readonly string header;
             private readonly Action<string> log;
             private readonly TimeProvider timeProvider;
+            private bool empty = true;
 
             public HighResolutionWriter(string path, string name, string header, Action<string> log, TimeProvider? timeProvider = null)
             {
@@ -810,13 +811,15 @@ namespace CA_DataUploaderLib
                 else
                     log.Invoke($"Skipping writing high resolution data for {name} as the folder has too many files (>{MaxFilesInFolder})");
                 stream.SetLength(0);
+                empty = true;
             }
 
             public async Task WriteLineAsync(string line, CancellationToken token)
             {
-                if (stream.Position == 0)
+                if (empty)
                     await writer.WriteLineAsync(header);
                 await writer.WriteLineAsync(line);
+                empty = false;
                 if (stream.Length > 900_000) // Flush if the stream is getting too large
                     await StopAsync(token);
             }
