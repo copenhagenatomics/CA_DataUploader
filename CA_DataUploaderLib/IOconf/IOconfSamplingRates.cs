@@ -31,6 +31,7 @@ namespace CA_DataUploaderLib.IOconf
         public readonly int MainLoopDelay;
         public readonly int VectorUploadDelay;
 
+        public override string UniqueKey() => Type;
         protected override void ValidateName(string name) { } // no validation
     }
 }
