@@ -4,6 +4,8 @@ using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -456,9 +458,11 @@ namespace CA_DataUploaderLib
             var lastValidReadTime = _cmd.Time.GetTimestamp();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
             var timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
-            long lastLogInfoTime = 0, lastLogErrorTime = 0, lastLogBoardErrorTime = 0, lastLogBoardOkTime = 0, lastMultilineMessageTime = 0;
-            int logInfoSkipped = 0, logErrorSkipped = 0, logBoardErrorSkipped = 0, logBoardOkSkipped = 0, multilineMessageSkipped = 0;
+            long lastLogInfoTime = 0, lastLogErrorTime = 0, lastLogBoardErrorTime = 0, lastLogBoardOkTime = 0, lastMultilineMessageTime = 0, lastHighResolutionErrorTime = 0;
+            int logInfoSkipped = 0, logErrorSkipped = 0, logBoardErrorSkipped = 0, logBoardOkSkipped = 0, multilineMessageSkipped = 0, highResolutionErrorSkipped = 0;
             uint lastStatus = 0;
+            bool highResolutionMode = false;
+            Lazy<HighResolutionWriter> highResolutionWriter = new(new HighResolutionWriter(Path.Combine("..", "recordings"), boxName, string.Join(", ", targetSamples.Select(s => s.Input.Name)), (message) => LowFrequencyHighResolutionError((args, skipMessage) => LogError(args.board, $"{args.message}{skipMessage}"), (board, message))));
             MultilineMessageReceiver multilineMessageReceiver = new((message) => LowFrequencyMultilineMessage((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)));
             //We set the state early if we detect no data is being returned or if we received values,
             //but we only set ReturningNonValues if it has passed timeBetweenReads since the last valid read
@@ -468,6 +472,8 @@ namespace CA_DataUploaderLib
                 if (line == default)
                 {
                     multilineMessageReceiver.LogPossibleIncompleteMessage();
+                    if (highResolutionMode)
+                        await highResolutionWriter.Value.StopAsync(token); 
                     return; //timed out/unexpected error reading from the board, let the caller run the reconnect flow
                 }
 
@@ -482,6 +488,20 @@ namespace CA_DataUploaderLib
                         ProcessLine(numbers, board, targetSamples);
                         lastValidReadTime = _cmd.Time.GetTimestamp();
                         _boardsState.SetState(boxName, ConnectionState.ReceivingValues);
+
+                        if (!highResolutionMode && (status & 0x00800000) != 0) // High resolution mode started?
+                        {
+                            highResolutionMode = true;
+                            timeBetweenReads = TimeSpan.FromMilliseconds(10 * 1.5);
+                        }
+                        if (highResolutionMode && (status & 0x00800000) == 0) // High resolution mode ended?
+                        {
+                            highResolutionMode = false;
+                            timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
+                            await highResolutionWriter.Value.StopAsync(token);
+                        }
+                        if (highResolutionMode)
+                            await highResolutionWriter.Value.WriteLineAsync(line, token);
 
                         if (status != lastStatus && (status & 0x01000000) != 0) // Flash ongoing?
                             timeBetweenReads = TimeSpan.FromSeconds(1.5);
@@ -522,6 +542,7 @@ namespace CA_DataUploaderLib
             void LowFrequencyLogBoardError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "board error", args, ref lastLogBoardErrorTime, ref logBoardErrorSkipped);
             void LowFrequencyLogBoardOk<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "board ok", args, ref lastLogBoardOkTime, ref logBoardOkSkipped);
             void LowFrequencyMultilineMessage<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "multiline", args, ref lastMultilineMessageTime, ref multilineMessageSkipped);
+            void LowFrequencyHighResolutionError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "high resolution", args, ref lastHighResolutionErrorTime, ref highResolutionErrorSkipped);
 
             void LowFrequencyLog<T>(Action<T, string> logAction, string logType, T args, ref long lastLogTime, ref int logSkipped)
             {
@@ -744,6 +765,64 @@ namespace CA_DataUploaderLib
                 multilineMessage = new();
                 multilineMessageMode = false;
                 multilineMessageLineCount = 0;
+            }
+        }
+
+        public class HighResolutionWriter
+        {
+            public const int MaxFilesInFolder = 20; // Maximum number of high resolution files to keep in the folder
+            private readonly MemoryStream stream;
+            private readonly StreamWriter writer;
+            private readonly string path, name;
+            private readonly string header;
+            private readonly Action<string> log;
+            private readonly TimeProvider timeProvider;
+            private bool empty = true;
+
+            public HighResolutionWriter(string path, string name, string header, Action<string> log, TimeProvider? timeProvider = null)
+            {
+                stream = new MemoryStream(1_000_000);
+                writer = new StreamWriter(stream, Encoding.ASCII, 1_000);
+                this.path = path;
+                this.name = name;
+                this.header = header;
+                this.log = log;
+                this.timeProvider = timeProvider ?? TimeProvider.System;
+            }
+
+            /// <summary>
+            /// Stop accumulating data and write to file - if there are not too many files in the folder.
+            /// </summary>
+            public async Task StopAsync(CancellationToken token)
+            {
+                await writer.FlushAsync(token);
+                if (stream.Position == 0)
+                    return;
+                Directory.CreateDirectory(path); // Ensure the directory exists
+                if (Directory.GetFiles(path, $"HighResolution_{name}_*.zip", SearchOption.TopDirectoryOnly).Length < MaxFilesInFolder)
+                {
+                    stream.Position = 0; // Reset stream position for reading
+                    var fileName = $"HighResolution_{name}_{timeProvider.GetUtcNow():yyyy-MM-dd_HH-mm-ss}";
+                    using var fileStream = new FileStream(Path.Combine(path, fileName + ".zip"), FileMode.Create, FileAccess.Write);
+                    using var archive = new ZipArchive(fileStream, ZipArchiveMode.Create);
+                    var entry = archive.CreateEntry(fileName + ".csv");
+                    using var entryStream = entry.Open();
+                    stream.CopyTo(entryStream);
+                }
+                else
+                    log.Invoke($"Skipping writing high resolution data for {name} as the folder has too many files (>{MaxFilesInFolder})");
+                stream.SetLength(0);
+                empty = true;
+            }
+
+            public async Task WriteLineAsync(string line, CancellationToken token)
+            {
+                if (empty)
+                    await writer.WriteLineAsync(header);
+                await writer.WriteLineAsync(line);
+                empty = false;
+                if (stream.Length > 900_000) // Flush if the stream is getting too large
+                    await StopAsync(token);
             }
         }
 
