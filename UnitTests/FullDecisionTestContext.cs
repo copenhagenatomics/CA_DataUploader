@@ -67,7 +67,7 @@ namespace UnitTests
             cmd.MakeDecisionUsingInputsFromNewVector(vector, vector, acceptedEvents.Select(e => e.Data).ToList());
         }
 
-        private class ChannelLogger : ILog
+        internal class ChannelLogger : ILog
         {
             private readonly Channel<string> log = Channel.CreateUnbounded<string>();
             public ChannelReader<string> Log => log.Reader;

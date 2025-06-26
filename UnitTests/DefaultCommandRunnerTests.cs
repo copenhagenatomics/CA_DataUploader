@@ -1,10 +1,12 @@
-﻿using CA_DataUploaderLib;
-using CA_DataUploaderLib.Extensions;
+﻿using CA.LoopControlPluginBase;
+using CA_DataUploaderLib;
+using CA_DataUploaderLib.IOconf;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using System;
 using System.Collections.Generic;
-using System.Globalization;
+using System.Text;
+using System.Threading.Channels;
+using static UnitTests.FullDecisionTestContext;
 
 namespace UnitTests
 {
@@ -12,84 +14,100 @@ namespace UnitTests
     public class DefaultCommandRunnerTests
     {
         [TestMethod]
-        public void Run_RandomCommand_ReturnsFalse()
+        public void Execute_RandomCommand_Rejected()
         {
             // Arrange
-            DefaultCommandRunner runner = new(new Mock<ILog>().Object);
+            var logger = new ChannelLogger();
+            var logs = logger.Log;
+            var cmd = new CommandHandler(new Mock<IIOconf>().Object, runCommandLoop: false, logger: logger);
+            cmd.AddDecisions([new TestDecision([])]);
 
-            // Act + Assert
-            Assert.IsFalse(runner.Run("random", true));
+            // Act
+            cmd.Execute("random", true);
+
+            // Assert
+            Assert.IsTrue(GetAllLogs(logs).Contains("unknown command"));
         }
 
-        [TestMethod]
-        public void Run_SingleWorkCommand_ReturnsTrueWithOrWithoutParameter()
+        [DataRow("test")]
+        [DataRow("test 42")]
+        [DataRow("test 42.0")]
+        [DataRow("test 0x123")]
+        [DataRow("test #ffffff")]
+        [DataTestMethod]
+        public void Execute_SingleWordCommand_AcceptedWithOrWithoutParameter(string command)
         {
             // Arrange
-            DefaultCommandRunner runner = new(new Mock<ILog>().Object);
-            foreach (var (command, func) in GetValidationCommands(["test"]))
-                runner.AddCommand(command, func);
+            var logger = new ChannelLogger();
+            var logs = logger.Log;
+            var cmd = new CommandHandler(new Mock<IIOconf>().Object, runCommandLoop: false, logger: logger);
+            cmd.AddDecisions([new TestDecision(["test"])]);
 
-            // Act + Assert
-            Assert.IsTrue(runner.Run("test", true));
-            Assert.IsTrue(runner.Run("test 42", true));
-            Assert.IsTrue(runner.Run("test 42.0", true));
-            Assert.IsTrue(runner.Run("test 0x123", true));
-            Assert.IsTrue(runner.Run("test #123456", true));
+            // Act
+            cmd.Execute(command, true);
+
+            // Assert
+            Assert.IsTrue(GetAllLogs(logs).Contains("command accepted"));
         }
 
-        [TestMethod]
-        public void Run_MultiWordCommand_Tests()
+        [DataRow("er autoscan start", true, false)]
+        [DataRow("er_autoscan_start", true, false)]
+        [DataRow("er autoscan start 123", true, false)]
+        [DataRow("er_autoscan_start 123", true, false)]
+        [DataRow("er autoscan star", false, false)]
+        [DataRow("er_autoscan_star", false, false)]
+        [DataRow("er autoscan star 123", false, false)]
+        [DataRow("er_autoscan_star 123", false, false)]
+        [DataRow("er autoscan start more", false, false)]
+        [DataRow("er_autoscan_start_more", false, false)]
+        [DataRow("er autoscan start more 123", false, false)]
+        [DataRow("er_autoscan_start_more_123", false, false)]
+        [DataRow("er autoscan", false, false)]
+        [DataRow("er_autoscan", false, false)]
+        [DataRow("er autoscan 123", false, false)]
+        [DataRow("er_autoscan 123", false, false)]
+        [DataRow("er", false, false)]
+        [DataRow("er 123", false, false)]
+        [DataRow("ergo", false, true)]
+        [DataRow("ergo 123", false, true)]
+        [DataTestMethod]
+        public void Execute_MultiWordCommand_Tests(string command, bool accepted, bool unknown)
         {
             // Arrange
-            DefaultCommandRunner runner = new(new Mock<ILog>().Object);
-            foreach (var (command, func) in GetValidationCommands(["er autoscan start"]))
-                runner.AddCommand(command, func);
+            var logger = new ChannelLogger();
+            var logs = logger.Log;
+            var cmd = new CommandHandler(new Mock<IIOconf>().Object, runCommandLoop: false, logger: logger);
+            cmd.AddDecisions([new TestDecision(["er autoscan start"])]);
 
-            // Act + Assert
-            Assert.IsTrue(runner.Run("er autoscan start", true));
-            Assert.IsTrue(runner.Run("er autoscan start 123", true));
-            Assert.IsFalse(runner.Run("er autoscan start more", true));
-            Assert.IsFalse(runner.Run("er autoscan start more123", true));
-            Assert.IsFalse(runner.Run("er autoscan", true));
-            Assert.IsFalse(runner.Run("er autoscan 123", true));
-            Assert.IsFalse(runner.Run("er", true));
-            Assert.IsFalse(runner.Run("er 123", true));
-            Assert.IsFalse(runner.Run("ergo", true));
-            Assert.IsFalse(runner.Run("ergo 123", true));
+            // Act
+            cmd.Execute(command, true);
+
+            // Assert
+            Assert.IsTrue(GetAllLogs(logs).Contains(accepted 
+                ? "command accepted" 
+                : unknown 
+                    ? "unknown command"
+                    : "bad command"));
         }
 
-        /// <summary>
-        /// This method is a (almost identical) copy of the one in <see cref="CA_DataUploaderLib.Extensions.DecisionExtensions"/>
-        /// </summary>
-        public static IEnumerable<(string command, Func<List<string>, bool> commandValidationFunction)> GetValidationCommands(List<string> events)
+
+        public static string GetAllLogs(ChannelReader<string> logs)
         {
-            foreach (var e in events)
-            {
-                //This just avoids the commands being reported as rejected for now, but the way to go about in the long run is to add detection of the executed commands by looking at the vectors.
-                //Note that even then, the decisions are not reporting which commands they actually handled or ignore, specially as they are receiving all commands and then handle what applies to the decision.
-                var expectedArgs = e.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                var firstWordInEvent = expectedArgs[0];
-                yield return (firstWordInEvent, args =>
-                {
-                    if (args.Count != expectedArgs.Length && args.Count != expectedArgs.Length + 1)
-                        return false;
+            var allLogs = new StringBuilder();
+            while (logs.TryRead(out var log))
+                allLogs.AppendLine(log);
+            return allLogs.ToString();
+        }
 
-                    for (int i = 1; i < expectedArgs.Length; i++)
-                    {
-                        if (!args[i].Equals(expectedArgs[i], StringComparison.OrdinalIgnoreCase))
-                            return false;
-                    }
-
-                    if (args.Count == expectedArgs.Length)
-                        return true;
-
-                    var target = args[expectedArgs.Length];
-                    return target.TryToDouble(out _) ||
-                        target.StartsWith("0x") && uint.TryParse(target[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _) ||
-                        target.StartsWith('#') && uint.TryParse(target[1..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _);
-                }
-                );
-            }
+        private class TestDecision(List<string> handledEvents) : LoopControlDecision
+        {
+            public override string Name => "TestDecision";
+            public override PluginField[] PluginFields => [];
+            public override string[] ReferenceFields => [];
+            public override string[] HandledEvents => [.. handledEvents];
+            public override void Initialize(CA.LoopControlPluginBase.VectorDescription desc) { }
+            public override void MakeDecision(CA.LoopControlPluginBase.DataVector vector, List<string> events) { }
+            public override void SetConfig(IDecisionConfig config) { }
         }
     }
 }
