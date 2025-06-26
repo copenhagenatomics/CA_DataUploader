@@ -334,7 +334,7 @@ namespace CA_DataUploaderLib
 
         private void HandleCommand(string cmdString, bool isUserCommand)
         {
-            cmdString = cmdString.Trim();
+            cmdString = cmdString.Replace('_', ' ').Trim();
             cmdString = Regex.Replace(cmdString, @"\s+", " "); // Merge multiple whitespace characters
             if (isUserCommand)
                 UserCommandReceived?.Invoke(this, new(cmdString, EventType.Command, DateTime.UtcNow));
