@@ -358,7 +358,9 @@ namespace CA_DataUploaderLib
                 catch (OperationCanceledException ex) when (ex.CancellationToken == token)
                 { }
                 catch (ObjectDisposedException)
-                {
+                { 
+                    // the board was intentionally and permanently closed until the next restart
+                    // e.g. typically due to unsupported configuration for a board or during autoconfig/firmware updates
                     LogData(board, "Detected closed connection (write loop)");
                     return;
                 }
