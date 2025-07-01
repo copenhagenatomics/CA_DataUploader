@@ -134,7 +134,7 @@ namespace CA_DataUploaderLib
         }
 
         public async Task<string> SafeReadLine(CancellationToken token) => await RunWaitingForAnyOngoingReconnect(ReadLine, token);
-        public Task SafeWriteLine(string msg, CancellationToken token) => RunWaitingForAnyOngoingReconnect(_ => { if (port.IsOpen) port.WriteLine(msg); else throw new ObjectDisposedException("Closed connection detected (port is closed)"); } , token);
+        public Task SafeWriteLine(string msg, CancellationToken token) => RunWaitingForAnyOngoingReconnect(_ => { if (!Closed) port.WriteLine(msg); else throw new ObjectDisposedException("Closed connection detected (port is closed)"); } , token);
 
         public async Task SafeClose(CancellationToken token)
         {
