@@ -56,7 +56,7 @@ namespace CA_DataUploaderLib.IOconf
                 }
                 else
                 {
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Error: old current board {Map.Name} cannot use new format for sensor {Name}. Disconnecting board.");
+                    CALog.LogErrorAndConsoleLn(LogID.A, $"Error: old current board {Map.Name} cannot use new format for sensor {Name}. Disconnecting board. Received header:{Environment.NewLine}{Map.Board.HeaderLines}");
                     Map.ForceDisconnectBoard().Wait();
                 }
             }

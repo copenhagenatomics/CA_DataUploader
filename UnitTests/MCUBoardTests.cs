@@ -271,6 +271,36 @@ Some unexpected failure
             Assert.AreEqual("4", await ReadLine(reader));
         }
 
+        [TestMethod]
+        public async Task ReadSerialStoresHeaderLines()
+        {
+            var pipe = new Pipe();
+            var (reader, writer) = (pipe.Reader, pipe.Writer);
+            var header = new MCUBoard.Header();
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
+            var lines = """
+1
+2
+3
+Serial Number: 1234
+Product Type: Custom Board
+Sub Product Type: 0
+MCU Family: The new Mcu
+Software Version: 1.2.3
+Compile Date: 1-1-2023
+Git SHA: abcd
+PCB Version: 1.2
+Calibration: abc123.4
+
+""";
+            foreach (var line in lines.Split(Environment.NewLine))
+                await Write(writer, line + "\n");
+            await Write(writer, "The header detection waits for an extra non-empty line after the header - this line satisfies that.\n");
+
+            Assert.IsTrue(await res);
+            Assert.AreEqual(lines, header.Lines);
+        }
+
 
 
         private static Task<string> ReadLine(PipeReader reader) => MCUBoard.ReadLine(MCUBoard.Dependencies.Default, reader, "abc", 16, TryReadLine, CancellationToken.None);
