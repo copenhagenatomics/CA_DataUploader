@@ -291,7 +291,7 @@ Some unexpected failure
             public void LogData(LogID id, string msg) => sb.AppendLine($"data-{id}-{msg}");
             public void LogError(LogID id, string msg, Exception ex) => sb.AppendLine($"error-{id}-{msg}-{ex}");
             public void LogError(LogID id, string msg) => sb.AppendLine($"error-{id}-{msg}");
-            public void LogInfo(LogID id, string msg) => sb.AppendLine($"info-{id}-{msg}");
+            public void LogInfo(LogID id, string msg, string? user = null) => sb.AppendLine($"info-{id}-{msg}");
             public override string ToString() => sb.ToString();
         }
     }

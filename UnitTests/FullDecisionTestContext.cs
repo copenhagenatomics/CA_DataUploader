@@ -74,7 +74,7 @@ namespace UnitTests
             public void LogData(LogID id, string msg) => log.Writer.TryWrite($"data-{id}-{msg}");
             public void LogError(LogID id, string msg, Exception ex) => log.Writer.TryWrite($"error-{id}-{msg}-{ex}");
             public void LogError(LogID id, string msg) => log.Writer.TryWrite($"error-{id}-{msg}");
-            public void LogInfo(LogID id, string msg) => log.Writer.TryWrite($"info-{id}-{msg}");
+            public void LogInfo(LogID id, string msg, string? user = null) => log.Writer.TryWrite($"info-{id}-{msg}");
         }
     }
 }

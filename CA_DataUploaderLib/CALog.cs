@@ -29,19 +29,19 @@ namespace CA_DataUploaderLib
         void ILog.LogData(LogID id, string msg) => LogData(id, msg);
         void ILog.LogError(LogID id, string msg, Exception ex) => LogErrorAndConsoleLn(id, msg, ex);
         void ILog.LogError(LogID id, string msg) => LogErrorAndConsoleLn(id, msg);
-        void ILog.LogInfo(LogID id, string msg) => LogInfoAndConsoleLn(id, msg);
+        void ILog.LogInfo(LogID id, string msg, string? user = null) => LogInfoAndConsoleLn(id, msg, user);
         public static void LogData(LogID logID, string msg) => _localLogger.LogData(logID, msg);
 
-        public static void LogInfoAndConsoleLn(LogID logID, string msg)
+        public static void LogInfoAndConsoleLn(LogID logID, string msg, string? user = null)
         {
             LoggerForUserOutput.LogInfo(msg);
-            _localLogger.LogInfo(logID, msg);
+            _localLogger.LogInfo(logID, msg, user);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error)
         {
             LoggerForUserOutput.LogError(error);
-            _localLogger.LogInfo(logID, error);
+            _localLogger.LogError(logID, error);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error, Exception ex)
@@ -157,16 +157,16 @@ namespace CA_DataUploaderLib
 
             public void LogError(LogID id, string msg) => WriteToFile(id, msg);
 
-            public void LogInfo(LogID id, string msg) => WriteToFile(id, msg);
+            public void LogInfo(LogID id, string msg, string? user = null) => WriteToFile(id, msg, user);
 
-            private static void WriteToFile(LogID logID, string msg)
+            private static void WriteToFile(LogID logID, string msg, string? user = null)
             {
                 try
                 {
                     lock (_logDir)
                     {
                         // always add timestamp and a NewLine
-                        msg = $"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} - {msg}{Environment.NewLine}";
+                        msg = $"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} - {msg}{(!string.IsNullOrEmpty(user) ? $" [{user}]" : "")}{Environment.NewLine}";
                         File.AppendAllText(GetFilename(logID), msg);
                     }
                 }
