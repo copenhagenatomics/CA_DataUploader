@@ -29,7 +29,7 @@ namespace CA_DataUploaderLib
         void ILog.LogData(LogID id, string msg) => LogData(id, msg);
         void ILog.LogError(LogID id, string msg, Exception ex) => LogErrorAndConsoleLn(id, msg, ex);
         void ILog.LogError(LogID id, string msg) => LogErrorAndConsoleLn(id, msg);
-        void ILog.LogInfo(LogID id, string msg, string? user = null) => LogInfoAndConsoleLn(id, msg, user);
+        void ILog.LogInfo(LogID id, string msg, string? user) => LogInfoAndConsoleLn(id, msg, user);
         public static void LogData(LogID logID, string msg) => _localLogger.LogData(logID, msg);
 
         public static void LogInfoAndConsoleLn(LogID logID, string msg, string? user = null)
