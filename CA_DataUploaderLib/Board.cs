@@ -29,6 +29,7 @@ namespace CA_DataUploaderLib
         public string? GitSha { get; protected set; }
         public string? Calibration { get; protected set; }
         public string? UpdatedCalibration { get; protected set; }
+        public string? HeaderLines { get; protected set; }
 
         public bool TrySetMap(IOconfMap map)
         {

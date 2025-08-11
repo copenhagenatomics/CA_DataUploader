@@ -463,6 +463,7 @@ namespace CA_DataUploaderLib
             public string? GitSha { get; private set; }
             public string? Calibration { get; private set; }
             public string? UpdatedCalibration { get; private set; }
+            public string? Lines { get; private set; }
 
             private readonly Dependencies Dependencies;
 
@@ -490,6 +491,7 @@ namespace CA_DataUploaderLib
                         if (res.IsCanceled)
                         {
                             LogMissingHeader("pipe canceled");
+                            Lines = linesRead.ToString();
                             return ableToRead;
                         }
 
@@ -550,12 +552,14 @@ namespace CA_DataUploaderLib
                         if (res.IsCompleted)
                         { // typically means the connection was closed.
                             LogMissingHeader("pipe closed");
+                            Lines = linesRead.ToString();
                             return ableToRead;
                         }
                     }
                     catch (OperationCanceledException ex) when (ex.CancellationToken == token)
                     {
                         LogMissingHeader("timed out");
+                        Lines = linesRead.ToString();
                         return ableToRead;
                     }
                     catch (Exception ex)
@@ -565,6 +569,7 @@ namespace CA_DataUploaderLib
                 }
 
                 await ReadOptionalNonEmptyLine(Dependencies, pipeReader, port, 2000, tryReadLine, _ => false, CancellationToken.None);//avoid any extra empty lines just after the full header from getting read by callers
+                Lines = linesRead.ToString();
                 return true;
 
                 void LogMissingHeader(string reason) => 
@@ -576,6 +581,7 @@ namespace CA_DataUploaderLib
                 {
                     calibration = default;
                     var readLine = TryReadOptionalNonEmptyLine(ref buffer, tryReadLine, l => l.Contains(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase), out var line);
+                    linesRead.AppendLine(line);
                     if (readLine && !string.IsNullOrEmpty(line))
                         calibration = line[(line.IndexOf(CalibrationHeader, StringComparison.InvariantCultureIgnoreCase) + CalibrationHeader.Length)..].Trim();
                     return readLine;
@@ -594,6 +600,7 @@ namespace CA_DataUploaderLib
                 mcuBoard.PcbVersion = PcbVersion;
                 mcuBoard.Calibration = Calibration;
                 mcuBoard.UpdatedCalibration = UpdatedCalibration;
+                mcuBoard.HeaderLines = Lines;
             }
         }
 
