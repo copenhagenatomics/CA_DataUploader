@@ -142,7 +142,7 @@ namespace CA_DataUploaderLib
 
         /// <returns>an <see cref="Action"/> that can be used to unregister the command.</returns>
         public Action AddCommand(string name, Func<List<string>, bool> func) => _commandRunner.AddCommand(name, func);
-        public void Execute(string command, bool isUserCommand = false) => HandleCommand(command, isUserCommand);
+        public void Execute(string command, bool isUserCommand = false, string? username = null) => HandleCommand(command, isUserCommand, username);
         public void AddSubsystem(ISubsystemWithVectorData subsystem) => _subsystems.Add(subsystem);
         public VectorDescription GetFullSystemVectorDescription() => GetExtendedVectorDescription().VectorDescription;
         public ExtendedVectorDescription GetExtendedVectorDescription() => _fullSystemFilterAndMath.Value;
@@ -282,10 +282,10 @@ namespace CA_DataUploaderLib
         public void FireAlert(string msg, DateTime timespan) => FireCustomEvent(msg, timespan, (byte)EventType.Alert);
         /// <summary>registers a custom event (low frequency, such like user commands and alerts that have a max firing rate)</summary>
         /// <remarks>preferably use values above 100 for eventType to avoid future collisions with built in event types</remarks>
-        public void FireCustomEvent(string msg, DateTime timespan, byte eventType) 
+        public void FireCustomEvent(string msg, DateTime timespan, byte eventType, string? user = null) 
         {
-            EventFired?.Invoke(this, new EventFiredArgs(msg, eventType, timespan));
-            _locallyFiredEvents.Writer.TryWrite(new(msg, eventType, timespan));
+            EventFired?.Invoke(this, new EventFiredArgs(msg, eventType, timespan, user: user));
+            _locallyFiredEvents.Writer.TryWrite(new(msg, eventType, timespan, user: user));
         }
 
         /// <summary>
@@ -332,22 +332,22 @@ namespace CA_DataUploaderLib
             Logger.LogInfo(LogID.A, "Exiting CommandHandler.LoopForever() " + DateTime.UtcNow.Subtract(_start));
         }
 
-        private void HandleCommand(string cmdString, bool isUserCommand)
+        private void HandleCommand(string cmdString, bool isUserCommand, string? username = null)
         {
             cmdString = cmdString.Replace('_', ' ').Trim();
             cmdString = Regex.Replace(cmdString, @"\s+", " "); // Merge multiple whitespace characters
             if (isUserCommand)
                 UserCommandReceived?.Invoke(this, new(cmdString, EventType.Command, DateTime.UtcNow));
             if (_commandRunner.Run(cmdString, isUserCommand) && isUserCommand)
-                OnUserCommandAccepted(cmdString);
+                OnUserCommandAccepted(cmdString, username);
         }
 
-        private void OnUserCommandAccepted(string cmdString)
+        private void OnUserCommandAccepted(string cmdString, string? username = null)
         {
             if (AcceptedCommands.LastOrDefault() != cmdString)
                 AcceptedCommands.Add(cmdString);
             AcceptedCommandsIndex = AcceptedCommands.Count;
-            FireCustomEvent(cmdString, DateTime.UtcNow, (byte)EventType.Command);
+            FireCustomEvent(cmdString, DateTime.UtcNow, (byte)EventType.Command, username);
         }
 
         /// <returns>the text line <c>null</c> if we are no longer running (_running is false)</returns>

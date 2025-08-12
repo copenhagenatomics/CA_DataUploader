@@ -29,19 +29,19 @@ namespace CA_DataUploaderLib
         void ILog.LogData(LogID id, string msg) => LogData(id, msg);
         void ILog.LogError(LogID id, string msg, Exception ex) => LogErrorAndConsoleLn(id, msg, ex);
         void ILog.LogError(LogID id, string msg) => LogErrorAndConsoleLn(id, msg);
-        void ILog.LogInfo(LogID id, string msg) => LogInfoAndConsoleLn(id, msg);
+        void ILog.LogInfo(LogID id, string msg, string? user) => LogInfoAndConsoleLn(id, msg, user);
         public static void LogData(LogID logID, string msg) => _localLogger.LogData(logID, msg);
 
-        public static void LogInfoAndConsoleLn(LogID logID, string msg)
+        public static void LogInfoAndConsoleLn(LogID logID, string msg, string? user = null)
         {
-            LoggerForUserOutput.LogInfo(msg);
-            _localLogger.LogInfo(logID, msg);
+            LoggerForUserOutput.LogInfo(msg, user);
+            _localLogger.LogInfo(logID, msg, user);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error)
         {
             LoggerForUserOutput.LogError(error);
-            _localLogger.LogInfo(logID, error);
+            _localLogger.LogError(logID, error);
         }
 
         public static void LogErrorAndConsoleLn(LogID logID, string error, Exception ex)
@@ -58,7 +58,7 @@ namespace CA_DataUploaderLib
             public void LogData(string message) => Console.WriteLine(message);
             public void LogError(string message) => WriteLineToConsole(message, ConsoleColor.Red);
             public void LogError(Exception ex) => WriteLineToConsole(ex.ToString(), ConsoleColor.Red);
-            public void LogInfo(string message) => Console.WriteLine(message);
+            public void LogInfo(string message, string? user = null) => Console.WriteLine(message);
 
             private static void WriteLineToConsole(string line, ConsoleColor color)
             {
@@ -86,7 +86,7 @@ namespace CA_DataUploaderLib
             public void LogData(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log);
             public void LogError(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.LogError);
             public void LogError(Exception ex) => handler.FireCustomEvent(ex.ToString(), DateTime.UtcNow, (byte)EventType.LogError);
-            public void LogInfo(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log);
+            public void LogInfo(string message, string? user = null) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log, user);
 
             /// <summary>prints remoteEvents to the console for 5 seconds when detecting local user commands<summary>
             void EnableTempClusterOutputOnLocalActions(CommandHandler cmd)
@@ -157,16 +157,16 @@ namespace CA_DataUploaderLib
 
             public void LogError(LogID id, string msg) => WriteToFile(id, msg);
 
-            public void LogInfo(LogID id, string msg) => WriteToFile(id, msg);
+            public void LogInfo(LogID id, string msg, string? user = null) => WriteToFile(id, msg, user);
 
-            private static void WriteToFile(LogID logID, string msg)
+            private static void WriteToFile(LogID logID, string msg, string? user = null)
             {
                 try
                 {
                     lock (_logDir)
                     {
                         // always add timestamp and a NewLine
-                        msg = $"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} - {msg}{Environment.NewLine}";
+                        msg = $"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} - {msg}{(!string.IsNullOrEmpty(user) ? $" [{user}]" : "")}{Environment.NewLine}";
                         File.AppendAllText(GetFilename(logID), msg);
                     }
                 }

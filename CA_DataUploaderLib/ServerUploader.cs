@@ -123,7 +123,7 @@ namespace CA_DataUploaderLib
             //note slightly changing the event time below is a workaround to ensure they come in order in the event log
             int @eventIndex = 0;
             foreach (var e in vector.Events)
-                SendEvent(this, new EventFiredArgs($"{((e.EventType == (byte) EventType.Log || e.EventType == (byte)EventType.LogError) ? NodeIdToName(e.NodeId) : "")}{e.Data}", e.EventType, e.TimeSpan.AddTicks(eventIndex++)));
+                SendEvent(this, new EventFiredArgs($"{((e.EventType == (byte) EventType.Log || e.EventType == (byte)EventType.LogError) ? NodeIdToName(e.NodeId) : "")}{e.Data}", e.EventType, e.TimeSpan.AddTicks(eventIndex++), user: e.User));
 
             //now queue vectors
             _vectorsChannel.Writer.TryWrite(FilterOnlyUploadFieldsAndCheckInvalidValues(vector, out var invalidValueMessage));
