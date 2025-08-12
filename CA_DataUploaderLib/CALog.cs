@@ -34,7 +34,7 @@ namespace CA_DataUploaderLib
 
         public static void LogInfoAndConsoleLn(LogID logID, string msg, string? user = null)
         {
-            LoggerForUserOutput.LogInfo(msg);
+            LoggerForUserOutput.LogInfo(msg, user);
             _localLogger.LogInfo(logID, msg, user);
         }
 
@@ -58,7 +58,7 @@ namespace CA_DataUploaderLib
             public void LogData(string message) => Console.WriteLine(message);
             public void LogError(string message) => WriteLineToConsole(message, ConsoleColor.Red);
             public void LogError(Exception ex) => WriteLineToConsole(ex.ToString(), ConsoleColor.Red);
-            public void LogInfo(string message) => Console.WriteLine(message);
+            public void LogInfo(string message, string? user = null) => Console.WriteLine(message);
 
             private static void WriteLineToConsole(string line, ConsoleColor color)
             {
@@ -86,7 +86,7 @@ namespace CA_DataUploaderLib
             public void LogData(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log);
             public void LogError(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.LogError);
             public void LogError(Exception ex) => handler.FireCustomEvent(ex.ToString(), DateTime.UtcNow, (byte)EventType.LogError);
-            public void LogInfo(string message) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log);
+            public void LogInfo(string message, string? user = null) => handler.FireCustomEvent(message, DateTime.UtcNow, (byte)EventType.Log, user);
 
             /// <summary>prints remoteEvents to the console for 5 seconds when detecting local user commands<summary>
             void EnableTempClusterOutputOnLocalActions(CommandHandler cmd)
