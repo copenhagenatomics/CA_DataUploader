@@ -22,6 +22,30 @@ Port 6 measures voltage[0 - 5V]
 End of board status.
 """;
 
+        private static readonly string completeUptimeMessage = """
+Start of uptime
+Serial Number: 35005B5556500520343234
+Product Type: ZrO2Oxygen
+Sub Product Type: 0
+MCU Family: STM32F401xB/C Rev 1
+Software Version: 2c4dff2-dirty
+Compile Date: 2025-07-22
+Git SHA: 2c4dff2bc1f57bbe1315ae2d6f9492e2de3ec687
+PCB Version: 1.5
+Calibration: CAL 1,13,-1500.00,81.699997,-0.00496 2,13,0.00,0.305000,0.00000 9.10,9.10
+
+Name, channel, reset, count
+Total board uptime minutes, 0, 0, 0
+Minutes since rework, 1, 0, 0
+Minutes since last software update, 2, 0, 0
+Software failures, 3, 0, 0
+High range sensor uptime minutes, 4, 0, 0
+Low range sensor uptime minutes, 5, 0, 0
+High range heater uptime minutes, 6, 0, 0
+Low range heater uptime minutes, 7, 0, 0
+End of uptime
+""";
+
         private static readonly string incompleteMultilineMessage = """
 Start of board Status:
 The board is operating normally.
@@ -34,6 +58,13 @@ Port 2 measures voltage[0 - 5V]
 "4.650325, 3543.687988, 4.639473, 4.656060, 4.628024, 4.629683, 0x0",
 "4.650254, 3543.561768, 4.639433, 4.655966, 4.627975, 4.629673, 0x0",
 ..completeMultilineMessage.Split(Environment.NewLine),
+"4.650369, 3543.680420, 4.639513, 4.656144, 4.627993, 4.629726, 0x0",
+"4.650223, 3543.606201, 4.639447, 4.656077, 4.627962, 4.629629, 0x0" ];
+
+        private readonly List<string> linesWithCompleteUptimeMessage = [
+"4.650325, 3543.687988, 4.639473, 4.656060, 4.628024, 4.629683, 0x0",
+"4.650254, 3543.561768, 4.639433, 4.655966, 4.627975, 4.629673, 0x0",
+..completeUptimeMessage.Split(Environment.NewLine),
 "4.650369, 3543.680420, 4.639513, 4.656144, 4.627993, 4.629726, 0x0",
 "4.650223, 3543.606201, 4.639447, 4.656077, 4.627962, 4.629629, 0x0" ];
 
@@ -50,7 +81,7 @@ Port 2 measures voltage[0 - 5V]
             // Arrange
             var logCount = 0;
             var log = "";
-            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; });
+            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new Exception("No uptime should get logged"));
 
             // Act
             foreach (var line in linesWithCompleteMessage)
@@ -67,7 +98,7 @@ Port 2 measures voltage[0 - 5V]
             // Arrange
             var logCount = 0;
             var log = "";
-            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; });
+            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new Exception("No uptime should get logged"));
 
             // Act
             foreach (var line in linesWithIncompleteMessage)
@@ -83,7 +114,7 @@ Port 2 measures voltage[0 - 5V]
             // Arrange
             var logCount = 0;
             var log = "";
-            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; });
+            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new Exception("No uptime should get logged"));
 
             // Act
             foreach (var line in linesWithIncompleteMessage)
@@ -97,12 +128,29 @@ Port 2 measures voltage[0 - 5V]
         }
 
         [TestMethod]
+        public void HandleLine_CompleteUptimeBlock_Logged()
+        {
+            // Arrange
+            var logCount = 0;
+            var logUptime = "";
+            var sut = new MultilineMessageReceiver((_) => throw new Exception("No info block should get logged"), (s) => { logCount++; logUptime += s; });
+
+            // Act
+            foreach (var line in linesWithCompleteUptimeMessage)
+                sut.HandleLine(line);
+
+            // Assert
+            Assert.AreEqual(1, logCount);
+            Assert.IsTrue(logUptime.Contains(completeUptimeMessage));
+        }
+
+        [TestMethod]
         public void LogPossibleIncompleteMessage_CompleteMessage_NothingIsLogged()
         {
             // Arrange
             var logCount = 0;
             var log = "";
-            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; });
+            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new Exception("No uptime should get logged"));
             foreach (var line in linesWithCompleteMessage)
                 sut.HandleLine(line);
             logCount = 0;
@@ -120,7 +168,7 @@ Port 2 measures voltage[0 - 5V]
             // Arrange
             var logCount = 0;
             var log = "";
-            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; });
+            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new Exception("No uptime should get logged"));
             foreach (var line in linesWithIncompleteMessage)
                 sut.HandleLine(line);
 

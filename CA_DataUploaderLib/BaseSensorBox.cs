@@ -31,6 +31,7 @@ namespace CA_DataUploaderLib
         private readonly Dictionary<MCUBoard, (ChannelReader<string> Reader, ChannelWriter<string> Writer)> _boardCustomCommands = [];
         private static readonly Dictionary<CommandHandler, Dictionary<string, string>> _usedBoxNames = []; //Dictionary of used board names tied to a specific CommandHandler-instance
         private readonly Dictionary<string, TaskCompletionSource> _reconnectTasks = [];
+        private readonly Dictionary<MCUBoard, CancellationTokenSource> _uptimeCancellationTokens = [];
 
         public BaseSensorBox(CommandHandler cmd, string commandName, IEnumerable<IOconfInput> values)
         {
@@ -57,6 +58,7 @@ namespace CA_DataUploaderLib
 
             _boards = allBoards.Where(b => b.map.IsLocalBoard).Select(b => (b.map, b.values, vectorReader: (DataVectorReader?)null, boardStateIndexInFullVector: -1)).ToArray();
             _boardsState = new AllBoardsState(_boards.Select(b => b.map));
+            _uptimeCancellationTokens = _boards.Where(b => b.map.McuBoard is not null).ToDictionary(b => b.map.McuBoard!, b => new CancellationTokenSource());
 
 
             static void EnforceNoDuplicatePorts(string boxName, SensorSample.InputBased[] sensors)
@@ -303,8 +305,31 @@ namespace CA_DataUploaderLib
 
             return boards
                 .Where(b => b.map.McuBoard != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
-                .SelectMany(b => new[] { BoardReadLoop(b.map.McuBoard!, b.map.BoxName, b.values, token), BoardWriteLoop(b.map.McuBoard!, b.vectorReader, b.boardStateIndexInFullVector, token) })
+                .SelectMany(b => new[] { 
+                    BoardReadLoop(b.map.McuBoard!, b.map.BoxName, b.values, token), 
+                    BoardWriteLoop(b.map.McuBoard!, b.vectorReader, b.boardStateIndexInFullVector, token),
+                    DailyUptimeTask(b.map.McuBoard!, CancellationTokenSource.CreateLinkedTokenSource(token, _uptimeCancellationTokens[b.map.McuBoard!].Token).Token)})
                 .ToList();
+        }
+
+        private async Task DailyUptimeTask(MCUBoard board, CancellationToken token)
+        {
+            // Initial random delay to avoid all boards starting requesting (and uploading) uptime data at the same time
+            await Task.WhenAny(Task.Delay(TimeSpan.FromSeconds(Random.Shared.Next(5, 180)), token)); // The WhenAny avoids exceptions if the token is canceled
+
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    RunCustomCommand(board, "uptime");
+                    await Task.Delay(TimeSpan.FromHours(24), token);
+                }
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine("DailyUptimeTask stopped");
+                    break;
+                }
+            }
         }
 
         private async Task BoardWriteLoop(MCUBoard board, DataVectorReader? vectorReader, int boardStateIndexInFullVector, CancellationToken token)
@@ -465,7 +490,9 @@ namespace CA_DataUploaderLib
             uint lastStatus = 0;
             bool highResolutionMode = false;
             Lazy<HighResolutionWriter> highResolutionWriter = new(new HighResolutionWriter(Path.Combine("..", "recordings"), boxName, string.Join(", ", targetSamples.Select(s => s.Input.Name)), (message) => LowFrequencyHighResolutionError((args, skipMessage) => LogError(args.board, $"{args.message}{skipMessage}"), (board, message))));
-            MultilineMessageReceiver multilineMessageReceiver = new((message) => LowFrequencyMultilineMessage((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)));
+            MultilineMessageReceiver multilineMessageReceiver = new(
+                (message) => LowFrequencyMultilineMessage((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)), 
+                (uptime) => _cmd.FireCustomEvent(uptime, DateTime.UtcNow, (byte)EventType.Uptime));
             //We set the state early if we detect no data is being returned or if we received values,
             //but we only set ReturningNonValues if it has passed timeBetweenReads since the last valid read
             while (!token.IsCancellationRequested) // we only stop reading if a disconnect/timeout is detected or the process is being stopped
@@ -514,8 +541,7 @@ namespace CA_DataUploaderLib
                             LowFrequencyLogBoardError((args, skipMessage) =>
                             {
                                 LogError(args.board, $"Board entered error state with 0x{args.status:X}{skipMessage}");
-                                if (_boardCustomCommands.TryGetValue(board, out var customCommandsChannel))
-                                    customCommandsChannel.Writer.TryWrite("Status");
+                                RunCustomCommand(board, "Status");
                             }, (board, status));
                         }
                         if ((status & 0x80000000) == 0 && (lastStatus & 0x80000000) != 0) // Error gone?
@@ -526,6 +552,12 @@ namespace CA_DataUploaderLib
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
+                        if (line.StartsWith("MISREAD: uptime"))
+                        {
+                            LogData(board, "Uptime not supported");
+                            _uptimeCancellationTokens[board].Cancel(); //Stop the uptime task
+                            continue;
+                        }
                         LowFrequencyLogInfo((args, skipMessage) => LogInfo(args.board, $"Unexpected board response '{args.line.ToLiteral()}'{skipMessage}"), (board, line));
                         if (_cmd.Time.GetElapsedTime(lastValidReadTime) > timeBetweenReads)
                             _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
@@ -718,11 +750,12 @@ namespace CA_DataUploaderLib
         /// <summary>
         /// Receives and logs lines part of a multiline message delimited by "Start of" and "End of".
         /// </summary>
-        public class MultilineMessageReceiver(Action<string> log)
+        public class MultilineMessageReceiver(Action<string> log, Action<string> logUptime)
         {
             private StringBuilder multilineMessage = new();
             private bool multilineMessageMode = false;
             private int multilineMessageLineCount = 0;
+            private bool isUptimeMessage = false;
             private const int maxMultilineMessageLineCount = 30;
             private const string startTag = "Start of";
             private const string endTag = "End of";
@@ -735,8 +768,12 @@ namespace CA_DataUploaderLib
             public bool HandleLine(string line)
             {
                 line = line.Trim();
-                if (line.StartsWith(startTag, StringComparison.InvariantCultureIgnoreCase) || multilineMessageMode)
+                var isStartLine = line.StartsWith(startTag, StringComparison.InvariantCultureIgnoreCase);
+                if (isStartLine || multilineMessageMode)
                 {
+                    if (isStartLine)
+                        isUptimeMessage = line.EndsWith("uptime", StringComparison.InvariantCultureIgnoreCase);
+
                     multilineMessageMode = true;
                     multilineMessage.AppendLine(line);
                     if (line.StartsWith(endTag, StringComparison.InvariantCultureIgnoreCase) ||
@@ -763,7 +800,11 @@ namespace CA_DataUploaderLib
 
             private void LogMessage()
             {
-                log($"{multilineMessage}");
+                if (isUptimeMessage)
+                    logUptime($"{multilineMessage}");
+                else
+                    log($"{multilineMessage}");
+                isUptimeMessage = false;
                 multilineMessage = new();
                 multilineMessageMode = false;
                 multilineMessageLineCount = 0;
