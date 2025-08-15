@@ -326,7 +326,6 @@ namespace CA_DataUploaderLib
                 }
                 catch (OperationCanceledException)
                 {
-                    Console.WriteLine("DailyUptimeTask stopped");
                     break;
                 }
             }
