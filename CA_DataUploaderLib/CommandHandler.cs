@@ -403,7 +403,8 @@ namespace CA_DataUploaderLib
 
         private void RestorePreviousAcceptedCommand()
         {
-            if (AcceptedCommandsIndex > 0)
+            if (AcceptedCommandsIndex <= 0)
+                return;
 
             AcceptedCommandsIndex--;
             ReplaceInputCommand(AcceptedCommands[AcceptedCommandsIndex]);
