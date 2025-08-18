@@ -1,6 +1,7 @@
 ﻿#nullable enable
 using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.Extensions;
+using CA_DataUploaderLib.Helpers;
 using CA_DataUploaderLib.IOconf;
 using System;
 using System.Collections.Generic;
@@ -42,7 +43,11 @@ namespace CA_DataUploaderLib
             public HeaterDecision(Config config)
             {
                 _config = config;
-                _eventsMap = new(StringComparer.OrdinalIgnoreCase) { { $"heater {Name} on", Events.heateron }, { $"heater {Name} off", Events.heateroff }, { "emergencyshutdown", Events.emergencyshutdown }, { "oven", Events.oven } };
+                _eventsMap = new(StringComparer.OrdinalIgnoreCase) { 
+                    { DecisionHelper.ToUserEvent($"heater {Name} on"), Events.heateron }, 
+                    { DecisionHelper.ToUserEvent($"heater {Name} off"), Events.heateroff }, 
+                    { "emergencyshutdown", Events.emergencyshutdown }, 
+                    { "oven", Events.oven } };
             }
 
             public override void Initialize(CA.LoopControlPluginBase.VectorDescription desc) => _indexes = new(desc, _config);
