@@ -6,6 +6,7 @@
         Command = 1,
         SystemChangeNotification = 2,
         Log = 3,
-        LogError = 4
+        LogError = 4,
+        Uptime = 5,
     }
 }
