@@ -33,9 +33,11 @@ namespace CA_DataUploaderLib
         /// Note however that there are many other ways that bit flips could affect related actuations and also the functioning of this very class.
         /// </remarks>
         public bool ChangedOrExpired(double[] newVector, DateTime currentVectorTime) =>
-            Vector.Length != newVector.Length
-            || Indices.Any(i => Vector[i] != newVector[i]) || (repeatMilliseconds > -1 && timeProvider.GetElapsedTime(lastActionExecutedTime).TotalMilliseconds >= repeatMilliseconds)
+            Changed(newVector) || (repeatMilliseconds > -1 && timeProvider.GetElapsedTime(lastActionExecutedTime).TotalMilliseconds >= repeatMilliseconds)
             || currentVectorTime >= TimeToRepeat;
+
+        protected bool Changed(double[] newVector) =>
+            Vector.Length != newVector.Length || Indices.Any(i => Vector[i] != newVector[i]);
 
         public void ExecutedNewAction(double[] newVector, DateTime currentVectorTime)
         {
