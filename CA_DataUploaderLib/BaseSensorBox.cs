@@ -770,12 +770,16 @@ namespace CA_DataUploaderLib
                 var isStartLine = line.StartsWith(startTag, StringComparison.InvariantCultureIgnoreCase);
                 if (isStartLine || multilineMessageMode)
                 {
+                    multilineMessageMode = true;
+
                     if (isStartLine)
                         isUptimeMessage = line.EndsWith("uptime", StringComparison.InvariantCultureIgnoreCase);
 
-                    multilineMessageMode = true;
-                    multilineMessage.AppendLine(line);
-                    if (line.StartsWith(endTag, StringComparison.InvariantCultureIgnoreCase) ||
+                    var isEndLine = line.StartsWith(endTag, StringComparison.InvariantCultureIgnoreCase);
+                    if (!isUptimeMessage || (!isStartLine && !isEndLine))
+                        multilineMessage.AppendLine(line);
+
+                    if (isEndLine ||
                         multilineMessageLineCount++ >= maxMultilineMessageLineCount)
                     {
                         LogMessage();

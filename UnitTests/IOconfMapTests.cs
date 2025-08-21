@@ -95,7 +95,7 @@ namespace UnitTests
             var mapline = new IOconfMap($"Map; 1234567890; MiscBox; pi42incorrect", 1);
 
             // Act + Assert
-            var ex = Assert.ThrowsException<Exception>(() => mapline.ValidateDependencies(ioConfMock.Object));
+            var ex = Assert.ThrowsException<FormatException>(() => mapline.ValidateDependencies(ioConfMock.Object));
             Assert.IsTrue(ex.Message.StartsWith($"Failed to find node in configuration for Map"), ex.Message);
 
         }
@@ -109,7 +109,7 @@ namespace UnitTests
             var mapline = new IOconfMap($"Map; 1234567890; MiscBox", 1);
 
             // Act + Assert
-            var ex = Assert.ThrowsException<Exception>(() => mapline.ValidateDependencies(ioConfMock.Object));
+            var ex = Assert.ThrowsException<FormatException>(() => mapline.ValidateDependencies(ioConfMock.Object));
             Assert.IsTrue(ex.Message.StartsWith($"The node name is not optional for distributed deployments"), ex.Message);
         }
     }

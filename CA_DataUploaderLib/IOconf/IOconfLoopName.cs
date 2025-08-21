@@ -10,7 +10,7 @@ namespace CA_DataUploaderLib.IOconf
             Format = "LoopName;Name;DebugLevel;[Server]";
 
             var list = ToList();
-            if(!Enum.TryParse<CALogLevel>(list[2], out LogLevel)) throw new Exception("IOconfLoopName: wrong LogLevel: " + row);
+            if(!Enum.TryParse<CALogLevel>(list[2], out LogLevel)) throw new FormatException("IOconfLoopName: wrong LogLevel: " + row);
             Server = list.Count > 3 ? list[3] : "https://stagingtsserver.copenhagenatomics.com";
         }
 
@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib.IOconf
         protected override void ValidateName(string name)
         {
             if (!new Regex(@"^[a-zA-Z_-]+[a-zA-Z0-9_-]*$").IsMatch(name))
-                throw new Exception($"Invalid loop name: {name}. Name can only contain letters, numbers (except as the first character), hyphen and underscore.");
+                throw new FormatException($"Invalid loop name: {name}. Name can only contain letters, numbers (except as the first character), hyphen and underscore.");
         }
     }
 }

@@ -14,9 +14,9 @@ namespace CA_DataUploaderLib.IOconf
 
             var list = ToList();
             if (!int.TryParse(list[1], out OvenArea)) 
-                throw new Exception($"Oven area must be a number: {row} {Format}");
+                throw new FormatException($"Oven area must be a number: {row} {Format}");
             if (OvenArea < 1)
-                throw new Exception("Oven area must be a number bigger than or equal to 1");
+                throw new FormatException("Oven area must be a number bigger than or equal to 1");
         }
 
         public LoopControlDecision CreateDecision(IIOconf ioconf) => new OvenAreaDecision(new($"ovenarea{OvenArea}", OvenArea, ioconf.GetEntries<IOconfOvenProportionalControlUpdates>().SingleOrDefault()));

@@ -16,28 +16,28 @@ namespace CA_DataUploaderLib.IOconf
 
             var list = ToList();
             if (!int.TryParse(list[1], out OvenArea)) 
-                throw new Exception($"Oven area must be a number: {row} {Format}");
+                throw new FormatException($"Oven area must be a number: {row} {Format}");
             if (OvenArea < 1)
-                throw new Exception("Oven area must be a number bigger than or equal to 1");
+                throw new FormatException("Oven area must be a number bigger than or equal to 1");
 
             HeaterName = list[2];
             TemperatureSensorName = list[3];
 
             if (list.Count < 5) return;
             if (!list[4].TryToDouble(out var proportionalGain))
-                throw new Exception($"Failed to parse the specified proportional gain: {row}");
+                throw new FormatException($"Failed to parse the specified proportional gain: {row}");
             ProportionalGain = proportionalGain;
 
             if (list.Count < 6) return;
             if (!TimeSpan.TryParse(list[5], out var controlPeriod))
-                throw new Exception($"Failed to parse the specified control period: {row}");
+                throw new FormatException($"Failed to parse the specified control period: {row}");
             ControlPeriod = controlPeriod;
 
             if (list.Count < 7) return;
             if (!int.TryParse(list[6], out var maxOutputPercentage))
-                throw new Exception($"Failed to parse the specified proportional gain: {row}");
+                throw new FormatException($"Failed to parse the specified proportional gain: {row}");
             if (maxOutputPercentage < 0 || maxOutputPercentage > 100)
-                throw new Exception($"Max output percentage must be a whole number between 0 and 100: {row}");
+                throw new FormatException($"Max output percentage must be a whole number between 0 and 100: {row}");
             MaxOutputPercentage = maxOutputPercentage / 100d;
         }
 
@@ -69,7 +69,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public IOconfHeater HeatingElement
         { 
-            get => heatingElement ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(HeatingElement)}."); 
+            get => heatingElement ?? throw new InvalidOperationException($"Call {nameof(ValidateDependencies)} before accessing {nameof(HeatingElement)}."); 
             private set => heatingElement = value; 
         }
         public string TemperatureSensorName { get; }

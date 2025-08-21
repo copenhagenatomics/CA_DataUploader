@@ -36,7 +36,7 @@ namespace UnitTests
         [DataTestMethod]
         public void InvalidName(string name) 
         {
-            var ex = Assert.ThrowsException<Exception>(() => new IOconfLoopName($"LoopName; {name}; Normal; https://stagingtsserver.copenhagenatomics.come", 0));
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfLoopName($"LoopName; {name}; Normal; https://stagingtsserver.copenhagenatomics.come", 0));
             Assert.IsTrue(ex.Message.StartsWith($"Invalid loop name: {name}"), ex.Message);
         }
 
