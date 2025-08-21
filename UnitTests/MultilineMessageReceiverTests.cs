@@ -23,7 +23,6 @@ End of board status.
 """;
 
         private static readonly string completeUptimeMessage = """
-Start of uptime
 Serial Number: 35005B5556500520343234
 Product Type: ZrO2Oxygen
 Sub Product Type: 0
@@ -43,7 +42,6 @@ High range sensor uptime minutes, 4, 0, 0
 Low range sensor uptime minutes, 5, 0, 0
 High range heater uptime minutes, 6, 0, 0
 Low range heater uptime minutes, 7, 0, 0
-End of uptime
 """;
 
         private static readonly string incompleteMultilineMessage = """
@@ -64,7 +62,9 @@ Port 2 measures voltage[0 - 5V]
         private readonly List<string> linesWithCompleteUptimeMessage = [
 "4.650325, 3543.687988, 4.639473, 4.656060, 4.628024, 4.629683, 0x0",
 "4.650254, 3543.561768, 4.639433, 4.655966, 4.627975, 4.629673, 0x0",
+"Start of uptime",
 ..completeUptimeMessage.Split(Environment.NewLine),
+"End of uptime",
 "4.650369, 3543.680420, 4.639513, 4.656144, 4.627993, 4.629726, 0x0",
 "4.650223, 3543.606201, 4.639447, 4.656077, 4.627962, 4.629629, 0x0" ];
 
@@ -89,7 +89,7 @@ Port 2 measures voltage[0 - 5V]
 
             // Assert
             Assert.AreEqual(1, logCount);
-            Assert.IsTrue(log.Contains(completeMultilineMessage));
+            Assert.AreEqual(completeMultilineMessage, log.Trim());
         }
 
         [TestMethod]
@@ -141,7 +141,7 @@ Port 2 measures voltage[0 - 5V]
 
             // Assert
             Assert.AreEqual(1, logCount);
-            Assert.IsTrue(logUptime.Contains(completeUptimeMessage));
+            Assert.AreEqual(completeUptimeMessage, logUptime.Trim());
         }
 
         [TestMethod]
