@@ -69,7 +69,7 @@ namespace CA_DataUploaderLib.IOconf
 
         public IOconfHeater HeatingElement
         { 
-            get => heatingElement ?? throw new MemberAccessException($"Call {nameof(ValidateDependencies)} before accessing {nameof(HeatingElement)}."); 
+            get => heatingElement ?? throw new InvalidOperationException($"Call {nameof(ValidateDependencies)} before accessing {nameof(HeatingElement)}."); 
             private set => heatingElement = value; 
         }
         public string TemperatureSensorName { get; }

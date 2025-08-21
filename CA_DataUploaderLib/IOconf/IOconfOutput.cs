@@ -38,7 +38,7 @@ namespace CA_DataUploaderLib.IOconf
         public readonly int PortNumber = 1;
         public IOconfMap Map
         {
-            get => _map ?? throw new MemberAccessException($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
+            get => _map ?? throw new InvalidOperationException($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
             private set => _map = value;
         }
 
