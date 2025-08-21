@@ -34,13 +34,13 @@ namespace CA_DataUploaderLib.IOconf
 
             var list = ToList();
             if (list.Count < 5)
-                throw new Exception($"Wrong filter format: {row}{Environment.NewLine}{Format}");
+                throw new FormatException($"Wrong filter format: {row}{Environment.NewLine}{Format}");
 
             if (!Enum.TryParse(list[2], out FilterType filterType))
-                throw new Exception($"Wrong filter type: {row}{Environment.NewLine}{Format}");
+                throw new FormatException($"Wrong filter type: {row}{Environment.NewLine}{Format}");
 
             if (!list[3].TryToDouble(out var filterLength))
-                throw new Exception($"Wrong filter length: {row}{Environment.NewLine}{Format}");
+                throw new FormatException($"Wrong filter length: {row}{Environment.NewLine}{Format}");
 
             if (filterType == FilterType.Sustained)
                 (_decisionFilter, NameInVector, SourceNames) = InitSustainedFilter(list);
@@ -113,7 +113,7 @@ namespace CA_DataUploaderLib.IOconf
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception($"Wrong format for filter expression: {row}{Environment.NewLine}{format}", ex);
+                    throw new FormatException($"Wrong format for filter expression: {row}{Environment.NewLine}{format}", ex);
                 }
             }
 

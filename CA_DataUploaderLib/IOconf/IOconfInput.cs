@@ -62,11 +62,11 @@ namespace CA_DataUploaderLib.IOconf
         {
             if (list.Count > 3 && int.TryParse(list[3], out var port))
             {
-                if (port < 1) throw new Exception($"{type}: port numbers must start at 1 {row}");
+                if (port < 1) throw new FormatException($"{type}: port numbers must start at 1 {row}");
                 return (true, false, port);
             }
             else if (parsePortRequired)
-                throw new Exception($"{type}: wrong port number: {row}");
+                throw new FormatException($"{type}: wrong port number: {row}");
             else if (list.Count > 3 && "skip".Equals(list[3], StringComparison.InvariantCultureIgnoreCase))
                 return (false, true, 1);
             else
@@ -77,7 +77,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             var maps = ioconf.GetMap();
             var map = maps.SingleOrDefault(x => x.BoxName == boxName) ?? 
-                throw new Exception($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
+                throw new FormatException($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
             // Map.BoardSettings == BoardSettings.Default is there since some boards need separate board settings, but have multiple sensor entries. 
             // This check means a new BoardSettings instance will be created with first entry of board, but not updated (i.e. shared) among the rest of the board entries.    
             if (!skipBoardSettings && map.BoardSettings == BoardSettings.Default)
@@ -96,7 +96,7 @@ namespace CA_DataUploaderLib.IOconf
                 var list = ToList();
                 (_, var skip, PortNumber) = GetPort(row, type, parsePortRequired, list);
                 if (skip)
-                    throw new Exception($"{type}: unexpected skip: {row}");
+                    throw new FormatException($"{type}: unexpected skip: {row}");
                 BoxName = list[2];
                 BoardStateName = BaseSensorBox.GetBoxStateName(BoxName);
                 _boardSettings = boardSettings;
@@ -121,7 +121,7 @@ namespace CA_DataUploaderLib.IOconf
 
             public IOconfMap Map
             {
-                get => _map ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
+                get => _map ?? throw new MemberAccessException($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
                 private set => _map = value;
             }
 

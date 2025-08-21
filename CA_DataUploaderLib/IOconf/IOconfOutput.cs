@@ -17,7 +17,7 @@ namespace CA_DataUploaderLib.IOconf
             BoardStateName = BaseSensorBox.GetBoxStateName(BoxName);
             _boardSettings = settings;
             if (parsePort && !int.TryParse(list[3], out PortNumber)) throw new Exception($"{type}: wrong port number: {row}");
-            if (PortNumber < 1) throw new Exception($"{type}: port numbers must start at 1 {row}");
+            if (PortNumber < 1) throw new FormatException($"{type}: port numbers must start at 1 {row}");
         }
 
         public virtual IEnumerable<IOconfInput> GetExpandedInputConf()
@@ -38,7 +38,7 @@ namespace CA_DataUploaderLib.IOconf
         public readonly int PortNumber = 1;
         public IOconfMap Map
         {
-            get => _map ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
+            get => _map ?? throw new MemberAccessException($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
             private set => _map = value;
         }
 
@@ -47,7 +47,7 @@ namespace CA_DataUploaderLib.IOconf
             var maps = ioconf.GetMap();
             var map = maps.SingleOrDefault(x => x.BoxName == boxName);
             if (map == null)
-                throw new Exception($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
+                throw new FormatException($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
             map.BoardSettings = settings;
             return map;
         }

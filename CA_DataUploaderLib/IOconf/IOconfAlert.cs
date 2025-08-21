@@ -24,7 +24,7 @@ namespace CA_DataUploaderLib.IOconf
             Format = "Alert;Name;SensorName comparison value;[rateMinutes];[command]";
             EventType = eventType;
             var list = ToList();
-            if (list[0] != "Alert" || list.Count < 3) throw new Exception("IOconfAlert: wrong format: " + row);
+            if (list[0] != "Alert" || list.Count < 3) throw new FormatException("IOconfAlert: wrong format: " + row);
    
             (Sensor, Value, MessageTemplate, type) = ParseExpression(
                 Name, list[2], $"IOconfAlert: wrong format: {row}. Format: {Format}.");
@@ -57,7 +57,7 @@ namespace CA_DataUploaderLib.IOconf
         public bool CheckValue(double newValue, DateTime vectorTime)
         {
             //don't alert for invalid values.
-            //Sensor readers are responsible for reporting fully lost sensors, while actuating logic is responsible for only doing targetted reactions.
+            //Sensor readers are responsible for reporting fully lost sensors, while actuating logic is responsible for only doing targeted reactions.
             //Limitation: emergency shutdown alerts ignore board disconnects or lost sensors (10k+ thermocouple errors),
             //            for the earlier separate alerts can be set on the disconnects, for the later use alert + Math like this (filter length controls how long before the alert sees the 10k and triggers): Math;MyFilterDisconnected;MyFilter >= 10000
             //            Also note that some redundant alerts can be added so that if one sensor fails the problem can still be detected by other sensors/boards.
@@ -93,7 +93,7 @@ namespace CA_DataUploaderLib.IOconf
         {
             var match = comparisonRegex.Match(expression);
             if (!match.Success)
-                throw new Exception(formatErrorMessage + " Supported comparisons: =, !=, >, <, >=, <=");
+                throw new FormatException(formatErrorMessage + " Supported comparisons: =, !=, >, <, >=, <=");
             return ParseExpression(name, expression, match);
         }
 
@@ -118,7 +118,7 @@ namespace CA_DataUploaderLib.IOconf
                 "<" => AlertCompare.SmallerThan,
                 ">=" => AlertCompare.BiggerOrEqualTo,
                 "<=" => AlertCompare.SmallerOrEqualTo,
-                _ => throw new Exception("Alert expression - wrong format: " + expression),
+                _ => throw new FormatException("Alert expression - wrong format: " + expression),
             };
 
             return (sensor, value, messageTemplate, type);

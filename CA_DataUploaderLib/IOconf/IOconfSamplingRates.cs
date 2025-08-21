@@ -17,12 +17,12 @@ namespace CA_DataUploaderLib.IOconf
                 MainLoopDelay = (int)(1000 / double.Parse(list[1], NumberStyles.Float, CultureInfo.InvariantCulture));
                 var vectorUploadFreq = double.Parse(list[2], NumberStyles.Float, CultureInfo.InvariantCulture);
                 if (vectorUploadFreq > 2)
-                    throw new Exception($"{nameof(IOconfSamplingRates)}: too high upload frequency. Must be maximum 2 Hz: " + row);
+                    throw new FormatException($"{nameof(IOconfSamplingRates)}: too high upload frequency. Must be maximum 2 Hz: " + row);
                 VectorUploadDelay = (int)(1000 / vectorUploadFreq);
             }
             catch(Exception ex)
             {
-                throw new Exception($"{nameof(IOconfSamplingRates)}: wrong format - expression: " + row, ex);
+                throw new FormatException($"{nameof(IOconfSamplingRates)}: wrong format - expression: " + row, ex);
             }
         }
 

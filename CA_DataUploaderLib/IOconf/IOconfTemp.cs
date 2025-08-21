@@ -39,9 +39,9 @@ namespace CA_DataUploaderLib.IOconf
                 PortNumber = 1;
             }
             else if (!HasPort)
-                throw new Exception($"{type}: wrong port number: {row}");
+                throw new FormatException($"{type}: wrong port number: {row}");
             else if (PortNumber < 1 || PortNumber > 34)
-                throw new Exception($"{type}: invalid port number: {row}");
+                throw new FormatException($"{type}: invalid port number: {row}");
         }
 
         public override void ValidateDependencies(IIOconf ioconf)
