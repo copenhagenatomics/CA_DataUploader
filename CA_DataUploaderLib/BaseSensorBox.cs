@@ -484,13 +484,13 @@ namespace CA_DataUploaderLib
             var lastValidReadTime = _cmd.Time.GetTimestamp();
             // we need to allow some extra time to avoid too aggressive reporting of boards not giving data, no particular reason for it being 50%.
             var timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
-            long lastLogInfoTime = 0, lastLogErrorTime = 0, lastLogBoardErrorTime = 0, lastLogBoardOkTime = 0, lastMultilineMessageTime = 0, lastHighResolutionErrorTime = 0;
-            int logInfoSkipped = 0, logErrorSkipped = 0, logBoardErrorSkipped = 0, logBoardOkSkipped = 0, multilineMessageSkipped = 0, highResolutionErrorSkipped = 0;
+            LowFrequencyLog info = new(_cmd.Time, "info"), error = new(_cmd.Time, "error"), boardError = new(_cmd.Time, "board error"), boardOk = new(_cmd.Time, "board ok"), 
+                multiline = new(_cmd.Time, "multiline"), highResolution = new(_cmd.Time, "high resolution");
             uint lastStatus = 0;
             bool highResolutionMode = false;
-            Lazy<HighResolutionWriter> highResolutionWriter = new(new HighResolutionWriter(Path.Combine("..", "recordings"), boxName, string.Join(", ", targetSamples.Select(s => s.Input.Name)), (message) => LowFrequencyHighResolutionError((args, skipMessage) => LogError(args.board, $"{args.message}{skipMessage}"), (board, message))));
+            Lazy<HighResolutionWriter> highResolutionWriter = new(new HighResolutionWriter(Path.Combine("..", "recordings"), boxName, string.Join(", ", targetSamples.Select(s => s.Input.Name)), (message) => highResolution.Log((args, skipMessage) => LogError(args.board, $"{args.message}{skipMessage}"), (board, message))));
             MultilineMessageReceiver multilineMessageReceiver = new(
-                (message) => LowFrequencyMultilineMessage((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)), 
+                (message) => multiline.Log((args, skipMessage) => LogInfo(args.board, $"{args.message}{skipMessage}"), (board, message)), 
                 (uptime) => _cmd.FireCustomEvent(uptime, DateTime.UtcNow, (byte)EventType.Uptime));
             //We set the state early if we detect no data is being returned or if we received values,
             //but we only set ReturningNonValues if it has passed timeBetweenReads since the last valid read
@@ -537,7 +537,7 @@ namespace CA_DataUploaderLib
                             timeBetweenReads = TimeSpan.FromMilliseconds(board.ConfigSettings.MillisecondsBetweenReads * 1.5);
                         if ((status & 0x80000000) != 0 && (lastStatus & 0x80000000) == 0) // Error?
                         {
-                            LowFrequencyLogBoardError((args, skipMessage) =>
+                            boardError.Log((args, skipMessage) =>
                             {
                                 LogError(args.board, $"Board entered error state with 0x{args.status:X}{skipMessage}");
                                 RunCustomCommand(board, "Status");
@@ -545,7 +545,7 @@ namespace CA_DataUploaderLib
                         }
                         if ((status & 0x80000000) == 0 && (lastStatus & 0x80000000) != 0) // Error gone?
                         {
-                            LowFrequencyLogBoardOk((args, skipMessage) => LogInfo(args.board, $"Board resumed normal state with 0x{args.status:X}{skipMessage}"), (board, status));
+                            boardOk.Log((args, skipMessage) => LogInfo(args.board, $"Board resumed normal state with 0x{args.status:X}{skipMessage}"), (board, status));
                         }
                         lastStatus = status;
                     }
@@ -557,38 +557,17 @@ namespace CA_DataUploaderLib
                             _uptimeCancellationTokens[board].Cancel(); //Stop the uptime task
                             continue;
                         }
-                        LowFrequencyLogInfo((args, skipMessage) => LogInfo(args.board, $"Unexpected board response '{args.line.ToLiteral()}'{skipMessage}"), (board, line));
+                        info.Log((args, skipMessage) => LogInfo(args.board, $"Unexpected board response '{args.line.ToLiteral()}'{skipMessage}"), (board, line));
                         if (_cmd.Time.GetElapsedTime(lastValidReadTime) > timeBetweenReads)
                             _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                     }
                 }
                 catch (Exception ex)
                 { //usually a parsing errors on non value data, we log it and consider it as such i.e. we set ReturningNonValues if we have not had a valid read in timeBetweenReads
-                    LowFrequencyLogError((args, skipMessage) => LogError(args.board, $"Failed handling board response '{args.line.ToLiteral()}'{skipMessage}", args.ex), (board, line, ex));
+                    error.Log((args, skipMessage) => LogError(args.board, $"Failed handling board response '{args.line.ToLiteral()}'{skipMessage}", args.ex), (board, line, ex));
                     if (_cmd.Time.GetElapsedTime(lastValidReadTime) > timeBetweenReads)
                         _boardsState.SetState(boxName, ConnectionState.ReturningNonValues);
                 }
-            }
-
-            void LowFrequencyLogInfo<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "info", args, ref lastLogInfoTime, ref logInfoSkipped);
-            void LowFrequencyLogError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "error", args, ref lastLogErrorTime, ref logErrorSkipped);
-            void LowFrequencyLogBoardError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "board error", args, ref lastLogBoardErrorTime, ref logBoardErrorSkipped);
-            void LowFrequencyLogBoardOk<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "board ok", args, ref lastLogBoardOkTime, ref logBoardOkSkipped);
-            void LowFrequencyMultilineMessage<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "multiline", args, ref lastMultilineMessageTime, ref multilineMessageSkipped);
-            void LowFrequencyHighResolutionError<T>(Action<T, string> logAction, T args) => LowFrequencyLog(logAction, "high resolution", args, ref lastHighResolutionErrorTime, ref highResolutionErrorSkipped);
-
-            void LowFrequencyLog<T>(Action<T, string> logAction, string logType, T args, ref long lastLogTime, ref int logSkipped)
-            {
-                if (lastLogTime != 0 && _cmd.Time.GetElapsedTime(lastLogTime).TotalMinutes < 5)
-                {
-                    if (logSkipped++ == 0)
-                        logAction(args, $"{Environment.NewLine}Skipping further messages for this board (max 2 {logType} messages every 5 minutes)");
-                    return;
-                }
-
-                lastLogTime = _cmd.Time.GetTimestamp();
-                logAction(args, "");
-                logSkipped = 0;
             }
         }
 
