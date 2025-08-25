@@ -86,7 +86,7 @@ namespace CA_DataUploaderLib.IOconf
             AlertCompare.SmallerThan => val < Value,
             AlertCompare.BiggerOrEqualTo => val >= Value,
             AlertCompare.SmallerOrEqualTo => val <= Value,
-            _ => throw new Exception("IOconfAlert: this should never happen"),
+            _ => throw new InvalidOperationException("IOconfAlert: this should never happen"),
         };
 
         private static (string sensor, double value, string messageTemplate, AlertCompare type) ParseExpression(string name, string expression, string formatErrorMessage)

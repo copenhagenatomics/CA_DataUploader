@@ -16,7 +16,7 @@ namespace CA_DataUploaderLib.IOconf
             BoxName = list[2];
             BoardStateName = BaseSensorBox.GetBoxStateName(BoxName);
             _boardSettings = settings;
-            if (parsePort && !int.TryParse(list[3], out PortNumber)) throw new Exception($"{type}: wrong port number: {row}");
+            if (parsePort && !int.TryParse(list[3], out PortNumber)) throw new FormatException($"{type}: wrong port number: {row}");
             if (PortNumber < 1) throw new FormatException($"{type}: port numbers must start at 1 {row}");
         }
 

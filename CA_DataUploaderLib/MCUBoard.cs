@@ -40,7 +40,7 @@ namespace CA_DataUploaderLib
         public const string boardVersionHeader = "Board Version:";
 
         public const string mcuFamilyHeader = "MCU Family:";
-        public bool InitialConnectionSucceeded {get; private set;} = false;
+        public bool InitialConnectionSucceeded { get; private set; }
 
         public const string CalibrationHeader = "Calibration:";
 

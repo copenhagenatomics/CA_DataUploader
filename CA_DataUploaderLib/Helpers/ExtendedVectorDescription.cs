@@ -33,7 +33,7 @@ namespace CA_DataUploaderLib.Helpers
             
             var duplicates = allItems.GroupBy(x => x.Descriptor, StringComparer.InvariantCultureIgnoreCase).Where(x => x.Count() > 1).Select(x => x.Key);
             if (duplicates.Any())
-                throw new Exception("Different fields cannot use the same name (even if the casing is different). Please rename: " + string.Join(", ", duplicates));
+                throw new FormatException("Different fields cannot use the same name (even if the casing is different). Please rename: " + string.Join(", ", duplicates));
 
             var allFields = allItems.Select(i => i.Descriptor).ToArray();
             _filterVectorExpansion.Initialize(allFields);
