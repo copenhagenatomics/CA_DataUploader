@@ -42,10 +42,10 @@ namespace CA_DataUploaderLib.Helpers
                         FilterType.SumAvg => validSamples.Average(y => y.Sum(x => x.Value)),
                         FilterType.DiffAvg => validSamples.First().Count == 2 ? 
                             validSamples.Average(y => y[0].Value - y[1].Value) : 
-                            throw new Exception("Filter DiffAvg must have two input source names"),
+                            throw new FormatException("Filter DiffAvg must have two input source names"),
                         FilterType.Triangle => TriangleFilter(validSamples, length, Output.TimeStamp),
                         FilterType.None => validSamples.Last().Select(x => x.Value).Average(),
-                        _ => throw new InvalidOperationException($"unexpected filter type in FilterSample: {filterType}")
+                        _ => throw new InvalidOperationException($"Unexpected filter type in FilterSample: {filterType}")
                     };
                     return;
                 }

@@ -18,7 +18,7 @@ namespace CA_DataUploaderLib.IOconf
             Format = "Map;SerialNo/COM1/USB1-1.1;BoxName;[NodeName];[baud rate];[customwrites]";
 
             var list = ToList();
-            if (list[0] != "Map") throw new Exception($"IOconfMap: wrong format: {row} {Format}");
+            if (list[0] != "Map") throw new FormatException($"IOconfMap: wrong format: {row} {Format}");
             var isVirtualPort = IsVirtualPortName(list[1]);
             bool isWindows = RpiVersion.IsWindows();
             if (isWindows && list[1].StartsWith("COM"))
@@ -113,11 +113,11 @@ namespace CA_DataUploaderLib.IOconf
         /// <summary>the cluster node that is directly connected to the device or <c>default</c> when using </summary>
         public IOconfNode DistributedNode 
         { 
-            get => _distributedNode ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(DistributedNode)}.");
+            get => _distributedNode ?? throw new InvalidOperationException($"Call {nameof(ValidateDependencies)} before accessing {nameof(DistributedNode)}.");
             private set => _distributedNode = value;
         }
         public bool IsLocalBoard => DistributedNode.IsCurrentSystem;
-        public bool CustomWritesEnabled { get; } = false;
+        public bool CustomWritesEnabled { get; }
         public Board? Board { get; private set; }
         public MCUBoard? McuBoard { get; private set; }
 
@@ -140,7 +140,7 @@ namespace CA_DataUploaderLib.IOconf
         protected override void ValidateName(string name) 
         {
             if (!ValidateMapNameRegex.IsMatch(name))
-                throw new Exception($"Invalid map name: {name}. Name can only contain letters, numbers (except as the first character) and underscore.");
+                throw new FormatException($"Invalid map name: {name}. Name can only contain letters, numbers (except as the first character) and underscore.");
         }
     }
 }

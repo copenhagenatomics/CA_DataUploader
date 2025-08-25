@@ -10,7 +10,7 @@ namespace CA_DataUploaderLib.IOconf
             Format = $"{TypeName};MainLoop;VectorUploads";
 
             var list = ToList();
-            if (list[0] != TypeName || list.Count != 3) throw new Exception($"{nameof(IOconfSamplingRates)}: wrong format: " + row);
+            if (list[0] != TypeName || list.Count != 3) throw new FormatException($"{nameof(IOconfSamplingRates)}: wrong format: " + row);
             
             try
             {
@@ -28,8 +28,8 @@ namespace CA_DataUploaderLib.IOconf
 
         public const string TypeName = "SamplingRates";
 
-        public readonly int MainLoopDelay;
-        public readonly int VectorUploadDelay;
+        public int MainLoopDelay { get; }
+        public int VectorUploadDelay { get; }
 
         public override string UniqueKey() => Type;
         protected override void ValidateName(string name) { } // no validation

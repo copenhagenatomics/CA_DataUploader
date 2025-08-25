@@ -38,7 +38,7 @@ namespace UnitTests
         [DataTestMethod]
         public void InvalidName(string name)
         {
-            var ex = Assert.ThrowsException<Exception>(() => new IOconfMap($"Map; anything_goes_here; {name}", 0));
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfMap($"Map; anything_goes_here; {name}", 0));
             Assert.IsTrue(ex.Message.StartsWith($"Invalid map name: {name}"), ex.Message);
         }
 

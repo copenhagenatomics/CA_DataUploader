@@ -8,8 +8,8 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfHeater(string row, int lineNum) : base(row, lineNum, "Heater")
         {
-            //note: the format used to be "Heater;Name;BoxName;port number;MaxTemperature;CurrentSensingNoiseTreshold",
-            //but CurrentSensingNoiseTreshold got removed as its no longer relevant to the current decision logic
+            //note: the format used to be "Heater;Name;BoxName;port number;MaxTemperature;CurrentSensingNoiseThreshold",
+            //but CurrentSensingNoiseThreshold got removed as its no longer relevant to the current decision logic
             //(used to influence repeat of off commands, but now they run unconditionally by the SwitchboardController.
             Format = "Heater;Name;BoxName;port number;[MaxTemperature]";
 

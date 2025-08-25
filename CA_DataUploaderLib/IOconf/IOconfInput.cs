@@ -51,7 +51,7 @@ namespace CA_DataUploaderLib.IOconf
         public bool Skip { get; init; }
         public IOconfMap Map
         {
-            get => _map ?? throw new Exception($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
+            get => _map ?? throw new InvalidOperationException($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
             private set => _map = value;
         }
         protected bool HasPort { get; }
