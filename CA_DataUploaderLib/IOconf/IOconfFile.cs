@@ -99,7 +99,7 @@ namespace CA_DataUploaderLib.IOconf
             }
             catch (Exception ex)
             {
-                throw new Exception($"Did you forgot to include login information in top of {Directory.GetCurrentDirectory()}\\IO.conf ?", ex);
+                throw new FormatException($"Did you forget to include login information in top of {Directory.GetCurrentDirectory()}\\IO.conf ?", ex);
             }
         }
 

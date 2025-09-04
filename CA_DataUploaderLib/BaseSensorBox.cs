@@ -551,7 +551,7 @@ namespace CA_DataUploaderLib
                     }
                     else if (!board.ConfigSettings.Parser.IsExpectedNonValuesLine(line))// mostly responses to commands or headers on reconnects.
                     {
-                        if (line.StartsWith("MISREAD: uptime"))
+                        if (line.Trim().StartsWith("MISREAD: uptime"))
                         {
                             LogData(board, "Uptime not supported");
                             _uptimeCancellationTokens[board].Cancel(); //Stop the uptime task
