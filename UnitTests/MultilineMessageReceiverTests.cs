@@ -81,7 +81,7 @@ Port 2 measures voltage[0 - 5V]
             // Arrange
             var logCount = 0;
             var log = "";
-            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new Exception("No uptime should get logged"));
+            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new InvalidOperationException("No uptime should get logged"));
 
             // Act
             foreach (var line in linesWithCompleteMessage)
@@ -98,7 +98,7 @@ Port 2 measures voltage[0 - 5V]
             // Arrange
             var logCount = 0;
             var log = "";
-            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new Exception("No uptime should get logged"));
+            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new InvalidOperationException("No uptime should get logged"));
 
             // Act
             foreach (var line in linesWithIncompleteMessage)
@@ -114,7 +114,7 @@ Port 2 measures voltage[0 - 5V]
             // Arrange
             var logCount = 0;
             var log = "";
-            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new Exception("No uptime should get logged"));
+            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new InvalidOperationException("No uptime should get logged"));
 
             // Act
             foreach (var line in linesWithIncompleteMessage)
@@ -133,7 +133,7 @@ Port 2 measures voltage[0 - 5V]
             // Arrange
             var logCount = 0;
             var logUptime = "";
-            var sut = new MultilineMessageReceiver((_) => throw new Exception("No info block should get logged"), (s) => { logCount++; logUptime += s; });
+            var sut = new MultilineMessageReceiver((_) => throw new InvalidOperationException("No info block should get logged"), (s) => { logCount++; logUptime += s; });
 
             // Act
             foreach (var line in linesWithCompleteUptimeMessage)
@@ -150,7 +150,7 @@ Port 2 measures voltage[0 - 5V]
             // Arrange
             var logCount = 0;
             var log = "";
-            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new Exception("No uptime should get logged"));
+            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new InvalidOperationException("No uptime should get logged"));
             foreach (var line in linesWithCompleteMessage)
                 sut.HandleLine(line);
             logCount = 0;
@@ -168,7 +168,7 @@ Port 2 measures voltage[0 - 5V]
             // Arrange
             var logCount = 0;
             var log = "";
-            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new Exception("No uptime should get logged"));
+            var sut = new MultilineMessageReceiver((s) => { logCount++; log += s; }, (_) => throw new InvalidOperationException("No uptime should get logged"));
             foreach (var line in linesWithIncompleteMessage)
                 sut.HandleLine(line);
 
