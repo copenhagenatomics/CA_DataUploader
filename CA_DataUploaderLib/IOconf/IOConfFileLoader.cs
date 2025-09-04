@@ -13,7 +13,7 @@ namespace CA_DataUploaderLib.IOconf
             return File.Exists("IO.conf");
         }
 
-        public static (List<string>, List<IOconfRow> original, List<IOconfRow> expanded) Load(IIOconfLoader loader)
+        public static (List<string> raw, List<IOconfRow> original, List<IOconfRow> expanded) Load(IIOconfLoader loader)
         {
             if (!FileExists())
             {
