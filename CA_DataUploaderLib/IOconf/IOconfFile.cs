@@ -10,6 +10,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         private List<IOconfRow> Table = [];
         private List<IOconfRow> OriginalRows = [];
+        private readonly Dictionary<string, string> CodeRepoURLs = [];
         public List<string> RawLines { get; private set; } = [];
 
         private static readonly Lazy<IOconfFile> lazy = new(() => new IOconfFile());
@@ -20,14 +21,16 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfFile()
         {
             Reload();
+            CodeRepoURLs = IOconfCodeRepo.ReadURLsFromFile();
         }
 
-        public IOconfFile(List<string> rawLines, bool performCheck = true)
-            : this(DefaultLoader, rawLines, performCheck) { }
-        public IOconfFile(IIOconfLoader loader, List<string> rawLines, bool performCheck = true)
+        public IOconfFile(List<string> rawLines, Dictionary<string, string>? codeRepoURLs = null, bool performCheck = true)
+            : this(DefaultLoader, rawLines, codeRepoURLs, performCheck) { }
+        public IOconfFile(IIOconfLoader loader, List<string> rawLines, Dictionary<string, string>? codeRepoURLs = null, bool performCheck = true)
         {
             (OriginalRows, Table) = IOconfFileLoader.ParseLines(loader, rawLines);
             RawLines = rawLines;
+            CodeRepoURLs = codeRepoURLs ?? IOconfCodeRepo.ReadURLsFromFile();
             EnsureRPiTempEntry();
             if (performCheck)
                 CheckConfig();
@@ -49,6 +52,7 @@ namespace CA_DataUploaderLib.IOconf
         public void WriteToDisk()
         {
             IOconfFileLoader.WriteToDisk(GetRawFile());
+            IOconfCodeRepo.WriteURLsToFile(CodeRepoURLs);
         }
 
         public void CheckConfig()
@@ -165,5 +169,7 @@ namespace CA_DataUploaderLib.IOconf
                 }
             }
         }
+        public Dictionary<string, string> GetCodeRepoURLs() => CodeRepoURLs;
+
     }
 }

@@ -30,5 +30,6 @@ namespace CA_DataUploaderLib.IOconf
         public string GetRawFile();
         public IEnumerable<string> GetBoardStateNames(string sensor);
         public void WriteToDisk();
+        public Dictionary<string, string> GetCodeRepoURLs();
     }
 }

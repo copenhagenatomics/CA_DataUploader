@@ -25,6 +25,7 @@ namespace CA_DataUploaderLib.IOconf
             ("GenericOutput", (r, l) => new IOconfGenericOutput(r, l)),
             ("Node", (r, l) => new IOconfNode(r, l)),
             ("Code", (r, l) => new IOconfCode(r, l)),
+            (IOconfCodeRepo.ConfigName, (r, l) => new IOconfCodeRepo(r, l)),
             (IOconfCurrent.TypeName, (r, l) => new IOconfCurrent(r, l)),
             (IOconfCurrentFault.TypeName, (r, l) => new IOconfCurrentFault(r, l)),
             (IOconfExpandLines.ConfigName, (r, loader) => new IOconfExpandLines(r, loader)),
