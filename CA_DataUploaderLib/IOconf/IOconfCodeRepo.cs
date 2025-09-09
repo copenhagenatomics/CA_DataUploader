@@ -23,7 +23,7 @@ namespace CA_DataUploaderLib.IOconf
             URL = list.Count >= 3 ? list[2] : throw new FormatException($"Missing URL in {ConfigName}-line in IO.conf: {row}{Environment.NewLine}{Format}");
 
             if (URL != HiddenURL)
-                throw new FormatException($"Raw URL in {ConfigName}-line should now happen: {row}{Environment.NewLine}{Format}");
+                throw new FormatException($"Raw URL in {ConfigName}-line should not happen: {row}{Environment.NewLine}{Format}");
         }
 
         public string URL { get; private set; }
