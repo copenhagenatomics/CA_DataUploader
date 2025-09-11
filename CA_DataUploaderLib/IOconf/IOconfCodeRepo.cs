@@ -9,6 +9,7 @@ namespace CA_DataUploaderLib.IOconf
         public const string ConfigName = "CodeRepo";
         public const string HiddenURL = "******";
         public const string RepoUrlJsonFile = "CodeRepoURLs.json";
+        private static readonly JsonSerializerOptions jsonSerializerOptions = new() { WriteIndented = true };
 
         public static IOconfCodeRepo Default => new($"{ConfigName}; default; {HiddenURL}", 0, "https://caplugins.blob.core.windows.net/default/" );
         private IOconfCodeRepo(string row, int lineNum, string url) : base(row, lineNum, ConfigName)
@@ -83,14 +84,12 @@ namespace CA_DataUploaderLib.IOconf
         /// <param name="extractedURLs"></param>
         public static void WriteURLsToFile(Dictionary<string, string> extractedURLs)
         {
-            Dictionary<string, string> repoURLs = System.IO.File.Exists(RepoUrlJsonFile)
-                ? JsonSerializer.Deserialize<Dictionary<string, string>>(System.IO.File.ReadAllText(RepoUrlJsonFile)) ?? []
-                : [];
+            var repoURLs = ReadURLsFromFile();
 
             foreach (var repoUrl in extractedURLs)
                 repoURLs[repoUrl.Key] = repoUrl.Value;
 
-            var jsonOut = JsonSerializer.Serialize(repoURLs, new JsonSerializerOptions { WriteIndented = true });
+            var jsonOut = JsonSerializer.Serialize(repoURLs, jsonSerializerOptions);
             System.IO.File.WriteAllText(RepoUrlJsonFile, jsonOut);
         }
     }

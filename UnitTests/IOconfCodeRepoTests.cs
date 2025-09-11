@@ -39,7 +39,7 @@ namespace UnitTests
 
             // Assert
             Assert.AreEqual(expectedOutput, result);
-            CollectionAssert.AreEqual(extractedURLs, new Dictionary<string, string> { { "repoA", "https://example.com/repoA" }, { "repoB", "https://example.com/repoB" } });
+            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://example.com/repoA" }, { "repoB", "https://example.com/repoB" } }, extractedURLs);
         }
 
         [TestMethod]
@@ -54,7 +54,7 @@ namespace UnitTests
 
             // Assert
             Assert.AreEqual(expectedOutput, result);
-            CollectionAssert.AreEqual(extractedURLs, new Dictionary<string, string> { { "repoA", "https://example.com/repoA" } });
+            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://example.com/repoA" } }, extractedURLs);
         }
 
         [TestMethod]
@@ -70,7 +70,7 @@ namespace UnitTests
 
             // Assert
             Assert.AreEqual(expectedOutput, result);
-            CollectionAssert.AreEqual(extractedURLs, new Dictionary<string, string> { { "repoA", "https://oldurl.com/repoA" }, { "repoB", "https://example.com/repoB" } });
+            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://oldurl.com/repoA" }, { "repoB", "https://example.com/repoB" } }, extractedURLs);
         }
 
         [TestMethod]
@@ -160,6 +160,24 @@ namespace UnitTests
             // Assert
             Assert.IsTrue(File.Exists(IOconfCodeRepo.RepoUrlJsonFile));
             CollectionAssert.AreEqual(existingURLs.Union(newURL).ToDictionary(), IOconfCodeRepo.ReadURLsFromFile());
+        }
+
+        [TestMethod]
+        public void ReadWriteURLsToFile_UpdateExistingFile()
+        {
+            // Arrange
+            if (File.Exists(IOconfCodeRepo.RepoUrlJsonFile))
+                File.Delete(IOconfCodeRepo.RepoUrlJsonFile);
+            var existingURLs = new Dictionary<string, string> { { "repoA", "https://example.com/repoA" }, { "repoB", "https://example.com/repoB" } };
+            IOconfCodeRepo.WriteURLsToFile(existingURLs);
+            var newURL = new Dictionary<string, string> { { "repoA", "https://newurl.com/repoA" } };
+
+            // Act
+            IOconfCodeRepo.WriteURLsToFile(newURL);
+
+            // Assert
+            Assert.IsTrue(File.Exists(IOconfCodeRepo.RepoUrlJsonFile));
+            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://newurl.com/repoA" }, { "repoB", "https://example.com/repoB" } }, IOconfCodeRepo.ReadURLsFromFile());
         }
     }
 }

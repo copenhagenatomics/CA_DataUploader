@@ -47,6 +47,7 @@ namespace CA_DataUploaderLib.IOconf
         /// <summary>
         /// Writes the configuration to a file IO.conf on disk.
         /// Renames any existing configuration to IO.conf.backup1 (trailing number increasing).
+        /// Also writes the code repository URLs to a file on disk.
         /// </summary>
         /// <param name="ioconf"></param>
         public void WriteToDisk()
