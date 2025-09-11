@@ -75,7 +75,6 @@ namespace CA_DataUploaderLib.IOconf
             return System.IO.File.Exists(RepoUrlJsonFile)
                 ? JsonSerializer.Deserialize<Dictionary<string, string>>(System.IO.File.ReadAllText(RepoUrlJsonFile)) ?? []
                 : [];
-
         }
 
         /// <summary>
