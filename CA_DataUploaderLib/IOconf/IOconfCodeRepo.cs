@@ -11,7 +11,7 @@ namespace CA_DataUploaderLib.IOconf
         public const string RepoUrlJsonFile = "CodeRepoURLs.json";
         private static readonly JsonSerializerOptions jsonSerializerOptions = new() { WriteIndented = true };
 
-        public static IOconfCodeRepo Default => new($"{ConfigName}; default; {HiddenURL}", 0, "https://caplugins.blob.core.windows.net/default/" );
+        public static IOconfCodeRepo Default { get; } = new($"{ConfigName}; default; {HiddenURL}", 0, "https://caplugins.blob.core.windows.net/default/" );
         private IOconfCodeRepo(string row, int lineNum, string url) : base(row, lineNum, ConfigName)
         {
             URL = url;

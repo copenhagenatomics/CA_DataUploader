@@ -23,6 +23,7 @@ namespace UnitTests
             // Assert
             Assert.AreEqual("somePlugin", sut.ClassName);
             Assert.AreEqual("pc1", sut.Name);
+            Assert.AreSame(IOconfCodeRepo.Default, sut.CodeRepo);
         }
 
         [TestMethod]
