@@ -7,6 +7,7 @@ namespace CA_DataUploaderLib.IOconf
     public class IOconfCode : IOconfRow
     {
         private static readonly ConditionalWeakTable<IIOconf, object> _nodeInstances = []; //using object to work around reference only limitations for the ConditionalWeakTable value
+        private static readonly Version _pluginBaseVersion = typeof(CA.LoopControlPluginBase.LoopControlDecision).Assembly.GetName().Version ?? throw new InvalidOperationException("Could not determine plugin base version.");
 
         public IOconfCode(string row, int lineNum) : base(row, lineNum, "Code", requireName: false)
         {
@@ -47,5 +48,16 @@ namespace CA_DataUploaderLib.IOconf
             _nodeInstances.AddOrUpdate(ioconf, (byte)(Index + 1));
             base.ValidateDependencies(ioconf);
         }
+
+        /// <summary>
+        /// Generate plugin filename as stored locally in the plugins folder (possibly with repo name prepended - except for the default repo).
+        /// </summary>
+        public string GenerateLocalFilename() => $"{(CodeRepo is not null && CodeRepo.Name != "default" ? CodeRepo.Name + '-' : "")}{GenerateRepoFilename()}";
+        
+        /// <summary>
+        /// Generate plugin filename as stored in the repository.
+        /// </summary>
+        public string GenerateRepoFilename() => $"{ClassName}-{Version}-base{_pluginBaseVersion}.dll";
+
     }
 }

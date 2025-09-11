@@ -33,7 +33,7 @@ namespace CA_DataUploaderLib
         void LoadPlugin(string assemblyFullPath)
         {
             var (context, assembly) = LoadAssembly(assemblyFullPath);
-            var decisions = CreateInstances<LoopControlDecision>(assembly, []).ToList();
+            var decisions = CreateInstances<LoopControlDecision>(assembly, Path.GetFileName(assemblyFullPath), []).ToList();
             if (decisions.Count == 0)
             {
                 context.Unload();
@@ -51,14 +51,14 @@ namespace CA_DataUploaderLib
             return (context, context.LoadFromStream(fs));
         }
 
-        IEnumerable<T> CreateInstances<T>(Assembly assembly, params object[] args)
+        IEnumerable<T> CreateInstances<T>(Assembly assembly, string filename, params object[] args)
         {
             var confDecisions = ioconf.GetEntries<IOconfCode>();
             foreach (Type type in assembly.GetTypes())
             {
                 if (!typeof(T).IsAssignableFrom(type)) continue;
 
-                foreach (var confDecision in confDecisions.Where(cd => cd.ClassName == type.Name))
+                foreach (var confDecision in confDecisions.Where(cd => cd.GenerateLocalFilename() == filename))
                 {
                     var result =
                         (confDecision.Name == confDecision.ClassName
