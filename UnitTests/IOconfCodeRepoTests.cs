@@ -15,7 +15,7 @@ namespace UnitTests
         public void ExtractAndHideURLs_WhenUrlIsMalformed_ThrowsException()
         {
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => IOconfCodeRepo.ExtractAndHideURLs("CodeRepo; test; horse/::some..url.co", []));
+            var ex = Assert.ThrowsException<FormatException>(() => IOconfCodeRepo.ExtractAndHideURLs(["CodeRepo; test; horse/::some..url.co"], []));
             Assert.IsTrue(ex.Message.StartsWith("Invalid URL"));
         }
 
@@ -23,7 +23,7 @@ namespace UnitTests
         public void ExtractAndHideURLs_WhenUrlIsMissing_ThrowsException()
         {
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => IOconfCodeRepo.ExtractAndHideURLs("CodeRepo; test", []));
+            var ex = Assert.ThrowsException<FormatException>(() => IOconfCodeRepo.ExtractAndHideURLs(["CodeRepo; test"], []));
             Assert.IsTrue(ex.Message.StartsWith("Missing URL"));
         }
 
@@ -31,14 +31,14 @@ namespace UnitTests
         public void ExtractAndHideURLs_ReplacesUrl()
         {
             // Arrange
-            string input = $"CodeRepo; repoA; https://example.com/repoA{Environment.NewLine}CodeRepo;repoB;https://example.com/repoB";
-            string expectedOutput = $"CodeRepo; repoA; {IOconfCodeRepo.HiddenURL}{Environment.NewLine}CodeRepo;repoB;{IOconfCodeRepo.HiddenURL}";
+            List<string> input = [$"CodeRepo; repoA; https://example.com/repoA", "CodeRepo;repoB;https://example.com/repoB"];
+            List<string> expectedOutput = [$"CodeRepo; repoA; {IOconfCodeRepo.HiddenURL}", $"CodeRepo;repoB;{IOconfCodeRepo.HiddenURL}"];
 
             // Act
             var (result, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(input, []);
 
             // Assert
-            Assert.AreEqual(expectedOutput, result);
+            CollectionAssert.AreEqual(expectedOutput, result);
             CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://example.com/repoA" }, { "repoB", "https://example.com/repoB" } }, extractedURLs);
         }
 
@@ -46,14 +46,14 @@ namespace UnitTests
         public void ExtractAndHideURLs_OnlyProcessesCodeRepoLines()
         {
             // Arrange
-            string input = $"CodeRepo; repoA; https://example.com/repoA{Environment.NewLine}OtherType; repoB; https://example.com/repoB";
-            string expectedOutput = $"CodeRepo; repoA; {IOconfCodeRepo.HiddenURL}{Environment.NewLine}OtherType; repoB; https://example.com/repoB";
+            List<string> input = [$"CodeRepo; repoA; https://example.com/repoA", "OtherType; repoB; https://example.com/repoB"];
+            List<string> expectedOutput = [$"CodeRepo; repoA; {IOconfCodeRepo.HiddenURL}", "OtherType; repoB; https://example.com/repoB"];
 
             // Act
             var (result, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(input, []);
 
             // Assert
-            Assert.AreEqual(expectedOutput, result);
+            CollectionAssert.AreEqual(expectedOutput, result);
             CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://example.com/repoA" } }, extractedURLs);
         }
 
@@ -62,14 +62,14 @@ namespace UnitTests
         {
             // Arrange
             var initialDict = new Dictionary<string, string> { { "repoA", "https://oldurl.com/repoA" } };
-            string input = "CodeRepo; repoB; https://example.com/repoB";
-            string expectedOutput = $"CodeRepo; repoB; {IOconfCodeRepo.HiddenURL}";
+            List<string> input = ["CodeRepo; repoB; https://example.com/repoB"];
+            List<string> expectedOutput = [$"CodeRepo; repoB; {IOconfCodeRepo.HiddenURL}"];
 
             // Act
             var (result, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(input, initialDict);
 
             // Assert
-            Assert.AreEqual(expectedOutput, result);
+            CollectionAssert.AreEqual(expectedOutput, result);
             CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://oldurl.com/repoA" }, { "repoB", "https://example.com/repoB" } }, extractedURLs);
         }
 
@@ -78,14 +78,14 @@ namespace UnitTests
         {
             // Arrange
             var initialDict = new Dictionary<string, string> { { "repoA", "https://oldurl.com/repoA" } };
-            string input = "CodeRepo; repoA; https://newurl.com/repoA";
-            string expectedOutput = $"CodeRepo; repoA; {IOconfCodeRepo.HiddenURL}";
+            List<string> input = ["CodeRepo; repoA; https://newurl.com/repoA"];
+            List<string> expectedOutput = [$"CodeRepo; repoA; {IOconfCodeRepo.HiddenURL}"];
 
             // Act
             var (result, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(input, initialDict);
 
             // Assert
-            Assert.AreEqual(expectedOutput, result);
+            CollectionAssert.AreEqual(expectedOutput, result);
             CollectionAssert.AreEqual(extractedURLs, new Dictionary<string, string> { { "repoA", "https://newurl.com/repoA" } });
         }
 
@@ -101,7 +101,7 @@ namespace UnitTests
         public void ValidateDependencies_WhenUrlIsNotFound_ThrowsException()
         {
             // Arrange
-            string input = $"CodeRepo; repoA; https://example.com/repoA";
+            List<string> input = [$"CodeRepo; repoA; https://example.com/repoA/"];
             var (parsedInput, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(input, []);
             var sut = new IOconfCodeRepo($"CodeRepo; repoB; {IOconfCodeRepo.HiddenURL}", 0);
             var ioConfMock = new Mock<IIOconf>();
@@ -116,14 +116,14 @@ namespace UnitTests
         public void ValidateDependencies_WhenUrlIsFound()
         {
             // Arrange
-            var url = "https://example.com/repoA";
-            string input = $"CodeRepo; repoA; {url}";
+            var url = "https://example.com/repoA/";
+            List<string> input = [$"CodeRepo; repoA; {url}"];
             var (parsedInput, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(input, []);
             var ioConfMock = new Mock<IIOconf>();
             ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
 
             // Act + Assert
-            var sut = new IOconfCodeRepo(parsedInput, 0);
+            var sut = new IOconfCodeRepo(parsedInput[0], 0);
             sut.ValidateDependencies(ioConfMock.Object);
             Assert.AreEqual(url, sut.URL);
         }
@@ -178,6 +178,55 @@ namespace UnitTests
             // Assert
             Assert.IsTrue(File.Exists(IOconfCodeRepo.RepoUrlJsonFile));
             CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://newurl.com/repoA" }, { "repoB", "https://example.com/repoB" } }, IOconfCodeRepo.ReadURLsFromFile());
+        }
+
+        [TestMethod]
+        public void GenerateDownloadUrl_WithoutQueryParameters_TrailingForwardSlash()
+        {
+            // Arrange
+            List<string> input = [$"CodeRepo; repoA; https://example.com/repoA/"];
+            var (parsedInput, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(input, []);
+            var ioConfMock = new Mock<IIOconf>();
+            ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
+            var sut = new IOconfCodeRepo(parsedInput[0], 0);
+            sut.ValidateDependencies(ioConfMock.Object);
+
+            // Act + Assert
+            var downloadUrl = sut.GenerateDownloadUrl("file");
+            Assert.AreEqual(new Uri("https://example.com/repoA/file"), downloadUrl);
+        }
+
+        [TestMethod]
+        public void GenerateDownloadUrl_WithoutQueryParameters_NoTrailingForwardSlash()
+        {
+            // Arrange
+            List<string> input = [$"CodeRepo; repoA; https://example.com/repoA"]; // <- no trailing '/'
+            var (parsedInput, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(input, []);
+            var ioConfMock = new Mock<IIOconf>();
+            ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
+            var sut = new IOconfCodeRepo(parsedInput[0], 0);
+            sut.ValidateDependencies(ioConfMock.Object);
+
+            // Act + Assert
+            var downloadUrl = sut.GenerateDownloadUrl("file.dll");
+            Assert.AreEqual(new Uri("https://example.com/repoA/file.dll"), downloadUrl);
+        }
+
+        [TestMethod]
+        public void GenerateDownloadUrl_WithQueryParameters()
+        {
+            // Arrange
+            var url = "https://example.com/repoA/?secrets=1234567890&goes=here";
+            List<string> input = [$"CodeRepo; repoA; {url}"];
+            var (parsedInput, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(input, []);
+            var ioConfMock = new Mock<IIOconf>();
+            ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
+            var sut = new IOconfCodeRepo(parsedInput[0], 0);
+            sut.ValidateDependencies(ioConfMock.Object);
+
+            // Act + Assert
+            var downloadUrl = sut.GenerateDownloadUrl("file.dll");
+            Assert.AreEqual(new Uri("https://example.com/repoA/file.dll?secrets=1234567890&goes=here"), downloadUrl);
         }
     }
 }

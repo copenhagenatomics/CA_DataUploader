@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 
+[assembly: InternalsVisibleTo("UnitTests")]
 namespace CA_DataUploaderLib.IOconf
 {
     public class IOconfCodeRepo : IOconfRow
@@ -11,7 +14,7 @@ namespace CA_DataUploaderLib.IOconf
         public const string RepoUrlJsonFile = "CodeRepoURLs.json";
         private static readonly JsonSerializerOptions jsonSerializerOptions = new() { WriteIndented = true };
 
-        public static IOconfCodeRepo Default { get; } = new($"{ConfigName}; default; {HiddenURL}", 0, "https://caplugins.blob.core.windows.net/default/" );
+        public static IOconfCodeRepo Default { get; } = new($"{ConfigName}; default; {HiddenURL}", 0, "https://caplugins.blob.core.windows.net/default/");
         private IOconfCodeRepo(string row, int lineNum, string url) : base(row, lineNum, ConfigName)
         {
             URL = url;
@@ -34,7 +37,9 @@ namespace CA_DataUploaderLib.IOconf
             var repoURLs = ioconf.GetCodeRepoURLs();
             if (!repoURLs.TryGetValue(Name, out var actualUrl))
                 throw new FormatException($"URL for {ConfigName} '{Name}' not found!");
-            URL = actualUrl;
+            URL = actualUrl.Contains('?')
+                ? actualUrl
+                : !actualUrl.EndsWith('/') ? actualUrl + '/' : actualUrl; // Ensure URLs without query parameters end with '/'
             base.ValidateDependencies(ioconf);
         }
 
@@ -42,32 +47,31 @@ namespace CA_DataUploaderLib.IOconf
         /// Extracts URLs from CodeRepo lines in the input configuration string
         /// and returns the cleaned input string together with a dictionary of the extracted URLs.
         /// </summary>
-        public static (string cleanedInput, Dictionary<string, string> extractedURLs) ExtractAndHideURLs(string input, Dictionary<string, string> existingURLs)
+        internal static (List<string> cleanedInput, Dictionary<string, string> extractedURLs) ExtractAndHideURLs(List<string> input, Dictionary<string, string> existingURLs)
         {
-            var lines = input.Split([Environment.NewLine], StringSplitOptions.None);
             Dictionary<string, string> repoURLs = new(existingURLs);
-            
-            for (int i = 0; i < lines.Length; i++)
+
+            for (int i = 0; i < input.Count; i++)
             {
-                var line = lines[i];
+                var line = input[i];
                 if (!line.Trim().StartsWith(ConfigName, StringComparison.Ordinal))
                     continue;
-                
+
                 var parts = line.Split(';', StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length <= 2)
                     throw new FormatException($"Missing URL in {ConfigName}-line : {line}");
                 if (parts[2] == HiddenURL)
                     continue; // already hidden
-                    
+
                 var repoName = parts[1].Trim();
                 var url = parts[2].Trim();
                 if (!Uri.IsWellFormedUriString(url, UriKind.Absolute))
                     throw new FormatException($"Invalid URL format in {ConfigName}-line: {line}");
                 repoURLs[repoName] = url;
-                lines[i] = line.Replace(url, HiddenURL);
+                input[i] = line.Replace(url, HiddenURL);
             }
 
-            return (string.Join(Environment.NewLine, lines), repoURLs);
+            return (input, repoURLs);
         }
 
         public static Dictionary<string, string> ReadURLsFromFile()
@@ -89,7 +93,22 @@ namespace CA_DataUploaderLib.IOconf
                 repoURLs[repoUrl.Key] = repoUrl.Value;
 
             var jsonOut = JsonSerializer.Serialize(repoURLs, jsonSerializerOptions);
-            System.IO.File.WriteAllText(RepoUrlJsonFile, jsonOut);
+            File.WriteAllText(RepoUrlJsonFile, jsonOut);
+        }
+
+        /// <summary>
+        /// Inserts the filename after the last '/' in the URL of the CodeRepo
+        /// Examples:
+        /// URL = "https://public.blob.net/default/" + filename
+        /// URL = "https://private.blob.net/no-see/" + filename + "?secret=0123456789"
+        /// </summary>
+        public Uri GenerateDownloadUrl(string filename)
+        {
+            
+            var url = URL[..(URL.LastIndexOf('/') + 1)] + filename + URL[(URL.LastIndexOf('/') + 1)..];
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                throw new InvalidOperationException($"URI is invalid: {url}");
+            return uri;
         }
     }
 }

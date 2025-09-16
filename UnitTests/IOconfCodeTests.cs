@@ -44,8 +44,8 @@ namespace UnitTests
         {
             // Arrange
             var ioConfMock = new Mock<IIOconf>();
-            var (parsedInput, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs("CodeRepo; other; https://some.url.co", []);
-            ioConfMock.Setup(x => x.GetEntries<IOconfCodeRepo>()).Returns([new IOconfCodeRepo(parsedInput, 0)]);
+            var (parsedInput, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(["CodeRepo; other; https://some.url.co"], []);
+            ioConfMock.Setup(x => x.GetEntries<IOconfCodeRepo>()).Returns([new IOconfCodeRepo(parsedInput[0], 0)]);
             ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
             var sut = new IOconfCode($"Code; default/somePlugin; 0.123.0; pc1", 1);
 
@@ -59,8 +59,8 @@ namespace UnitTests
         {
             // Arrange
             var ioConfMock = new Mock<IIOconf>();
-            var (parsedInput, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs("CodeRepo; other; https://some.url.co", []);
-            var codeRepo = new IOconfCodeRepo(parsedInput, 0);
+            var (parsedInput, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(["CodeRepo; other; https://some.url.co"], []);
+            var codeRepo = new IOconfCodeRepo(parsedInput[0], 0);
             ioConfMock.Setup(x => x.GetEntries<IOconfCodeRepo>()).Returns([codeRepo]);
             ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
             var sut = new IOconfCode($"Code; other/somePlugin; 0.123.0; pc1", 1);

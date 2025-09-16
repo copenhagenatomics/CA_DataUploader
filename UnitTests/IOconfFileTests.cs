@@ -16,10 +16,10 @@ namespace UnitTests
         [TestMethod]
         public void WhenTwoRowsInDifferentGroupsHaveTheSameName_ThenNoExceptionIsThrown()
         {
-            var _ = new IOconfFile(new(){
+            var _ = new IOconfFile([
                 "Map; 1234567890; tm01",
                 "TypeK; sameName; tm01; 1",
-                "TypeJ; sameName; tm01; 2" });
+                "TypeJ; sameName; tm01; 2" ]);
         }
 
         [TestMethod]
