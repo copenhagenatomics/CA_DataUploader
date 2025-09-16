@@ -24,13 +24,13 @@ namespace CA_DataUploaderLib.IOconf
             CodeRepoURLs = IOconfCodeRepo.ReadURLsFromFile();
         }
 
-        public IOconfFile(List<string> rawLines, Dictionary<string, string>? codeRepoURLs = null, bool performCheck = true)
-            : this(DefaultLoader, rawLines, codeRepoURLs, performCheck) { }
-        public IOconfFile(IIOconfLoader loader, List<string> rawLines, Dictionary<string, string>? codeRepoURLs = null, bool performCheck = true)
+        public IOconfFile(List<string> rawLines, bool performCheck = true)
+            : this(DefaultLoader, rawLines, performCheck) { }
+        public IOconfFile(IIOconfLoader loader, List<string> rawLines, bool performCheck = true)
         {
+            (rawLines, CodeRepoURLs) = IOconfCodeRepo.ExtractAndHideURLs(rawLines, IOconfCodeRepo.ReadURLsFromFile());
             (OriginalRows, Table) = IOconfFileLoader.ParseLines(loader, rawLines);
             RawLines = rawLines;
-            CodeRepoURLs = codeRepoURLs ?? IOconfCodeRepo.ReadURLsFromFile();
             EnsureRPiTempEntry();
             if (performCheck)
                 CheckConfig();

@@ -233,6 +233,17 @@ RedundantSensors;redundant;expandtag{ovenheaters}
             Assert.AreEqual(2, current.PortNumber);
         }
 
+        [TestMethod]
+        public void Constructor_CodeRepoURLsAreExtracted()
+        {
+            // Act
+            var ioconf = new IOconfFile(["CodeRepo; testRepo; https://example.com/testRepo"]);
+
+            // Assert
+            Assert.AreEqual($"CodeRepo; testRepo; {IOconfCodeRepo.HiddenURL}", ioconf.RawLines[0]);
+            Assert.IsTrue(ioconf.GetCodeRepoURLs().Contains(KeyValuePair.Create("testRepo", "https://example.com/testRepo")));
+        }
+
         private class IOConfMathing(string row, int lineIndex) : IOconfRow(row, lineIndex, "Mathing")
         {
         }
