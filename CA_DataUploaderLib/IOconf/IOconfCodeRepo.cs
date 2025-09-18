@@ -107,7 +107,7 @@ namespace CA_DataUploaderLib.IOconf
             
             var url = URL[..(URL.LastIndexOf('/') + 1)] + filename + URL[(URL.LastIndexOf('/') + 1)..];
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
-                throw new InvalidOperationException($"URI is invalid: {url}");
+                throw new InvalidOperationException($"URL is invalid: {url}");
             return uri;
         }
     }
