@@ -31,16 +31,13 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public string URL { get; private set; }
-        
-        public override void ValidateDependencies(IIOconf ioconf)
+
+        public void LoadURL(IIOconf ioconf)
         {
             var repoURLs = ioconf.GetCodeRepoURLs();
             if (!repoURLs.TryGetValue(Name, out var actualUrl))
                 throw new FormatException($"URL for {ConfigName} '{Name}' not found!");
-            URL = actualUrl.Contains('?')
-                ? actualUrl
-                : !actualUrl.EndsWith('/') ? actualUrl + '/' : actualUrl; // Ensure URLs without query parameters end with '/'
-            base.ValidateDependencies(ioconf);
+            URL = actualUrl;
         }
 
         /// <summary>

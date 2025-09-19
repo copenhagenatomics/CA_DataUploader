@@ -39,7 +39,7 @@ namespace UnitTests
 
             // Assert
             CollectionAssert.AreEqual(expectedOutput, result);
-            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://example.com/repoA" }, { "repoB", "https://example.com/repoB" } }, extractedURLs);
+            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://example.com/repoA/" }, { "repoB", "https://example.com/repoB/" } }, extractedURLs);
         }
 
         [TestMethod]
@@ -113,7 +113,7 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void ValidateDependencies_WhenUrlIsNotFound_ThrowsException()
+        public void LoadURL_WhenUrlIsNotFound_ThrowsException()
         {
             // Arrange
             List<string> input = [$"CodeRepo; repoA; https://example.com/repoA/"];
@@ -123,12 +123,12 @@ namespace UnitTests
             ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
 
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => sut.ValidateDependencies(ioConfMock.Object));
+            var ex = Assert.ThrowsException<FormatException>(() => sut.LoadURL(ioConfMock.Object));
             Assert.IsTrue(ex.Message.Contains("not found"), ex.Message);
         }
 
         [TestMethod]
-        public void ValidateDependencies_WhenUrlIsFound()
+        public void LoadURL_WhenUrlIsFound()
         {
             // Arrange
             var url = "https://example.com/repoA/";
@@ -136,10 +136,10 @@ namespace UnitTests
             var (parsedInput, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs(input, []);
             var ioConfMock = new Mock<IIOconf>();
             ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
+            var sut = new IOconfCodeRepo(parsedInput[0], 0);
 
             // Act + Assert
-            var sut = new IOconfCodeRepo(parsedInput[0], 0);
-            sut.ValidateDependencies(ioConfMock.Object);
+            sut.LoadURL(ioConfMock.Object);
             Assert.AreEqual(url, sut.URL);
         }
 
@@ -219,7 +219,7 @@ namespace UnitTests
             var ioConfMock = new Mock<IIOconf>();
             ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
             var sut = new IOconfCodeRepo(parsedInput[0], 0);
-            sut.ValidateDependencies(ioConfMock.Object);
+            sut.LoadURL(ioConfMock.Object);
 
             // Act + Assert
             var downloadUrl = sut.GenerateDownloadUrl("file");
@@ -235,7 +235,7 @@ namespace UnitTests
             var ioConfMock = new Mock<IIOconf>();
             ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
             var sut = new IOconfCodeRepo(parsedInput[0], 0);
-            sut.ValidateDependencies(ioConfMock.Object);
+            sut.LoadURL(ioConfMock.Object);
 
             // Act + Assert
             var downloadUrl = sut.GenerateDownloadUrl("file.dll");
@@ -252,7 +252,7 @@ namespace UnitTests
             var ioConfMock = new Mock<IIOconf>();
             ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
             var sut = new IOconfCodeRepo(parsedInput[0], 0);
-            sut.ValidateDependencies(ioConfMock.Object);
+            sut.LoadURL(ioConfMock.Object);
 
             // Act + Assert
             var downloadUrl = sut.GenerateDownloadUrl("file.dll");
