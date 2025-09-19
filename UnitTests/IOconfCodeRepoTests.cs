@@ -196,6 +196,21 @@ namespace UnitTests
         }
 
         [TestMethod]
+        public void ReadURLsFromFile_SurvivesCorruptFile()
+        {
+            // Arrange
+            if (File.Exists(IOconfCodeRepo.RepoUrlJsonFile))
+                File.Delete(IOconfCodeRepo.RepoUrlJsonFile);
+            File.WriteAllText(IOconfCodeRepo.RepoUrlJsonFile, "blablabla");
+
+            // Act
+            var urls = IOconfCodeRepo.ReadURLsFromFile();
+
+            // Assert
+            Assert.AreEqual(0, urls.Count);
+        }
+
+        [TestMethod]
         public void GenerateDownloadUrl_WithoutQueryParameters_TrailingForwardSlash()
         {
             // Arrange

@@ -79,9 +79,17 @@ namespace CA_DataUploaderLib.IOconf
 
         public static Dictionary<string, string> ReadURLsFromFile()
         {
-            return System.IO.File.Exists(RepoUrlJsonFile)
+            try
+            {
+                return System.IO.File.Exists(RepoUrlJsonFile)
                 ? JsonSerializer.Deserialize<Dictionary<string, string>>(System.IO.File.ReadAllText(RepoUrlJsonFile)) ?? []
                 : [];
+            }
+            catch (Exception ex)
+            {
+                CALog.LogError(LogID.A, $"Could not read or parse {RepoUrlJsonFile}", ex);
+            }
+            return [];
         }
 
         /// <summary>
@@ -95,6 +103,9 @@ namespace CA_DataUploaderLib.IOconf
             foreach (var repoUrl in extractedURLs)
                 repoURLs[repoUrl.Key] = repoUrl.Value;
 
+            if (repoURLs.Count == 0)
+                return;
+            
             var jsonOut = JsonSerializer.Serialize(repoURLs, jsonSerializerOptions);
             File.WriteAllText(RepoUrlJsonFile, jsonOut);
         }
