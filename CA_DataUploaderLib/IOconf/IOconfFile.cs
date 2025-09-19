@@ -1,6 +1,7 @@
 ﻿#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 
@@ -10,7 +11,7 @@ namespace CA_DataUploaderLib.IOconf
     {
         private List<IOconfRow> Table = [];
         private List<IOconfRow> OriginalRows = [];
-        private readonly Dictionary<string, string> CodeRepoURLs = [];
+        private Dictionary<string, string> CodeRepoURLs;
         public List<string> RawLines { get; private set; } = [];
 
         private static readonly Lazy<IOconfFile> lazy = new(() => new IOconfFile());
@@ -21,7 +22,6 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfFile()
         {
             Reload();
-            CodeRepoURLs = IOconfCodeRepo.ReadURLsFromFile();
         }
 
         public IOconfFile(List<string> rawLines, bool performCheck = true)
@@ -36,8 +36,9 @@ namespace CA_DataUploaderLib.IOconf
                 CheckConfig();
         }
 
-        public void Reload()
+        [MemberNotNull(nameof(CodeRepoURLs))]
         {
+            CodeRepoURLs = IOconfCodeRepo.ReadURLsFromFile();
             // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization rejects the custom entries.
             (RawLines, OriginalRows, Table) = IOconfFileLoader.Load(DefaultLoader);
             EnsureRPiTempEntry();
