@@ -37,6 +37,7 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         [MemberNotNull(nameof(CodeRepoURLs))]
+        public void Reload()
         {
             CodeRepoURLs = IOconfCodeRepo.ReadURLsFromFile();
             // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization rejects the custom entries.
