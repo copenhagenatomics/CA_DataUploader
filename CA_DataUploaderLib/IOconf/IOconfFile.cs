@@ -171,7 +171,12 @@ namespace CA_DataUploaderLib.IOconf
                 }
             }
         }
-        public Dictionary<string, string> GetCodeRepoURLs() => CodeRepoURLs;
 
+        public Dictionary<string, string> GetCodeRepoURLs() => CodeRepoURLs;
+        public void ValidateCodeRepoURLs()
+        {
+            foreach (var codeRepo in GetEntries<IOconfCodeRepo>())
+                codeRepo.LoadURL(this);
+        }
     }
 }
