@@ -54,16 +54,16 @@ namespace CA_DataUploaderLib.IOconf
                 if (!line.Trim().StartsWith(ConfigName, StringComparison.Ordinal))
                     continue;
 
-                var parts = line.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                var parts = line.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 if (parts.Length <= 2)
-                    throw new FormatException($"Missing URL in {ConfigName}-line : {line}");
+                    throw new FormatException($"Missing URL for {ConfigName}-line : {line}");
                 if (parts[2] == HiddenURL)
                     continue; // already hidden
 
                 var repoName = parts[1].Trim();
                 var url = parts[2].Trim();
                 if (!Uri.IsWellFormedUriString(url, UriKind.Absolute))
-                    throw new FormatException($"Invalid URL format in {ConfigName}-line: {line}");
+                    throw new FormatException($"Invalid URL format for {ConfigName}-line: {line}");
 
                 repoURLs[repoName] = url.Contains('?')
                     ? url

@@ -28,6 +28,16 @@ namespace UnitTests
         }
 
         [TestMethod]
+        public void ExtractAndHideURLs_WhenUrlIsAlreadyHidden_NothingIsExtracted()
+        {
+            // Act
+            var (_, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs([$"CodeRepo; test; {IOconfCodeRepo.HiddenURL}"], []);
+
+            // Assert
+            Assert.AreEqual(0, extractedURLs.Count);
+        }
+
+        [TestMethod]
         public void ExtractAndHideURLs_ReplacesUrl()
         {
             // Arrange
@@ -149,7 +159,7 @@ namespace UnitTests
             // Arrange
             if (File.Exists(IOconfCodeRepo.RepoUrlJsonFile))
                 File.Delete(IOconfCodeRepo.RepoUrlJsonFile);
-            var urls = new Dictionary<string, string> { { "repoA", "https://example.com/repoA/" }, { "repoB", "https://newurl.com/repoB/" } };
+            var urls = new Dictionary<string, string> { { "repoA", "https://example.com/repoA/?sv=123&si=ca" }, { "repoB", "https://newurl.com/repoB/" } };
 
             // Act
             IOconfCodeRepo.WriteURLsToFile(urls);
