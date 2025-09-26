@@ -16,10 +16,10 @@ namespace UnitTests
         [TestMethod]
         public void WhenTwoRowsInDifferentGroupsHaveTheSameName_ThenNoExceptionIsThrown()
         {
-            var _ = new IOconfFile(new(){
+            var _ = new IOconfFile([
                 "Map; 1234567890; tm01",
                 "TypeK; sameName; tm01; 1",
-                "TypeJ; sameName; tm01; 2" });
+                "TypeJ; sameName; tm01; 2" ]);
         }
 
         [TestMethod]
@@ -231,6 +231,17 @@ RedundantSensors;redundant;expandtag{ovenheaters}
             var current = (IOconfCurrent)rows[0];
             Assert.AreEqual("current_ct01", current.Name);
             Assert.AreEqual(2, current.PortNumber);
+        }
+
+        [TestMethod]
+        public void Constructor_CodeRepoURLsAreExtracted()
+        {
+            // Act
+            var ioconf = new IOconfFile(["CodeRepo; testRepo; https://example.com/testRepo/"]);
+
+            // Assert
+            Assert.AreEqual($"CodeRepo; testRepo; {IOconfCodeRepo.HiddenURL}", ioconf.RawLines[0]);
+            Assert.IsTrue(ioconf.GetCodeRepoURLs().Contains(KeyValuePair.Create("testRepo", "https://example.com/testRepo/")));
         }
 
         private class IOConfMathing(string row, int lineIndex) : IOconfRow(row, lineIndex, "Mathing")

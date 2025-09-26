@@ -1,6 +1,7 @@
 ﻿#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 
@@ -10,18 +11,13 @@ namespace CA_DataUploaderLib.IOconf
     {
         private List<IOconfRow> Table = [];
         private List<IOconfRow> OriginalRows = [];
+        private Dictionary<string, string> CodeRepoURLs;
         public List<string> RawLines { get; private set; } = [];
 
         private static readonly Lazy<IOconfFile> lazy = new(() => new IOconfFile());
         public static IIOconf Instance => lazy.Value;
         public static IIOconfLoader DefaultLoader { get; } = new IOconfLoader();
         public static bool FileExists() => IOconfFileLoader.FileExists();
-        /// <summary>
-        /// Writes the supplied contents to a file IO.conf on disk.
-        /// Renames any existing configuration to IO.conf.backup1 (trailing number increasing).
-        /// </summary>
-        /// <param name="ioconf"></param>
-        public static void WriteToDisk(string conf) => IOconfFileLoader.WriteToDisk(conf);
 
         public IOconfFile()
         {
@@ -32,6 +28,7 @@ namespace CA_DataUploaderLib.IOconf
             : this(DefaultLoader, rawLines, performCheck) { }
         public IOconfFile(IIOconfLoader loader, List<string> rawLines, bool performCheck = true)
         {
+            (rawLines, CodeRepoURLs) = IOconfCodeRepo.ExtractAndHideURLs(rawLines, IOconfCodeRepo.ReadURLsFromFile());
             (OriginalRows, Table) = IOconfFileLoader.ParseLines(loader, rawLines);
             RawLines = rawLines;
             EnsureRPiTempEntry();
@@ -39,12 +36,26 @@ namespace CA_DataUploaderLib.IOconf
                 CheckConfig();
         }
 
+        [MemberNotNull(nameof(CodeRepoURLs))]
         public void Reload()
         {
+            CodeRepoURLs = IOconfCodeRepo.ReadURLsFromFile();
             // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization rejects the custom entries.
             (RawLines, OriginalRows, Table) = IOconfFileLoader.Load(DefaultLoader);
             EnsureRPiTempEntry();
             CheckConfig();
+        }
+
+        /// <summary>
+        /// Writes the configuration to a file IO.conf on disk.
+        /// Renames any existing configuration to IO.conf.backup1 (trailing number increasing).
+        /// Also writes the code repository URLs to a file on disk.
+        /// </summary>
+        /// <param name="ioconf"></param>
+        public void WriteToDisk()
+        {
+            IOconfFileLoader.WriteToDisk(GetRawFile());
+            IOconfCodeRepo.WriteURLsToFile(CodeRepoURLs);
         }
 
         public void CheckConfig()
@@ -160,6 +171,13 @@ namespace CA_DataUploaderLib.IOconf
                         yield return boardState;
                 }
             }
+        }
+
+        public Dictionary<string, string> GetCodeRepoURLs() => CodeRepoURLs;
+        public void ValidateCodeRepoURLs()
+        {
+            foreach (var codeRepo in GetEntries<IOconfCodeRepo>())
+                codeRepo.LoadURL(this);
         }
     }
 }

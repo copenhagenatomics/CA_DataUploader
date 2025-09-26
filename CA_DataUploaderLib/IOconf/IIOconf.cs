@@ -29,5 +29,8 @@ namespace CA_DataUploaderLib.IOconf
         public IEnumerable<T> GetEntriesWithoutExpansion<T>();
         public string GetRawFile();
         public IEnumerable<string> GetBoardStateNames(string sensor);
+        public void WriteToDisk();
+        public Dictionary<string, string> GetCodeRepoURLs();
+        public void ValidateCodeRepoURLs();
     }
 }
