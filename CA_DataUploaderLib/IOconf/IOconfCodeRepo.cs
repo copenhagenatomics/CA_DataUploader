@@ -64,10 +64,11 @@ namespace CA_DataUploaderLib.IOconf
                 var url = parts[2].Trim();
                 if (!Uri.IsWellFormedUriString(url, UriKind.Absolute))
                     throw new FormatException($"Invalid URL format for {ConfigName}-line: {line}");
+                var uriBuilder = new UriBuilder(url);
+                if (!uriBuilder.Path.EndsWith('/'))
+                    uriBuilder.Path += '/'; // Ensure path part of URL ends with '/'
 
-                repoURLs[repoName] = url.Contains('?')
-                    ? url
-                    : !url.EndsWith('/') ? url + '/' : url; // Ensure URLs without query parameters end with '/'
+                repoURLs[repoName] = uriBuilder.Uri.ToString();
                 input[i] = line.Replace(url, HiddenURL);
             }
 
