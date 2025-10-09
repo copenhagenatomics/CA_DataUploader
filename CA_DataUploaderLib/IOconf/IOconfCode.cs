@@ -15,8 +15,7 @@ namespace CA_DataUploaderLib.IOconf
             Format = "Code; [RepoName/]Name; Version; [InstanceName]";
             var list = ToList();
             if (list.Count < 3) throw new FormatException($"Missing version in Code line in IO.conf: {row} {Environment.NewLine}{Format}");
-            if (!Version.TryParse(list[2], out var v)) throw new FormatException($"Invalid version format in Code line in IO.conf: {row} {Environment.NewLine}{Format}");
-            Version = v;
+            Version = list[2];
             if (list[1].Contains('/'))
             {
                 ClassName = Name = list[1][(list[1].LastIndexOf('/') + 1)..];
@@ -37,7 +36,7 @@ namespace CA_DataUploaderLib.IOconf
             private set => codeRepo = value;
         }
         public int Index { get; private set; }
-        public Version Version { get; }
+        public string Version { get; }
 
         public override void ValidateDependencies(IIOconf ioconf)
         {
