@@ -93,6 +93,18 @@ namespace CA_DataUploaderLib.IOconf
         /// </summary>
         public virtual void ValidateDependencies(IIOconf ioconf) {}
 
+        protected static IOconfMap GetMap(IIOconf ioconf, string boxName, BoardSettings settings, bool skipBoardSettings = false)
+        {
+            var maps = ioconf.GetMap();
+            var map = maps.SingleOrDefault(x => x.BoxName == boxName) ??
+                throw new FormatException($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
+            // Map.BoardSettings == BoardSettings.Default is there since some boards need separate board settings, but have multiple sensor entries. 
+            // This check means a new BoardSettings instance will be created with first entry of board, but not updated (i.e. shared) among the rest of the board entries.    
+            if (!skipBoardSettings && map.BoardSettings == BoardSettings.Default)
+                map.BoardSettings = settings;
+            return map;
+        }
+
         protected virtual void ValidateName(string name)
         {
             if (!ValidateNameRegex.IsMatch(name))

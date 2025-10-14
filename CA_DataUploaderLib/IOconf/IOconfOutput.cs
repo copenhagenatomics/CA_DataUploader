@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -40,16 +39,6 @@ namespace CA_DataUploaderLib.IOconf
         {
             get => _map ?? throw new InvalidOperationException($"Call {nameof(ValidateDependencies)} before accessing {nameof(Map)}.");
             private set => _map = value;
-        }
-
-        protected static IOconfMap GetMap(IIOconf ioconf, string boxName, BoardSettings settings)
-        {
-            var maps = ioconf.GetMap();
-            var map = maps.SingleOrDefault(x => x.BoxName == boxName);
-            if (map == null)
-                throw new FormatException($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
-            map.BoardSettings = settings;
-            return map;
         }
 
         protected IOconfInput NewPortInput(string name, int portNumber, bool upload = true) => new(Row, LineNumber, Type, Map, portNumber) { Name = name, Upload = upload };
