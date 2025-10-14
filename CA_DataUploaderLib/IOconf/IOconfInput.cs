@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -73,18 +72,6 @@ namespace CA_DataUploaderLib.IOconf
                 return (false, false, 1);
         }
 
-        private static IOconfMap GetMap(IIOconf ioconf, string boxName, BoardSettings settings, bool skipBoardSettings)
-        {
-            var maps = ioconf.GetMap();
-            var map = maps.SingleOrDefault(x => x.BoxName == boxName) ?? 
-                throw new FormatException($"{boxName} not found in map: {string.Join(", ", maps.Select(x => x.BoxName))}");
-            // Map.BoardSettings == BoardSettings.Default is there since some boards need separate board settings, but have multiple sensor entries. 
-            // This check means a new BoardSettings instance will be created with first entry of board, but not updated (i.e. shared) among the rest of the board entries.    
-            if (!skipBoardSettings && map.BoardSettings == BoardSettings.Default)
-                map.BoardSettings = settings;
-            return map;
-        }
-
         public class Expandable : IOconfRow, IIOconfRowWithBoardState
         {
             private readonly BoardSettings _boardSettings;
@@ -104,7 +91,7 @@ namespace CA_DataUploaderLib.IOconf
 
             public override void ValidateDependencies(IIOconf ioconf)
             {
-                Map = GetMap(ioconf, BoxName, _boardSettings, false);
+                Map = GetMap(ioconf, BoxName, _boardSettings);
             }
 
             public virtual IEnumerable<IOconfInput> GetExpandedConf()
