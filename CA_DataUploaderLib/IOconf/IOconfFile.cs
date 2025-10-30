@@ -83,6 +83,9 @@ namespace CA_DataUploaderLib.IOconf
             var errorMessage = string.Empty;
             foreach (var g in groups.Where(x => x.Count() > 1))
                 errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"Duplicate configuration key {g.Key} detected. Lines involved:{Environment.NewLine}{string.Join(Environment.NewLine, g.Select(r => r.Row).ToList())}";
+            var mapLines = GetMap().GroupBy(m => m.USBPort ?? m.SerialNumber);
+            foreach (var heater in mapLines.Where(x => x.Count() > 1))
+                errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"Two Map-lines cannot use the same port or serial number. Lines involved:{Environment.NewLine}{string.Join(Environment.NewLine, heater.Select(y => y.Row))}";
             if (!string.IsNullOrEmpty(errorMessage))
                 throw new FormatException(errorMessage);
         }

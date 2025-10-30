@@ -96,7 +96,7 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public string? USBPort { get; }
-        private string? SerialNumber { get; }
+        public string? SerialNumber { get; }
         public string BoxName { get; }
         public BoardSettings BoardSettings
         {

@@ -1,10 +1,10 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using CA_DataUploaderLib.Extensions;
+﻿using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Collections.Generic;
 
 namespace UnitTests
 {
@@ -30,6 +30,15 @@ namespace UnitTests
                 "Map; 1234567890; tm01",
                 "TypeJ; sameName; tm01; 1",
                 "TypeJ; sameName; tm01; 2" ]);
+        }
+
+        [TestMethod]
+        public void WhenTwoMapLinesHaveTheSameSerial_ThenAnExceptionIsThrown()
+        {
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([
+                "Map; 1234567890; tm01",
+                "Map; 1234567890; tm02" ]));
+            Assert.IsTrue(ex.Message.StartsWith("Two Map-lines cannot use the same port or serial number"));
         }
 
         [TestMethod]
@@ -91,9 +100,9 @@ Math; temperature_tm01_01_math; temperature_tm01_01 + 1
             var loader = new IOconfLoader();
             loader.AddLoader(IOconfRowWithListArgument.ConfigName, (r, l) => new IOconfRowWithListArgument(r, l));
             var ioconf = new IOconfFile(loader, @"
-Map;fakeserial;ac01
-Map;fakeserial;ac02
-Map;fakeserial;ac03
+Map;fakeserial1;ac01
+Map;fakeserial2;ac02
+Map;fakeserial3;ac03
 Heater; LeftHeater16; ac01;01;850; tags:phase1 ovenarea4 ovenheaters area=2 // Freely choose tags to assign config entries to groups
 Heater; LeftHeater17; ac02;01;850; tags:phase2 ovenarea4 ovenheaters area=4
 Heater; LeftHeater18; ac02;02;850; tags:phase2 ovenarea4 ovenheaters area=5
