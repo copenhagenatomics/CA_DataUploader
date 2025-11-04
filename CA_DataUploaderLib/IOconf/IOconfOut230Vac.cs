@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace CA_DataUploaderLib.IOconf
@@ -26,7 +27,18 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         /// <remarks>This config is general for the board, so caller must make sure to use a single instance x board</remarks>
-        public IOconfInput GetBoardTemperatureInputConf() => NewPortInput(Map.BoxName + "_temperature", 5);
+        public IOconfInput[] GetBoardTemperatureInputConf()
+        {
+            // AC-board PCB version 6.5 and up have 4 temperature sensors
+            if (Version.TryParse(Map.Board?.PcbVersion, out var version) && version >= new Version(6, 5))
+                return [
+                    NewPortInput(Map.BoxName + "_temperature1", 5),
+                    NewPortInput(Map.BoxName + "_temperature2", 6),
+                    NewPortInput(Map.BoxName + "_temperature3", 7),
+                    NewPortInput(Map.BoxName + "_temperature4", 8),
+                    ];
+            return [NewPortInput(Map.BoxName + "_temperature", 5)];
+        }
         public static BoardSettings GetSwitchboardBoardSettings() => 
             new() { Parser = SwitchBoardResponseParser.Default };
         public class SwitchBoardResponseParser : BoardSettings.LineParser
