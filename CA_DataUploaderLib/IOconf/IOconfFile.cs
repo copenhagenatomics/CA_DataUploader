@@ -64,6 +64,7 @@ namespace CA_DataUploaderLib.IOconf
             // Work-around for dealing with Redundant-lines after everything else
             Table.Where(e => e is not Redundancy.IOconfRedundant).ToList().ForEach(e => e.ValidateDependencies(this));
             Table.Where(e => e is Redundancy.IOconfRedundant).ToList().ForEach(e => e.ValidateDependencies(this));
+            CheckMapLineUniquenessRules();
             CheckOvenHeaterRelationshipRule();
         }
 
@@ -83,9 +84,19 @@ namespace CA_DataUploaderLib.IOconf
             var errorMessage = string.Empty;
             foreach (var g in groups.Where(x => x.Count() > 1))
                 errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"Duplicate configuration key {g.Key} detected. Lines involved:{Environment.NewLine}{string.Join(Environment.NewLine, g.Select(r => r.Row).ToList())}";
-            var mapLines = GetMap().GroupBy(m => m.USBPort ?? m.SerialNumber);
-            foreach (var heater in mapLines.Where(x => x.Count() > 1))
-                errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"Two Map-lines cannot use the same port or serial number. Lines involved:{Environment.NewLine}{string.Join(Environment.NewLine, heater.Select(y => y.Row))}";
+            if (!string.IsNullOrEmpty(errorMessage))
+                throw new FormatException(errorMessage);
+        }
+
+        private void CheckMapLineUniquenessRules()
+        {
+            var errorMessage = string.Empty;
+            // No two map lines can have the same serial number
+            foreach (var mapLine in GetMap().GroupBy(m => m.SerialNumber).Where(x => x.Key is not null && x.Count() > 1))
+                errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"Two Map-lines cannot use the same serial number. Lines involved:{Environment.NewLine}{string.Join(Environment.NewLine, mapLine.Select(y => y.Row))}";
+            // No two map lines on the same node can have the same port
+            foreach (var mapLine in GetMap().GroupBy(m => new { m.DistributedNode, m.USBPort }).Where(x => x.Key.USBPort is not null && x.Count() > 1))
+            errorMessage += (!string.IsNullOrEmpty(errorMessage) ? Environment.NewLine : "") + $"Two Map-lines for the same node cannot use the same port. Lines involved:{Environment.NewLine}{string.Join(Environment.NewLine, mapLine.Select(y => y.Row))}";
             if (!string.IsNullOrEmpty(errorMessage))
                 throw new FormatException(errorMessage);
         }
