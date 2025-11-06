@@ -90,6 +90,12 @@ namespace CA_DataUploaderLib
                     {
                         if (board.TrySetMap(ioconfMap))
                         {
+                            if (didMap)
+                            {
+                                await ioconfMap.ForceDisconnectBoard();
+                                dependencies.LogError(LogID.A, $"Multiple map entries matched board: {board.ToShortDescription()}. Check your configuration.");
+                                break;
+                            }
                             board.ConfigSettings = ioconfMap.BoardSettings;
                             port.ReadTimeout = ioconfMap.BoardSettings.MaxMillisecondsWithoutNewValues;
                             await board.UpdateCalibration(board.ConfigSettings);
