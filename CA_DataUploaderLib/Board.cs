@@ -10,7 +10,7 @@ namespace CA_DataUploaderLib
             Map = map;
             if (map != null)
             {
-                map.Setboard(this);
+                map.SetBoard(this);
                 BoxName = map.BoxName;
             }
             ProductType = productType;
@@ -33,7 +33,7 @@ namespace CA_DataUploaderLib
 
         public bool TrySetMap(IOconfMap map)
         {
-            var boardMatched = map.Setboard(this);
+            var boardMatched = map.SetBoard(this);
             if (boardMatched)
                 BoxName = map.BoxName;
             return boardMatched;

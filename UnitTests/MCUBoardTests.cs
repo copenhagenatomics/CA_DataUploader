@@ -20,7 +20,7 @@ namespace UnitTests
         public async Task Processes4SingleValueLines()
         {//note the memorystream used in this test in reality simulates reading already read data before a disconnect,
          //which means this can't reproduce behaviors where logic waits for data since reads from the pipe either get any data 
-         //and the pipe is detected as closed inmediately.
+         //and the pipe is detected as closed immediately.
             var data = "2\n3\n4\n5\n";
             var dataBytes = Encoding.ASCII.GetBytes(data);
             using var ms = new MemoryStream(dataBytes);

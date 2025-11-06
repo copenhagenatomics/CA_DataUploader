@@ -63,7 +63,7 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public event EventHandler<EventArgs>? OnBoardDetected;
-        public bool Setboard(Board board)
+        public bool SetBoard(Board board)
         {
             if (!IsLocalBoard)
                 return false; //when using a distributed deployment, the map entries are only valid in the specified node.
