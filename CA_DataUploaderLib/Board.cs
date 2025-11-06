@@ -10,14 +10,14 @@ namespace CA_DataUploaderLib
             Map = map;
             if (map != null)
             {
-                map.Setboard(this);
+                map.SetBoard(this);
                 BoxName = map.BoxName;
             }
             ProductType = productType;
         }
 
         public string PortName { get; }
-        public IOconfMap? Map { get; }
+        public IOconfMap? Map { get; private set; }
         public string? ProductType { get; protected set; }
         public string? SerialNumber { get; protected set; }
         public string? SubProductType { get; protected set; }
@@ -33,9 +33,12 @@ namespace CA_DataUploaderLib
 
         public bool TrySetMap(IOconfMap map)
         {
-            var boardMatched = map.Setboard(this);
+            var boardMatched = map.SetBoard(this);
             if (boardMatched)
+            {
+                Map = map;
                 BoxName = map.BoxName;
+            }
             return boardMatched;
         }
 
