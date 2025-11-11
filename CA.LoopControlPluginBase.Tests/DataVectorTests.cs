@@ -34,7 +34,9 @@ namespace CA.LoopControlPluginBase.Tests
             var vector = new DataVector(baseTime, data);
 
             // Act - tests the old int overload still works (backward compatibility)
+            #pragma warning disable CS0618
             var result = vector.TimeAfter(int.MaxValue);
+            #pragma warning restore CS0618
 
             // Assert
             var expectedTime = baseTime.AddMilliseconds(int.MaxValue);
