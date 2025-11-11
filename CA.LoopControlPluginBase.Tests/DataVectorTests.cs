@@ -2,7 +2,7 @@ using CA.LoopControlPluginBase;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 
-namespace UnitTests
+namespace CA.LoopControlPluginBase.Tests
 {
     [TestClass]
     public class DataVectorTests
@@ -14,7 +14,7 @@ namespace UnitTests
             var baseTime = new DateTime(2020, 1, 1, 0, 0, 0);
             var data = new double[10];
             var vector = new DataVector(baseTime, data);
-            var milliseconds600Hours = 600L * 60 * 60 * 1000; // exceeds int.MaxValue (2,147,483,647)
+            var milliseconds600Hours = 600L * 60 * 60 * 1000;
 
             // Act
             var result = vector.TimeAfter(milliseconds600Hours);
