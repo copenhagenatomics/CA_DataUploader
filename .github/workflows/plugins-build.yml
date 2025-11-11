@@ -3,11 +3,11 @@ name: build plugins
 on:
   push:
     tags: 'plugins*'
-    paths: 'CA.LoopControlPluginBase/**'
+    paths: 'CA.LoopControlPluginBase*/**'
     branches: [ master ]
   pull_request:
     branches: [ master ]
-    paths: 'CA.LoopControlPluginBase/**'
+    paths: 'CA.LoopControlPluginBase*/**'
 
 jobs:
   build:
