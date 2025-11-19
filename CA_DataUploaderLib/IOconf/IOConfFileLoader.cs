@@ -58,9 +58,11 @@ namespace CA_DataUploaderLib.IOconf
                 }
                 while (File.Exists(newFilename));
 
-                File.Move(filename, newFilename);
+                File.Copy(filename, newFilename);
             }
-            File.WriteAllText(filename, ioconf);
+            var temp = Path.GetTempFileName();
+            File.WriteAllText(temp, ioconf);
+            File.Move(temp, filename, true);
         }
 
         private static IOconfRow CreateType(IIOconfLoader confLoader, string row, int lineNum)

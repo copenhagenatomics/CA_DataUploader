@@ -240,10 +240,6 @@ namespace CA_DataUploaderLib
                 {
                     if (!decisionsIndexes.TryGetValue(conf.Name, out var decisionAndIndex)) 
                         throw new FormatException($"Decision listed in IO.conf (line {conf.LineNumber + 1}) was not found: '{conf.Row}'");
-                    var decisionVersion = decisionAndIndex.decision.GetType().Assembly.GetName().Version ?? throw new FormatException($"Failed to retrieve assembly version for decision '{conf.Row}' (line {conf.LineNumber + 1})");
-                    if (decisionVersion.Major != conf.Version.Major || decisionVersion.Minor != conf.Version.Minor || decisionVersion.Build != conf.Version.Build )
-                        //the 3 digits the user sees/configures does not match the 4 digits the scxmltocode tool produces, so we compare the 3 digits explicitly above i.e. 1.0.2.0 vs. 1.0.2
-                        throw new FormatException($"Decision listed in IO.conf (line {conf.LineNumber + 1}) did not match expected version: {conf.Version} - Actual: {decisionVersion} - '{conf.Row}'");
                     decisionsIndexes[conf.Name] = (decisionAndIndex.decision, decisions.Count + conf.Index); 
                 }
 

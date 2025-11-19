@@ -45,6 +45,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.github\release-drafter.yml = .github\release-drafter.yml
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CA.LoopControlPluginBase.Tests", "CA.LoopControlPluginBase.Tests\CA.LoopControlPluginBase.Tests.csproj", "{EB7C3DAE-0CE8-4882-AA3A-68B08D71D11F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -67,6 +69,10 @@ Global
 		{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EB7C3DAE-0CE8-4882-AA3A-68B08D71D11F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EB7C3DAE-0CE8-4882-AA3A-68B08D71D11F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EB7C3DAE-0CE8-4882-AA3A-68B08D71D11F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EB7C3DAE-0CE8-4882-AA3A-68B08D71D11F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

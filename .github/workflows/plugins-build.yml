@@ -3,11 +3,11 @@ name: build plugins
 on:
   push:
     tags: 'plugins*'
-    paths: 'CA.LoopControlPluginBase/**'
+    paths: 'CA.LoopControlPluginBase*/**'
     branches: [ master ]
   pull_request:
     branches: [ master ]
-    paths: 'CA.LoopControlPluginBase/**'
+    paths: 'CA.LoopControlPluginBase*/**'
 
 jobs:
   build:
@@ -23,11 +23,11 @@ jobs:
       with:
         dotnet-version: '8.0'
     - name: Restore dependencies
-      run: dotnet restore CA.LoopControlPluginBase
+      run: dotnet restore CA.LoopControlPluginBase.Tests
     - name: Build
-      run: dotnet build CA.LoopControlPluginBase -c Release --no-restore
+      run: dotnet build CA.LoopControlPluginBase.Tests -c Release --no-restore
     - name: Test
-      run: dotnet test CA.LoopControlPluginBase -c Release --no-build --verbosity normal
+      run: dotnet test CA.LoopControlPluginBase.Tests -c Release --no-build --verbosity normal
     - name: Pack CA.LoopControlPluginBase
       run: dotnet pack CA.LoopControlPluginBase -c Release -o out
     - name: make generated nuget packages available as workflow artifacts too

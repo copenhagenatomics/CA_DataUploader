@@ -1,10 +1,11 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using CA_DataUploaderLib;
 using CA_DataUploaderLib.Extensions;
 using CA_DataUploaderLib.IOconf;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Collections.Generic;
 
 namespace UnitTests
 {
@@ -30,6 +31,90 @@ namespace UnitTests
                 "Map; 1234567890; tm01",
                 "TypeJ; sameName; tm01; 1",
                 "TypeJ; sameName; tm01; 2" ]);
+        }
+
+        [TestMethod]
+        public void WhenTwoMapLinesHaveTheSameSerial_SinglePiSystem_ThenAnExceptionIsThrown()
+        {
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([
+                "Map; 1234567890; tm01",
+                "Map; 1234567890; tm02" ]));
+            Assert.IsTrue(ex.Message.StartsWith("Two Map-lines cannot use the same serial number"));
+        }
+
+        [TestMethod]
+        public void WhenTwoMapLinesHaveDifferentSerial_SinglePiSystem_ThenNoException()
+        {
+            var _ = new IOconfFile([
+                $"Map; 1234567890; tm01",
+                $"Map; 1234567891; tm02" ]);
+        }
+
+        [TestMethod]
+        public void WhenTwoMapLinesHaveTheSamePort_SinglePiSystem_ThenAnExceptionIsThrown()
+        {
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([
+                $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm01",
+                $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm02" ]));
+            Assert.IsTrue(ex.Message.StartsWith("Two Map-lines for the same node cannot use the same port"));
+        }
+
+        [TestMethod]
+        public void WhenTwoMapLinesHaveDifferentPorts_SinglePiSystem_ThenNoException()
+        {
+            var _ = new IOconfFile([
+                $"Map; {(RpiVersion.IsWindows() ? "COM2" : "USB1-1-2")}; tm01",
+                $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm02" ]);
+        }
+
+        [TestMethod]
+        public void WhenTwoMapLinesForTheSameNodeHaveTheSameSerial_MultiPiSystem_ThenAnExceptionIsThrown()
+        {
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([
+                "Node; node1; 1.2.3.4",
+                "Map; 1234567890; tm01; node1",
+                "Map; 1234567890; tm02; node1" ]));
+            Assert.IsTrue(ex.Message.StartsWith("Two Map-lines cannot use the same serial number"));
+        }
+
+        [TestMethod]
+        public void WhenTwoMapLinesForDifferentNodesHaveTheSameSerial_MultiPiSystem_ThenAnExceptionIsThrown()
+        {
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([
+                "Node; node1; 1.2.3.4",
+                "Node; node2; 1.2.3.5",
+                "Map; 1234567890; tm01; node1",
+                "Map; 1234567890; tm02; node2" ]));
+            Assert.IsTrue(ex.Message.StartsWith("Two Map-lines cannot use the same serial number"));
+        }
+
+        [TestMethod]
+        public void WhenTwoMapLinesForTheSameNodeHaveTheSamePort_MultiPiSystem_ThenAnExceptionIsThrown()
+        {
+            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([
+                "Node; node1; 1.2.3.4",
+                $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm01; node1",
+                $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm02; node1" ]));
+            Assert.IsTrue(ex.Message.StartsWith("Two Map-lines for the same node cannot use the same port"));
+        }
+
+        [TestMethod]
+        public void WhenTwoMapLinesForTheSameNodeHaveDifferentPorts_MultiPiSystem_ThenNoException()
+        {
+            var _ = new IOconfFile([
+                "Node; node1; 1.2.3.4",
+                $"Map; {(RpiVersion.IsWindows() ? "COM2" : "USB1-1-2")}; tm01; node1",
+                $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm02; node1" ]);
+        }
+
+        [TestMethod]
+        public void WhenTwoMapLinesForDifferentNodesHaveTheSamePort_MultiPiSystem_ThenNoException()
+        {
+            var _ = new IOconfFile([
+                "Node; node1; 1.2.3.4",
+                "Node; node2; 1.2.3.4",
+                $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm01; node1",
+                $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm02; node2" ]);
         }
 
         [TestMethod]
@@ -91,9 +176,9 @@ Math; temperature_tm01_01_math; temperature_tm01_01 + 1
             var loader = new IOconfLoader();
             loader.AddLoader(IOconfRowWithListArgument.ConfigName, (r, l) => new IOconfRowWithListArgument(r, l));
             var ioconf = new IOconfFile(loader, @"
-Map;fakeserial;ac01
-Map;fakeserial;ac02
-Map;fakeserial;ac03
+Map;fakeserial1;ac01
+Map;fakeserial2;ac02
+Map;fakeserial3;ac03
 Heater; LeftHeater16; ac01;01;850; tags:phase1 ovenarea4 ovenheaters area=2 // Freely choose tags to assign config entries to groups
 Heater; LeftHeater17; ac02;01;850; tags:phase2 ovenarea4 ovenheaters area=4
 Heater; LeftHeater18; ac02;02;850; tags:phase2 ovenarea4 ovenheaters area=5

@@ -28,7 +28,7 @@ namespace UnitTests
             var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
             mapLine.ValidateDependencies(ioConfMock);
             ioConf.ValidateDependencies(ioConfMock);
-            mapLine.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
+            mapLine.SetBoard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
 
             // Assert
             Assert.IsNull(mapLine!.BoardSettings.Calibration);
@@ -49,7 +49,7 @@ namespace UnitTests
             var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
             mapLine.ValidateDependencies(ioConfMock);
             ioConf.ValidateDependencies(ioConfMock);
-            mapLine.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
+            mapLine.SetBoard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
 
             // Assert
             var decimalDigits = new NumberFormatInfo() { NumberDecimalDigits = 6 };
@@ -72,7 +72,7 @@ namespace UnitTests
             var ioConf = new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {loadSideRating.ToString(CultureInfo.InvariantCulture)}; {meterSideRating.ToString(CultureInfo.InvariantCulture)}", 0);
             mapLine.ValidateDependencies(ioConfMock);
             ioConf.ValidateDependencies(ioConfMock);
-            mapLine.Setboard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
+            mapLine.SetBoard(new TestBoard(portPrefix + portName, mapLine, boardCalibration));
 
             // Assert
             var decimalDigits = new NumberFormatInfo() { NumberDecimalDigits = 6 };
