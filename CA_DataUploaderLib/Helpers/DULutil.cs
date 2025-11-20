@@ -94,9 +94,9 @@ namespace CA_DataUploaderLib.Helpers
                     WorkingDirectory = Environment.CurrentDirectory
                 }
             };
-            p.ErrorDataReceived += (sender, e) => { errorOutput += e.Data; };
+            p.ErrorDataReceived += (sender, e) => { errorOutput += (string.IsNullOrEmpty(errorOutput) ? string.Empty : Environment.NewLine) + e.Data; };
             if (!p.Start())
-                throw new Exception($"Unable to start process with command: {command} {arguments}");
+                throw new InvalidOperationException($"Unable to start process with command: {command} {arguments}");
 
             // To avoid deadlocks, always read the output stream first and then wait.
             // And, if you read both output and error stream use an asynchronous read operation on at least one of them.
@@ -104,7 +104,7 @@ namespace CA_DataUploaderLib.Helpers
             string standardOutput = p.StandardOutput.ReadToEnd().TrimEnd();
 
             if (!p.WaitForExit(60000))
-                throw new Exception($"Timed out waiting for command to exit: {command} {arguments}");
+                throw new TimeoutException($"Timed out waiting for command to exit: {command} {arguments}");
 
             if (debug)
             {

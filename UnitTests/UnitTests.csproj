@@ -18,4 +18,17 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\CA_DataUploaderLib\CA_DataUploaderLib.csproj" />
 	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="TestData\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Update="TestData\CodeRepoURLs.json">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="TestData\IO.conf">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
 </Project>
