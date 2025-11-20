@@ -41,7 +41,7 @@ namespace UnitTests
         public void ExtractAndHideURLs_ReplacesUrl()
         {
             // Arrange
-            List<string> input = [$"CodeRepo; repoA; https://example.com/repoA/", "CodeRepo;repoB;https://example.com/repoB/"];
+            List<string> input = [$"CodeRepo; repoA; https://example.com/repoA/", "CodeRepo;repoB;https://example.com/repoB/?si=123"];
             List<string> expectedOutput = [$"CodeRepo; repoA; {IOconfCodeRepo.HiddenURL}", $"CodeRepo;repoB;{IOconfCodeRepo.HiddenURL}"];
 
             // Act
@@ -49,14 +49,14 @@ namespace UnitTests
 
             // Assert
             CollectionAssert.AreEqual(expectedOutput, result);
-            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://example.com/repoA/" }, { "repoB", "https://example.com/repoB/" } }, extractedURLs);
+            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://example.com/repoA/" }, { "repoB", "https://example.com/repoB/?si=123" } }, extractedURLs);
         }
 
         [TestMethod]
-        public void ExtractAndHideURLs_UrlWithoutQueryParameters_EnsureTrailingForwardSlash()
+        public void ExtractAndHideURLs_EnsurePathHasTrailingForwardSlash()
         {
             // Arrange
-            List<string> input = [$"CodeRepo; repoA; https://example.com/without", "CodeRepo;repoB;https://example.com/repoB/?si=123"];
+            List<string> input = [$"CodeRepo; repoA; https://example.com/without", "CodeRepo;repoB;https://example.com/repoB?si=123"];
             List<string> expectedOutput = [$"CodeRepo; repoA; {IOconfCodeRepo.HiddenURL}", $"CodeRepo;repoB;{IOconfCodeRepo.HiddenURL}"];
 
             // Act

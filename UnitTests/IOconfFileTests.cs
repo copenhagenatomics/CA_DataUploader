@@ -329,6 +329,18 @@ RedundantSensors;redundant;expandtag{ovenheaters}
             Assert.IsTrue(ioconf.GetCodeRepoURLs().Contains(KeyValuePair.Create("testRepo", "https://example.com/testRepo/")));
         }
 
+        [TestMethod]
+        public void CanLoadConfigAndCodeRepoURLsFromFolder()
+        {
+            // Act
+            var ioconf = new IOconfFile("TestData");
+
+            // Assert
+            var codeRepoURLs = ioconf.GetCodeRepoURLs();
+            Assert.AreEqual(1, codeRepoURLs.Count);
+            Assert.IsTrue(codeRepoURLs.Contains(KeyValuePair.Create("testRepoFromFolder", "https://example.com/testRepoFromFolder/")));
+        }
+
         private class IOConfMathing(string row, int lineIndex) : IOconfRow(row, lineIndex, "Mathing")
         {
         }
