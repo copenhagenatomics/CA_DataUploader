@@ -75,13 +75,14 @@ namespace CA_DataUploaderLib.IOconf
             return (input, repoURLs);
         }
 
-        public static Dictionary<string, string> ReadURLsFromFile()
+        public static Dictionary<string, string> ReadURLsFromFile(string? directory = null)
         {
             try
             {
-                return System.IO.File.Exists(RepoUrlJsonFile)
-                ? JsonSerializer.Deserialize<Dictionary<string, string>>(System.IO.File.ReadAllText(RepoUrlJsonFile)) ?? []
-                : [];
+                var filePath = Path.Combine(directory ?? Directory.GetCurrentDirectory(), RepoUrlJsonFile);
+                return File.Exists(filePath)
+                    ? JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(filePath)) ?? []
+                    : [];
             }
             catch (Exception ex)
             {
@@ -116,7 +117,6 @@ namespace CA_DataUploaderLib.IOconf
         /// </summary>
         public Uri GenerateDownloadUrl(string filename)
         {
-            
             var url = URL[..(URL.LastIndexOf('/') + 1)] + filename + URL[(URL.LastIndexOf('/') + 1)..];
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
                 throw new InvalidOperationException($"URL is invalid: {url}");

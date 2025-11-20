@@ -19,9 +19,9 @@ namespace CA_DataUploaderLib.IOconf
         public static IIOconfLoader DefaultLoader { get; } = new IOconfLoader();
         public static bool FileExists() => IOconfFileLoader.FileExists();
 
-        public IOconfFile()
+        public IOconfFile(string? directory = null)
         {
-            Reload();
+            Reload(directory);
         }
 
         public IOconfFile(List<string> rawLines, bool performCheck = true)
@@ -37,11 +37,11 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         [MemberNotNull(nameof(CodeRepoURLs))]
-        public void Reload()
+        public void Reload(string? directory = null)
         {
-            CodeRepoURLs = IOconfCodeRepo.ReadURLsFromFile();
+            CodeRepoURLs = IOconfCodeRepo.ReadURLsFromFile(directory);
             // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization rejects the custom entries.
-            (RawLines, OriginalRows, Table) = IOconfFileLoader.Load(DefaultLoader);
+            (RawLines, OriginalRows, Table) = IOconfFileLoader.Load(DefaultLoader, directory);
             EnsureRPiTempEntry();
             CheckConfig();
         }
