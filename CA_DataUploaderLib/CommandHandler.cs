@@ -212,6 +212,7 @@ namespace CA_DataUploaderLib
                 .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
                 .ToList();
             var globalInputs = descItemsPerSubsystem.SelectMany(s => s.GlobalInputs).ToList();
+            CheckForDecisionNameDuplicates(_decisions);
             OrderDecisionsBasedOnIOconf(_decisions);
             var decisions = _decisions.Concat(_safetyDecisions);
             SetConfigBasedOnIOconf(decisions);
@@ -226,21 +227,25 @@ namespace CA_DataUploaderLib
                 this, desc.VectorDescription._items.Select((f, i) => (name: f.Descriptor, i)).ToDictionary(f => f.name, f => f.i));
             return desc;
 
-            /// <summary>gets a comparer that can be used to order plugins based on the order listed in IO.conf</summary>
-            /// <remarks>all decisions listed in the IO.conf come after the decisions not listed. The decisions that are not listed keep the order in which they were added</remarks>
-            void OrderDecisionsBasedOnIOconf(List<LoopControlDecision> decisions)
+            void CheckForDecisionNameDuplicates(List<LoopControlDecision> decisions)
             {
                 var decisionDupes = decisions.GroupBy(d => new { d.Name }).Where(x => x.Skip(1).Any());
                 if (decisionDupes.Any())
                     throw new FormatException($"Duplicate decision names detected - please rename: {string.Join(", ", decisionDupes.Select(g => g.Key.Name))}");
+            }
+
+            /// <summary>gets a comparer that can be used to order plugins based on the order listed in IO.conf</summary>
+            /// <remarks>all decisions listed in the IO.conf come after the decisions not listed. The decisions that are not listed keep the order in which they were added</remarks>
+            void OrderDecisionsBasedOnIOconf(List<LoopControlDecision> decisions)
+            {
                 //indexes are the original position at first and we later change the index of those found in IO.conf to decisions.Count + the conf order/index (so those in IO.conf come after non listed + in conf order).
-                var decisionsIndexes = decisions.Select((decision, index) => (decision, index)).ToDictionary(tuple => tuple.decision.Name, tuple => (tuple.decision, tuple.index)); 
+                var decisionsIndexes = decisions.Select((decision, index) => (decision, index)).ToDictionary(tuple => tuple.decision.Name, tuple => (tuple.decision, tuple.index));
                 var confDecisions = _ioconf.GetEntries<IOconfCode>();
                 foreach (var conf in confDecisions)
                 {
-                    if (!decisionsIndexes.TryGetValue(conf.Name, out var decisionAndIndex)) 
+                    if (!decisionsIndexes.TryGetValue(conf.Name, out var decisionAndIndex))
                         throw new FormatException($"Decision listed in IO.conf (line {conf.LineNumber + 1}) was not found: '{conf.Row}'");
-                    decisionsIndexes[conf.Name] = (decisionAndIndex.decision, decisions.Count + conf.Index); 
+                    decisionsIndexes[conf.Name] = (decisionAndIndex.decision, decisions.Count + conf.Index);
                 }
 
                 decisions.Sort((x, y) => decisionsIndexes[x.Name].index.CompareTo(decisionsIndexes[y.Name].index));
