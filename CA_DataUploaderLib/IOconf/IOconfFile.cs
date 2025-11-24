@@ -15,12 +15,16 @@ namespace CA_DataUploaderLib.IOconf
         public List<string> RawLines { get; private set; } = [];
 
         private static readonly Lazy<IOconfFile> lazy = new(() => new IOconfFile());
+        private readonly string directory = Directory.GetCurrentDirectory();
+
         public static IIOconf Instance => lazy.Value;
         public static IIOconfLoader DefaultLoader { get; } = new IOconfLoader();
-        public static bool FileExists() => IOconfFileLoader.FileExists();
+        public static bool FileExists() => IOconfFileLoader.FileExists(Directory.GetCurrentDirectory());
 
-        public IOconfFile()
+        public IOconfFile(string? directory = null)
         {
+            if (directory is not null)
+                this.directory = directory;
             Reload();
         }
 
@@ -28,7 +32,7 @@ namespace CA_DataUploaderLib.IOconf
             : this(DefaultLoader, rawLines, performCheck) { }
         public IOconfFile(IIOconfLoader loader, List<string> rawLines, bool performCheck = true)
         {
-            (rawLines, CodeRepoURLs) = IOconfCodeRepo.ExtractAndHideURLs(rawLines, IOconfCodeRepo.ReadURLsFromFile());
+            (rawLines, CodeRepoURLs) = IOconfCodeRepo.ExtractAndHideURLs(rawLines, IOconfCodeRepo.ReadURLsFromFile(directory));
             (OriginalRows, Table) = IOconfFileLoader.ParseLines(loader, rawLines);
             RawLines = rawLines;
             EnsureRPiTempEntry();
@@ -39,15 +43,15 @@ namespace CA_DataUploaderLib.IOconf
         [MemberNotNull(nameof(CodeRepoURLs))]
         public void Reload()
         {
-            CodeRepoURLs = IOconfCodeRepo.ReadURLsFromFile();
+            CodeRepoURLs = IOconfCodeRepo.ReadURLsFromFile(directory);
             // the separate IOconfFileLoader can be used by callers to expand the IOconfFile before the IOconfFile initialization rejects the custom entries.
-            (RawLines, OriginalRows, Table) = IOconfFileLoader.Load(DefaultLoader);
+            (RawLines, OriginalRows, Table) = IOconfFileLoader.Load(DefaultLoader, directory);
             EnsureRPiTempEntry();
             CheckConfig();
         }
 
         /// <summary>
-        /// Writes the configuration to a file IO.conf on disk.
+        /// Writes the configuration to a file IO.conf in the default directory on disk (Directory.GetCurrentDirectory()).
         /// Renames any existing configuration to IO.conf.backup1 (trailing number increasing).
         /// Also writes the code repository URLs to a file on disk.
         /// </summary>
@@ -55,7 +59,7 @@ namespace CA_DataUploaderLib.IOconf
         public void WriteToDisk()
         {
             IOconfFileLoader.WriteToDisk(GetRawFile());
-            IOconfCodeRepo.WriteURLsToFile(CodeRepoURLs);
+            IOconfCodeRepo.WriteURLsToFile(CodeRepoURLs, Directory.GetCurrentDirectory());
         }
 
         public void CheckConfig()

@@ -11,6 +11,8 @@ namespace UnitTests
     [TestClass]
     public class IOconfCodeRepoTests
     {
+        private string currentDirectory = Directory.GetCurrentDirectory();
+
         [TestMethod]
         public void ExtractAndHideURLs_WhenUrlIsMalformed_ThrowsException()
         {
@@ -41,7 +43,7 @@ namespace UnitTests
         public void ExtractAndHideURLs_ReplacesUrl()
         {
             // Arrange
-            List<string> input = [$"CodeRepo; repoA; https://example.com/repoA/", "CodeRepo;repoB;https://example.com/repoB/"];
+            List<string> input = [$"CodeRepo; repoA; https://example.com/repoA/", "CodeRepo;repoB;https://example.com/repoB/?si=123"];
             List<string> expectedOutput = [$"CodeRepo; repoA; {IOconfCodeRepo.HiddenURL}", $"CodeRepo;repoB;{IOconfCodeRepo.HiddenURL}"];
 
             // Act
@@ -49,14 +51,14 @@ namespace UnitTests
 
             // Assert
             CollectionAssert.AreEqual(expectedOutput, result);
-            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://example.com/repoA/" }, { "repoB", "https://example.com/repoB/" } }, extractedURLs);
+            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://example.com/repoA/" }, { "repoB", "https://example.com/repoB/?si=123" } }, extractedURLs);
         }
 
         [TestMethod]
-        public void ExtractAndHideURLs_UrlWithoutQueryParameters_EnsureTrailingForwardSlash()
+        public void ExtractAndHideURLs_EnsurePathHasTrailingForwardSlash()
         {
             // Arrange
-            List<string> input = [$"CodeRepo; repoA; https://example.com/without", "CodeRepo;repoB;https://example.com/repoB/?si=123"];
+            List<string> input = [$"CodeRepo; repoA; https://example.com/without", "CodeRepo;repoB;https://example.com/repoB?si=123"];
             List<string> expectedOutput = [$"CodeRepo; repoA; {IOconfCodeRepo.HiddenURL}", $"CodeRepo;repoB;{IOconfCodeRepo.HiddenURL}"];
 
             // Act
@@ -162,11 +164,11 @@ namespace UnitTests
             var urls = new Dictionary<string, string> { { "repoA", "https://example.com/repoA/?sv=123&si=ca" }, { "repoB", "https://newurl.com/repoB/" } };
 
             // Act
-            IOconfCodeRepo.WriteURLsToFile(urls);
+            IOconfCodeRepo.WriteURLsToFile(urls, currentDirectory);
 
             // Assert
             Assert.IsTrue(File.Exists(IOconfCodeRepo.RepoUrlJsonFile));
-            CollectionAssert.AreEqual(urls, IOconfCodeRepo.ReadURLsFromFile());
+            CollectionAssert.AreEqual(urls, IOconfCodeRepo.ReadURLsFromFile(currentDirectory));
         }
 
         [TestMethod]
@@ -176,15 +178,15 @@ namespace UnitTests
             if (File.Exists(IOconfCodeRepo.RepoUrlJsonFile))
                 File.Delete(IOconfCodeRepo.RepoUrlJsonFile);
             var existingURLs = new Dictionary<string, string> { { "repoA", "https://example.com/repoA/" }, { "repoB", "https://newurl.com/repoB/" } };
-            IOconfCodeRepo.WriteURLsToFile(existingURLs);
+            IOconfCodeRepo.WriteURLsToFile(existingURLs, currentDirectory);
             var newURL = new Dictionary<string, string> { { "repoC", "https://example.com/repoC/" } };
 
             // Act
-            IOconfCodeRepo.WriteURLsToFile(newURL);
+            IOconfCodeRepo.WriteURLsToFile(newURL, currentDirectory);
 
             // Assert
             Assert.IsTrue(File.Exists(IOconfCodeRepo.RepoUrlJsonFile));
-            CollectionAssert.AreEqual(existingURLs.Union(newURL).ToDictionary(), IOconfCodeRepo.ReadURLsFromFile());
+            CollectionAssert.AreEqual(existingURLs.Union(newURL).ToDictionary(), IOconfCodeRepo.ReadURLsFromFile(currentDirectory));
         }
 
         [TestMethod]
@@ -194,15 +196,15 @@ namespace UnitTests
             if (File.Exists(IOconfCodeRepo.RepoUrlJsonFile))
                 File.Delete(IOconfCodeRepo.RepoUrlJsonFile);
             var existingURLs = new Dictionary<string, string> { { "repoA", "https://example.com/repoA/" }, { "repoB", "https://example.com/repoB/" } };
-            IOconfCodeRepo.WriteURLsToFile(existingURLs);
+            IOconfCodeRepo.WriteURLsToFile(existingURLs, currentDirectory);
             var newURL = new Dictionary<string, string> { { "repoA", "https://newurl.com/repoA/" } };
 
             // Act
-            IOconfCodeRepo.WriteURLsToFile(newURL);
+            IOconfCodeRepo.WriteURLsToFile(newURL, currentDirectory);
 
             // Assert
             Assert.IsTrue(File.Exists(IOconfCodeRepo.RepoUrlJsonFile));
-            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://newurl.com/repoA/" }, { "repoB", "https://example.com/repoB/" } }, IOconfCodeRepo.ReadURLsFromFile());
+            CollectionAssert.AreEqual(new Dictionary<string, string> { { "repoA", "https://newurl.com/repoA/" }, { "repoB", "https://example.com/repoB/" } }, IOconfCodeRepo.ReadURLsFromFile(currentDirectory));
         }
 
         [TestMethod]
@@ -214,7 +216,7 @@ namespace UnitTests
             File.WriteAllText(IOconfCodeRepo.RepoUrlJsonFile, "blablabla");
 
             // Act
-            var urls = IOconfCodeRepo.ReadURLsFromFile();
+            var urls = IOconfCodeRepo.ReadURLsFromFile(currentDirectory);
 
             // Assert
             Assert.AreEqual(0, urls.Count);
