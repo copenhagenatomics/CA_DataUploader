@@ -75,11 +75,11 @@ namespace CA_DataUploaderLib.IOconf
             return (input, repoURLs);
         }
 
-        public static Dictionary<string, string> ReadURLsFromFile(string? directory = null)
+        public static Dictionary<string, string> ReadURLsFromFile(string directory)
         {
             try
             {
-                var filePath = Path.Combine(directory ?? Directory.GetCurrentDirectory(), RepoUrlJsonFile);
+                var filePath = Path.Combine(directory, RepoUrlJsonFile);
                 return File.Exists(filePath)
                     ? JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(filePath)) ?? []
                     : [];
@@ -95,9 +95,9 @@ namespace CA_DataUploaderLib.IOconf
         /// Add to or update the URLs in the JSON file with the provided dictionary of extracted URLs.
         /// </summary>
         /// <param name="extractedURLs"></param>
-        public static void WriteURLsToFile(Dictionary<string, string> extractedURLs)
+        public static void WriteURLsToFile(Dictionary<string, string> extractedURLs, string directory)
         {
-            var repoURLs = ReadURLsFromFile();
+            var repoURLs = ReadURLsFromFile(directory);
 
             foreach (var repoUrl in extractedURLs)
                 repoURLs[repoUrl.Key] = repoUrl.Value;

@@ -94,7 +94,7 @@ namespace CA_DataUploaderLib.Helpers
                     WorkingDirectory = Environment.CurrentDirectory
                 }
             };
-            p.ErrorDataReceived += (sender, e) => { errorOutput += (string.IsNullOrEmpty(errorOutput) ? string.Empty : Environment.NewLine) + e.Data; };
+            p.ErrorDataReceived += (sender, e) => { errorOutput += e.Data + Environment.NewLine; };
             if (!p.Start())
                 throw new InvalidOperationException($"Unable to start process with command: {command} {arguments}");
 

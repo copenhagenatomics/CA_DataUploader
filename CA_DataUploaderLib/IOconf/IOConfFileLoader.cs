@@ -8,15 +8,15 @@ namespace CA_DataUploaderLib.IOconf
 {
     internal static class IOconfFileLoader
     {
-        public static bool FileExists(string? directory = null)
+        public static bool FileExists(string directory)
         {
-            var configPath = Path.Combine(directory ?? Directory.GetCurrentDirectory(), "IO.conf");
+            var configPath = Path.Combine(directory, "IO.conf");
             return File.Exists(configPath);
         }
 
-        public static (List<string> raw, List<IOconfRow> original, List<IOconfRow> expanded) Load(IIOconfLoader loader, string? directory = null)
+        public static (List<string> raw, List<IOconfRow> original, List<IOconfRow> expanded) Load(IIOconfLoader loader, string directory)
         {
-            var configPath = Path.Combine(directory ?? Directory.GetCurrentDirectory(), "IO.conf");
+            var configPath = Path.Combine(directory, "IO.conf");
             if (!File.Exists(configPath))
             {
                 throw new FileNotFoundException($"Could not find the file {configPath}");
