@@ -341,7 +341,7 @@ namespace CA_DataUploaderLib
             cmdString = cmdString.Replace('_', ' ').Trim();
             cmdString = Regex.Replace(cmdString, @"\s+", " "); // Merge multiple whitespace characters
             if (isUserCommand)
-                UserCommandReceived?.Invoke(this, new(cmdString, EventType.Command, DateTime.UtcNow));
+                UserCommandReceived?.Invoke(this, new(cmdString, EventType.Command, DateTime.UtcNow, username));
             if (_commandRunner.Run(cmdString, isUserCommand) && isUserCommand)
                 OnUserCommandAccepted(cmdString, username);
         }
