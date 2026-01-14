@@ -166,12 +166,20 @@ namespace CA_DataUploaderLib
 
         private void MakeDecisionsAfterInputs(DataVector vector, List<string> commands, ExtendedVectorDescription extendedDesc)
         {
+            commands = ReplaceExternalShutdownCommandWithEmergencyShutdown(commands);
             extendedDesc.MakeDecision(vector);
             var decisionsVector = new CA.LoopControlPluginBase.DataVector(vector.Timestamp, vector.Data);
             foreach (var decision in _decisions)
                 decision.MakeDecision(decisionsVector, commands);
             foreach (var decision in _safetyDecisions)
                 decision.MakeDecision(decisionsVector, commands);
+
+            static List<string> ReplaceExternalShutdownCommandWithEmergencyShutdown(List<string> commands)
+            {
+                if (commands.Contains("externalshutdown"))
+                    commands = [.. commands.Select(s => s == "externalshutdown" ? "emergencyshutdown" : s)];
+                return commands;
+            }
         }
 
         public Task RunSubsystems() => RunSubsystems(StopToken);
