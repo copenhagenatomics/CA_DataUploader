@@ -287,7 +287,7 @@ namespace CA_DataUploaderLib
                     else if (_config.InvalidValueDelay == 0)
                         value = _config.DefaultInvalidValue;
                     else if (invalidValueDelay == 0.0)
-                        invalidValueDelay = _latestVector.TimeAfter((int)(_config.InvalidValueDelay * 1000));
+                        invalidValueDelay = _latestVector.TimeAfter((long)(_config.InvalidValueDelay * 1000));
                     else if (_latestVector.Reached(invalidValueDelay))
                         value = _config.DefaultInvalidValue;
                 }

@@ -189,8 +189,8 @@ namespace CA_DataUploaderLib
                                 break;
                             case States.InControlPeriod:
                                 var secondsOn = GetProportionalControlSecondsOn();
-                                nextcontrolperiod = _latestVector.TimeAfter((int)(GetControlPeriodSeconds() * 1000));
-                                controlperiodtimeoff = _latestVector.TimeAfter(secondsOn < 0.1d ? 0 : (int)(secondsOn * 1000));
+                                nextcontrolperiod = _latestVector.TimeAfter((long)(GetControlPeriodSeconds() * 1000));
+                                controlperiodtimeoff = _latestVector.TimeAfter(secondsOn < 0.1d ? 0 : (long)(secondsOn * 1000));
                                 on = _latestVector.Reached(controlperiodtimeoff) ? 0 : 1;
                                 break;
                             default: //any state without entry actions goes here
