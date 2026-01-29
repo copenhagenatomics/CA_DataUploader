@@ -28,7 +28,7 @@ namespace UnitTests
             filter.Input([new("X", 3) { TimeStamp = now.AddSeconds(0.8) }]);
             filter.Input([new("X", 3) { TimeStamp = now.AddSeconds(0.9) }]);
             var result = filter.Output.Value;
-            Assert.IsTrue(Math.Abs(3d - result) < 0.0000000001, $"{result}");
+            Assert.IsLessThan(0.0000000001, Math.Abs(3d - result), $"{result}");
         }
 
         [TestMethod]
@@ -51,7 +51,7 @@ namespace UnitTests
             filter.Input([new("X", 4) { TimeStamp = now.AddSeconds(1.2) }]);
             filter.Input([new("X", 4) { TimeStamp = now.AddSeconds(1.3) }]);
             var result = filter.Output.Value;
-            Assert.IsTrue(Math.Abs(3.727272727d - result) < 0.0000001, $"{result} - {now:o}");
+            Assert.IsLessThan(0.0000001, Math.Abs(3.727272727d - result), $"{result} - {now:o}");
         }
 
         [TestMethod]
@@ -74,7 +74,7 @@ namespace UnitTests
             filter.Input([new("X", 4) { TimeStamp = now.AddSeconds(1.2) }]);
             filter.Input([new("X", 4) { TimeStamp = now.AddSeconds(1.3) }]);
             var result = filter.Output.Value;
-            Assert.IsTrue(Math.Abs(3.727272727d - result) < 0.0000001, $"{result}");
+            Assert.IsLessThan(0.0000001, Math.Abs(3.727272727d - result), $"{result}");
         }
 
         [TestMethod]
@@ -131,7 +131,7 @@ namespace UnitTests
             filter.Input([new("X", 4) { TimeStamp = now.AddSeconds(1.2) }]);
             filter.Input([new("X", 4) { TimeStamp = now.AddSeconds(1.3) }]);
             var result = filter.Output.Value;
-            Assert.IsTrue(Math.Abs(3.727272727d - result) < 0.0000001, $"{result}");
+            Assert.IsLessThan(0.0000001, Math.Abs(3.727272727d - result), $"{result}");
 
         }
     }

@@ -8,7 +8,7 @@ namespace UnitTests
     public class IOconfOvenTests
     {
         [DataRow("Oven;2;topheater1;typek1;0.2;00:00:10;20", "topheater1", "typek1", 0.2d, 10d, 0.2d)]
-        [DataTestMethod]
+        [TestMethod]
         public void ParsesOvenLine(string row, string heaterName, string sensorName, double pgain, double controlPeriodSeconds, double maxOutput) 
         {
             var oven = new IOconfOven(row, 0);
@@ -21,7 +21,7 @@ namespace UnitTests
 
         [DataRow("OvenProportionalControlUpdates;3.5;00:01:10;30", 3.5d, 70d, 0.3d)]
         [DataRow("OvenProportionalControlUpdates;3;00:00:05;5", 3d, 5d, 0.05d)]
-        [DataTestMethod]
+        [TestMethod]
         public void ParsesOvenProportionalControlUpdatesLine(string row, double pgain, double controlPeriodSeconds, double maxOutput)
         {
             var oven = new IOconfOvenProportionalControlUpdates(row, 0);
@@ -33,10 +33,10 @@ namespace UnitTests
         [DataRow("OvenProportionalControlUpdates;3.5a;00:01:10;30")]
         [DataRow("OvenProportionalControlUpdates;3;00:00:05;5d")]
         [DataRow("OvenProportionalControlUpdates;3;00:00:05;-5")]
-        [DataTestMethod]
+        [TestMethod]
         public void ThrowsFormatExceptionOnBrokenOvenProportionalControlUpdatesLine(string row)
         {
-            Assert.ThrowsException<FormatException>(() => new IOconfOvenProportionalControlUpdates(row, 0));
+            Assert.Throws<FormatException>(() => new IOconfOvenProportionalControlUpdates(row, 0));
         }
     }
 }

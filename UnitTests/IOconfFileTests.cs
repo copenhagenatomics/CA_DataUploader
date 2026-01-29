@@ -24,22 +24,21 @@ namespace UnitTests
         }
 
         [TestMethod]
-        [ExpectedException(typeof(FormatException), "An exception should have been thrown but was not.")]
         public void WhenTwoRowsInTheSameGroupHaveTheSameName_ThenAnExceptionIsThrown()
         {
-            var _ = new IOconfFile([
+            Assert.Throws<FormatException>(() => new IOconfFile([
                 "Map; 1234567890; tm01",
                 "TypeJ; sameName; tm01; 1",
-                "TypeJ; sameName; tm01; 2" ]);
+                "TypeJ; sameName; tm01; 2" ]), "An exception should have been thrown but was not.");
         }
 
         [TestMethod]
         public void WhenTwoMapLinesHaveTheSameSerial_SinglePiSystem_ThenAnExceptionIsThrown()
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([
+            var ex = Assert.Throws<FormatException>(() => new IOconfFile([
                 "Map; 1234567890; tm01",
                 "Map; 1234567890; tm02" ]));
-            Assert.IsTrue(ex.Message.StartsWith("Two Map-lines cannot use the same serial number"));
+            Assert.StartsWith("Two Map-lines cannot use the same serial number", ex.Message);
         }
 
         [TestMethod]
@@ -53,10 +52,10 @@ namespace UnitTests
         [TestMethod]
         public void WhenTwoMapLinesHaveTheSamePort_SinglePiSystem_ThenAnExceptionIsThrown()
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([
+            var ex = Assert.Throws<FormatException>(() => new IOconfFile([
                 $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm01",
                 $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm02" ]));
-            Assert.IsTrue(ex.Message.StartsWith("Two Map-lines for the same node cannot use the same port"));
+            Assert.StartsWith("Two Map-lines for the same node cannot use the same port", ex.Message);
         }
 
         [TestMethod]
@@ -70,32 +69,32 @@ namespace UnitTests
         [TestMethod]
         public void WhenTwoMapLinesForTheSameNodeHaveTheSameSerial_MultiPiSystem_ThenAnExceptionIsThrown()
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([
+            var ex = Assert.Throws<FormatException>(() => new IOconfFile([
                 "Node; node1; 1.2.3.4",
                 "Map; 1234567890; tm01; node1",
                 "Map; 1234567890; tm02; node1" ]));
-            Assert.IsTrue(ex.Message.StartsWith("Two Map-lines cannot use the same serial number"));
+            Assert.StartsWith("Two Map-lines cannot use the same serial number", ex.Message);
         }
 
         [TestMethod]
         public void WhenTwoMapLinesForDifferentNodesHaveTheSameSerial_MultiPiSystem_ThenAnExceptionIsThrown()
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([
+            var ex = Assert.Throws<FormatException>(() => new IOconfFile([
                 "Node; node1; 1.2.3.4",
                 "Node; node2; 1.2.3.5",
                 "Map; 1234567890; tm01; node1",
                 "Map; 1234567890; tm02; node2" ]));
-            Assert.IsTrue(ex.Message.StartsWith("Two Map-lines cannot use the same serial number"));
+            Assert.StartsWith("Two Map-lines cannot use the same serial number", ex.Message);
         }
 
         [TestMethod]
         public void WhenTwoMapLinesForTheSameNodeHaveTheSamePort_MultiPiSystem_ThenAnExceptionIsThrown()
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([
+            var ex = Assert.Throws<FormatException>(() => new IOconfFile([
                 "Node; node1; 1.2.3.4",
                 $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm01; node1",
                 $"Map; {(RpiVersion.IsWindows() ? "COM3" : "USB1-2-3")}; tm02; node1" ]));
-            Assert.IsTrue(ex.Message.StartsWith("Two Map-lines for the same node cannot use the same port"));
+            Assert.StartsWith("Two Map-lines for the same node cannot use the same port", ex.Message);
         }
 
         [TestMethod]
@@ -249,7 +248,7 @@ RedundantSensors;redundant;expandtag{ovenheaters}
         {
             var rowsEnum = ParseLines(["Account;john;john.doe@example.com;johndoepass"]);
             var rows = rowsEnum.ToArray();
-            Assert.AreEqual(1, rows.Length);
+            Assert.HasCount(1, rows);
             Assert.IsInstanceOfType(rows[0], typeof(IOconfAccount));
             var account = (IOconfAccount)rows[0];
             Assert.AreEqual("john-john.doe@example.com-johndoepass", $"{account.Name}-{account.Email}-{account.Password}");
@@ -260,7 +259,7 @@ RedundantSensors;redundant;expandtag{ovenheaters}
         {
             var rowsEnum = ParseLines(["Math;mymath;heater1 + 5"]);
             var rows = rowsEnum.ToArray();
-            Assert.AreEqual(1, rows.Length);
+            Assert.HasCount(1, rows);
             Assert.IsInstanceOfType(rows[0], typeof(IOconfMath));
             var math = (IOconfMath)rows[0];
             Assert.AreEqual("mymath", math.Name);
@@ -272,7 +271,7 @@ RedundantSensors;redundant;expandtag{ovenheaters}
         {
             var rowsEnum = ParseLines(["Map;fakeserial;realacbox2","GenericOutput;generic_ac_on;realacbox2;0;p1 $heater1_onoff 3"]);
             var rows = rowsEnum.ToArray();
-            Assert.AreEqual(2, rows.Length);
+            Assert.HasCount(2, rows);
             Assert.IsInstanceOfType(rows[1], typeof(IOconfGenericOutput));
             var output = (IOconfGenericOutput)rows[1];
             Assert.AreEqual("generic_ac_on", output.Name);
@@ -286,7 +285,7 @@ RedundantSensors;redundant;expandtag{ovenheaters}
         {
             var rowsEnum = ParseLines(["GenericOutput;generic_ac_on;realacbox2;0;p1 on 3 ${heater1_onoff}00%","Map;fake1;realacbox2"]);
             var rows = rowsEnum.ToArray();
-            Assert.AreEqual(2, rows.Length);
+            Assert.HasCount(2, rows);
             Assert.IsInstanceOfType(rows[0], typeof(IOconfGenericOutput));
             var output = (IOconfGenericOutput)rows[0];
             Assert.AreEqual("generic_ac_on", output.Name);
@@ -302,7 +301,7 @@ RedundantSensors;redundant;expandtag{ovenheaters}
             loader.AddLoader("Mathing", (row, lineIndex) => new IOConfMathing(row, lineIndex));
             var ioconf = new IOconfFile(loader, ["Mathing;mymath;heater1 + 5"]);
             var rows = ioconf.GetEntries<IOconfRow>().ToArray();
-            Assert.AreEqual(2, rows.Length);
+            Assert.HasCount(2, rows);
             Assert.IsInstanceOfType(rows[0], typeof(IOConfMathing));
         }
 
@@ -311,7 +310,7 @@ RedundantSensors;redundant;expandtag{ovenheaters}
         {
             var rowsEnum = ParseLines(["Current;current_ct01;ct01;2;300","Map;fakeserial;ct01"]);
             var rows = rowsEnum.ToArray();
-            Assert.AreEqual(2, rows.Length);
+            Assert.HasCount(2, rows);
             Assert.IsInstanceOfType(rows[0], typeof(IOconfCurrent));
             var current = (IOconfCurrent)rows[0];
             Assert.AreEqual("current_ct01", current.Name);
@@ -337,7 +336,7 @@ RedundantSensors;redundant;expandtag{ovenheaters}
 
             // Assert
             var codeRepoURLs = ioconf.GetCodeRepoURLs();
-            Assert.AreEqual(1, codeRepoURLs.Count);
+            Assert.HasCount(1, codeRepoURLs);
             Assert.IsTrue(codeRepoURLs.Contains(KeyValuePair.Create("testRepoFromFolder", "https://example.com/testRepoFromFolder/")));
         }
 

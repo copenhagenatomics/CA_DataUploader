@@ -37,16 +37,16 @@ namespace UnitTests
 
             // Assert
             var zipFiles = Directory.GetFiles(tempDir, $"HighResolution_{name}_*.zip");
-            Assert.AreEqual(1, zipFiles.Length, "Expected one zip file to be created.");
+            Assert.HasCount(1, zipFiles, "Expected one zip file to be created.");
             using var archive = ZipFile.OpenRead(zipFiles[0]);
             var entry = archive.Entries.FirstOrDefault(e => e.FullName.EndsWith(".csv"));
             Assert.IsNotNull(entry, "CSV entry not found in zip.");
             using var entryStream = entry.Open();
             using var reader = new StreamReader(entryStream);
             string content = reader.ReadToEnd();
-            Assert.IsTrue(content.StartsWith("header1, header2"));
-            Assert.AreEqual(1, Regex.Matches(content, "header1, header2").Count);
-            Assert.IsTrue(content.Contains($"1, 2{Environment.NewLine}2, 3{Environment.NewLine}3, 4"));
+            Assert.StartsWith("header1, header2", content);
+            Assert.HasCount(1, Regex.Matches(content, "header1, header2"));
+            Assert.Contains($"1, 2{Environment.NewLine}2, 3{Environment.NewLine}3, 4", content);
         }
 
         [TestMethod]
@@ -64,7 +64,7 @@ namespace UnitTests
             
             // Assert - Should have flushed at least once
             var zipFiles = Directory.GetFiles(tempDir, $"HighResolution_{name}_*.zip");
-            Assert.IsTrue(zipFiles.Length > 0, "Expected at least one zip file to be created after large writes.");
+            Assert.IsNotEmpty(zipFiles, "Expected at least one zip file to be created after large writes.");
         }
 
         [TestMethod]
@@ -85,7 +85,7 @@ namespace UnitTests
 
             // Assert - Should create two files
             var zipFiles = Directory.GetFiles(tempDir, $"HighResolution_{name}_*.zip");
-            Assert.IsTrue(zipFiles.Length == 2, $"Expected two zip files after two stops, but seeing {zipFiles.Length}.");
+            Assert.HasCount(2, zipFiles, $"Expected two zip files after two stops, but seeing {zipFiles.Length}.");
             foreach (var zipFile in Directory.GetFiles(tempDir, $"HighResolution_{name}_*.zip"))
             {
                 using var archive = ZipFile.OpenRead(zipFile);
@@ -93,8 +93,8 @@ namespace UnitTests
                 using var entryStream = entry!.Open();
                 using var reader = new StreamReader(entryStream);
                 string content = reader.ReadToEnd();
-                Assert.IsTrue(content.StartsWith("header1, header2"));
-                Assert.IsTrue(content.Contains("1, 2"));
+                Assert.StartsWith("header1, header2", content);
+                Assert.Contains("1, 2", content);
             }
         }
 
@@ -117,7 +117,7 @@ namespace UnitTests
 
             // Assert
             var zipFiles = Directory.GetFiles(tempDir, $"HighResolution_{name}_*.zip");
-            Assert.IsTrue(zipFiles.Length == HighResolutionWriter.MaxFilesInFolder, $"Should not exceed MaxFilesInFolder limit {zipFiles.Length} != {HighResolutionWriter.MaxFilesInFolder}.");
+            Assert.HasCount(HighResolutionWriter.MaxFilesInFolder, zipFiles, $"Should not exceed MaxFilesInFolder limit {zipFiles.Length} != {HighResolutionWriter.MaxFilesInFolder}.");
         }
     }
 }

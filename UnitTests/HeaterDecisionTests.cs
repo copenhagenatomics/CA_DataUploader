@@ -29,11 +29,11 @@ namespace UnitTests
         public void Setup() => ReplaceConfig(NewConfig);
 
         [TestMethod]
-        public void RejectsExtraOvenArea() => Assert.ThrowsException<FormatException>(() => ReplaceConfig(extraLines: "OvenArea;2"));
+        public void RejectsExtraOvenArea() => Assert.Throws<FormatException>(() => ReplaceConfig(extraLines: "OvenArea;2"));
         [TestMethod]
-        public void RejectsExtraMixingOvenAreaWithRegularOven() => Assert.ThrowsException<FormatException>(() => ReplaceConfig(extraLines: "Oven;2;heater;temp"));
+        public void RejectsExtraMixingOvenAreaWithRegularOven() => Assert.Throws<FormatException>(() => ReplaceConfig(extraLines: "Oven;2;heater;temp"));
         [TestMethod]
-        public void RejectsExtraOvenForSameHeater() => Assert.ThrowsException<FormatException>(() => ReplaceConfig(extraLines: $"Math;fake;123{Environment.NewLine}Oven;1;heater;fake"));
+        public void RejectsExtraOvenForSameHeater() => Assert.Throws<FormatException>(() => ReplaceConfig(extraLines: $"Math;fake;123{Environment.NewLine}Oven;1;heater;fake"));
 
         [TestMethod]
         public void WhenHeaterIsOffCanTurnOn()
@@ -256,9 +256,9 @@ namespace UnitTests
         [TestMethod]
         public void PControlFieldsAreNotAddedByDefault()
         {
-            Assert.ThrowsException<ArgumentOutOfRangeException>(() => Field("ovenarea1_pgain"));
-            Assert.ThrowsException<ArgumentOutOfRangeException>(() => Field("ovenarea1_controlperiod"));
-            Assert.ThrowsException<ArgumentOutOfRangeException>(() => Field("ovenarea1_maxoutput"));
+            Assert.Throws<ArgumentOutOfRangeException>(() => Field("ovenarea1_pgain"));
+            Assert.Throws<ArgumentOutOfRangeException>(() => Field("ovenarea1_controlperiod"));
+            Assert.Throws<ArgumentOutOfRangeException>(() => Field("ovenarea1_maxoutput"));
         }
 
         [TestMethod]
@@ -284,7 +284,7 @@ namespace UnitTests
         [DataRow(-100, 2, true)]
         [DataRow(100, -1, true)]
         [DataRow(100, -100, true)]
-        [DataTestMethod]//note we don't include 0 above, as that is the default vector value which is interpreted as the field not being set
+        [TestMethod]//note we don't include 0 above, as that is the default vector value which is interpreted as the field not being set
         public void PControlDoesNotTurnOnWithMaxOutputAndOrPGainValuesBelow0(int maxoutput, int pgain, bool useVector)
         {
             ReplaceConfig(extraLines: "OvenProportionalControlUpdates;2;00:00:30;100");
@@ -315,7 +315,7 @@ namespace UnitTests
         [DataRow(-1, true)]
         [DataRow(-1000, true)]
         [DataRow(0.1, true)]
-        [DataTestMethod] //note we don't include 0 above, as that is the default vector value which is interpreted as the field not being set
+        [TestMethod] //note we don't include 0 above, as that is the default vector value which is interpreted as the field not being set
         public void PControlReactsImmediatelyWhenControlPeriodIsBelowOrEqual100Ms(double controlperiodseconds, bool useVector)
         {
             ReplaceConfig(NewConfig.WithProportionalGain(2), extraLines: "OvenProportionalControlUpdates;2;00:00:30;100");

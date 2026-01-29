@@ -35,11 +35,11 @@ namespace UnitTests
         [DataRow("name=with=equals")]
         [DataRow("name+with+plus")]
         [DataRow("name-with-dash")]
-        [DataTestMethod]
+        [TestMethod]
         public void InvalidName(string name)
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfMap($"Map; anything_goes_here; {name}", 0));
-            Assert.IsTrue(ex.Message.StartsWith($"Invalid map name: {name}"), ex.Message);
+            var ex = Assert.Throws<FormatException>(() => new IOconfMap($"Map; anything_goes_here; {name}", 0));
+            Assert.StartsWith($"Invalid map name: {name}", ex.Message, ex.Message);
         }
 
         [DataRow("name_with_number_42")]
@@ -47,7 +47,7 @@ namespace UnitTests
         [DataRow("lowercase")]
         [DataRow("_name_starting_with_underscore")]
         [DataRow("name_with_underscore")]
-        [DataTestMethod]
+        [TestMethod]
         public void ValidName(string name)
         {
             _ = new IOconfMap($"Map; anything_goes_here; {name}", 0);
@@ -95,8 +95,8 @@ namespace UnitTests
             var mapline = new IOconfMap($"Map; 1234567890; MiscBox; pi42incorrect", 1);
 
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => mapline.ValidateDependencies(ioConfMock.Object));
-            Assert.IsTrue(ex.Message.StartsWith($"Failed to find node in configuration for Map"), ex.Message);
+            var ex = Assert.Throws<FormatException>(() => mapline.ValidateDependencies(ioConfMock.Object));
+            Assert.StartsWith($"Failed to find node in configuration for Map", ex.Message, ex.Message);
 
         }
 
@@ -109,8 +109,8 @@ namespace UnitTests
             var mapline = new IOconfMap($"Map; 1234567890; MiscBox", 1);
 
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => mapline.ValidateDependencies(ioConfMock.Object));
-            Assert.IsTrue(ex.Message.StartsWith($"The node name is not optional for distributed deployments"), ex.Message);
+            var ex = Assert.Throws<FormatException>(() => mapline.ValidateDependencies(ioConfMock.Object));
+            Assert.StartsWith($"The node name is not optional for distributed deployments", ex.Message, ex.Message);
         }
     }
 }

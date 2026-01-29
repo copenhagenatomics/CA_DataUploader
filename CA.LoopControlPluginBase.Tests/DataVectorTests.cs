@@ -1,7 +1,3 @@
-using CA.LoopControlPluginBase;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-
 namespace CA.LoopControlPluginBase.Tests
 {
     [TestClass]
