@@ -301,7 +301,7 @@ namespace CA_DataUploaderLib
         {
             var missingBoards = boards.Where(h => h.map.McuBoard == null).Select(b => b.map.BoxName).Distinct().ToList();
             if (missingBoards.Count > 0)
-                _cmd.Logger.LogError(LogID.A, $"{Title} - missing boards detected {string.Join(",", missingBoards)}. Related sensors/actuators are disabled.");
+                _cmd.Logger.LogError(LogID.A, $"{Title} - missing boards detected: {string.Join(", ", missingBoards)}. Related sensors/actuators are disabled.");
 
             return boards
                 .Where(b => b.map.McuBoard != null) //we ignore the missing boards for now as we don't have auto reconnect logic yet for boards not detected during system start.
