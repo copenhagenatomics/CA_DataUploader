@@ -17,16 +17,16 @@ namespace UnitTests
         public void ExtractAndHideURLs_WhenUrlIsMalformed_ThrowsException()
         {
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => IOconfCodeRepo.ExtractAndHideURLs(["CodeRepo; test; horse/::some..url.co"], []));
-            Assert.IsTrue(ex.Message.StartsWith("Invalid URL"));
+            var ex = Assert.Throws<FormatException>(() => IOconfCodeRepo.ExtractAndHideURLs(["CodeRepo; test; horse/::some..url.co"], []));
+            Assert.StartsWith("Invalid URL", ex.Message);
         }
 
         [TestMethod]
         public void ExtractAndHideURLs_WhenUrlIsMissing_ThrowsException()
         {
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => IOconfCodeRepo.ExtractAndHideURLs(["CodeRepo; test"], []));
-            Assert.IsTrue(ex.Message.StartsWith("Missing URL"));
+            var ex = Assert.Throws<FormatException>(() => IOconfCodeRepo.ExtractAndHideURLs(["CodeRepo; test"], []));
+            Assert.StartsWith("Missing URL", ex.Message);
         }
 
         [TestMethod]
@@ -36,7 +36,7 @@ namespace UnitTests
             var (_, extractedURLs) = IOconfCodeRepo.ExtractAndHideURLs([$"CodeRepo; test; {IOconfCodeRepo.HiddenURL}"], []);
 
             // Assert
-            Assert.AreEqual(0, extractedURLs.Count);
+            Assert.IsEmpty(extractedURLs);
         }
 
         [TestMethod]
@@ -120,8 +120,8 @@ namespace UnitTests
         public void Constructor_ClearTextUrl_ThrowsException()
         {
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfCodeRepo("CodeRepo; repoA; https://example.com/repoA/", 0));
-            Assert.IsTrue(ex.Message.StartsWith("Raw URL"), ex.Message);
+            var ex = Assert.Throws<FormatException>(() => new IOconfCodeRepo("CodeRepo; repoA; https://example.com/repoA/", 0));
+            Assert.StartsWith("Raw URL", ex.Message, ex.Message);
         }
 
         [TestMethod]
@@ -135,8 +135,8 @@ namespace UnitTests
             ioConfMock.Setup(x => x.GetCodeRepoURLs()).Returns(extractedURLs);
 
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => sut.LoadURL(ioConfMock.Object));
-            Assert.IsTrue(ex.Message.Contains("not found"), ex.Message);
+            var ex = Assert.Throws<FormatException>(() => sut.LoadURL(ioConfMock.Object));
+            Assert.Contains("not found", ex.Message, ex.Message);
         }
 
         [TestMethod]
@@ -219,7 +219,7 @@ namespace UnitTests
             var urls = IOconfCodeRepo.ReadURLsFromFile(currentDirectory);
 
             // Assert
-            Assert.AreEqual(0, urls.Count);
+            Assert.IsEmpty(urls);
         }
 
         [TestMethod]

@@ -35,8 +35,8 @@ namespace UnitTests
             var sut = new IOconfCode($"Code; salt/somePlugin; 0.123.0; pc1", 1);
 
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => sut.ValidateDependencies(ioConfMock.Object));
-            Assert.IsTrue(ex.Message.Contains("CodeRepo with name 'salt' not found for Code line"));
+            var ex = Assert.Throws<FormatException>(() => sut.ValidateDependencies(ioConfMock.Object));
+            Assert.Contains("CodeRepo with name 'salt' not found for Code line", ex.Message);
         }
 
         [TestMethod]
@@ -50,8 +50,8 @@ namespace UnitTests
             var sut = new IOconfCode($"Code; default/somePlugin; 0.123.0; pc1", 1);
 
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => sut.ValidateDependencies(ioConfMock.Object));
-            Assert.IsTrue(ex.Message.Contains("CodeRepo with name 'default' not found for Code line"));
+            var ex = Assert.Throws<FormatException>(() => sut.ValidateDependencies(ioConfMock.Object));
+            Assert.Contains("CodeRepo with name 'default' not found for Code line", ex.Message);
         }
 
         [TestMethod]

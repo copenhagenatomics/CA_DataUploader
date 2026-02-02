@@ -16,12 +16,12 @@ namespace UnitTests
         public void ValidateDependencies_PointingToNonexistentSensor_Fail()
         {
             // Act
-            var ex = Assert.ThrowsException<FormatException>(() => _ = new IOconfFile(@"
+            var ex = Assert.Throws<FormatException>(() => _ = new IOconfFile(@"
 RedundantSensors; redundant; doesnotexist
 ".SplitNewLine(StringSplitOptions.None)));
 
             // Assert
-            Assert.IsTrue(ex.Message.Contains("Failed to find"));
+            Assert.Contains("Failed to find", ex.Message);
         }
 
         [TestMethod]

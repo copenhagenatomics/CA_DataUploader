@@ -34,11 +34,11 @@ namespace UnitTests
         [DataRow("name=with=equals")]
         [DataRow("name+with+plus")]
         [DataRow("name-with-dash")]
-        [DataTestMethod]
+        [TestMethod]
         public void InvalidName_Constructor(string name) 
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfRow($"TestType; {name}", 0, "TestType"));
-            Assert.IsTrue(ex.Message.StartsWith($"Invalid name: {name}"), ex.Message);
+            var ex = Assert.Throws<FormatException>(() => new IOconfRow($"TestType; {name}", 0, "TestType"));
+            Assert.StartsWith($"Invalid name: {name}", ex.Message, ex.Message);
         }
 
         [DataRow("0_cannot_start_with_number")]
@@ -68,11 +68,11 @@ namespace UnitTests
         [DataRow("name=with=equals")]
         [DataRow("name+with+plus")]
         [DataRow("name-with-dash")]
-        [DataTestMethod]
+        [TestMethod]
         public void InvalidName_NameSetter(string name)
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfRow($"TestType; allowedName", 0, "TestType") { Name = name });
-            Assert.IsTrue(ex.Message.StartsWith($"Invalid name: {name}"), ex.Message);
+            var ex = Assert.Throws<FormatException>(() => new IOconfRow($"TestType; allowedName", 0, "TestType") { Name = name });
+            Assert.StartsWith($"Invalid name: {name}", ex.Message, ex.Message);
         }
 
         [DataRow("name_with_number_42")]
@@ -80,7 +80,7 @@ namespace UnitTests
         [DataRow("lowercase")]
         [DataRow("_name_starting_with_underscore")]
         [DataRow("name_with_underscore")]
-        [DataTestMethod]
+        [TestMethod]
         public void ValidName(string name)
         {
             _ = new IOconfRow($"TestType; {name}", 0, "TestType");

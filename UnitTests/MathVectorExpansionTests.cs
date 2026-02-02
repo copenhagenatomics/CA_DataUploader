@@ -38,10 +38,9 @@ namespace UnitTests
         }
 
         [TestMethod]
-        [ExpectedException(typeof(ArgumentException), "If the Math-expression references a source which is not in the vector, this should cause an exception.")]
         public void MathReferencingSourceNotInVectorCausesException()
         {
-            _ = NewConf("Math;MyMath;NotInVector + 2");
+            Assert.Throws<ArgumentException>(() => NewConf("Math;MyMath;NotInVector + 2"), "If the Math-expression references a source which is not in the vector, this should cause an exception.");
         }
 
         [TestMethod]

@@ -26,7 +26,7 @@ namespace UnitTests
             cmd.Execute("random", true);
 
             // Assert
-            Assert.IsTrue(GetAllLogs(logs).Contains("unknown command"));
+            Assert.Contains("unknown command", GetAllLogs(logs));
         }
 
         [DataRow("test")]
@@ -34,7 +34,7 @@ namespace UnitTests
         [DataRow("test 42.0")]
         [DataRow("test 0x123")]
         [DataRow("test #ffffff")]
-        [DataTestMethod]
+        [TestMethod]
         public void Execute_SingleWordCommand_AcceptedWithOrWithoutParameter(string command)
         {
             // Arrange
@@ -47,7 +47,7 @@ namespace UnitTests
             cmd.Execute(command, true);
 
             // Assert
-            Assert.IsTrue(GetAllLogs(logs).Contains("command accepted"));
+            Assert.Contains("command accepted", GetAllLogs(logs));
         }
 
         [DataRow("er autoscan start", true, false)]
@@ -70,7 +70,7 @@ namespace UnitTests
         [DataRow("er 123", false, false)]
         [DataRow("ergo", false, true)]
         [DataRow("ergo 123", false, true)]
-        [DataTestMethod]
+        [TestMethod]
         public void Execute_MultiWordCommand_Tests(string command, bool accepted, bool unknown)
         {
             // Arrange
@@ -83,11 +83,11 @@ namespace UnitTests
             cmd.Execute(command, true);
 
             // Assert
-            Assert.IsTrue(GetAllLogs(logs).Contains(accepted 
-                ? "command accepted" 
-                : unknown 
+            Assert.Contains(accepted
+                ? "command accepted"
+                : unknown
                     ? "unknown command"
-                    : "bad command"));
+                    : "bad command", GetAllLogs(logs));
         }
 
 

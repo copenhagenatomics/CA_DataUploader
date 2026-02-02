@@ -31,7 +31,7 @@ namespace UnitTests
         [DataRow("Math;MyName;Sqrt(MyValue)", -1, double.NaN)]
         [DataRow("Math;MyName;MyValue ** 8", 2d, 256d)] // ** = Pow = exponential
         [DataRow("Math;MyName;Pow(MyValue, 8)", 2d, 256d)]
-        [DataTestMethod]
+        [TestMethod]
         public void CalculatesExpectedValue(string row, double value, double expectedResult) 
         {
             var math = new IOconfFile([row]).GetMath().Single();
@@ -40,7 +40,7 @@ namespace UnitTests
 
         [DataRow("Math;MyName;MyValue > 2", 5d, 1d)]
         [DataRow("Math;MyName;MyValue > 2", -2d, 0d)]
-        [DataTestMethod]
+        [TestMethod]
         public void CanUseComparisons(string row, double value, double expectedResult)
         {
             var math = new IOconfFile([row]).GetMath().Single();
@@ -50,7 +50,7 @@ namespace UnitTests
         [TestMethod]
         public void RejectsExpressionWithThousandsSeparator()
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile(["Math;MyName;MyValue + 123,222"]));
+            var ex = Assert.Throws<FormatException>(() => new IOconfFile(["Math;MyName;MyValue + 123,222"]));
             Assert.AreEqual("IOconfMath: wrong format - expression: MyValue + 123,222. Row: Math;MyName;MyValue + 123,222", ex.Message);
         }
 
@@ -72,7 +72,7 @@ namespace UnitTests
         [DataRow("Math;MyName;Left || Middle && Right", "Left", "Middle", "Right")]
         [DataRow("Math;MyName;(Left && Middle) || (Middle || Left) && (Right || Middle && Left)", "Left", "Middle", "Right")]
         [DataRow("Math;MyName;(Left > 5) || (Middle == 42) && (Right <= 12)", "Left", "Middle", "Right")]
-        [DataTestMethod]
+        [TestMethod]
         public void CanParseSources(string row, params string[] expectedSources) 
         {
             var math = new IOconfFile([row]).GetMath().Single();
@@ -98,23 +98,23 @@ namespace UnitTests
         [DataRow("Math; MyName; Sin(123, 234, 345)")]
         [DataRow("Math; MyName; Sqrt()")]
         [DataRow("Math; MyName; Sqrt(123, 234)")]
-        [DataTestMethod]
+        [TestMethod]
         public void RejectsExpressionIfIncorrectNumberOfArgumentsGivenToBuiltInFunction(string row)
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfFile([row]));
-            Assert.IsTrue(ex.Message.StartsWith("IOconfMath: wrong format - expression:"));
+            var ex = Assert.Throws<FormatException>(() => new IOconfFile([row]));
+            Assert.StartsWith("IOconfMath: wrong format - expression:", ex.Message);
         }
 
         [TestMethod]
         public void IntegerOverflowCheckAtConstruction()
         {
-            Assert.ThrowsException<OverflowException>(() => new IOconfFile(["Math; overflowTest; 298*200*200*200*decimalNumber"]));
+            Assert.Throws<OverflowException>(() => new IOconfFile(["Math; overflowTest; 298*200*200*200*decimalNumber"]));
         }
 
         [TestMethod]
         public void IntegerUnderflowCheckAtConstruction()
         {
-            Assert.ThrowsException<OverflowException>(() => new IOconfFile(["Math; overflowTest; -298*200*200*200*decimalNumber"]));
+            Assert.Throws<OverflowException>(() => new IOconfFile(["Math; overflowTest; -298*200*200*200*decimalNumber"]));
         }
     }
 }

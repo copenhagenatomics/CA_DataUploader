@@ -17,7 +17,7 @@ namespace UnitTests
         [DataRow("Alert;MyName;Sensorx<123", 122d)]
         [DataRow("Alert;MyName;Sensorx < 123", 122d)]
         [DataRow("Alert;OxygenRaised;OxygenOut_Oxygen%>1", 2d)]
-        [DataTestMethod]
+        [TestMethod]
         public void AlertTriggers(string row, double value) 
         {
             var alert = new IOconfAlert(row, 0);
@@ -37,7 +37,7 @@ namespace UnitTests
         [DataRow("Alert;MyName;Sensorx > 123", double.NaN, 123.00012d)]
         [DataRow("Alert;MyName;Sensorx >= 123", double.NaN, 123d)]
         [DataRow("Alert;MyName;Sensorx <= 123", double.NaN, 122d)]
-        [DataTestMethod]
+        [TestMethod]
         public void AlertTriggersWhenOldValueDidNotMatch(string row, double oldValue, double value)
         {
             var alert = new IOconfAlert(row, 0);
@@ -47,7 +47,7 @@ namespace UnitTests
 
         [DataRow("Alert;MyName;Sensorx = 123", 122d, 123d, " MyName (Sensorx) = 123 (123)")]
         [DataRow("Alert;MyName;Sensorx > 123", 123d, 123.00012d, " MyName (Sensorx) > 123 (123.00012)")]
-        [DataTestMethod]
+        [TestMethod]
         public void AlertReturnsExpectedMessageAfterCheckingValueTwice(string row, double oldValue, double value, string expectedMessage)
         {
             var alert = new IOconfAlert(row, 0);
@@ -64,7 +64,7 @@ namespace UnitTests
         [DataRow("Alert;MyName;Sensorx<=123", 122.999d, 123d)]
         [DataRow("Alert;MyName;Sensorx<=123", 122d, 122d)]
         [DataRow("Alert;MyName;Sensorx<123", 121d, 122d)]
-        [DataTestMethod]
+        [TestMethod]
         public void AlertDoesNotTriggersWhenOldValueMatched(string row, double oldValue, double value)
         {
             var alert = new IOconfAlert(row, 0);
@@ -78,10 +78,10 @@ namespace UnitTests
         [DataRow("Alert;MyName;Sensorx > abc")]
         [DataRow("Alert;MyName;Sensorx")]
         [DataRow("Alert;MyName;Sensorx <= 123,2")]//thousands separator is not allowed so this does not get interpreted as 1232
-        [DataTestMethod]
+        [TestMethod]
         public void AlertRejectsInvalidConfiguration(string row)
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfAlert(row, 0));
+            var ex = Assert.Throws<FormatException>(() => new IOconfAlert(row, 0));
             Assert.AreEqual($"IOconfAlert: wrong format: {row}. Format: Alert;Name;SensorName comparison value;[rateMinutes];[command]. Supported comparisons: =, !=, >, <, >=, <=", ex.Message);
         }
     }

@@ -33,11 +33,11 @@ namespace UnitTests
         [DataRow("name.with.dot")]
         [DataRow("name=with=equals")]
         [DataRow("name+with+plus")]
-        [DataTestMethod]
+        [TestMethod]
         public void InvalidName(string name) 
         {
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfLoopName($"LoopName; {name}; Normal; https://stagingtsserver.copenhagenatomics.come", 0));
-            Assert.IsTrue(ex.Message.StartsWith($"Invalid loop name: {name}"), ex.Message);
+            var ex = Assert.Throws<FormatException>(() => new IOconfLoopName($"LoopName; {name}; Normal; https://stagingtsserver.copenhagenatomics.come", 0));
+            Assert.StartsWith($"Invalid loop name: {name}", ex.Message, ex.Message);
         }
 
         [DataRow("name_with_number_42")]
@@ -47,7 +47,7 @@ namespace UnitTests
         [DataRow("name-with-dash")]
         [DataRow("_name_starting_with_underscore")]
         [DataRow("name_with_underscore")]
-        [DataTestMethod]
+        [TestMethod]
         public void ValidName(string name)
         {
             _ = new IOconfLoopName($"LoopName; {name}; Normal; https://stagingtsserver.copenhagenatomics.come", 0);

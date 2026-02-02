@@ -16,7 +16,7 @@ namespace UnitTests
 
         [DataRow(null)]
         [DataRow("Old")]
-        [DataTestMethod]
+        [TestMethod]
         public void BoardWithoutSupportedCalibrationDoesNotGetUpdatedAndGetsDisconnected(string? boardCalibration)
         {
             // Arrange
@@ -85,8 +85,8 @@ namespace UnitTests
         public void LoadSideRatingHasToBeSpecified()
         {
             // Act + Assert
-            var ex = Assert.ThrowsException<FormatException>(() => new IOconfCurrent($"Current; myCurrent; {boxName}; 2;  // <- no value here", 0));
-            Assert.IsTrue(ex.Message.Contains("wrong format"), "missing expected part of the exception message");
+            var ex = Assert.Throws<FormatException>(() => new IOconfCurrent($"Current; myCurrent; {boxName}; 2;  // <- no value here", 0));
+            Assert.Contains("wrong format", ex.Message, "missing expected part of the exception message");
         }
 
         [DataRow("-1",    false)]
@@ -98,7 +98,7 @@ namespace UnitTests
         [DataRow("300.0", true)]
         [DataRow("300A",  false)]
         [DataRow("12345", true)]
-        [DataTestMethod]
+        [TestMethod]
         public void LoadSideRatingHasToBeAValidNumber(string input, bool valid)
         {
             // Act + Assert
@@ -108,8 +108,8 @@ namespace UnitTests
             }
             else
             {
-                var ex = Assert.ThrowsException<FormatException>(() => new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {input}", 0));
-                Assert.IsTrue(ex.Message.StartsWith("Unsupported load side rating"), "missing expected part of the exception message");
+                var ex = Assert.Throws<FormatException>(() => new IOconfCurrent($"Current; myCurrent; {boxName}; 2; {input}", 0));
+                Assert.StartsWith("Unsupported load side rating", ex.Message, "missing expected part of the exception message");
             }
         }
 
@@ -124,7 +124,7 @@ namespace UnitTests
         [DataRow("5",    true)]
         [DataRow("5.01", false)]
         [DataRow("12345",false)]
-        [DataTestMethod]
+        [TestMethod]
         public void MeterSideRatingHasToBeAValidNumberWhenSpecified(string input, bool valid)
         {
             // Act + Assert
@@ -134,8 +134,8 @@ namespace UnitTests
             }
             else
             {
-                var ex = Assert.ThrowsException<FormatException>(() => new IOconfCurrent($"Current; myCurrent; {boxName}; 2; 300; {input}", 0));
-                Assert.IsTrue(ex.Message.StartsWith("Unsupported meter side rating"), "missing expected part of the exception message");
+                var ex = Assert.Throws<FormatException>(() => new IOconfCurrent($"Current; myCurrent; {boxName}; 2; 300; {input}", 0));
+                Assert.StartsWith("Unsupported meter side rating", ex.Message, "missing expected part of the exception message");
             }
         }
 

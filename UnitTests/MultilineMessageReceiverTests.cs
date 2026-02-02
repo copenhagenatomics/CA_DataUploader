@@ -124,7 +124,7 @@ Port 2 measures voltage[0 - 5V]
 
             // Assert
             Assert.AreEqual(1, logCount);
-            Assert.IsTrue(log.Contains(incompleteMultilineMessage));
+            Assert.Contains(incompleteMultilineMessage, log);
         }
 
         [TestMethod]
@@ -177,7 +177,7 @@ Port 2 measures voltage[0 - 5V]
 
             // Assert
             Assert.AreEqual(1, logCount);
-            Assert.IsTrue(log.Contains(incompleteMultilineMessage));
+            Assert.Contains(incompleteMultilineMessage, log);
         }
     }
 }

@@ -41,7 +41,7 @@ namespace UnitTests
         [TestMethod]
         public void SustainedFilterRequiresBooleanExpression()
         {
-            var ex = Assert.ThrowsException<FormatException>(() => GetFilters("Filter;MyFilter;Sustained;3;MyName"));
+            var ex = Assert.Throws<FormatException>(() => GetFilters("Filter;MyFilter;Sustained;3;MyName"));
             StringAssert.Contains(ex.Message, "Only boolean filter expressions are supported");
             StringAssert.Contains(ex.Message, "Filter;MyFilter;Sustained;3;MyName");
         }

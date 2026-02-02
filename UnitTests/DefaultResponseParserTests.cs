@@ -15,7 +15,7 @@ namespace UnitTests
         [DataRow("0.01,-0.05,0.06,0xa,", 10U, 0.01, -0.05, 0.06)] //Comma after status supported, but not expected
         [DataRow("0.01,-0.05,0.06, 0xA", 10U, 0.01, -0.05, 0.06)]
         [DataRow("0.01,-0.05,0.06,0xffffffff", uint.MaxValue, 0.01, -0.05, 0.06)]
-        [DataTestMethod]
+        [TestMethod]
         public void DefaultSettingsParsesExpectedValuesFormat(string line, uint expectedStatus, params double[] expectedValues)
         {
             var parser = BoardSettings.Default.Parser;
