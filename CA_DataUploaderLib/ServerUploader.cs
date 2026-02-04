@@ -250,9 +250,11 @@ namespace CA_DataUploaderLib
 
             async Task VectorsSender(CancellationToken token)
             {
-                var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(_ioconf.GetVectorUploadDelay()));
+                var defaultUploadPeriod = TimeSpan.FromMilliseconds(_ioconf.GetVectorUploadDelay());
+                var throttle = new PeriodicTimer(defaultUploadPeriod);
                 var stateWriter = _executedActionChannel.Writer;
                 var badVectors = new List<DateTime>();
+                var random = new Random();
 
                 try
                 {
@@ -260,7 +262,12 @@ namespace CA_DataUploaderLib
                     {
                         stateWriter.TryWrite(UploadState.VectorUploader);
                         if (!await PostQueuedVectorAsync(stateWriter))
+                        {
                             badVectors.Add(DateTime.UtcNow);
+                            throttle.Period = TimeSpan.FromSeconds(Math.Min(throttle.Period.TotalSeconds * 2 + random.NextDouble(), 120)); // Exponential backoff + jitter (max 2 minutes in total)
+                        }
+                        else
+                            throttle.Period = defaultUploadPeriod;
                     }
                 }
                 catch (OperationCanceledException) { }
@@ -273,7 +280,7 @@ namespace CA_DataUploaderLib
 
             async Task EventsSender(CancellationToken token)
             {
-                //note this uses this uses the vector upload delay for the frequency for no special reason, it was just an easy value to use for this
+                //note this uses the vector upload delay for the frequency for no special reason, it was just an easy value to use for this
                 var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(_ioconf.GetVectorUploadDelay()));
                 var stateWriter = _executedActionChannel.Writer;
                 var badEvents = new List<DateTime>();
@@ -796,6 +803,7 @@ namespace CA_DataUploaderLib
             private static async Task<T> RunWithRetriesWithLinearBackoff<TArgs, T>(Func<TArgs, CancellationToken, Task<T>> func, TArgs args, string actionMsg, CancellationToken cancellationToken)
             {
                 Random random = new();
+                var maxDelay = TimeSpan.FromHours(1);
                 TimeSpan delay = delayIncrementWithJitter();
                 int connectionAttempts = 0;
                 while (true)
@@ -832,6 +840,7 @@ namespace CA_DataUploaderLib
                         await Task.Delay(delay, cancellationToken);
                     }
                     delay += delayIncrementWithJitter();
+                    delay = delay > maxDelay ? maxDelay : delay;
                 }
 
                 TimeSpan delayIncrementWithJitter()
