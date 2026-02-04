@@ -1,11 +1,10 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.32112.339
+# Visual Studio Version 18
+VisualStudioVersion = 18.2.11415.280 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ScreenShots", "ScreenShots", "{9AC8D98A-B7B2-41E5-AD84-E6BAA91FF674}"
 	ProjectSection(SolutionItems) = preProject
-		ScreenShots\CA_AverageTemperature.exe.png = ScreenShots\CA_AverageTemperature.exe.png
 		ScreenShots\CA_DataUploader.exe.png = ScreenShots\CA_DataUploader.exe.png
 		ScreenShots\IO.conf.png = ScreenShots\IO.conf.png
 		ScreenShots\OnlineChart.png = ScreenShots\OnlineChart.png
@@ -17,24 +16,6 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CA_DataUploaderLib", "CA_DataUploaderLib\CA_DataUploaderLib.csproj", "{C86BB1C7-DCDE-4EFB-87A2-94F5B08AC0D1}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CA_DataUploader", "CA_DataUploader\CA_DataUploader.csproj", "{DCD62830-D180-4614-9B8D-FE76722850E5}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Arduino", "Arduino", "{25600F56-93FA-4A44-8792-A8F01654C996}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TemperatureFakeData", "TemperatureFakeData", "{F6EE63D6-6AF8-413E-AC68-DA23FB2CEE6F}"
-	ProjectSection(SolutionItems) = preProject
-		Arduino\TemperatureFakeData\readEEPROM.h = Arduino\TemperatureFakeData\readEEPROM.h
-		Arduino\TemperatureFakeData\TemperatureFakeData.ino = Arduino\TemperatureFakeData\TemperatureFakeData.ino
-	EndProjectSection
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TemperatureUnit10pin", "TemperatureUnit10pin", "{9E649827-E30B-479E-9854-B4A96EDE0162}"
-	ProjectSection(SolutionItems) = preProject
-		Arduino\TemperatureUnit10pin\ClosedCube_Si7051.cpp = Arduino\TemperatureUnit10pin\ClosedCube_Si7051.cpp
-		Arduino\TemperatureUnit10pin\ClosedCube_Si7051.h = Arduino\TemperatureUnit10pin\ClosedCube_Si7051.h
-		Arduino\TemperatureUnit10pin\MAX31855.cpp = Arduino\TemperatureUnit10pin\MAX31855.cpp
-		Arduino\TemperatureUnit10pin\MAX31855.h = Arduino\TemperatureUnit10pin\MAX31855.h
-		Arduino\TemperatureUnit10pin\readEEPROM.h = Arduino\TemperatureUnit10pin\readEEPROM.h
-		Arduino\TemperatureUnit10pin\TemperatureUnit10pin.ino = Arduino\TemperatureUnit10pin\TemperatureUnit10pin.ino
-	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CA.LoopControlPluginBase", "CA.LoopControlPluginBase\CA.LoopControlPluginBase.csproj", "{8AD99C5D-C79B-4F8F-A826-CF83883A41BB}"
 EndProject
@@ -76,10 +57,6 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{F6EE63D6-6AF8-413E-AC68-DA23FB2CEE6F} = {25600F56-93FA-4A44-8792-A8F01654C996}
-		{9E649827-E30B-479E-9854-B4A96EDE0162} = {25600F56-93FA-4A44-8792-A8F01654C996}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {71B6B0EC-79F1-4349-B0E0-9E499FAC26BB}
