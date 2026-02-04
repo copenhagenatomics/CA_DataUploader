@@ -250,9 +250,11 @@ namespace CA_DataUploaderLib
 
             async Task VectorsSender(CancellationToken token)
             {
-                var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(_ioconf.GetVectorUploadDelay()));
+                var defaultUploadPeriod = TimeSpan.FromMilliseconds(_ioconf.GetVectorUploadDelay());
+                var throttle = new PeriodicTimer(defaultUploadPeriod);
                 var stateWriter = _executedActionChannel.Writer;
                 var badVectors = new List<DateTime>();
+                var random = new Random();
 
                 try
                 {
@@ -260,7 +262,12 @@ namespace CA_DataUploaderLib
                     {
                         stateWriter.TryWrite(UploadState.VectorUploader);
                         if (!await PostQueuedVectorAsync(stateWriter))
+                        {
                             badVectors.Add(DateTime.UtcNow);
+                            throttle.Period = TimeSpan.FromSeconds(Math.Min(throttle.Period.TotalSeconds * 2 + random.NextDouble(), 120)); // Exponential backoff + jitter (max 2 minutes in total)
+                        }
+                        else
+                            throttle.Period = defaultUploadPeriod;
                     }
                 }
                 catch (OperationCanceledException) { }
@@ -273,7 +280,7 @@ namespace CA_DataUploaderLib
 
             async Task EventsSender(CancellationToken token)
             {
-                //note this uses this uses the vector upload delay for the frequency for no special reason, it was just an easy value to use for this
+                //note this uses the vector upload delay for the frequency for no special reason, it was just an easy value to use for this
                 var throttle = new PeriodicTimer(TimeSpan.FromMilliseconds(_ioconf.GetVectorUploadDelay()));
                 var stateWriter = _executedActionChannel.Writer;
                 var badEvents = new List<DateTime>();
@@ -735,7 +742,7 @@ namespace CA_DataUploaderLib
 
             private static async Task<(int plotId, string plotName)> GetPlotIDAsyncWithRetries(string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription, CancellationToken cancellationToken)
             {
-                return await RunWithRetries(GetPlotIDAsync, (loopName, client, loginToken, publicKey, signedVectorDescription), "obtain/create plot for the system", cancellationToken);
+                return await RunWithRetriesWithLinearBackoff(GetPlotIDAsync, (loopName, client, loginToken, publicKey, signedVectorDescription), "obtain/create plot for the system", cancellationToken);
 
                 static async Task<(int plotId, string plotName)> GetPlotIDAsync((string loopName, HttpClient client, string loginToken, byte[] publicKey, byte[] signedVectorDescription) args, CancellationToken cancellationToken)
                 {
@@ -767,7 +774,7 @@ namespace CA_DataUploaderLib
 
             private static Task<string> GetLoginTokenWithRetries(HttpClient client, ConnectionInfo info, CancellationToken cancellationToken)
             {
-                return RunWithRetries(GetLoginToken, (client, info), "verify system identity with the plot server", cancellationToken);
+                return RunWithRetriesWithLinearBackoff(GetLoginToken, (client, info), "verify system identity with the plot server", cancellationToken);
 
                 static async Task<string> GetLoginToken((HttpClient client, ConnectionInfo accountInfo) args, CancellationToken cancellationToken)
                 {
@@ -793,8 +800,11 @@ namespace CA_DataUploaderLib
                 }
             }
 
-            private static async Task<T> RunWithRetries<TArgs, T>(Func<TArgs, CancellationToken, Task<T>> func, TArgs args, string actionMsg, CancellationToken cancellationToken)
+            private static async Task<T> RunWithRetriesWithLinearBackoff<TArgs, T>(Func<TArgs, CancellationToken, Task<T>> func, TArgs args, string actionMsg, CancellationToken cancellationToken)
             {
+                Random random = new();
+                var maxDelay = TimeSpan.FromHours(1);
+                TimeSpan delay = delayIncrementWithJitter();
                 int connectionAttempts = 0;
                 while (true)
                 {
@@ -812,13 +822,13 @@ namespace CA_DataUploaderLib
                     }
                     catch (OperationCanceledException ex) when (ex.CancellationToken != cancellationToken && !cancellationToken.IsCancellationRequested)
                     {//in some cases this could happen when hitting timeouts - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
-                        OnError($"Failed to {actionMsg}, attempting to reconnect in 5 seconds.", ex);
-                        await Task.Delay(5000, cancellationToken);
+                        OnError($"Failed to {actionMsg}, attempting to reconnect in {delay.TotalSeconds} seconds.", ex);
+                        await Task.Delay(delay, cancellationToken);
                     }
                     catch (HttpRequestException ex)
                     {
-                        OnError($"Failed to {actionMsg} (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}), attempting to reconnect in 5 seconds.", ex);
-                        await Task.Delay(5000, cancellationToken);
+                        OnError($"Failed to {actionMsg} (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}), attempting to reconnect in {delay.TotalSeconds} seconds.", ex);
+                        await Task.Delay(delay, cancellationToken);
                     }
                     catch (Exception ex)
                     {
@@ -826,9 +836,17 @@ namespace CA_DataUploaderLib
                         //Above is expected to be improved in .net 8, but it was unclear while writing this which exception set is guaranteed to really include all types of failures doing the request and fetching the corresponding response.
                         //Failures should usually be a network or potentially a temporary error returned by the server, we continue retrying - https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.postasync?view=net-6.0
                         //however, it is also some error codes the server returns that can be shared by temporary and permanent rejection errors
-                        OnError($"Failed to {actionMsg}, attempting to reconnect in 5 seconds.", ex);
-                        await Task.Delay(5000, cancellationToken);
+                        OnError($"Failed to {actionMsg}, attempting to reconnect in {delay.TotalSeconds} seconds.", ex);
+                        await Task.Delay(delay, cancellationToken);
                     }
+                    delay += delayIncrementWithJitter();
+                    delay = delay > maxDelay ? maxDelay : delay;
+                }
+
+                TimeSpan delayIncrementWithJitter()
+                {
+                    // Returns a number of seconds in the range: [5, 10]
+                    return TimeSpan.FromSeconds(5 + random.Next(6));
                 }
             }
 
