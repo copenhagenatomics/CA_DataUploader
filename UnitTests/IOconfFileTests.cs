@@ -38,7 +38,7 @@ namespace UnitTests
             var ex = Assert.Throws<FormatException>(() => new IOconfFile([
                 "Map; 1234567890; tm01",
                 "Map; 1234567890; tm02" ]));
-            Assert.StartsWith("Two Map-lines cannot use the same serial number", ex.Message);
+            Assert.StartsWith("Two Map-lines for the same node cannot use the same serial number", ex.Message);
         }
 
         [TestMethod]
@@ -73,18 +73,17 @@ namespace UnitTests
                 "Node; node1; 1.2.3.4",
                 "Map; 1234567890; tm01; node1",
                 "Map; 1234567890; tm02; node1" ]));
-            Assert.StartsWith("Two Map-lines cannot use the same serial number", ex.Message);
+            Assert.StartsWith("Two Map-lines for the same node cannot use the same serial number", ex.Message);
         }
 
         [TestMethod]
-        public void WhenTwoMapLinesForDifferentNodesHaveTheSameSerial_MultiPiSystem_ThenAnExceptionIsThrown()
+        public void WhenTwoMapLinesForDifferentNodesHaveTheSameSerial_MultiPiSystem_ThenNoException()
         {
-            var ex = Assert.Throws<FormatException>(() => new IOconfFile([
+            var _ = new IOconfFile([
                 "Node; node1; 1.2.3.4",
                 "Node; node2; 1.2.3.5",
                 "Map; 1234567890; tm01; node1",
-                "Map; 1234567890; tm02; node2" ]));
-            Assert.StartsWith("Two Map-lines cannot use the same serial number", ex.Message);
+                "Map; 1234567890; tm02; node2" ]);
         }
 
         [TestMethod]
