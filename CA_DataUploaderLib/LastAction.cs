@@ -8,23 +8,25 @@ namespace CA_DataUploaderLib
     {
         private readonly int repeatMilliseconds;
         private readonly TimeProvider timeProvider;
+        private readonly double defaultTarget;
         private long lastActionExecutedTime;
 
-        public LastAction(int targetIndex, int repeatMilliseconds) : this(targetIndex, repeatMilliseconds, TimeProvider.System) { }
-        public LastAction(int targetIndex, int repeatMilliseconds, TimeProvider timeProvider) : this([targetIndex], repeatMilliseconds, timeProvider) { }
-        public LastAction(IEnumerable<int> targetIndices, int repeatMilliseconds) : this(targetIndices, repeatMilliseconds, TimeProvider.System) { }
-        public LastAction(IEnumerable<int> targetIndices, int repeatMilliseconds, TimeProvider timeProvider)
+        public LastAction(int targetIndex, int repeatMilliseconds, double defaultTarget = 0.0) : this(targetIndex, repeatMilliseconds, TimeProvider.System, defaultTarget) { }
+        public LastAction(int targetIndex, int repeatMilliseconds, TimeProvider timeProvider, double defaultTarget = 0.0) : this([targetIndex], repeatMilliseconds, timeProvider, defaultTarget) { }
+        public LastAction(IEnumerable<int> targetIndices, int repeatMilliseconds, double defaultTarget = 0.0) : this(targetIndices, repeatMilliseconds, TimeProvider.System, defaultTarget) { }
+        public LastAction(IEnumerable<int> targetIndices, int repeatMilliseconds, TimeProvider timeProvider, double defaultTarget = 0.0)
         {
             Indices = [.. targetIndices];
             this.repeatMilliseconds = repeatMilliseconds;
             this.timeProvider = timeProvider;
+            this.defaultTarget = defaultTarget;
         }
 
         private double[] Vector { get; set; } = [];
         private int[] Indices { get; set; }
         private DateTime TimeToRepeat { get; set; }
 
-        public IEnumerable<double> Targets => Indices.Select(i => Vector[i]);
+        public IEnumerable<double> Targets => Indices.Select(i => Vector.Length == 0 ? defaultTarget : Vector[i]);
 
         /// <remarks>
         /// We determine whether the last action has expired (should be repeated) by checking the time passed in 2 different ways,

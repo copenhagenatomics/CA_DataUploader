@@ -70,12 +70,12 @@ namespace UnitTests
             Assert.IsTrue(action.ChangedOrExpired([0.0, 0.1, 0.2, 0.3, 1.0], now), "expiration is expected before executing the first action");
             now = now.AddSeconds(1);
             action.ExecutedNewAction([0.0, 0.2, 0.3, 0.4, 1.0], now);
-            CollectionAssert.AreEqual(new double[] { 0.2, 0.3, 0.4 }, action.Targets.ToArray());
+            CollectionAssert.AreEqual(new [] { 0.2, 0.3, 0.4 }, action.Targets.ToArray());
             Assert.IsFalse(action.ChangedOrExpired([0.0, 0.2, 0.3, 0.4, 1.0], now), "2: no expiration expected at 0s");
             Assert.IsFalse(action.ChangedOrExpired([0.0, 0.2, 0.3, 0.4, 1.0], now.AddYears(10)), "2: no expiration expected at 10 years");
             Assert.IsTrue(action.ChangedOrExpired([0.0, 0.3, 0.4, 0.5, 1.0], now.AddMilliseconds(100)), "2: target change must be detected");
             action.ExecutedNewAction([0.0, 0.3, 0.4, 0.5, 1.0], now);
-            CollectionAssert.AreEqual(new double[] { 0.3, 0.4, 0.5 }, action.Targets.ToArray());
+            CollectionAssert.AreEqual(new [] { 0.3, 0.4, 0.5 }, action.Targets.ToArray());
             Assert.IsFalse(action.ChangedOrExpired([0.0, 0.3, 0.4, 0.5, 1.0], now), "3: no expiration expected at 0s");
             Assert.IsFalse(action.ChangedOrExpired([0.0, 0.3, 0.4, 0.5, 1.0], now.AddDays(30)), "3: no expiration expected at 30 days");
             Assert.IsTrue(action.ChangedOrExpired([0.0, 0.3, 0.2, 0.5, 1.0], now.AddMilliseconds(100)), "3: target change must be detected");
@@ -95,6 +95,21 @@ namespace UnitTests
             action.ResetVectorBasedTimeout(now);//we can only test the time passing after a timeout if we reset the vector based timeout (even passing DateTime.MinValue as now would not skip the vector based comparison). 
             time.Advance(TimeSpan.FromMilliseconds(500));
             Assert.IsTrue(action.ChangedOrExpired([0.2], now), "expiration expected resuming after a timeout (based on time passing)");
+        }
+
+        [TestMethod()]
+        public void ReadingTargetsBeforeFirstVectorDoesNotThrowException()
+        {
+            var action = new LastAction([5], 500);
+            _ = action.Targets.First();
+        }
+
+        [TestMethod()]
+        public void ReadingTargetsBeforeFirstVectorReturnsDefaultTarget()
+        {
+            var defaultTarget = -1.0;
+            var action = new LastAction([5, 6], 500, defaultTarget);
+            CollectionAssert.AreEqual(new [] { defaultTarget, defaultTarget }, action.Targets.ToArray());
         }
     }
 }

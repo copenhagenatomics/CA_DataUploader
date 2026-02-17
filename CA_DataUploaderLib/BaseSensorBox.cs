@@ -222,7 +222,7 @@ namespace CA_DataUploaderLib
             async Task WriteAction(DataVector? vector, MCUBoard board, CancellationToken token)
             {
                 vectorIndices ??= getIndices();
-                lastAction ??= new LastAction(vectorIndices, repeatMilliseconds);
+                lastAction ??= new LastAction(vectorIndices, repeatMilliseconds, defaultTarget);
                 defaultTargets ??= vectorIndices.Select(i => defaultTarget).ToList();
 
                 if (vector == null)
