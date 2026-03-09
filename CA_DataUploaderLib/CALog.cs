@@ -166,7 +166,7 @@ namespace CA_DataUploaderLib
                     lock (_logDir)
                     {
                         // always add timestamp and a NewLine
-                        msg = $"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} - {msg}{(!string.IsNullOrEmpty(user) ? $" [{user}]" : "")}{Environment.NewLine}";
+                        msg = $"{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss.fff} - {msg}{(!string.IsNullOrEmpty(user) ? $" [{user}]" : "")}{Environment.NewLine}";
                         File.AppendAllText(GetFilename(logID), msg);
                     }
                 }
