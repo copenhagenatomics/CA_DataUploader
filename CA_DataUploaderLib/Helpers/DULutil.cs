@@ -56,6 +56,14 @@ namespace CA_DataUploaderLib.Helpers
             }
         }
 
+        /// <summary>
+        /// Executes <paramref name="command"/> through <c>/bin/bash -c</c>.
+        /// This overload does not prevent shell injection: <paramref name="command"/> must be a trusted constant
+        /// and must not include user/configuration input. When untrusted values need to be passed, use the
+        /// overload with an argument array so they are supplied as arguments instead of being embedded in shell code.
+        /// </summary>
+        /// <param name="command">Trusted shell command text to execute</param>
+        /// <returns>The shell process</returns>
         public static Process? CreateAndStartShellProcess(string command)
         {
             return Process.Start(new ProcessStartInfo()
@@ -68,6 +76,32 @@ namespace CA_DataUploaderLib.Helpers
                 RedirectStandardOutput = true,
                 WorkingDirectory = Environment.CurrentDirectory
             });
+        }
+
+        /// <summary>
+        /// Use this overload when having user/configuration input that needs to be passed as arguments to the command to avoid shell injection issues.
+        /// <paramref name="command"/> must be a trusted constant and must not include user/configuration input.
+        /// </summary>
+        /// <param name="command">Trusted shell command text to execute</param>
+        /// <param name="args">Argument list</param>
+        /// <returns>The shell process</returns>
+        public static Process? CreateAndStartShellProcess(string command, params string[] args)
+        {
+            var psi = new ProcessStartInfo()
+            {
+                FileName = "/bin/bash",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                WorkingDirectory = Environment.CurrentDirectory
+            };
+            psi.ArgumentList.Add("-c");
+            psi.ArgumentList.Add($"{command} $@"); // $@ is replaced by the list of arguments that follow
+            psi.ArgumentList.Add("_"); // dummy $0, which is excluded by $@
+            foreach (var arg in args)
+                psi.ArgumentList.Add(arg);
+            return Process.Start(psi);
         }
 
         public static (string stdOutput, string errOutput, int exitCode) ExecuteCommand(string command, string arguments, bool debug = false, Action<string>? logger = null)
