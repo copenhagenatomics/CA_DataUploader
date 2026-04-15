@@ -56,6 +56,11 @@ namespace CA_DataUploaderLib.Helpers
             }
         }
 
+        /// <summary>
+        /// Make sure to use the overload with argument array when having user/configuration input that need to be passed as arguments to avoid shell injection issues.
+        /// </summary>
+        /// <param name="command">Command</param>
+        /// <returns>The shell process</returns>
         public static Process? CreateAndStartShellProcess(string command)
         {
             return Process.Start(new ProcessStartInfo()
@@ -68,6 +73,31 @@ namespace CA_DataUploaderLib.Helpers
                 RedirectStandardOutput = true,
                 WorkingDirectory = Environment.CurrentDirectory
             });
+        }
+
+        /// <summary>
+        /// Use this overload when having user/configuration input that need to be passed as arguments to the command to avoid shell injection issues.
+        /// </summary>
+        /// <param name="command">Command</param>
+        /// <param name="args">Argument list</param>
+        /// <returns>The shell process</returns>
+        public static Process? CreateAndStartShellProcess(string command, params string[] args)
+        {
+            var psi = new ProcessStartInfo()
+            {
+                FileName = "/bin/bash",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                WorkingDirectory = Environment.CurrentDirectory
+            };
+            psi.ArgumentList.Add("-c");
+            psi.ArgumentList.Add($"{command} $@"); // "$@" is replaced by the list of arguments that follow
+            psi.ArgumentList.Add("_"); // dummy $0, which is excluded by "$@"
+            foreach (var arg in args)
+                psi.ArgumentList.Add(arg);
+            return Process.Start(psi);
         }
 
         public static (string stdOutput, string errOutput, int exitCode) ExecuteCommand(string command, string arguments, bool debug = false, Action<string>? logger = null)
