@@ -154,8 +154,8 @@ namespace CA_DataUploaderLib
         }
 
         public string ToDebugString(string separator) =>
-            $"{BoxNameHeader}{BoxName}{separator}Port name: {PortName}{separator}Baud rate: {port.BaudRate}{separator}{serialNumberHeader} {SerialNumber}{separator}{productTypeHeader} {ProductType}{separator}{pcbVersionHeader}{PcbVersion}{separator}{softwareVersionHeader} {SoftwareVersion}{separator}{CalibrationHeader} {Calibration}{separator}";
-        public override string ToString() => $"{productTypeHeader} {ProductType,-20} {serialNumberHeader} {SerialNumber,-12} Port name: {PortName,-18} {pcbVersionHeader} {PcbVersion}";
+            $"{BoxNameHeader}{BoxName}{separator}Port name: {PortName}{separator}Baud rate: {port.BaudRate}{separator}{serialNumberHeader} {SerialNumber}{separator}{productTypeHeader} {ProductType}{separator}{subProductTypeHeader} {SubProductType}{separator}{pcbVersionHeader}{PcbVersion}{separator}{softwareVersionHeader} {SoftwareVersion}{separator}{CalibrationHeader} {Calibration}{separator}";
+        public override string ToString() => $"{productTypeHeader} {ProductType,-20} {subProductTypeHeader} {SubProductType,-3} {serialNumberHeader} {SerialNumber,-12} Port name: {PortName,-18} {pcbVersionHeader} {PcbVersion}";
 
         /// <summary>
         /// Reopens the connection.
