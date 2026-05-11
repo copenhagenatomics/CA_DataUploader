@@ -26,7 +26,6 @@ namespace CA_DataUploaderLib
         private readonly (IOconfMap map, SensorSample.InputBased[] values, DataVectorReader? vectorReader, int boardStateIndexInFullVector)[] _boards = [];
         protected readonly AllBoardsState _boardsState = new([]);
         private readonly Dictionary<MCUBoard, SensorSample.InputBased[]> _boardSamplesLookup = [];
-        private readonly string mainSubsystem;
         private readonly Dictionary<MCUBoard, List<(Func<DataVector?, MCUBoard, CancellationToken, Task> write, Func<MCUBoard, CancellationToken, Task> exit)>> _builtInWriteActions = [];
         private readonly Dictionary<MCUBoard, (ChannelReader<string> Reader, ChannelWriter<string> Writer)> _boardCustomCommands = [];
         private static readonly Dictionary<CommandHandler, Dictionary<string, string>> _usedBoxNames = []; //Dictionary of used board names tied to a specific CommandHandler-instance
@@ -35,7 +34,6 @@ namespace CA_DataUploaderLib
 
         public BaseSensorBox(CommandHandler cmd, string commandName, IEnumerable<IOconfInput> values)
         {
-            mainSubsystem = commandName.ToLower();
             Title = commandName;
             _cmd = cmd;
             _values = values.Select(x => new SensorSample.InputBased(x)).ToList();
@@ -43,7 +41,7 @@ namespace CA_DataUploaderLib
             if (_values.Count == 0)
                 return;  // no data
 
-            SubscribeCommandsToSubsystems(cmd, mainSubsystem, _values);
+            cmd.AddMultinodeCommand(commandName.ToLower(), a => a.Count == 1, ShowQueue);
             cmd.AddSubsystem(this);
             cmd.FullVectorIndexesCreated += InitializeBuiltInActionsIndexesAndVectorsChannel;
 
@@ -159,16 +157,6 @@ namespace CA_DataUploaderLib
         }
 
         public Task Run(CancellationToken token) => RunBoardLoops(_boards, token);
-        private void SubscribeCommandsToSubsystems(CommandHandler cmd, string mainSubsystem, List<SensorSample.InputBased> values)
-        {
-            cmd.AddMultinodeCommand(mainSubsystem, _ => true, ShowQueue);
-            var subsystemOverrides = values.Select(v => v.Input.SubsystemOverride).OfType<string>().Distinct();
-            foreach (var subsystem in subsystemOverrides)
-            {
-                if (subsystem == mainSubsystem) continue;
-                cmd.AddMultinodeCommand(subsystem, _ => true, ShowQueue);
-            }
-        }
 
         public IEnumerable<SensorSample> GetInputValues() => _localValues
             .Select(s => s.Clone())
@@ -252,15 +240,10 @@ namespace CA_DataUploaderLib
 
         private void ShowQueue(List<string> args)
         {
-            var subsystem = args[0].ToLower();
-            var isMainCommand = subsystem == mainSubsystem;
             StringBuilder sb = new();
             foreach (var t in _localValues)
             {
-                string? subsystemOverride = t.Input.SubsystemOverride;
-                var matchesSubsystem = (isMainCommand && subsystemOverride == default) || subsystemOverride == subsystem;
-                if (matchesSubsystem)
-                    sb.AppendLine($"{t.Input.Name,-22}={t.Value,9:N2}");
+                sb.AppendLine($"{t.Input.Name,-22}={t.Value,9:N2}");
             }
 
             _cmd.Logger.LogInfo(LogID.A, sb.ToString());

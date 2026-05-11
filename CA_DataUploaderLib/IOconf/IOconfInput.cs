@@ -54,7 +54,6 @@ namespace CA_DataUploaderLib.IOconf
             private set => _map = value;
         }
         protected bool HasPort { get; }
-        public string? SubsystemOverride { get; init; }
         public bool Upload { get; init; } = true;
 
         private static (bool hasPort, bool skip, int port) GetPort(string row, string type, bool parsePortRequired, List<string> list)
@@ -112,8 +111,8 @@ namespace CA_DataUploaderLib.IOconf
                 private set => _map = value;
             }
 
-            protected IOconfInput NewInput(string name, int portNumber, string? subsystemOverride = null) => 
-                new(Row, LineNumber, Type, Map, portNumber) { Name = name, SubsystemOverride = subsystemOverride };
+            protected IOconfInput NewInput(string name, int portNumber) => 
+                new(Row, LineNumber, Type, Map, portNumber) { Name = name };
         }
     }
 }
