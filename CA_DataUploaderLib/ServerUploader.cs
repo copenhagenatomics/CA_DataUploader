@@ -34,9 +34,11 @@ namespace CA_DataUploaderLib
         private DateTime _lastTimestamp;
         private (bool[] uploadMap, VectorDescription uploadDesc)? _desc;
         private (bool[] uploadMap, VectorDescription uploadDesc) Desc => _desc ?? throw new InvalidOperationException("Usage of desc before vector description initialization");
-        private static readonly BoundedChannelOptions BoundedOptions = new(10000) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true };
+        private const int ChannelBufferCapacity = 10000;
+        private const int UploadBufferCapacity = 20000;
+        private static readonly BoundedChannelOptions BoundedOptions = new(ChannelBufferCapacity) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true };
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(BoundedOptions);
-        private readonly Channel<DataVector> _vectorsChannel = Channel.CreateBounded<DataVector>(BoundedOptions);
+        private readonly BoundedUploadBuffer<DataVector> _vectorsBuffer = new(UploadBufferCapacity);
         private readonly Channel<EventFiredArgs> _eventsChannel = Channel.CreateBounded<EventFiredArgs>(BoundedOptions);
         private readonly IIOconf _ioconf;
         private readonly CommandHandler _cmd;
@@ -126,7 +128,7 @@ namespace CA_DataUploaderLib
                 SendEvent(this, new EventFiredArgs($"{((e.EventType == (byte) EventType.Log || e.EventType == (byte)EventType.LogError) ? NodeIdToName(e.NodeId) : "")}{e.Data}", e.EventType, e.TimeSpan.AddTicks(eventIndex++), user: e.User));
 
             //now queue vectors
-            _vectorsChannel.Writer.TryWrite(FilterOnlyUploadFieldsAndCheckInvalidValues(vector, out var invalidValueMessage));
+            _vectorsBuffer.Add(FilterOnlyUploadFieldsAndCheckInvalidValues(vector, out var invalidValueMessage));
 
             //Possibly send event due to invalid values detected in the vector
             if (!string.IsNullOrWhiteSpace(invalidValueMessage))
@@ -462,7 +464,8 @@ namespace CA_DataUploaderLib
 
         private ValueTask<bool> PostQueuedVectorAsync(ChannelWriter<UploadState> stateWriter)
         {
-            var list = DequeueAllEntries(_vectorsChannel.Reader);
+            var snapshot = _vectorsBuffer.Snapshot();
+            var list = snapshot.Items;
             if (list.Count == 0) return ValueTask.FromResult(true); //no vectors, return success
 
             stateWriter.TryWrite(UploadState.VectorUpload);
@@ -476,7 +479,11 @@ namespace CA_DataUploaderLib
                 {
                     using var response = await Plot.PostVectorAsync(buffer, timestamp);
                     var success = CheckAndLogFailures(response, "Failed posting vector");
-                    stateWriter.TryWrite(UploadState.UploadedVector);
+                    if (success)
+                    {
+                        _vectorsBuffer.RemoveThrough(snapshot.LastSequence);
+                        stateWriter.TryWrite(UploadState.UploadedVector);
+                    }
                     return success;
                 }
                 catch (HttpRequestException ex)
@@ -632,6 +639,63 @@ namespace CA_DataUploaderLib
 
             return success;
         }
+
+        internal sealed class BoundedUploadBuffer<T>
+        {
+            private readonly int _capacity;
+            private readonly Queue<(long sequence, T item)> _items = new();
+            private readonly object _lock = new();
+            private long _nextSequence;
+
+            public BoundedUploadBuffer(int capacity)
+            {
+                if (capacity <= 0)
+                    throw new ArgumentOutOfRangeException(nameof(capacity));
+
+                _capacity = capacity;
+            }
+
+            public void Add(T item)
+            {
+                lock (_lock)
+                {
+                    while (_items.Count >= _capacity)
+                        _items.Dequeue();
+
+                    _items.Enqueue((_nextSequence++, item));
+                }
+            }
+
+            public UploadBufferSnapshot<T> Snapshot()
+            {
+                lock (_lock)
+                {
+                    if (_items.Count == 0)
+                        return new([], -1);
+
+                    var list = new List<T>(_items.Count);
+                    long lastSequence = -1;
+                    foreach (var (sequence, item) in _items)
+                    {
+                        list.Add(item);
+                        lastSequence = sequence;
+                    }
+
+                    return new(list, lastSequence);
+                }
+            }
+
+            public void RemoveThrough(long lastSequence)
+            {
+                lock (_lock)
+                {
+                    while (_items.TryPeek(out var entry) && entry.sequence <= lastSequence)
+                        _items.Dequeue();
+                }
+            }
+        }
+
+        internal readonly record struct UploadBufferSnapshot<T>(IReadOnlyList<T> Items, long LastSequence);
 
         public static string ReadStringFromStream(Stream? input)
         {
