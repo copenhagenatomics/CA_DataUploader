@@ -518,7 +518,7 @@ namespace CA_DataUploaderLib
                 catch (HttpRequestException ex)
                 {
                     OnError($"Failed posting vector (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}).", ex);
-                    return ShouldRetryUpload(ex.StatusCode) ? false : HandleFailedVectorUpload(ex.StatusCode, pendingVectors);
+                    return HandleFailedVectorUpload(ex.StatusCode, pendingVectors);
                 }
                 catch (Exception ex)
                 {
