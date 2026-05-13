@@ -91,7 +91,7 @@ namespace UnitTests
             var logs = new List<string>();
 
             // Act
-            var result = ServerUploader.HandleFailedEventUpload(HttpStatusCode.BadGateway, pendingEvent, ref nonRetryableFailures, logs.Add);
+            var result = ServerUploader.HandleFailedEventUpload(isLocalFailure: false, HttpStatusCode.BadGateway, pendingEvent, ref nonRetryableFailures, logs.Add);
 
             // Assert
             Assert.AreSame(pendingEvent, result);
@@ -108,7 +108,7 @@ namespace UnitTests
             var logs = new List<string>();
 
             // Act
-            var result = ServerUploader.HandleFailedEventUpload(HttpStatusCode.BadRequest, pendingEvent, ref nonRetryableFailures, logs.Add);
+            var result = ServerUploader.HandleFailedEventUpload(isLocalFailure: false, HttpStatusCode.BadRequest, pendingEvent, ref nonRetryableFailures, logs.Add);
 
             // Assert
             Assert.AreSame(pendingEvent, result);
@@ -125,13 +125,32 @@ namespace UnitTests
             var logs = new List<string>();
 
             // Act
-            var result = ServerUploader.HandleFailedEventUpload(HttpStatusCode.BadRequest, pendingEvent, ref nonRetryableFailures, logs.Add);
+            var result = ServerUploader.HandleFailedEventUpload(isLocalFailure: false, HttpStatusCode.BadRequest, pendingEvent, ref nonRetryableFailures, logs.Add);
 
             // Assert
             Assert.IsNull(result);
             Assert.AreEqual(0, nonRetryableFailures);
             Assert.HasCount(1, logs);
             StringAssert.Contains(logs.Single(), "400 BadRequest");
+            StringAssert.Contains(logs.Single(), pendingEvent.Data);
+        }
+
+        [TestMethod]
+        public void HandleFailedEventUpload_WhenLocalFailureReachesLimit_DropsPendingEventAndLogsLocalFailure()
+        {
+            // Arrange
+            var pendingEvent = NewEvent();
+            var nonRetryableFailures = 2;
+            var logs = new List<string>();
+
+            // Act
+            var result = ServerUploader.HandleFailedEventUpload(isLocalFailure: true, statusCode: null, pendingEvent, ref nonRetryableFailures, logs.Add);
+
+            // Assert
+            Assert.IsNull(result);
+            Assert.AreEqual(0, nonRetryableFailures);
+            Assert.HasCount(1, logs);
+            StringAssert.Contains(logs.Single(), "local exception");
             StringAssert.Contains(logs.Single(), pendingEvent.Data);
         }
 

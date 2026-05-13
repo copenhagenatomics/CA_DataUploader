@@ -571,11 +571,10 @@ namespace CA_DataUploaderLib
                     return pendingEvent;
             }
 
-            var events = DequeueAllEntries(_eventsChannel.Reader);
-            if (events.Count == 0) return null;
-
-            foreach (var e in FilterEvents(events))
+            while (_eventsChannel.Reader.TryRead(out var e))
             {
+                if (_eventFilters.Any(eval => eval(e)))
+                    continue;
                 if (TrackDuplicate(e.Data)) continue;
 
                 pendingEvent = await PostOrKeepPendingEvent(e);
@@ -598,6 +597,7 @@ namespace CA_DataUploaderLib
 
                 badEvents.Add(DateTime.UtcNow);
                 return HandleFailedEventUpload(
+                    result.IsLocalFailure,
                     result.StatusCode,
                     e,
                     ref _pendingEventUploadNonRetryableFailures,
@@ -628,9 +628,9 @@ namespace CA_DataUploaderLib
         }
 
         internal static EventFiredArgs? HandleFailedEventUpload(
-            HttpStatusCode? statusCode, EventFiredArgs e, ref int nonRetryableFailures, Action<string> logError)
+            bool isLocalFailure, HttpStatusCode? statusCode, EventFiredArgs e, ref int nonRetryableFailures, Action<string> logError)
         {
-            if (ShouldRetryUpload(statusCode))
+            if (!isLocalFailure && ShouldRetryUpload(statusCode))
                 return e;
 
             nonRetryableFailures++;
@@ -639,7 +639,8 @@ namespace CA_DataUploaderLib
 
             logError(
                 $"Discarding event upload after {nonRetryableFailures} non-retryable upload failures " +
-                $"(status code: {(int?)statusCode} {statusCode}, event: {e.EventType} - {e.Data} - {e.TimeSpan:O}).");
+                $"(failure: {(isLocalFailure ? "local exception" : "HTTP response")}, " +
+                $"status code: {(int?)statusCode} {statusCode}, event: {e.EventType} - {e.Data} - {e.TimeSpan:O}).");
 
             nonRetryableFailures = 0;
             return null;
@@ -657,12 +658,12 @@ namespace CA_DataUploaderLib
             catch (HttpRequestException ex)
             {
                 OnError($"Failed posting event (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}): {args.EventType} - {args.Data} - {args.TimeSpan}", ex);
-                return new(false, ex.StatusCode);
+                return new(false, ex.StatusCode, IsLocalFailure: false);
             }
             catch (Exception ex)
             {
                 OnError($"Failed posting event: {args.EventType} - {args.Data} - {args.TimeSpan}", ex);
-                return new(false, null);
+                return new(false, null, IsLocalFailure: true);
             }
 
             Task<UploadResult> Post(EventFiredArgs args) => CheckAndLogEvent(Plot.PostEventAsync(GetSignedEvent(args)), "event");
@@ -675,14 +676,14 @@ namespace CA_DataUploaderLib
                     PostBoards(data.ToBoardsSerialInfoJsonUtf8Bytes(args.TimeSpan)),
                     Post(new EventFiredArgs(ToShortEventData(data), args.EventType, args.TimeSpan)));
                 return Array.TrueForAll(results, r => r.Success)
-                    ? new(true, null)
+                    ? new(true, null, IsLocalFailure: false)
                     : results.First(r => !r.Success);
             }
             async Task<UploadResult> CheckAndLogEvent(Task<HttpResponseMessage> responseTask, string type)
             {
                 using var response = await responseTask;
                 var success = CheckAndLogFailures(response, (type, args), a => $"Failed posting ({a.type}): {a.args.EventType} - {a.args.Data} - {a.args.TimeSpan}");
-                return new(success, success ? null : response.StatusCode);
+                return new(success, success ? null : response.StatusCode, IsLocalFailure: false);
             }
             static string ToShortEventData(SystemChangeNotificationData data)
             {
@@ -992,7 +993,7 @@ namespace CA_DataUploaderLib
             EventUpload
         }
 
-        private readonly record struct UploadResult(bool Success, HttpStatusCode? StatusCode);
+        private readonly record struct UploadResult(bool Success, HttpStatusCode? StatusCode, bool IsLocalFailure);
 
         internal static bool IsUploaderDisabled(IIOconf conf) => conf.GetEntries<IOconfDisableUploader>().Any();
         private class IOconfDisableUploader : IOconfRow
