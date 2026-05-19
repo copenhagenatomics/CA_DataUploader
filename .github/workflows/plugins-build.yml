@@ -15,11 +15,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '8.0'
     - name: Restore dependencies
@@ -31,7 +31,7 @@ jobs:
     - name: Pack CA.LoopControlPluginBase
       run: dotnet pack CA.LoopControlPluginBase -c Release -o out
     - name: make generated nuget packages available as workflow artifacts too
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: nugetpackages
         path: out
