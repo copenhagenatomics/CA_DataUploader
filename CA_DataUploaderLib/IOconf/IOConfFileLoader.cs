@@ -61,10 +61,19 @@ namespace CA_DataUploaderLib.IOconf
                 while (File.Exists(newFilename));
 
                 File.Copy(filename, newFilename);
+                using var backupFs = new FileStream(newFilename, FileMode.Open, FileAccess.ReadWrite);
+                backupFs.Flush(flushToDisk: true);
             }
-            var temp = Path.GetTempFileName();
-            File.WriteAllText(temp, ioconf);
+
+            var temp = filename + ".tmp";
+            using (var fs = new FileStream(temp, FileMode.Create, FileAccess.Write))
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes(ioconf);
+                fs.Write(bytes, 0, bytes.Length);
+                fs.Flush(flushToDisk: true);
+            }
             File.Move(temp, filename, true);
+
         }
 
         private static IOconfRow CreateType(IIOconfLoader confLoader, string row, int lineNum)
