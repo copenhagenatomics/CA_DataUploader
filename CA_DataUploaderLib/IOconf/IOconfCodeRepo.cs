@@ -104,9 +104,16 @@ namespace CA_DataUploaderLib.IOconf
 
             if (repoURLs.Count == 0)
                 return;
-            
+
             var jsonOut = JsonSerializer.Serialize(repoURLs, jsonSerializerOptions);
-            File.WriteAllText(RepoUrlJsonFile, jsonOut);
+            var temp = RepoUrlJsonFile + ".tmp";
+            using (var fs = new FileStream(temp, FileMode.Create, FileAccess.Write))
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes(jsonOut);
+                fs.Write(bytes, 0, bytes.Length);
+                fs.Flush(flushToDisk: true);
+            }
+            File.Move(temp, RepoUrlJsonFile, true);
         }
 
         /// <summary>

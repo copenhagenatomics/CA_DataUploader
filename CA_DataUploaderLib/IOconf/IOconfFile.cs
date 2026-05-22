@@ -58,8 +58,8 @@ namespace CA_DataUploaderLib.IOconf
         /// <param name="ioconf"></param>
         public void WriteToDisk()
         {
-            IOconfFileLoader.WriteToDisk(GetRawFile());
             IOconfCodeRepo.WriteURLsToFile(CodeRepoURLs, Directory.GetCurrentDirectory());
+            IOconfFileLoader.WriteToDisk(GetRawFile());
         }
 
         public void CheckConfig()
