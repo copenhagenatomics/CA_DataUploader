@@ -392,19 +392,6 @@ namespace CA_DataUploaderLib
             }
         }
 
-        static IReadOnlyList<T> DequeueAllEntries<T>(ChannelReader<T> reader)
-        {
-            if (!reader.TryRead(out var value))
-                return [];
-
-            var list = new List<T>();
-            do
-                list.Add(value);
-            while (reader.TryRead(out value));
-
-            return list;
-        }
-
         internal static void PrepareVectorUploadBatch(ChannelReader<DataVector> reader, List<DataVector> pendingVectors, int maxBatchSize)
         {
             if (pendingVectors.Count > 0)
@@ -545,17 +532,6 @@ namespace CA_DataUploaderLib
             pendingVectors.Clear();
             _pendingVectorUploadNonRetryableFailures = 0;
             return true;
-        }
-
-        private IEnumerable<EventFiredArgs> FilterEvents(IEnumerable<EventFiredArgs> events)
-        {
-            var filters = _eventFilters;
-            foreach (var e in events)
-            {
-                if (filters.Any(eval => eval(e)))
-                    continue;
-                yield return e;
-            }
         }
 
         private async ValueTask<EventFiredArgs?> PostQueuedEventsAsync(
