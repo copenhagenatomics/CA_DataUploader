@@ -61,7 +61,7 @@ namespace CA_DataUploaderLib.IOconf
                 while (File.Exists(newFilename));
 
                 File.Copy(filename, newFilename);
-                using var backupFs = new FileStream(newFilename, FileMode.Open, FileAccess.ReadWrite);
+                using var backupFs = new FileStream(newFilename, FileMode.Open, FileAccess.Write);
                 backupFs.Flush(flushToDisk: true);
             }
 
@@ -73,7 +73,6 @@ namespace CA_DataUploaderLib.IOconf
                 fs.Flush(flushToDisk: true);
             }
             File.Move(temp, filename, true);
-
         }
 
         private static IOconfRow CreateType(IIOconfLoader confLoader, string row, int lineNum)
