@@ -34,9 +34,14 @@ namespace CA_DataUploaderLib
         private DateTime _lastTimestamp;
         private (bool[] uploadMap, VectorDescription uploadDesc)? _desc;
         private (bool[] uploadMap, VectorDescription uploadDesc) Desc => _desc ?? throw new InvalidOperationException("Usage of desc before vector description initialization");
-        private static readonly BoundedChannelOptions BoundedOptions = new(10000) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true };
+        private const int ChannelBufferCapacity = 10000;
+        private const int UploadBufferCapacity = 20000;
+        internal const int VectorUploadBatchSize = 600;
+        private const int MaxNonRetryableUploadFailures = 3;
+        private static readonly BoundedChannelOptions BoundedOptions = new(ChannelBufferCapacity) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true };
+        private static readonly BoundedChannelOptions VectorBoundedOptions = new(UploadBufferCapacity) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true };
         private readonly Channel<UploadState> _executedActionChannel = Channel.CreateBounded<UploadState>(BoundedOptions);
-        private readonly Channel<DataVector> _vectorsChannel = Channel.CreateBounded<DataVector>(BoundedOptions);
+        private readonly Channel<DataVector> _vectorsChannel = Channel.CreateBounded<DataVector>(VectorBoundedOptions);
         private readonly Channel<EventFiredArgs> _eventsChannel = Channel.CreateBounded<EventFiredArgs>(BoundedOptions);
         private readonly IIOconf _ioconf;
         private readonly CommandHandler _cmd;
@@ -44,6 +49,8 @@ namespace CA_DataUploaderLib
         private readonly TaskCompletionSource<PlotConnection> _connectionEstablishedSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly Stopwatch _timeSinceLastInvalidValueEvent = new();
         private int _invalidValueEventsSkipped = 0;
+        private int _pendingVectorUploadNonRetryableFailures = 0;
+        private int _pendingEventUploadNonRetryableFailures = 0;
         private IReadOnlyList<Func<EventFiredArgs, bool>> _eventFilters = [];
 
         public string Title => nameof(ServerUploader);
@@ -254,6 +261,7 @@ namespace CA_DataUploaderLib
                 var throttle = new PeriodicTimer(defaultUploadPeriod);
                 var stateWriter = _executedActionChannel.Writer;
                 var badVectors = new List<DateTime>();
+                var pendingVectors = new List<DataVector>(VectorUploadBatchSize);
                 var random = new Random();
 
                 try
@@ -261,7 +269,7 @@ namespace CA_DataUploaderLib
                     while (await throttle.WaitForNextTickAsync(token))
                     {
                         stateWriter.TryWrite(UploadState.VectorUploader);
-                        if (!await PostQueuedVectorAsync(stateWriter))
+                        if (!await PostQueuedVectorAsync(stateWriter, pendingVectors))
                         {
                             badVectors.Add(DateTime.UtcNow);
                             throttle.Period = TimeSpan.FromSeconds(Math.Min(throttle.Period.TotalSeconds * 2 + random.NextDouble(), 120)); // Exponential backoff + jitter (max 2 minutes in total)
@@ -273,7 +281,7 @@ namespace CA_DataUploaderLib
                 catch (OperationCanceledException) { }
 
                 CALog.LogInfoAndConsoleLn(LogID.A, "Uploader is stopping, trying to send remaining queued vectors");
-                if (!await PostQueuedVectorAsync(stateWriter))
+                if (!await PostQueuedVectorAsync(stateWriter, pendingVectors))
                     badVectors.Add(DateTime.UtcNow);
                 PrintBadPackagesMessage(badVectors, "Vector", true);
             }
@@ -286,13 +294,14 @@ namespace CA_DataUploaderLib
                 var badEvents = new List<DateTime>();
                 Dictionary<string, int> duplicateEventsDetection = [];
                 Queue<(DateTime expirationTime, string @event)> duplicateEventsExpirationTimes = new();
+                EventFiredArgs? pendingEvent = null;
 
                 try
                 {
                     while (await throttle.WaitForNextTickAsync(token))
                     {
                         stateWriter.TryWrite(UploadState.EventUploader);
-                        await PostQueuedEventsAsync(stateWriter, badEvents, duplicateEventsDetection, duplicateEventsExpirationTimes);
+                        pendingEvent = await PostQueuedEventsAsync(stateWriter, badEvents, duplicateEventsDetection, duplicateEventsExpirationTimes, pendingEvent);
                     }
                 }
                 catch (OperationCanceledException) { }
@@ -301,7 +310,7 @@ namespace CA_DataUploaderLib
                 CALog.LogInfoAndConsoleLn(LogID.A, "Uploader is stopping, trying to send remaining queued events");
 
                 await Task.Delay(200, CancellationToken.None); //we give an extra 200ms to let any remaining shutdown events come in
-                await PostQueuedEventsAsync(stateWriter, badEvents, duplicateEventsDetection, duplicateEventsExpirationTimes);
+                pendingEvent = await PostQueuedEventsAsync(stateWriter, badEvents, duplicateEventsDetection, duplicateEventsExpirationTimes, pendingEvent);
                 PrintBadPackagesMessage(badEvents, "Events", true);
             }
 
@@ -383,17 +392,24 @@ namespace CA_DataUploaderLib
             }
         }
 
-        static IReadOnlyList<T> DequeueAllEntries<T>(ChannelReader<T> reader)
+        internal static void PrepareVectorUploadBatch(ChannelReader<DataVector> reader, List<DataVector> pendingVectors, int maxBatchSize)
         {
-            if (!reader.TryRead(out var value))
-                return [];
+            if (pendingVectors.Count > 0)
+                return;
 
-            var list = new List<T>();
-            do
-                list.Add(value);
-            while (reader.TryRead(out value));
+            for (int i = 0; i < maxBatchSize && reader.TryRead(out var vector); i++)
+                pendingVectors.Add(vector);
+        }
 
-            return list;
+        internal static bool ShouldRetryUpload(HttpStatusCode? statusCode)
+        {
+            return statusCode is null
+                or HttpStatusCode.NotFound // 404
+                or HttpStatusCode.RequestTimeout // 408
+                or HttpStatusCode.TooManyRequests // 429
+                or HttpStatusCode.BadGateway // 502
+                or HttpStatusCode.ServiceUnavailable // 503
+                or HttpStatusCode.GatewayTimeout; // 504
         }
 
         /// <returns>a signature of the original data followed by the data compressed with gzip.</returns>
@@ -460,14 +476,14 @@ namespace CA_DataUploaderLib
             Console.WriteLine($"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} (UTC) - {message}");
         }
 
-        private ValueTask<bool> PostQueuedVectorAsync(ChannelWriter<UploadState> stateWriter)
+        private ValueTask<bool> PostQueuedVectorAsync(ChannelWriter<UploadState> stateWriter, List<DataVector> pendingVectors)
         {
-            var list = DequeueAllEntries(_vectorsChannel.Reader);
-            if (list.Count == 0) return ValueTask.FromResult(true); //no vectors, return success
+            PrepareVectorUploadBatch(_vectorsChannel.Reader, pendingVectors, VectorUploadBatchSize);
+            if (pendingVectors.Count == 0) return ValueTask.FromResult(true); //no vectors, return success
 
             stateWriter.TryWrite(UploadState.VectorUpload);
-            var buffer = GetSignedVectors(list);
-            var timestamp = list[0].Timestamp;
+            var buffer = GetSignedVectors(pendingVectors);
+            var timestamp = pendingVectors[0].Timestamp;
             return new ValueTask<bool>(Post());
 
             async Task<bool> Post()
@@ -476,13 +492,20 @@ namespace CA_DataUploaderLib
                 {
                     using var response = await Plot.PostVectorAsync(buffer, timestamp);
                     var success = CheckAndLogFailures(response, "Failed posting vector");
-                    stateWriter.TryWrite(UploadState.UploadedVector);
-                    return success;
+                    if (success)
+                    {
+                        pendingVectors.Clear();
+                        _pendingVectorUploadNonRetryableFailures = 0;
+                        stateWriter.TryWrite(UploadState.UploadedVector);
+                        return true;
+                    }
+
+                    return HandleFailedVectorUpload(response.StatusCode, pendingVectors);
                 }
                 catch (HttpRequestException ex)
                 {
                     OnError($"Failed posting vector (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}).", ex);
-                    return false;
+                    return HandleFailedVectorUpload(ex.StatusCode, pendingVectors);
                 }
                 catch (Exception ex)
                 {
@@ -492,34 +515,69 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private IEnumerable<EventFiredArgs> FilterEvents(IEnumerable<EventFiredArgs> events)
+        private bool HandleFailedVectorUpload(HttpStatusCode? statusCode, List<DataVector> pendingVectors)
         {
-            var filters = _eventFilters;
-            foreach (var e in events)
-            {
-                if (filters.Any(eval => eval(e)))
-                    continue;
-                yield return e;
-            }
+            if (ShouldRetryUpload(statusCode))
+                return false;
+
+            _pendingVectorUploadNonRetryableFailures++;
+            if (_pendingVectorUploadNonRetryableFailures < MaxNonRetryableUploadFailures)
+                return false;
+
+            OnError(
+                $"Discarding vector upload batch after {_pendingVectorUploadNonRetryableFailures} non-retryable upload failures " +
+                $"(status code: {(int?)statusCode} {statusCode}, vectors: {pendingVectors.Count}, " +
+                $"range: {pendingVectors[0].Timestamp:O} - {pendingVectors[^1].Timestamp:O}).");
+
+            pendingVectors.Clear();
+            _pendingVectorUploadNonRetryableFailures = 0;
+            return true;
         }
 
-        private async ValueTask PostQueuedEventsAsync(
-            ChannelWriter<UploadState> stateWriter, List<DateTime> badEvents, Dictionary<string, int> duplicateEventsDetection, 
-            Queue<(DateTime expirationTime, string @event)> duplicateEventsExpirationTimes)
+        private async ValueTask<EventFiredArgs?> PostQueuedEventsAsync(
+            ChannelWriter<UploadState> stateWriter, List<DateTime> badEvents, Dictionary<string, int> duplicateEventsDetection,
+            Queue<(DateTime expirationTime, string @event)> duplicateEventsExpirationTimes, EventFiredArgs? pendingEvent)
         {
             RemoveExpiredDuplicateEvents();
 
-            var events = DequeueAllEntries(_eventsChannel.Reader);
-            if (events.Count == 0) return;
-
-            foreach (var e in FilterEvents(events))
+            if (pendingEvent != null)
             {
+                pendingEvent = await PostOrKeepPendingEvent(pendingEvent);
+                if (pendingEvent != null)
+                    return pendingEvent;
+            }
+
+            while (_eventsChannel.Reader.TryRead(out var e))
+            {
+                if (_eventFilters.Any(eval => eval(e)))
+                    continue;
                 if (TrackDuplicate(e.Data)) continue;
 
+                pendingEvent = await PostOrKeepPendingEvent(e);
+                if (pendingEvent != null)
+                    return pendingEvent;
+            }
+
+            return null;
+
+            async Task<EventFiredArgs?> PostOrKeepPendingEvent(EventFiredArgs e)
+            {
                 stateWriter.TryWrite(UploadState.EventUpload);
-                if (!await PostEventAsync(e))
-                    badEvents.Add(DateTime.UtcNow);
-                stateWriter.TryWrite(UploadState.UploadedEvent);
+                var result = await PostEventAsync(e);
+                if (result.Success)
+                {
+                    _pendingEventUploadNonRetryableFailures = 0;
+                    stateWriter.TryWrite(UploadState.UploadedEvent);
+                    return null;
+                }
+
+                badEvents.Add(DateTime.UtcNow);
+                return HandleFailedEventUpload(
+                    result.IsLocalFailure,
+                    result.StatusCode,
+                    e,
+                    ref _pendingEventUploadNonRetryableFailures,
+                    message => OnError(message));
             }
 
             bool TrackDuplicate(string e)
@@ -545,7 +603,26 @@ namespace CA_DataUploaderLib
             }
         }
 
-        private async Task<bool> PostEventAsync(EventFiredArgs args)
+        internal static EventFiredArgs? HandleFailedEventUpload(
+            bool isLocalFailure, HttpStatusCode? statusCode, EventFiredArgs e, ref int nonRetryableFailures, Action<string> logError)
+        {
+            if (!isLocalFailure && ShouldRetryUpload(statusCode))
+                return e;
+
+            nonRetryableFailures++;
+            if (nonRetryableFailures < MaxNonRetryableUploadFailures)
+                return e;
+
+            logError(
+                $"Discarding event upload after {nonRetryableFailures} non-retryable upload failures " +
+                $"(failure: {(isLocalFailure ? "local exception" : "HTTP response")}, " +
+                $"status code: {(int?)statusCode} {statusCode}, event: {e.EventType} - {e.Data} - {e.TimeSpan:O}).");
+
+            nonRetryableFailures = 0;
+            return null;
+        }
+
+        private async Task<UploadResult> PostEventAsync(EventFiredArgs args)
         {
             try
             {
@@ -557,29 +634,32 @@ namespace CA_DataUploaderLib
             catch (HttpRequestException ex)
             {
                 OnError($"Failed posting event (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}): {args.EventType} - {args.Data} - {args.TimeSpan}", ex);
-                return false;
+                return new(false, ex.StatusCode, IsLocalFailure: false);
             }
             catch (Exception ex)
             {
                 OnError($"Failed posting event: {args.EventType} - {args.Data} - {args.TimeSpan}", ex);
-                return false;
+                return new(false, null, IsLocalFailure: true);
             }
 
-            Task<bool> Post(EventFiredArgs args) => CheckAndLogEvent(Plot.PostEventAsync(GetSignedEvent(args)), "event");
-            Task<bool> PostBoards(byte[] message) => CheckAndLogEvent(Plot.PostBoardsAsync(SignAndCompress(message)), "board");
-            async Task<bool> PostSystemChangeNotificationAsync(EventFiredArgs args)
+            Task<UploadResult> Post(EventFiredArgs args) => CheckAndLogEvent(Plot.PostEventAsync(GetSignedEvent(args)), "event");
+            Task<UploadResult> PostBoards(byte[] message) => CheckAndLogEvent(Plot.PostBoardsAsync(SignAndCompress(message)), "board");
+            async Task<UploadResult> PostSystemChangeNotificationAsync(EventFiredArgs args)
             {
-                var data = SystemChangeNotificationData.ParseJson(args.Data) ?? 
+                var data = SystemChangeNotificationData.ParseJson(args.Data) ??
                     throw new FormatException($"Failed to parse SystemChangeNotificationData: {args.Data}");
                 var results = await Task.WhenAll(
                     PostBoards(data.ToBoardsSerialInfoJsonUtf8Bytes(args.TimeSpan)),
                     Post(new EventFiredArgs(ToShortEventData(data), args.EventType, args.TimeSpan)));
-                return Array.TrueForAll(results, r => r);
+                return Array.TrueForAll(results, r => r.Success)
+                    ? new(true, null, IsLocalFailure: false)
+                    : results.First(r => !r.Success);
             }
-            async Task<bool> CheckAndLogEvent(Task<HttpResponseMessage> responseTask, string type)
+            async Task<UploadResult> CheckAndLogEvent(Task<HttpResponseMessage> responseTask, string type)
             {
                 using var response = await responseTask;
-                return CheckAndLogFailures(response, (type, args), a => $"Failed posting ({a.type}): {a.args.EventType} - {a.args.Data} - {a.args.TimeSpan}");
+                var success = CheckAndLogFailures(response, (type, args), a => $"Failed posting ({a.type}): {a.args.EventType} - {a.args.Data} - {a.args.TimeSpan}");
+                return new(success, success ? null : response.StatusCode, IsLocalFailure: false);
             }
             static string ToShortEventData(SystemChangeNotificationData data)
             {
@@ -888,6 +968,8 @@ namespace CA_DataUploaderLib
             CheckState,
             EventUpload
         }
+
+        private readonly record struct UploadResult(bool Success, HttpStatusCode? StatusCode, bool IsLocalFailure);
 
         internal static bool IsUploaderDisabled(IIOconf conf) => conf.GetEntries<IOconfDisableUploader>().Any();
         private class IOconfDisableUploader : IOconfRow
