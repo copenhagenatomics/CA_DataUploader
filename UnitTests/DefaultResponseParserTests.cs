@@ -15,6 +15,12 @@ namespace UnitTests
         [DataRow("0.01,-0.05,0.06,0xa,", 10U, 0.01, -0.05, 0.06)] //Comma after status supported, but not expected
         [DataRow("0.01,-0.05,0.06, 0xA", 10U, 0.01, -0.05, 0.06)]
         [DataRow("0.01,-0.05,0.06,0xffffffff", uint.MaxValue, 0.01, -0.05, 0.06)]
+        [DataRow("inf, -0.05, 0.06, 0xA", 10U, double.PositiveInfinity, -0.05, 0.06)]
+        [DataRow("-inf, -0.05, 0.06, 0xA", 10U, double.NegativeInfinity, -0.05, 0.06)]
+        [DataRow("0.01, inf, 0.06, 0xA", 10U, 0.01, double.PositiveInfinity, 0.06)]
+        [DataRow("0.01, -inf, 0.06, 0xA", 10U, 0.01, double.NegativeInfinity, 0.06)]
+        [DataRow("0.01, -0.05, inf, 0xA", 10U, 0.01, -0.05, double.PositiveInfinity)]
+        [DataRow("0.01, -0.05, -inf, 0xA", 10U, 0.01, -0.05, double.NegativeInfinity)]
         [TestMethod]
         public void DefaultSettingsParsesExpectedValuesFormat(string line, uint expectedStatus, params double[] expectedValues)
         {

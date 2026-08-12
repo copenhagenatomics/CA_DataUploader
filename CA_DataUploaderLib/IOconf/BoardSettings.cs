@@ -50,7 +50,7 @@ namespace CA_DataUploaderLib.IOconf
                     uint.TryParse(lineMatch.Groups["Status"].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out status);
 
                 return (lineMatch.Groups["Values"].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-                    .Select(x => x.ToDouble())
+                    .Select(ParseValue)
                     .ToList(), status);
             }
 
@@ -58,7 +58,14 @@ namespace CA_DataUploaderLib.IOconf
 
             public virtual bool IsExpectedNonValuesLine(string line) => false;
 
-            [GeneratedRegex(@"^\s*(?<Values>[+-]?(?:[0-9]*[.])?[0-9]+\s*(?:,\s*[+-]?(?:[0-9]*[.])?[0-9]+\s*)*)(?:,\s*0x(?<Status>[0-9a-fA-F]+))?,?\s*$")]
+            /// <remarks>supports the infinity values reported by boards as inf/-inf/+inf</remarks>
+            protected static double ParseValue(string value) => value switch
+            {
+                _ when value.EndsWith("inf", StringComparison.OrdinalIgnoreCase) => value.StartsWith('-') ? double.NegativeInfinity : double.PositiveInfinity,
+                _ => value.ToDouble()
+            };
+
+            [GeneratedRegex(@"^\s*(?<Values>[+-]?(?:inf|(?:[0-9]*[.])?[0-9]+)\s*(?:,\s*[+-]?(?:inf|(?:[0-9]*[.])?[0-9]+)\s*)*)(?:,\s*0x(?<Status>[0-9a-fA-F]+))?,?\s*$", RegexOptions.IgnoreCase)]
             private static partial Regex HasCommaSeparatedNumbersRegex();
         }
     }
