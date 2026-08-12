@@ -7,7 +7,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Threading;
-using System.Threading.Channels;
 
 namespace CA_DataUploaderLib
 {
@@ -15,6 +14,7 @@ namespace CA_DataUploaderLib
     {
         private readonly SensorSample? _rpiGpuSample;
         private readonly SensorSample? _rpiCpuSample;
+
         public ThermocoupleBox(IIOconf ioconf, CommandHandler cmd) : base(cmd, "Temperatures", GetSensors(ioconf)) 
         { // these are disabled / null when RpiTemp is disabled
             _rpiGpuSample = _values.FirstOrDefault(x => IOconfRPiTemp.IsLocalGpuSensor(x.Input));
@@ -29,8 +29,9 @@ namespace CA_DataUploaderLib
             return loops;
         }
 
-        private static async Task ReadRpiTemperaturesLoop(SensorSample gpuSample, SensorSample cpuSample, CancellationToken token)
+        private async Task ReadRpiTemperaturesLoop(SensorSample gpuSample, SensorSample cpuSample, CancellationToken token)
         {
+            LowFrequencyLog readError = new(_cmd.Time, "read error");
             var msBetweenReads = 1000; // waiting every second, for higher resolution.
             while (!token.IsCancellationRequested)
             {
@@ -47,11 +48,13 @@ namespace CA_DataUploaderLib
                 }
                 catch (Exception ex)
                 { 
-                    CALog.LogErrorAndConsoleLn(LogID.A, $"Unexpected error reading rpi temperatures", ex);
+                    readError.Log((ex, skipMessage) => LogError($"Unexpected error reading rpi temperatures{skipMessage}", ex), ex);
                 }
             }
-            
         }
+
+        private void LogError(string message, Exception ex) => _cmd.Logger.LogError(LogID.A, $"{message} - {Title}", ex);
+
 
         private static IEnumerable<IOconfInput> GetSensors(IIOconf ioconf)
         {
