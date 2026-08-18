@@ -20,7 +20,7 @@ namespace CA_DataUploaderLib
         /// <summary>runs when the subsystem is about to stop running, but before all boards are closed</summary>
         /// <remarks>some boards might be closed, specially if the system is stopping due to losing connection to one of the boards</remarks>
         public event EventHandler? Stopping;
-        private readonly CommandHandler _cmd;
+        protected readonly CommandHandler _cmd;
         protected readonly List<SensorSample.InputBased> _values;
         protected readonly List<SensorSample.InputBased> _localValues;
         private readonly (IOconfMap map, SensorSample.InputBased[] values, DataVectorReader? vectorReader, int boardStateIndexInFullVector)[] _boards = [];
