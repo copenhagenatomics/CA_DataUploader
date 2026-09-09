@@ -12,6 +12,7 @@ namespace CA_DataUploaderLib.Helpers
         private readonly MathVectorExpansion _mathVectorExpansion;
         private readonly FilterVectorExpansion _filterVectorExpansion;
         private readonly int _inputsCount;
+        private readonly List<(IOconfAlert alert, int sourceIndex, int channelIndex)> _alertChannels = [];
 
         public VectorDescription VectorDescription { get; }
         /// <summary>
@@ -30,6 +31,8 @@ namespace CA_DataUploaderLib.Helpers
             allItems.AddRange(_filterVectorExpansion.GetDecisionVectorDescriptionEntries());
             allItems.AddRange(_mathVectorExpansion.GetVectorDescriptionEntries());
             allItems.AddRange(outputs);
+            var alerts = ioconf.GetAlerts().ToList();
+            allItems.AddRange(alerts.Select(a => new VectorDescriptionItem("double", a.ChannelName, DataTypeEnum.State)));
             
             var duplicates = allItems.GroupBy(x => x.Descriptor, StringComparer.InvariantCultureIgnoreCase).Where(x => x.Count() > 1).Select(x => x.Key);
             if (duplicates.Any())
@@ -38,7 +41,20 @@ namespace CA_DataUploaderLib.Helpers
             var allFields = allItems.Select(i => i.Descriptor).ToArray();
             _filterVectorExpansion.Initialize(allFields);
             _mathVectorExpansion.Initialize(allFields);
+            foreach (var alert in alerts)
+            {
+                var sourceIndex = Array.IndexOf(allFields, alert.Sensor);
+                if (sourceIndex < 0)
+                    throw new FormatException($"Alert: {alert.Name} points to missing vector field: {alert.Sensor}");
+                _alertChannels.Add((alert, sourceIndex, Array.IndexOf(allFields, alert.ChannelName)));
+            }
             VectorDescription = new VectorDescription(allItems, RpiVersion.GetHardware(), RpiVersion.GetSoftware());
+        }
+
+        public void CalculateAlertStates(DataVector vector)
+        {
+            foreach (var (alert, sourceIndex, channelIndex) in _alertChannels)
+                vector.Data[channelIndex] = alert.IsActive(vector[sourceIndex]) ? 1 : 0;
         }
 
         public void MakeDecision(DataVector vector)

@@ -173,6 +173,7 @@ namespace CA_DataUploaderLib
                 decision.MakeDecision(decisionsVector, commands);
             foreach (var decision in _safetyDecisions)
                 decision.MakeDecision(decisionsVector, commands);
+            extendedDesc.CalculateAlertStates(vector);
 
             static List<string> ReplaceExternalShutdownCommandWithEmergencyShutdown(List<string> commands)
             {

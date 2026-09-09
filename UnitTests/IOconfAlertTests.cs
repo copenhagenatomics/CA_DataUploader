@@ -1,12 +1,53 @@
-﻿using CA_DataUploaderLib.IOconf;
+﻿using CA_DataUploaderLib;
+using CA_DataUploaderLib.IOconf;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Linq;
 
 namespace UnitTests
 {
     [TestClass]
     public class IOconfAlertTests
     {
+        [DataRow("", "alert", EventType.Alert)]
+        [DataRow(";tags:level=alert", "alert", EventType.Alert)]
+        [DataRow(";tags:level=error", "error", EventType.LogError)]
+        [DataRow(";tags:level=info", "info", EventType.Log)]
+        [TestMethod]
+        public void SeveritySelectsEventTypeAndExpandedChannel(string tags, string level, EventType eventType)
+        {
+            var config = new IOconfFile([$"Alert;overPressure;pres_abs_bar > 1.5;5;hej{tags}"]);
+            var alert = config.GetAlerts().Single();
+
+            Assert.AreEqual(eventType, alert.EventType);
+            CollectionAssert.AreEqual(new[] { $"overPressure_{level}" }, alert.GetExpandedNames(config).ToArray());
+            Assert.AreEqual(5, alert.RateLimitMinutes);
+            Assert.AreEqual("hej", alert.Command);
+        }
+
+        [DataRow("level=warning")]
+        [DataRow("level=")]
+        [DataRow("level")]
+        [DataRow("level=info level=error")]
+        [DataRow("level=alert level=alert")]
+        [TestMethod]
+        public void SeverityRejectsInvalidOrRepeatedTags(string tags)
+        {
+            var ex = Assert.Throws<FormatException>(() => new IOconfFile([$"Alert;overPressure;pressure > 1.5;tags:{tags}"]));
+            StringAssert.Contains(ex.Message, "level");
+        }
+
+        [DataRow("", null)]
+        [DataRow(";hej", "hej")]
+        [TestMethod]
+        public void LegacyDefaultsRemainAvailable(string command, string? expectedCommand)
+        {
+            var alert = new IOconfAlert($"Alert;overPressure;pressure > 1.5{command}", 0);
+            Assert.AreEqual(30, alert.RateLimitMinutes);
+            Assert.AreEqual(expectedCommand, alert.Command);
+            Assert.AreEqual(EventType.Alert, alert.EventType);
+        }
+
         [DataRow("Alert;MyName;Sensorx=123", 123d)]
         [DataRow("Alert;MyName;Sensorx=193.123", 193.123d)]
         [DataRow("Alert;MyName;Sensorx>123", 123.00012d)]

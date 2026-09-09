@@ -4,6 +4,8 @@ using System.Globalization;
 using static System.FormattableString;
 using CA_DataUploaderLib.Extensions;
 using System.Text.RegularExpressions;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -22,7 +24,24 @@ namespace CA_DataUploaderLib.IOconf
         public IOconfAlert(string row, int lineNum, EventType eventType = EventType.Alert) : base(row, lineNum, "Alert")
         {
             Format = "Alert;Name;SensorName comparison value;[rateMinutes];[command]";
-            EventType = eventType;
+            var levels = Tags.Where(t => t.name == "level").Select(t => t.value).ToList();
+            if (levels.Count > 1)
+                throw new FormatException($"Alert: {Name} has repeated level tags. Specify only one of alert, error or info.");
+            var level = levels.SingleOrDefault() ?? eventType switch
+            {
+                EventType.Alert => "alert",
+                EventType.LogError => "error",
+                EventType.Log => "info",
+                _ => throw new ArgumentOutOfRangeException(nameof(eventType)),
+            };
+            EventType = level switch
+            {
+                "alert" => EventType.Alert,
+                "error" => EventType.LogError,
+                "info" => EventType.Log,
+                _ => throw new FormatException($"Alert: {Name} has invalid level '{level}'. Expected alert, error or info."),
+            };
+            ChannelName = $"{Name}_{level}";
             var list = ToList();
             if (list[0] != "Alert" || list.Count < 3) throw new FormatException("IOconfAlert: wrong format: " + row);
    
@@ -38,6 +57,8 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public string Sensor { get; }
+        public string ChannelName { get; }
+        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf) => [ChannelName];
         public string Message { get; private set; }
         public string? Command { get; }
         private readonly AlertCompare type;
@@ -53,6 +74,8 @@ namespace CA_DataUploaderLib.IOconf
 
         private const int DefaultRateLimitMinutes = 30; // by default fire the same alert max once every 30 mins.
         private DateTime LastTriggered;
+
+        public bool IsActive(double value) => !(value >= 10000) && RawCheckValue(value);
 
         public bool CheckValue(double newValue, DateTime vectorTime)
         {

@@ -66,6 +66,8 @@ namespace CA_DataUploaderLib
 
                         if (alert.EventType == EventType.Alert)
                             _cmd.FireAlert(alert.Message, timestamp);
+                        else if (alert.EventType == EventType.Log)
+                            CALog.LogInfoAndConsoleLn(LogID.A, alert.Message);
                         else
                             CALog.LogErrorAndConsoleLn(LogID.A, alert.Message);
 
@@ -94,9 +96,12 @@ namespace CA_DataUploaderLib
         {
             var indexes = vectorDesc._items.Select((f, i) => (f, i)).ToDictionary(f => f.f.Descriptor, f => f.i);
             var alerts = new List<(IOconfAlert alert, int sensorIndex)>();
-            var alertsDefinitions = ioconf.GetAlerts()
-                .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_alert")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.Alert)))
-                .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_error")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.LogError)));
+            var configuredAlerts = ioconf.GetAlerts().ToList();
+            var generatedChannels = configuredAlerts.Select(a => a.ChannelName).ToHashSet();
+            var automaticChannels = vectorDesc._items.Where(i => !generatedChannels.Contains(i.Descriptor));
+            var alertsDefinitions = configuredAlerts
+                .Concat(automaticChannels.Where(i => i.Descriptor.EndsWith("_alert")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.Alert)))
+                .Concat(automaticChannels.Where(i => i.Descriptor.EndsWith("_error")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.LogError)));
             foreach (var alert in alertsDefinitions)
             {
                 if (!indexes.TryGetValue(alert.Sensor, out var index))

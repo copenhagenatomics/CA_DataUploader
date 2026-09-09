@@ -29,6 +29,18 @@ Or build the source code with the .net 6 sdk installed (note to build from VS yo
 
 ![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/CA_DataUploader.exe.png)
 
+## Configured alert channels
+
+```text
+Alert; overPressure; pres_abs_bar > 1.5; 5; hej; tags:level=info
+```
+
+This creates `overPressure_info`: `1` when the pressure exceeds 1.5, otherwise `0`, calculated after all decisions. Readings `>= 10000` produce `0`; existing comparison behavior, including NaN, is unchanged. The channel stays active even when event emission is suppressed by cooldown.
+
+The optional trailing tag selects `alert` (the default), `error`, or `info`, producing `<name>_alert`, `<name>_error`, or `<name>_info` and the corresponding alert, error-log, or info-log event. Invalid or repeated `level` tags are rejected. Generated channel names must not collide with existing fields.
+
+`5` is the cooldown in minutes (default: 30); `hej` is an optional command, executed with the event. Events retain the original sensor details and trigger on the first active reading or an inactive-to-active transition, subject to cooldown. Sustained conditions do not produce reminders. A transition suppressed during cooldown is not emitted later merely because the cooldown expires.
+
 ## How to Debug your system. 
 
 First make sure the hardware is connected correctly. 
