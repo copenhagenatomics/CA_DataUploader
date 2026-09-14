@@ -34,8 +34,15 @@ namespace CA_DataUploaderLib
 
             public static IEnumerable<Decision.Config> ToDecisionConfigs(IEnumerable<IOconfRedundant> redundants, IIOconf ioconf)
             {
-                var invalidValueDelay = redundants.OfType<IOconfRedundantInvalidValueDelay>().SingleOrDefault()?.InvalidValueDelay ?? 0;
-                var grouped = redundants.Where(r => r is not IOconfRedundantInvalidValueDelay).GroupBy(r => r.Name).ToList();
+                var entries = redundants.ToList();
+                var defaultInvalidValueDelay = entries
+                    .OfType<IOconfRedundantInvalidValueDelay>()
+                    .SingleOrDefault(r => r.IsGlobal)?.InvalidValueDelay ?? 0;
+
+                var grouped = entries
+                    .Where(r => r is not IOconfRedundantInvalidValueDelay delay || !delay.IsGlobal)
+                    .GroupBy(r => r.Name);
+
                 foreach (var group in grouped)
                 {
                     var configs = group.ToList();
@@ -44,7 +51,12 @@ namespace CA_DataUploaderLib
                     var validRange = configs.OfType<IOconfRedundantValidRange>().SingleOrDefault()?.ValidRange ?? (double.MinValue, double.MaxValue);
                     var invalidDefault = configs.OfType<IOconfRedundantInvalidDefault>().SingleOrDefault()?.InvalidDefault ?? 10000;
                     var strategy = configs.OfType<IOconfRedundantStrategy>().SingleOrDefault()?.Strategy ?? RedundancyStrategy.Median;
-                    yield return new(sensorsConfig.Name, sensorsConfig.Sensors, sensorsConfig.GetBoardStateNames(ioconf), validRange, invalidDefault, strategy, invalidValueDelay);
+                    var invalidValueDelay = configs.OfType<IOconfRedundantInvalidValueDelay>()
+                        .SingleOrDefault()?.InvalidValueDelay ?? defaultInvalidValueDelay;
+
+                    yield return new(sensorsConfig.Name, sensorsConfig.Sensors,
+                        sensorsConfig.GetBoardStateNames(ioconf), validRange,
+                        invalidDefault, strategy, invalidValueDelay);
                 }
             }
         }
@@ -140,23 +152,37 @@ namespace CA_DataUploaderLib
         {
             public const string RowType = "RedundantInvalidValueDelay";
 
+            public bool IsGlobal { get; }
+
             /// <summary>
             /// In seconds.
             /// </summary>
-			public double InvalidValueDelay { get; }
+            public double InvalidValueDelay { get; }
 
-            public IOconfRedundantInvalidValueDelay(string row, int lineNum) : base(row, lineNum, RowType)
+            public IOconfRedundantInvalidValueDelay(string row, int lineNum)
+                : base(row, lineNum, RowType)
             {
                 var vals = ToList();
-                if (vals.Count < 2) throw new FormatException($"Too few values. Format: {RowType};InvalidValueDelay. Row {Row}");
-                if (!vals[1].TryToDouble(out var invalidValueDelay))
-                    throw new FormatException($"Failed to parse invalid value delay. Format: {RowType};InvalidValueDelay. Row {Row}");
+                if (vals.Count != 2 && vals.Count != 3)
+                    throw new FormatException(
+                        $"Expected {RowType};InvalidValueDelay or {RowType};Name;InvalidValueDelay. Row {Row}");
+
+                IsGlobal = vals.Count == 2;
+                if (!IsGlobal)
+                    base.ValidateName(Name);
+
+                if (!vals[^1].TryToDouble(out var invalidValueDelay))
+                    throw new FormatException(
+                        $"Failed to parse invalid value delay. Format: {RowType};InvalidValueDelay or {RowType};Name;InvalidValueDelay. Row {Row}");
 
                 InvalidValueDelay = invalidValueDelay;
             }
 
-            public override string UniqueKey() => Type;
-            protected override void ValidateName(string name) { } // no validation
+            public override string UniqueKey() => IsGlobal ? Type : base.UniqueKey();
+
+            // The generic form places a numeric delay in the Name position.
+            // Group-specific names are validated in the constructor.
+            protected override void ValidateName(string name) { }
         }
 
 
