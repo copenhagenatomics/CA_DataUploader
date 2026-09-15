@@ -171,9 +171,10 @@ namespace CA_DataUploaderLib
                 if (!IsGlobal)
                     base.ValidateName(Name);
 
-                if (!vals[^1].TryToDouble(out var invalidValueDelay))
+                if (!vals[^1].TryToDouble(out var invalidValueDelay) ||
+                    !double.IsFinite(invalidValueDelay) || invalidValueDelay < 0)
                     throw new FormatException(
-                        $"Failed to parse invalid value delay. Format: {RowType};InvalidValueDelay or {RowType};Name;InvalidValueDelay. Row {Row}");
+                        $"Invalid delay. Expected a finite, non-negative value. Format: {RowType};InvalidValueDelay or {RowType};Name;InvalidValueDelay. Row {Row}");
 
                 InvalidValueDelay = invalidValueDelay;
             }
