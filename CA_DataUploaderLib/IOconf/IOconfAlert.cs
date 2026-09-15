@@ -5,7 +5,6 @@ using static System.FormattableString;
 using CA_DataUploaderLib.Extensions;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -23,11 +22,20 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfAlert(string row, int lineNum, EventType eventType = EventType.Alert) : base(row, lineNum, "Alert")
         {
-            Format = "Alert;Name;SensorName comparison value;[rateMinutes];[command]";
-            var levels = Tags.Where(t => t.name == "level").Select(t => t.value).ToList();
-            if (levels.Count > 1)
-                throw new FormatException($"Alert: {Name} has repeated level tags. Specify only one of alert, error or info.");
-            EventType = levels.SingleOrDefault() switch
+            Format = "Alert;Name;SensorName comparison value;[rateMinutes];[command];[level:alert|error|info]";
+            var list = ToList();
+            if (list[0] != "Alert" || list.Count < 3) throw new FormatException("IOconfAlert: wrong format: " + row);
+            string? level = null;
+            for (int i = list.Count - 1; i >= 3; i--)
+            {
+                if (!list[i].StartsWith("level:", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (level != null)
+                    throw new FormatException($"Alert: {Name} has repeated level fields. Specify only one of alert, error or info.");
+                level = list[i][6..].Trim();
+                list.RemoveAt(i);
+            }
+            EventType = level switch
             {
                 null => eventType,
                 "alert" => EventType.Alert,
@@ -44,8 +52,6 @@ namespace CA_DataUploaderLib.IOconf
                 _ => throw new ArgumentOutOfRangeException(nameof(eventType)),
             };
             ChannelName = $"{Name}_{suffix}";
-            var list = ToList();
-            if (list[0] != "Alert" || list.Count < 3) throw new FormatException("IOconfAlert: wrong format: " + row);
    
             (Sensor, Value, MessageTemplate, type) = ParseExpression(
                 Name, list[2], $"IOconfAlert: wrong format: {row}. Format: {Format}.");

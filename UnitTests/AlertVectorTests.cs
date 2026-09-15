@@ -24,13 +24,13 @@ namespace UnitTests
         public void RestoreLogger() => CALog.LoggerForUserOutput = originalLogger;
 
         [DataRow("", "alert")]
-        [DataRow(";tags:level=alert", "alert")]
-        [DataRow(";tags:level=error", "error")]
-        [DataRow(";tags:level=info", "info")]
+        [DataRow(";level:alert", "alert")]
+        [DataRow(";level:error", "error")]
+        [DataRow(";level:info", "info")]
         [TestMethod]
-        public void ChannelTracksConditionOnEveryCycle(string tags, string level)
+        public void ChannelTracksConditionOnEveryCycle(string severity, string level)
         {
-            var config = new IOconfFile([$"Alert;overPressure;pressure > 1.5;5{tags}"]);
+            var config = new IOconfFile([$"Alert;overPressure;pressure > 1.5;5{severity}"]);
             using var cmd = CreateHandler(config, "pressure");
             var field = cmd.GetFullSystemVectorDescription()._items.Single(i => i.Descriptor == $"overPressure_{level}");
             Assert.AreEqual(DataTypeEnum.State, field.DirectionType);
@@ -47,13 +47,13 @@ namespace UnitTests
         }
 
         [DataRow("", "alert", EventType.Alert)]
-        [DataRow(";tags:level=alert", "alert", EventType.Alert)]
-        [DataRow(";tags:level=error", "error", EventType.LogError)]
-        [DataRow(";tags:level=info", "info", EventType.Log)]
+        [DataRow(";level:alert", "alert", EventType.Alert)]
+        [DataRow(";level:error", "error", EventType.LogError)]
+        [DataRow(";level:info", "info", EventType.Log)]
         [TestMethod]
-        public async Task ActivationEmitsOnceAndRateLimitsEventsAndCommands(string tags, string level, EventType eventType)
+        public async Task ActivationEmitsOnceAndRateLimitsEventsAndCommands(string severity, string level, EventType eventType)
         {
-            var config = new IOconfFile([$"Alert;overPressure;pressure > 1.5;5;emergencyshutdown{tags}"]);
+            var config = new IOconfFile([$"Alert;overPressure;pressure > 1.5;5;emergencyshutdown{severity}"]);
             using var cmd = CreateHandler(config, "pressure");
             CALog.LoggerForUserOutput = new CALog.EventsLogger(config, cmd);
             _ = new Alerts(config, cmd);
