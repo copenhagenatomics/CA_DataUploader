@@ -10,8 +10,14 @@ namespace CA_DataUploaderLib.IOconf
             Format = "LoopName;Name;DebugLevel;[Server]";
 
             var list = ToList();
-            if(!Enum.TryParse<CALogLevel>(list[2], out LogLevel)) throw new FormatException("IOconfLoopName: wrong LogLevel: " + row);
+            if (!Enum.TryParse<CALogLevel>(list[2], out LogLevel)) throw new FormatException("IOconfLoopName: wrong LogLevel: " + row);
             Server = list.Count > 3 ? list[3] : "https://stagingtsserver.copenhagenatomics.com";
+            if (!Uri.TryCreate(Server, UriKind.Absolute, out var serverUri) ||
+                (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps) ||
+                !serverUri.IsWellFormedOriginalString())
+            {
+                throw new FormatException($"Invalid server URL: {Server}. Expected an absolute HTTP or HTTPS URL.");
+            }
         }
 
         public static IOconfLoopName Default { get; } = 
