@@ -16,13 +16,13 @@ namespace UnitTests
         [TestMethod]
         public void SeveritySelectsEventTypeAndExpandedChannel(string tags, string level, EventType eventType)
         {
-            var config = new IOconfFile([$"Alert;overPressure;pres_abs_bar > 1.5;5;hej{tags}"]);
+            var config = new IOconfFile([$"Alert;overPressure;pres_abs_bar > 1.5;5;emergencyshutdown{tags}"]);
             var alert = config.GetAlerts().Single();
 
             Assert.AreEqual(eventType, alert.EventType);
             CollectionAssert.AreEqual(new[] { $"overPressure_{level}" }, alert.GetExpandedNames(config).ToArray());
             Assert.AreEqual(5, alert.RateLimitMinutes);
-            Assert.AreEqual("hej", alert.Command);
+            Assert.AreEqual("emergencyshutdown", alert.Command);
         }
 
         [DataRow("level=warning")]
@@ -38,7 +38,7 @@ namespace UnitTests
         }
 
         [DataRow("", null)]
-        [DataRow(";hej", "hej")]
+        [DataRow(";emergencyshutdown", "emergencyshutdown")]
         [TestMethod]
         public void LegacyDefaultsRemainAvailable(string command, string? expectedCommand)
         {

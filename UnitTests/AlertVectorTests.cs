@@ -53,12 +53,12 @@ namespace UnitTests
         [TestMethod]
         public async Task ActivationEmitsOnceAndRateLimitsEventsAndCommands(string tags, string level, EventType eventType)
         {
-            var config = new IOconfFile([$"Alert;overPressure;pressure > 1.5;5;hej{tags}"]);
+            var config = new IOconfFile([$"Alert;overPressure;pressure > 1.5;5;emergencyshutdown{tags}"]);
             using var cmd = CreateHandler(config, "pressure");
             CALog.LoggerForUserOutput = new CALog.EventsLogger(config, cmd);
             _ = new Alerts(config, cmd);
             var executions = 0;
-            cmd.AddCommand("hej", _ => { executions++; return true; });
+            cmd.AddCommand("emergencyshutdown", _ => { executions++; return true; });
             var index = cmd.GetFullSystemVectorDescription()._items.FindIndex(i => i.Descriptor == $"overPressure_{level}");
             var time = new DateTime(2026, 1, 1);
             foreach (var (minute, pressure, shouldEmit) in new[]
@@ -80,7 +80,7 @@ namespace UnitTests
                 {
                     var alertEvent = events.Single(e => e.EventType == (byte)eventType);
                     Assert.AreEqual(" overPressure (pressure) > 1.5 (2)", alertEvent.Data);
-                    Assert.AreEqual("hej", events.Single(e => e.EventType == (byte)EventType.Command).Data);
+                    Assert.AreEqual("emergencyshutdown", events.Single(e => e.EventType == (byte)EventType.Command).Data);
                 }
             }
         }
@@ -90,11 +90,11 @@ namespace UnitTests
         [TestMethod]
         public async Task FinalSafetyDecisionDeterminesChannelInLiveExecutionAndReplay(double finalPressure, double expected)
         {
-            var config = new IOconfFile(["Alert;overPressure;pressure > 1.5;0;hej"]);
+            var config = new IOconfFile(["Alert;overPressure;pressure > 1.5;0;emergencyshutdown"]);
             using var cmd = CreateHandler(config, "pressure");
             _ = new Alerts(config, cmd);
             var executions = 0;
-            cmd.AddCommand("hej", _ => { executions++; return true; });
+            cmd.AddCommand("emergencyshutdown", _ => { executions++; return true; });
             cmd.AddDecisions([new SetPressureDecision("normal", 3)]);
             cmd.AddSafetyDecisions([new SetPressureDecision("firstSafety", 4), new SetPressureDecision("lastSafety", finalPressure)]);
             var desc = cmd.GetFullSystemVectorDescription();
