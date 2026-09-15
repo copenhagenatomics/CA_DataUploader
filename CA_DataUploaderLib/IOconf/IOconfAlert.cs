@@ -27,21 +27,23 @@ namespace CA_DataUploaderLib.IOconf
             var levels = Tags.Where(t => t.name == "level").Select(t => t.value).ToList();
             if (levels.Count > 1)
                 throw new FormatException($"Alert: {Name} has repeated level tags. Specify only one of alert, error or info.");
-            var level = levels.SingleOrDefault() ?? eventType switch
+            EventType = levels.SingleOrDefault() switch
+            {
+                null => eventType,
+                "alert" => EventType.Alert,
+                "error" => EventType.LogError,
+                "info" => EventType.Log,
+                var invalid => throw new FormatException($"Alert: {Name} has invalid level '{invalid}'. Expected alert, error or info."),
+            };
+
+            var suffix = EventType switch
             {
                 EventType.Alert => "alert",
                 EventType.LogError => "error",
                 EventType.Log => "info",
                 _ => throw new ArgumentOutOfRangeException(nameof(eventType)),
             };
-            EventType = level switch
-            {
-                "alert" => EventType.Alert,
-                "error" => EventType.LogError,
-                "info" => EventType.Log,
-                _ => throw new FormatException($"Alert: {Name} has invalid level '{level}'. Expected alert, error or info."),
-            };
-            ChannelName = $"{Name}_{level}";
+            ChannelName = $"{Name}_{suffix}";
             var list = ToList();
             if (list[0] != "Alert" || list.Count < 3) throw new FormatException("IOconfAlert: wrong format: " + row);
    

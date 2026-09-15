@@ -31,8 +31,8 @@ namespace CA_DataUploaderLib.Helpers
             allItems.AddRange(_filterVectorExpansion.GetDecisionVectorDescriptionEntries());
             allItems.AddRange(_mathVectorExpansion.GetVectorDescriptionEntries());
             allItems.AddRange(outputs);
-            var alerts = ioconf.GetAlerts().ToList();
-            allItems.AddRange(alerts.Select(a => new VectorDescriptionItem("double", a.ChannelName, DataTypeEnum.State)));
+            var configuredAlerts = ioconf.GetAlerts().ToList();
+            allItems.AddRange(configuredAlerts.Select(a => new VectorDescriptionItem("double", a.ChannelName, DataTypeEnum.State)));
             
             var duplicates = allItems.GroupBy(x => x.Descriptor, StringComparer.InvariantCultureIgnoreCase).Where(x => x.Count() > 1).Select(x => x.Key);
             if (duplicates.Any())
@@ -41,7 +41,7 @@ namespace CA_DataUploaderLib.Helpers
             var allFields = allItems.Select(i => i.Descriptor).ToArray();
             _filterVectorExpansion.Initialize(allFields);
             _mathVectorExpansion.Initialize(allFields);
-            foreach (var alert in alerts)
+            foreach (var alert in configuredAlerts)
             {
                 var sourceIndex = Array.IndexOf(allFields, alert.Sensor);
                 if (sourceIndex < 0)
