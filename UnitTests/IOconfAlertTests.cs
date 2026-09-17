@@ -1,12 +1,70 @@
-﻿using CA_DataUploaderLib.IOconf;
+﻿using CA_DataUploaderLib;
+using CA_DataUploaderLib.IOconf;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Linq;
 
 namespace UnitTests
 {
     [TestClass]
     public class IOconfAlertTests
     {
+        [DataRow("", "alert", EventType.Alert)]
+        [DataRow(";level:alert", "alert", EventType.Alert)]
+        [DataRow(";level:error", "error", EventType.LogError)]
+        [DataRow(";level:info", "info", EventType.Log)]
+        [TestMethod]
+        public void SeveritySelectsEventTypeAndExpandedChannel(string severity, string level, EventType eventType)
+        {
+            var config = new IOconfFile([$"Alert;overPressure;pres_abs_bar > 1.5;5;emergencyshutdown{severity}"]);
+            var alert = config.GetAlerts().Single();
+
+            Assert.AreEqual(eventType, alert.EventType);
+            CollectionAssert.AreEqual(new[] { $"overPressure_{level}" }, alert.GetExpandedNames(config).ToArray());
+            Assert.AreEqual(5, alert.RateLimitMinutes);
+            Assert.AreEqual("emergencyshutdown", alert.Command);
+        }
+
+        [DataRow("level:warning")]
+        [DataRow("level:")]
+        [DataRow("level:error level:info")]
+        [DataRow("level:info;level:error")]
+        [DataRow("level:alert;level:alert")]
+        [TestMethod]
+        public void SeverityRejectsInvalidOrRepeatedFields(string fields)
+        {
+            var ex = Assert.Throws<FormatException>(() => new IOconfFile([$"Alert;overPressure;pressure > 1.5;{fields}"]));
+            StringAssert.Contains(ex.Message, "level");
+        }
+
+        [DataRow("level:error", 30, null)]
+        [DataRow("5;level:error", 5, null)]
+        [DataRow("emergencyshutdown;level:error", 30, "emergencyshutdown")]
+        [DataRow("5;emergencyshutdown;level: error", 5, "emergencyshutdown")]
+        [DataRow("Level: error;5;emergencyshutdown", 5, "emergencyshutdown")]
+        [DataRow("5;emergencyshutdown;level:error;tags:pressure", 5, "emergencyshutdown")]
+        [TestMethod]
+        public void SeverityFieldPreservesOptionalArguments(string fields, int cooldown, string? command)
+        {
+            var config = new IOconfFile([$"Alert;overPressure;pressure > 1.5;{fields}"]);
+            var alert = config.GetAlerts().Single();
+
+            Assert.AreEqual(EventType.LogError, alert.EventType);
+            Assert.AreEqual(cooldown, alert.RateLimitMinutes);
+            Assert.AreEqual(command, alert.Command);
+        }
+
+        [DataRow("", null)]
+        [DataRow(";emergencyshutdown", "emergencyshutdown")]
+        [TestMethod]
+        public void LegacyDefaultsRemainAvailable(string command, string? expectedCommand)
+        {
+            var alert = new IOconfAlert($"Alert;overPressure;pressure > 1.5{command}", 0);
+            Assert.AreEqual(30, alert.RateLimitMinutes);
+            Assert.AreEqual(expectedCommand, alert.Command);
+            Assert.AreEqual(EventType.Alert, alert.EventType);
+        }
+
         [DataRow("Alert;MyName;Sensorx=123", 123d)]
         [DataRow("Alert;MyName;Sensorx=193.123", 193.123d)]
         [DataRow("Alert;MyName;Sensorx>123", 123.00012d)]
@@ -82,7 +140,7 @@ namespace UnitTests
         public void AlertRejectsInvalidConfiguration(string row)
         {
             var ex = Assert.Throws<FormatException>(() => new IOconfAlert(row, 0));
-            Assert.AreEqual($"IOconfAlert: wrong format: {row}. Format: Alert;Name;SensorName comparison value;[rateMinutes];[command]. Supported comparisons: =, !=, >, <, >=, <=", ex.Message);
+            Assert.AreEqual($"IOconfAlert: wrong format: {row}. Format: Alert;Name;SensorName comparison value;[rateMinutes];[command];[level:alert|error|info]. Supported comparisons: =, !=, >, <, >=, <=", ex.Message);
         }
     }
 }

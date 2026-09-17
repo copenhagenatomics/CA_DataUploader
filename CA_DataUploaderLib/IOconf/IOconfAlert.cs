@@ -4,6 +4,7 @@ using System.Globalization;
 using static System.FormattableString;
 using CA_DataUploaderLib.Extensions;
 using System.Text.RegularExpressions;
+using System.Collections.Generic;
 
 namespace CA_DataUploaderLib.IOconf
 {
@@ -21,10 +22,36 @@ namespace CA_DataUploaderLib.IOconf
     {
         public IOconfAlert(string row, int lineNum, EventType eventType = EventType.Alert) : base(row, lineNum, "Alert")
         {
-            Format = "Alert;Name;SensorName comparison value;[rateMinutes];[command]";
-            EventType = eventType;
+            Format = "Alert;Name;SensorName comparison value;[rateMinutes];[command];[level:alert|error|info]";
             var list = ToList();
             if (list[0] != "Alert" || list.Count < 3) throw new FormatException("IOconfAlert: wrong format: " + row);
+            string? level = null;
+            for (int i = list.Count - 1; i >= 3; i--)
+            {
+                if (!list[i].StartsWith("level:", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (level != null)
+                    throw new FormatException($"Alert: {Name} has repeated level fields. Specify only one of alert, error or info.");
+                level = list[i][6..].Trim();
+                list.RemoveAt(i);
+            }
+            EventType = level switch
+            {
+                null => eventType,
+                "alert" => EventType.Alert,
+                "error" => EventType.LogError,
+                "info" => EventType.Log,
+                var invalid => throw new FormatException($"Alert: {Name} has invalid level '{invalid}'. Expected alert, error or info."),
+            };
+
+            var suffix = EventType switch
+            {
+                EventType.Alert => "alert",
+                EventType.LogError => "error",
+                EventType.Log => "info",
+                _ => throw new ArgumentOutOfRangeException(nameof(eventType)),
+            };
+            ChannelName = $"{Name}_{suffix}";
    
             (Sensor, Value, MessageTemplate, type) = ParseExpression(
                 Name, list[2], $"IOconfAlert: wrong format: {row}. Format: {Format}.");
@@ -38,6 +65,8 @@ namespace CA_DataUploaderLib.IOconf
         }
 
         public string Sensor { get; }
+        public string ChannelName { get; }
+        public override IEnumerable<string> GetExpandedNames(IIOconf ioconf) => [ChannelName];
         public string Message { get; private set; }
         public string? Command { get; }
         private readonly AlertCompare type;
@@ -53,6 +82,8 @@ namespace CA_DataUploaderLib.IOconf
 
         private const int DefaultRateLimitMinutes = 30; // by default fire the same alert max once every 30 mins.
         private DateTime LastTriggered;
+
+        public bool IsActive(double value) => !(value >= 10000) && RawCheckValue(value);
 
         public bool CheckValue(double newValue, DateTime vectorTime)
         {
