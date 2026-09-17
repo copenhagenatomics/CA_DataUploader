@@ -173,7 +173,6 @@ namespace CA_DataUploaderLib
                 decision.MakeDecision(decisionsVector, commands);
             foreach (var decision in _safetyDecisions)
                 decision.MakeDecision(decisionsVector, commands);
-            extendedDesc.CalculateAlertStates(vector);
 
             static List<string> ReplaceExternalShutdownCommandWithEmergencyShutdown(List<string> commands)
             {
@@ -223,8 +222,10 @@ namespace CA_DataUploaderLib
             var globalInputs = descItemsPerSubsystem.SelectMany(s => s.GlobalInputs).ToList();
             CheckForDecisionNameDuplicates(_decisions);
             OrderDecisionsBasedOnIOconf(_decisions);
+            OrderAlertDecisionsLast();
             var decisions = _decisions.Concat(_safetyDecisions);
-            SetConfigBasedOnIOconf(decisions);
+            // Alert decisions are fully configured by their Alert rows, not separate plugin configuration rows.
+            SetConfigBasedOnIOconf(decisions.Where(d => d is not Alerts.AlertDecision));
             Logger.LogData(LogID.A, $"Decisions order: {string.Join(", ", decisions.Select(d => d.Name))}");
             var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type) { Upload = f.Upload })).ToList();
             var desc = new ExtendedVectorDescription(_ioconf, inputsPerNode, globalInputs, outputs);
@@ -258,6 +259,14 @@ namespace CA_DataUploaderLib
                 }
 
                 decisions.Sort((x, y) => decisionsIndexes[x.Name].index.CompareTo(decisionsIndexes[y.Name].index));
+            }
+
+            /// <remarks>Alert decisions must see final safety values. OrderBy is stable, preserving registration order within both groups.</remarks>
+            void OrderAlertDecisionsLast()
+            {
+                var orderedSafetyDecisions = _safetyDecisions.OrderBy(d => d is Alerts.AlertDecision).ToList();
+                _safetyDecisions.Clear();
+                _safetyDecisions.AddRange(orderedSafetyDecisions);
             }
 
             void SetConfigBasedOnIOconf(IEnumerable<LoopControlDecision> decisions)

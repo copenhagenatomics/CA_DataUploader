@@ -32,6 +32,7 @@ namespace UnitTests
         {
             var config = new IOconfFile([$"Alert;overPressure;pressure > 1.5;5{severity}"]);
             using var cmd = CreateHandler(config, "pressure");
+            _ = new Alerts(config, cmd);
             var field = cmd.GetFullSystemVectorDescription()._items.Single(i => i.Descriptor == $"overPressure_{level}");
             Assert.AreEqual(DataTypeEnum.State, field.DirectionType);
             Assert.IsTrue(field.Upload);
@@ -164,6 +165,7 @@ namespace UnitTests
         {
             var config = new IOconfFile(["Alert;overPressure;pressure > 1.5", $"Math;{existingField};0"]);
             using var cmd = CreateHandler(config, "pressure");
+            _ = new Alerts(config, cmd);
             var ex = Assert.Throws<FormatException>(() => cmd.GetFullSystemVectorDescription());
             StringAssert.Contains(ex.Message, "Different fields cannot use the same name");
             StringAssert.Contains(ex.Message, existingField);
@@ -172,9 +174,41 @@ namespace UnitTests
         [TestMethod]
         public void MissingSourceFailsWhenBuildingVector()
         {
-            using var cmd = CreateHandler(new IOconfFile(["Alert;overPressure;missing > 1.5"]));
+            var config = new IOconfFile(["Alert;overPressure;missing > 1.5"]);
+            using var cmd = CreateHandler(config);
+            _ = new Alerts(config, cmd);
             var ex = Assert.Throws<FormatException>(() => cmd.GetFullSystemVectorDescription());
             StringAssert.Contains(ex.Message, "overPressure points to missing vector field: missing");
+        }
+
+        [DataRow("overPressure")]
+        [DataRow("overPressure_alert")]
+        [TestMethod]
+        public void AlertNamesDoNotAllowUnknownConfigurationLines(string rowType)
+        {
+            var config = new IOconfFile(["Alert;overPressure;pressure > 1.5", $"{rowType};somename;somevalue"]);
+            using var cmd = CreateHandler(config, "pressure");
+            _ = new Alerts(config, cmd);
+
+            var ex = Assert.Throws<NotSupportedException>(() => cmd.GetFullSystemVectorDescription());
+
+            StringAssert.Contains(ex.Message, rowType);
+            StringAssert.Contains(ex.Message, "somename");
+        }
+
+        [TestMethod]
+        public void ExistingDecisionCanUseAlertChannelNameForConfiguration()
+        {
+            var config = new IOconfFile(["Alert;overPressure;pressure > 1.5", "overPressure_alert;somename;somevalue"]);
+            using var cmd = CreateHandler(config, "pressure");
+            cmd.AddDecisions([new SetPressureDecision("overPressure_alert", 2)]);
+            _ = new Alerts(config, cmd);
+            DataVector? vector = null;
+
+            cmd.MakeDecision([new("pressure", 0)], new DateTime(2026, 1, 1), ref vector, []);
+
+            var index = cmd.GetFullSystemVectorDescription()._items.FindIndex(i => i.Descriptor == "overPressure_alert");
+            Assert.AreEqual(1d, vector[index]);
         }
 
         [TestMethod]
