@@ -29,6 +29,10 @@ Or build the source code with the .net 6 sdk installed (note to build from VS yo
 
 ![alt text](https://github.com/copenhagenatomics/CA_DataUploader/blob/master/ScreenShots/CA_DataUploader.exe.png)
 
+## Configured alert channels
+
+See [Alerts configuration](https://github.com/copenhagenatomics/CA_DataUploader/wiki/Alerts-configuration) for configuration syntax, severity levels, live channels, and event behavior.
+
 ## How to Debug your system. 
 
 First make sure the hardware is connected correctly. 

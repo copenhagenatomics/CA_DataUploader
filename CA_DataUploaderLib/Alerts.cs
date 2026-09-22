@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using CA.LoopControlPluginBase;
 using CA_DataUploaderLib.IOconf;
 
 namespace CA_DataUploaderLib
@@ -40,6 +41,7 @@ namespace CA_DataUploaderLib
         public Alerts(IIOconf ioconf, CommandHandler cmd) : base()
         {
             _cmd = cmd;
+            cmd.AddSafetyDecisions(ioconf.GetAlerts().Select(alert => new AlertDecision(alert)).ToList());
             cmd.FullVectorDescriptionCreated += DescriptionCreated;
 
             void DescriptionCreated(object? sender, VectorDescription desc)
@@ -48,6 +50,35 @@ namespace CA_DataUploaderLib
                 var reader = _cmd.GetReceivedVectorsReader();
                 _ = Task.Run(() => CheckAlertsOnReceivedVectors(reader));
             }
+        }
+
+        internal sealed class AlertDecision(IOconfAlert alert) : LoopControlDecision
+        {
+            private int _sourceIndex = -1;
+            private int _channelIndex = -1;
+            public override string Name => alert.ChannelName;
+            public override PluginField[] PluginFields => [new(alert.ChannelName)];
+            public override string[] HandledEvents => [];
+
+            public override void SetConfig(IDecisionConfig config) => config.ValidateConfiguredFields([]);
+
+            public override void Initialize(CA.LoopControlPluginBase.VectorDescription desc)
+            {
+                for (int i = 0; i < desc.Count; i++)
+                {
+                    if (desc[i] == alert.Sensor)
+                        _sourceIndex = i;
+                    if (desc[i] == alert.ChannelName)
+                        _channelIndex = i;
+                }
+                if (_sourceIndex < 0)
+                    throw new FormatException($"Alert: {alert.Name} points to missing vector field: {alert.Sensor}");
+                if (_channelIndex < 0)
+                    throw new FormatException($"Alert: {alert.Name} output channel is missing from the vector: {alert.ChannelName}");
+            }
+
+            public override void MakeDecision(CA.LoopControlPluginBase.DataVector vector, List<string> events) =>
+                vector[_channelIndex] = alert.IsActive(vector[_sourceIndex]) ? 1 : 0;
         }
 
         private async void CheckAlertsOnReceivedVectors(DataVectorReader reader)
@@ -66,6 +97,8 @@ namespace CA_DataUploaderLib
 
                         if (alert.EventType == EventType.Alert)
                             _cmd.FireAlert(alert.Message, timestamp);
+                        else if (alert.EventType == EventType.Log)
+                            CALog.LogInfoAndConsoleLn(LogID.A, alert.Message);
                         else
                             CALog.LogErrorAndConsoleLn(LogID.A, alert.Message);
 
@@ -94,9 +127,13 @@ namespace CA_DataUploaderLib
         {
             var indexes = vectorDesc._items.Select((f, i) => (f, i)).ToDictionary(f => f.f.Descriptor, f => f.i);
             var alerts = new List<(IOconfAlert alert, int sensorIndex)>();
-            var alertsDefinitions = ioconf.GetAlerts()
-                .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_alert")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.Alert)))
-                .Concat(vectorDesc._items.Where(i => i.Descriptor.EndsWith("_error")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.LogError)));
+            var configuredAlerts = ioconf.GetAlerts().ToList();
+            var generatedChannels = configuredAlerts.Select(a => a.ChannelName).ToHashSet();
+            var automaticChannels = vectorDesc._items.Where(i => !generatedChannels.Contains(i.Descriptor));
+            var alertsDefinitions = configuredAlerts
+                .Concat(automaticChannels.Where(i => i.Descriptor.EndsWith("_alert")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.Alert)))
+                .Concat(automaticChannels.Where(i => i.Descriptor.EndsWith("_error")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.LogError)))
+                .Concat(automaticChannels.Where(i => i.Descriptor.EndsWith("_info")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.Log)));
             foreach (var alert in alertsDefinitions)
             {
                 if (!indexes.TryGetValue(alert.Sensor, out var index))

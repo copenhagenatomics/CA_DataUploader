@@ -220,8 +220,9 @@ namespace CA_DataUploaderLib
                 .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
                 .ToList();
             var globalInputs = descItemsPerSubsystem.SelectMany(s => s.GlobalInputs).ToList();
-            CheckForDecisionNameDuplicates(_decisions);
+            CheckForDecisionNameDuplicates([.. _decisions, .. _safetyDecisions]);
             OrderDecisionsBasedOnIOconf(_decisions);
+            OrderAlertDecisionsLast();
             var decisions = _decisions.Concat(_safetyDecisions);
             SetConfigBasedOnIOconf(decisions);
             Logger.LogData(LogID.A, $"Decisions order: {string.Join(", ", decisions.Select(d => d.Name))}");
@@ -257,6 +258,14 @@ namespace CA_DataUploaderLib
                 }
 
                 decisions.Sort((x, y) => decisionsIndexes[x.Name].index.CompareTo(decisionsIndexes[y.Name].index));
+            }
+
+            /// <remarks>Alert decisions must see final safety values. OrderBy is stable, preserving registration order within both groups.</remarks>
+            void OrderAlertDecisionsLast()
+            {
+                var orderedSafetyDecisions = _safetyDecisions.OrderBy(d => d is Alerts.AlertDecision).ToList();
+                _safetyDecisions.Clear();
+                _safetyDecisions.AddRange(orderedSafetyDecisions);
             }
 
             void SetConfigBasedOnIOconf(IEnumerable<LoopControlDecision> decisions)
