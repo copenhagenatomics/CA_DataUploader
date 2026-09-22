@@ -83,7 +83,7 @@ namespace CA_DataUploaderLib.IOconf
         private const int DefaultRateLimitMinutes = 30; // by default fire the same alert max once every 30 mins.
         private DateTime LastTriggered;
 
-        public bool IsActive(double value) => !(value >= 10000) && RawCheckValue(value);
+        public bool IsActive(double value) => RawCheckValue(value);
 
         public bool CheckValue(double newValue, DateTime vectorTime)
         {

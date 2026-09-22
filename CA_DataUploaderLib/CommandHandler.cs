@@ -220,12 +220,11 @@ namespace CA_DataUploaderLib
                 .Select(n => (n.node, (IReadOnlyList<VectorDescriptionItem>)n.inputs))
                 .ToList();
             var globalInputs = descItemsPerSubsystem.SelectMany(s => s.GlobalInputs).ToList();
-            CheckForDecisionNameDuplicates(_decisions);
+            CheckForDecisionNameDuplicates([.. _decisions, .. _safetyDecisions]);
             OrderDecisionsBasedOnIOconf(_decisions);
             OrderAlertDecisionsLast();
             var decisions = _decisions.Concat(_safetyDecisions);
-            // Alert decisions are fully configured by their Alert rows, not separate plugin configuration rows.
-            SetConfigBasedOnIOconf(decisions.Where(d => d is not Alerts.AlertDecision));
+            SetConfigBasedOnIOconf(decisions);
             Logger.LogData(LogID.A, $"Decisions order: {string.Join(", ", decisions.Select(d => d.Name))}");
             var outputs = decisions.SelectMany(d => d.PluginFields.Select(f => new VectorDescriptionItem("double", f.Name, (DataTypeEnum)f.Type) { Upload = f.Upload })).ToList();
             var desc = new ExtendedVectorDescription(_ioconf, inputsPerNode, globalInputs, outputs);

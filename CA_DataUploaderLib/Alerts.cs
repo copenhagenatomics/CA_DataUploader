@@ -60,6 +60,8 @@ namespace CA_DataUploaderLib
             public override PluginField[] PluginFields => [new(alert.ChannelName)];
             public override string[] HandledEvents => [];
 
+            public override void SetConfig(IDecisionConfig config) => config.ValidateConfiguredFields([]);
+
             public override void Initialize(CA.LoopControlPluginBase.VectorDescription desc)
             {
                 for (int i = 0; i < desc.Count; i++)
@@ -130,7 +132,8 @@ namespace CA_DataUploaderLib
             var automaticChannels = vectorDesc._items.Where(i => !generatedChannels.Contains(i.Descriptor));
             var alertsDefinitions = configuredAlerts
                 .Concat(automaticChannels.Where(i => i.Descriptor.EndsWith("_alert")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.Alert)))
-                .Concat(automaticChannels.Where(i => i.Descriptor.EndsWith("_error")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.LogError)));
+                .Concat(automaticChannels.Where(i => i.Descriptor.EndsWith("_error")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.LogError)))
+                .Concat(automaticChannels.Where(i => i.Descriptor.EndsWith("_info")).Select(i => new IOconfAlert($"Alert;{i.Descriptor};{i.Descriptor} = 1;0", 0, EventType.Log)));
             foreach (var alert in alertsDefinitions)
             {
                 if (!indexes.TryGetValue(alert.Sensor, out var index))

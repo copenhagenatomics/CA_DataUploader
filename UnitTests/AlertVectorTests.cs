@@ -36,6 +36,7 @@ namespace UnitTests
             var field = cmd.GetFullSystemVectorDescription()._items.Single(i => i.Descriptor == $"overPressure_{level}");
             Assert.AreEqual(DataTypeEnum.State, field.DirectionType);
             Assert.IsTrue(field.Upload);
+            CollectionAssert.Contains(config.GetEntries<IOconfRow>().SelectMany(row => row.GetExpandedNames(config)).ToArray(), field.Descriptor);
             DataVector? vector = null;
             var time = new DateTime(2026, 1, 1);
             foreach (var (pressure, expected) in new[] { (1.5, 0d), (2d, 1d), (2d, 1d), (1.5, 0d) })
@@ -47,14 +48,22 @@ namespace UnitTests
             }
         }
 
-        [DataRow("", "alert", EventType.Alert)]
-        [DataRow(";level:alert", "alert", EventType.Alert)]
-        [DataRow(";level:error", "error", EventType.LogError)]
-        [DataRow(";level:info", "info", EventType.Log)]
+        [DataRow(";5;emergencyshutdown", "alert", EventType.Alert, 5, true)]
+        [DataRow(";5;emergencyshutdown;level:alert", "alert", EventType.Alert, 5, true)]
+        [DataRow(";5;emergencyshutdown;level:error", "error", EventType.LogError, 5, true)]
+        [DataRow(";5;emergencyshutdown;level:info", "info", EventType.Log, 5, true)]
+        [DataRow(";level:error", "error", EventType.LogError, 30, false)]
+        [DataRow(";5;level:error", "error", EventType.LogError, 5, false)]
+        [DataRow(";emergencyshutdown;level:error", "error", EventType.LogError, 30, true)]
+        [DataRow(";5;emergencyshutdown;level: error", "error", EventType.LogError, 5, true)]
+        [DataRow(";Level: error;5;emergencyshutdown", "error", EventType.LogError, 5, true)]
+        [DataRow(";5;emergencyshutdown;level:error;tags:pressure", "error", EventType.LogError, 5, true)]
+        [DataRow("", "alert", EventType.Alert, 30, false)]
+        [DataRow(";emergencyshutdown", "alert", EventType.Alert, 30, true)]
         [TestMethod]
-        public async Task ActivationEmitsOnceAndRateLimitsEventsAndCommands(string severity, string level, EventType eventType)
+        public async Task ActivationEmitsOnceAndRateLimitsEventsAndCommands(string fields, string level, EventType eventType, int cooldown, bool hasCommand)
         {
-            var config = new IOconfFile([$"Alert;overPressure;pressure > 1.5;5;emergencyshutdown{severity}"]);
+            var config = new IOconfFile([$"Alert;overPressure;pressure > 1.5{fields}"]);
             using var cmd = CreateHandler(config, "pressure");
             CALog.LoggerForUserOutput = new CALog.EventsLogger(config, cmd);
             _ = new Alerts(config, cmd);
@@ -64,8 +73,8 @@ namespace UnitTests
             var time = new DateTime(2026, 1, 1);
             foreach (var (minute, pressure, shouldEmit) in new[]
             {
-                (0, 2d, true), (1, 2d, false), (2, 1.5, false), (3, 2d, false),
-                (6, 2d, false), (7, 1.5, false), (8, 2d, true)
+                (0, 2d, true), (1, 2d, false), (cooldown - 2, 1.5, false), (cooldown - 1, 2d, false),
+                (cooldown + 1, 2d, false), (cooldown + 2, 1.5, false), (cooldown + 3, 2d, true)
             })
             {
                 DataVector? vector = null;
@@ -75,15 +84,93 @@ namespace UnitTests
                 var previousExecutions = executions;
                 await ReceiveVector(cmd, vector);
                 var events = cmd.DequeueEvents() ?? [];
-                Assert.HasCount(shouldEmit ? 2 : 0, events, $"Events at minute {minute}");
-                Assert.AreEqual(previousExecutions + (shouldEmit ? 1 : 0), executions);
+                Assert.HasCount(shouldEmit ? (hasCommand ? 2 : 1) : 0, events, $"Events at minute {minute}");
+                Assert.AreEqual(previousExecutions + (shouldEmit && hasCommand ? 1 : 0), executions);
                 if (shouldEmit)
                 {
                     var alertEvent = events.Single(e => e.EventType == (byte)eventType);
                     Assert.AreEqual(" overPressure (pressure) > 1.5 (2)", alertEvent.Data);
-                    Assert.AreEqual("emergencyshutdown", events.Single(e => e.EventType == (byte)EventType.Command).Data);
+                    if (hasCommand)
+                        Assert.AreEqual("emergencyshutdown", events.Single(e => e.EventType == (byte)EventType.Command).Data);
                 }
             }
+        }
+
+        [DataRow("Sensorx", "Sensorx=123", 122d, 123d, 123d)]
+        [DataRow("Sensorx", "Sensorx=193.123", 193.122d, 193.123d, 193.123d)]
+        [DataRow("Sensorx", "Sensorx>123", 123d, 124d, 123.00012d)]
+        [DataRow("Sensorx", "Sensorx>=123", 122.999d, 123d, 124d)]
+        [DataRow("Sensorx", "Sensorx<=123", 123.001d, 123d, 122d)]
+        [DataRow("Sensorx", "Sensorx<123", 123d, 122d, 121d)]
+        [DataRow("Sensorx", "Sensorx < 123", 123.001d, 121d, 122d)]
+        [DataRow("Sensorx", "Sensorx != 123", 123d, 122.999d, 124d)]
+        [DataRow("OxygenOut_Oxygen%", "OxygenOut_Oxygen%>1", 1d, 2d, 3d)]
+        [TestMethod]
+        public async Task ComparisonsTrackChannelsAndEmitOnlyOnActivation(string sensor, string condition, double inactive, double active, double stillActive)
+        {
+            var config = new IOconfFile([$"Alert;comparison;{condition};0"]);
+            using var cmd = CreateHandler(config, sensor);
+            _ = new Alerts(config, cmd);
+            var index = cmd.GetFullSystemVectorDescription()._items.FindIndex(i => i.Descriptor == "comparison_alert");
+            var time = new DateTime(2026, 1, 1);
+            foreach (var (value, state, emits) in new[]
+            {
+                (active, 1d, true), (stillActive, 1d, false), (inactive, 0d, false), (active, 1d, true)
+            })
+            {
+                DataVector? vector = null;
+                cmd.MakeDecision([new(sensor, value)], time, ref vector, []);
+                await ReceiveVector(cmd, vector);
+
+                Assert.AreEqual(state, vector[index]);
+                Assert.HasCount(emits ? 1 : 0, cmd.DequeueEvents() ?? []);
+                time = time.AddSeconds(1);
+            }
+        }
+
+        [DataRow("Sensorx = 123", 123d)]
+        [DataRow("Sensorx > 123", 123.00012d)]
+        [DataRow("Sensorx >= 123", 123d)]
+        [DataRow("Sensorx <= 123", 122d)]
+        [TestMethod]
+        public async Task ValidReadingAfterInitialNaNStillEmitsAlert(string condition, double value)
+        {
+            var config = new IOconfFile([$"Alert;recovered;{condition}"]);
+            using var cmd = CreateHandler(config, "Sensorx");
+            _ = new Alerts(config, cmd);
+            DataVector? vector = null;
+            var time = new DateTime(2026, 1, 1);
+            cmd.MakeDecision([new("Sensorx", double.NaN)], time, ref vector, []);
+            await ReceiveVector(cmd, vector);
+            cmd.DequeueEvents();
+
+            cmd.MakeDecision([new("Sensorx", value)], time.AddSeconds(1), ref vector, []);
+            await ReceiveVector(cmd, vector);
+
+            var events = cmd.DequeueEvents() ?? [];
+            Assert.HasCount(1, events);
+            Assert.AreEqual((byte)EventType.Alert, events[0].EventType);
+        }
+
+        [DataRow("Sensorx = 123", 122d, 123d, " MyName (Sensorx) = 123 (123)")]
+        [DataRow("Sensorx > 123", 123d, 123.00012d, " MyName (Sensorx) > 123 (123.00012)")]
+        [TestMethod]
+        public async Task AlertEventIncludesConditionAndReading(string condition, double oldValue, double value, string expectedMessage)
+        {
+            var config = new IOconfFile([$"Alert;MyName;{condition}"]);
+            using var cmd = CreateHandler(config, "Sensorx");
+            _ = new Alerts(config, cmd);
+            DataVector? vector = null;
+            var time = new DateTime(2026, 1, 1);
+            cmd.MakeDecision([new("Sensorx", oldValue)], time, ref vector, []);
+            await ReceiveVector(cmd, vector);
+
+            cmd.MakeDecision([new("Sensorx", value)], time.AddSeconds(1), ref vector, []);
+            await ReceiveVector(cmd, vector);
+
+            var events = cmd.DequeueEvents() ?? [];
+            Assert.HasCount(1, events);
+            Assert.AreEqual(expectedMessage, events[0].Data);
         }
 
         [DataRow(1.5, 0d)]
@@ -116,7 +203,7 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public async Task InvalidReadingsClearChannelWithoutChangingEventHistory()
+        public async Task LargeReadingsUpdateChannelWithoutChangingEventHistory()
         {
             var config = new IOconfFile(["Alert;overPressure;pressure > 1.5;0"]);
             using var cmd = CreateHandler(config, "pressure");
@@ -125,7 +212,7 @@ namespace UnitTests
             var time = new DateTime(2026, 1, 1);
             foreach (var (pressure, expected, emits) in new[]
             {
-                (10000d, 0d, false), (2d, 1d, true), (10001d, 0d, false),
+                (10000d, 1d, false), (2d, 1d, true), (10001d, 1d, false),
                 (2d, 1d, false), (1.5, 0d, false), (2d, 1d, true)
             })
             {
@@ -136,26 +223,6 @@ namespace UnitTests
                 Assert.HasCount(emits ? 1 : 0, cmd.DequeueEvents() ?? []);
                 time = time.AddSeconds(1);
             }
-        }
-
-        [DataRow("=", 0d)]
-        [DataRow("!=", 1d)]
-        [DataRow(">", 0d)]
-        [DataRow("<", 0d)]
-        [DataRow(">=", 0d)]
-        [DataRow("<=", 0d)]
-        [TestMethod]
-        public async Task NaNRetainsExistingComparisonSemantics(string comparison, double expected)
-        {
-            var config = new IOconfFile([$"Alert;overPressure;pressure {comparison} 1.5"]);
-            using var cmd = CreateHandler(config, "pressure");
-            _ = new Alerts(config, cmd);
-            var index = cmd.GetFullSystemVectorDescription()._items.FindIndex(i => i.Descriptor == "overPressure_alert");
-            DataVector? vector = null;
-            cmd.MakeDecision([new("pressure", double.NaN)], new DateTime(2026, 1, 1), ref vector, []);
-            Assert.AreEqual(expected, vector[index]);
-            await ReceiveVector(cmd, vector);
-            Assert.HasCount((int)expected, cmd.DequeueEvents() ?? []);
         }
 
         [DataRow("overPressure_alert")]
@@ -169,6 +236,31 @@ namespace UnitTests
             var ex = Assert.Throws<FormatException>(() => cmd.GetFullSystemVectorDescription());
             StringAssert.Contains(ex.Message, "Different fields cannot use the same name");
             StringAssert.Contains(ex.Message, existingField);
+        }
+
+        [DataRow("level:warning")]
+        [DataRow("level:")]
+        [DataRow("level:error level:info")]
+        [DataRow("level:info;level:error")]
+        [DataRow("level:alert;level:alert")]
+        [TestMethod]
+        public void ConfigurationRejectsInvalidOrRepeatedLevels(string fields)
+        {
+            var ex = Assert.Throws<FormatException>(() => new IOconfFile([$"Alert;overPressure;pressure > 1.5;{fields}"]));
+            StringAssert.Contains(ex.Message, "level");
+        }
+
+        [DataRow("Alert;MyName;Sensorx;=;123", DisplayName = "old format - no longer supported")]
+        [DataRow("Alert;MyName;Sensorx = ")]
+        [DataRow("Alert;MyName;Sensorx =")]
+        [DataRow("Alert;MyName;Sensorx > abc")]
+        [DataRow("Alert;MyName;Sensorx")]
+        [DataRow("Alert;MyName;Sensorx <= 123,2")]
+        [TestMethod]
+        public void ConfigurationRejectsInvalidConditions(string row)
+        {
+            var ex = Assert.Throws<FormatException>(() => new IOconfFile([row]));
+            StringAssert.Contains(ex.Message, row.Trim());
         }
 
         [TestMethod]
@@ -196,23 +288,28 @@ namespace UnitTests
             StringAssert.Contains(ex.Message, "somename");
         }
 
+        [DataRow(false)]
+        [DataRow(true)]
         [TestMethod]
-        public void ExistingDecisionCanUseAlertChannelNameForConfiguration()
+        public void AlertDecisionRejectsDuplicateDecisionName(bool safetyDecision)
         {
-            var config = new IOconfFile(["Alert;overPressure;pressure > 1.5", "overPressure_alert;somename;somevalue"]);
+            var config = new IOconfFile(["Alert;overPressure;pressure > 1.5"]);
             using var cmd = CreateHandler(config, "pressure");
-            cmd.AddDecisions([new SetPressureDecision("overPressure_alert", 2)]);
+            var decision = new SetPressureDecision("overPressure_alert", 2);
+            if (safetyDecision)
+                cmd.AddSafetyDecisions([decision]);
+            else
+                cmd.AddDecisions([decision]);
             _ = new Alerts(config, cmd);
-            DataVector? vector = null;
 
-            cmd.MakeDecision([new("pressure", 0)], new DateTime(2026, 1, 1), ref vector, []);
+            var ex = Assert.Throws<FormatException>(() => cmd.GetFullSystemVectorDescription());
 
-            var index = cmd.GetFullSystemVectorDescription()._items.FindIndex(i => i.Descriptor == "overPressure_alert");
-            Assert.AreEqual(1d, vector[index]);
+            StringAssert.Contains(ex.Message, "Duplicate decision names");
+            StringAssert.Contains(ex.Message, "overPressure_alert");
         }
 
         [TestMethod]
-        public async Task AutomaticAlertAndErrorChannelsStillEmitButInfoDoesNot()
+        public async Task AutomaticAlertErrorAndInfoChannelsEmitEvents()
         {
             var config = new IOconfFile([]);
             using var cmd = CreateHandler(config, "device_alert", "device_error", "device_info");
@@ -222,9 +319,10 @@ namespace UnitTests
             cmd.MakeDecision([new("device_alert", 1), new("device_error", 1), new("device_info", 1)], new DateTime(2026, 1, 1), ref vector, []);
             await ReceiveVector(cmd, vector);
             var events = cmd.DequeueEvents() ?? [];
-            Assert.HasCount(2, events);
+            Assert.HasCount(3, events);
             Assert.AreEqual(" device_alert (device_alert) = 1 (1)", events.Single(e => e.EventType == (byte)EventType.Alert).Data);
             Assert.AreEqual(" device_error (device_error) = 1 (1)", events.Single(e => e.EventType == (byte)EventType.LogError).Data);
+            Assert.AreEqual(" device_info (device_info) = 1 (1)", events.Single(e => e.EventType == (byte)EventType.Log).Data);
         }
 
         [TestMethod]
