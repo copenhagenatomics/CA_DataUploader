@@ -356,8 +356,10 @@ namespace CA_DataUploaderLib
         private void HandleCommand(string cmdString, bool isUserCommand, string? username = null)
         {
             cmdString = cmdString.Trim();
+            var commandName = cmdString.Split((char[]?)null, 2)[0];
             // Board names and custom command payloads must keep their underscores.
-            if (!Regex.IsMatch(cmdString, @"^(custom|reconnect)(\s|$)", RegexOptions.IgnoreCase))
+            if (!commandName.Equals("custom", StringComparison.OrdinalIgnoreCase) &&
+                !commandName.Equals("reconnect", StringComparison.OrdinalIgnoreCase))
                 cmdString = cmdString.Replace('_', ' ').Trim();
             cmdString = Regex.Replace(cmdString, @"\s+", " "); // Merge multiple whitespace characters
             if (isUserCommand)
