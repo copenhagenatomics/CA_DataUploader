@@ -91,6 +91,33 @@ namespace UnitTests
         }
 
 
+        [DataRow("board1", "custom board1 status")]
+        [DataRow("board_1", "custom board_1 status")]
+        [DataRow("board_room_1", "custom board_room_1 status")]
+        [DataRow("board1", "custom board1 set_mode 1")]
+        [DataRow("board1", "reconnect board1")]
+        [DataRow("board_1", "reconnect board_1")]
+        [DataRow("board_room_1", "reconnect board_room_1")]
+        [TestMethod]
+        public void Execute_BoardCommand_PreservesUnderscores(string boardName, string command)
+        {
+            // Arrange: use the real board-command validation without connecting hardware.
+            var ioconf = new Mock<IIOconf>();
+            ioconf.Setup(x => x.GetLoopName()).Returns("TestLoop");
+            var map = new IOconfMap($"Map; 1234567890; {boardName}; customwrites", 1);
+            map.ValidateDependencies(ioconf.Object);
+            var input = new IOconfInput($"Sensor; sensor1; {boardName}; 1", 2, "Sensor", map, 1);
+            var logger = new ChannelLogger();
+            using var cmd = new CommandHandler(ioconf.Object, runCommandLoop: false, logger: logger);
+            _ = new BaseSensorBox(cmd, "sensors", [input]);
+
+            // Act
+            cmd.Execute(command, true);
+
+            // Assert: a missing board can report a delivery failure, but the command must validate.
+            Assert.Contains($"Command: {command} - command accepted", GetAllLogs(logger.Log));
+        }
+
         public static string GetAllLogs(ChannelReader<string> logs)
         {
             var allLogs = new StringBuilder();
