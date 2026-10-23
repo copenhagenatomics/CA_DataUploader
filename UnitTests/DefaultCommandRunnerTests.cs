@@ -91,6 +91,62 @@ namespace UnitTests
         }
 
 
+        [DataRow("board1", "custom board1 status")]
+        [DataRow("board_1", "custom board_1 status")]
+        [DataRow("board_room_1", "custom board_room_1 status")]
+        [DataRow("board1", "custom board1 set_mode 1")]
+        [DataRow("board1", "reconnect board1")]
+        [DataRow("board_1", "reconnect board_1")]
+        [DataRow("board_room_1", "reconnect board_room_1")]
+        [TestMethod]
+        public void Execute_BoardCommand_PreservesUnderscores(string boardName, string command) =>
+            AssertBoardCommandAccepted(boardName, command, command);
+
+        [DataRow("custom\tboard_1 set_mode 1", "custom board_1 set_mode 1")]
+        [DataRow("reconnect\tboard_1", "reconnect board_1")]
+        [DataRow("  CuStOm \t board_1\tset_mode 1  ", "CuStOm board_1 set_mode 1")]
+        [DataRow("  ReCoNnEcT \t board_1  ", "ReCoNnEcT board_1")]
+        [DataRow("custom\u2003board_1 status", "custom board_1 status")]
+        [DataRow("reconnect\u2003board_1", "reconnect board_1")]
+        [TestMethod]
+        public void Execute_BoardCommand_NormalizesWhitespace(string command, string expectedCommand) =>
+            AssertBoardCommandAccepted("board_1", command, expectedCommand);
+
+        [DataRow("custom_mode_start", "custom mode start")]
+        [DataRow("reconnect_mode_start", "reconnect mode start")]
+        [DataRow("custommode_start", "custommode start")]
+        [DataRow("reconnectmode_start", "reconnectmode start")]
+        [TestMethod]
+        public void Execute_CommandSharingBoardCommandPrefix_ConvertsUnderscores(string command, string expectedCommand)
+        {
+            var logger = new ChannelLogger();
+            using var cmd = new CommandHandler(new Mock<IIOconf>().Object, runCommandLoop: false, logger: logger);
+            cmd.AddDecisions([new TestDecision([expectedCommand])]);
+
+            cmd.Execute(command, true);
+
+            Assert.Contains($"Command: {expectedCommand} - command accepted", GetAllLogs(logger.Log));
+        }
+
+        private static void AssertBoardCommandAccepted(string boardName, string command, string expectedCommand)
+        {
+            // Arrange: use the real board-command validation without connecting hardware.
+            var ioconf = new Mock<IIOconf>();
+            ioconf.Setup(x => x.GetLoopName()).Returns("TestLoop");
+            var map = new IOconfMap($"Map; 1234567890; {boardName}; customwrites", 1);
+            map.ValidateDependencies(ioconf.Object);
+            var input = new IOconfInput($"Sensor; sensor1; {boardName}; 1", 2, "Sensor", map, 1);
+            var logger = new ChannelLogger();
+            using var cmd = new CommandHandler(ioconf.Object, runCommandLoop: false, logger: logger);
+            _ = new BaseSensorBox(cmd, "sensors", [input]);
+
+            // Act
+            cmd.Execute(command, true);
+
+            // Assert: a missing board can report a delivery failure, but the command must validate.
+            Assert.Contains($"Command: {expectedCommand} - command accepted", GetAllLogs(logger.Log));
+        }
+
         public static string GetAllLogs(ChannelReader<string> logs)
         {
             var allLogs = new StringBuilder();

@@ -355,13 +355,20 @@ namespace CA_DataUploaderLib
 
         private void HandleCommand(string cmdString, bool isUserCommand, string? username = null)
         {
-            cmdString = cmdString.Replace('_', ' ').Trim();
+            cmdString = cmdString.Trim();
+            // Board names and custom command payloads must keep their underscores.
+            if (!StartsWithCommand(cmdString, "custom") && !StartsWithCommand(cmdString, "reconnect"))
+                cmdString = cmdString.Replace('_', ' ').Trim();
             cmdString = Regex.Replace(cmdString, @"\s+", " "); // Merge multiple whitespace characters
             if (isUserCommand)
                 UserCommandReceived?.Invoke(this, new(cmdString, EventType.Command, DateTime.UtcNow, username));
             if (_commandRunner.Run(cmdString, isUserCommand) && isUserCommand)
                 OnUserCommandAccepted(cmdString, username);
         }
+
+        private static bool StartsWithCommand(string command, string commandName) =>
+            command.StartsWith(commandName, StringComparison.OrdinalIgnoreCase) &&
+            (command.Length == commandName.Length || char.IsWhiteSpace(command[commandName.Length]));
 
         private void OnUserCommandAccepted(string cmdString, string? username = null)
         {
