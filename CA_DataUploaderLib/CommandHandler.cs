@@ -356,10 +356,8 @@ namespace CA_DataUploaderLib
         private void HandleCommand(string cmdString, bool isUserCommand, string? username = null)
         {
             cmdString = cmdString.Trim();
-            var commandName = cmdString.Split((char[]?)null, 2)[0];
             // Board names and custom command payloads must keep their underscores.
-            if (!commandName.Equals("custom", StringComparison.OrdinalIgnoreCase) &&
-                !commandName.Equals("reconnect", StringComparison.OrdinalIgnoreCase))
+            if (!StartsWithCommand(cmdString, "custom") && !StartsWithCommand(cmdString, "reconnect"))
                 cmdString = cmdString.Replace('_', ' ').Trim();
             cmdString = Regex.Replace(cmdString, @"\s+", " "); // Merge multiple whitespace characters
             if (isUserCommand)
@@ -367,6 +365,10 @@ namespace CA_DataUploaderLib
             if (_commandRunner.Run(cmdString, isUserCommand) && isUserCommand)
                 OnUserCommandAccepted(cmdString, username);
         }
+
+        private static bool StartsWithCommand(string command, string commandName) =>
+            command.StartsWith(commandName, StringComparison.OrdinalIgnoreCase) &&
+            (command.Length == commandName.Length || char.IsWhiteSpace(command[commandName.Length]));
 
         private void OnUserCommandAccepted(string cmdString, string? username = null)
         {
