@@ -22,47 +22,49 @@ namespace CA_DataUploaderLib.IOconf
 
     public class IOconfFilter : IOconfRow
     {
-        private readonly LegacyFilter? _legacyFilter;
-        private readonly DecisionFilter? _decisionFilter;
+        private readonly FilterType _filterType;
+        private readonly double _filterLength;
+        private LegacyFilter? _legacyFilter;
+        private DecisionFilter? _decisionFilter;
 
         public string NameInVector { get; }
-        public List<string> SourceNames { get; }
+        public List<string> SourceNames { get; private set; } = [];
 
         public IOconfFilter(string row, int lineNum) : base(row, lineNum, "Filter")
         {
             Format = $"Filter;Name;Sustained;FilterLength;conditionExpression{Environment.NewLine}Filter;Name;Average/Max/Min/SumAvg/DiffAvg/Triangle;FilterLength;SourceNames;[hidesource]";
+            ExpandsTags = true;
 
             var list = ToList();
             if (list.Count < 5)
                 throw new FormatException($"Wrong filter format: {row}{Environment.NewLine}{Format}");
 
-            if (!Enum.TryParse(list[2], out FilterType filterType))
+            if (!Enum.TryParse(list[2], out _filterType))
                 throw new FormatException($"Wrong filter type: {row}{Environment.NewLine}{Format}");
 
-            if (!list[3].TryToDouble(out var filterLength))
+            if (!list[3].TryToDouble(out _filterLength))
                 throw new FormatException($"Wrong filter length: {row}{Environment.NewLine}{Format}");
 
-            if (filterType == FilterType.Sustained)
-                (_decisionFilter, NameInVector, SourceNames) = InitSustainedFilter(list);
-            else
-                (_legacyFilter, NameInVector, SourceNames) = InitLegacyFilter(list);
+            NameInVector = _filterType == FilterType.Sustained ? Name : Name + "_filter";
+        }
 
-            (SustainedDecisionFilter, string nameInVector, List<string>) InitSustainedFilter(List<string> list)
+        public override void ValidateDependencies(IIOconf ioconf)
+        {
+            var list = ToList();
+            if (_filterType == FilterType.Sustained)
             {
                 if (list.Count != 5)
-                    throw new FormatException($"Unexpected format for {filterType} filter: {Row}{Environment.NewLine}{Format}");
-                var decision = new SustainedDecisionFilter(Name, filterLength, list[4], Row, Format);
-                return (decision, Name, decision.SourceNames);
+                    throw new FormatException($"Unexpected format for {_filterType} filter: {Row}{Environment.NewLine}{Format}");
+                var decision = new SustainedDecisionFilter(Name, _filterLength, list[4], Row, Format);
+                (_decisionFilter, SourceNames) = (decision, decision.SourceNames);
             }
-
-            (LegacyFilter, string nameInVector, List<string>) InitLegacyFilter(List<string> list)
+            else
             {
                 var sources = list.Skip(4).ToList();
                 var hideSource = sources.Last() == "hidesource";
                 if (hideSource)
                     sources.Remove("hidesource");
-                var name = Name + "_filter";
-                return (new(name, filterType, filterLength, sources, hideSource), name, sources);
+                (_legacyFilter, SourceNames) = (new(NameInVector, _filterType, _filterLength, sources, hideSource), sources);
             }
         }
 

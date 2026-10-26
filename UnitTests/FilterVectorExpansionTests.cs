@@ -72,7 +72,41 @@ namespace UnitTests
             }
         }
 
-        private static IEnumerable<IOconfFilter> GetFilters(string filter) => [new(filter, 2)];
+        [TestMethod]
+        public void AppliesSustainedFilterWithTags()
+        {
+            var ioconf = new IOconfFile([
+                "Map;fakeserial1;ac01",
+                "Heater;heater1;ac01;01;850;tags:heater",
+                "Heater;heater2;ac01;02;850;tags:heater",
+                "Filter;update_temps;Sustained;4.5;expandtag{heater, separator:+ ,$name_onoff} == 0"]);
+            var filter = ioconf.GetFilters().Single();
+            Assert.AreEqual("heater1_onoff+ heater2_onoff == 0", filter.ToList()[4]);
+            CollectionAssert.AreEquivalent(new[] { "heater1_onoff", "heater2_onoff" }, filter.SourceNames);
+
+            var inputsDesc = ToDescItemInputs(["heater1_onoff", "heater2_onoff"]);
+            var expansion = new FilterVectorExpansion(inputsDesc, ioconf.GetFilters(), CALogLevel.Normal);
+            var mathExpansion = new MathVectorExpansion([]);
+            List<VectorDescriptionItem> allFields = [.. inputsDesc, .. expansion.GetDecisionVectorDescriptionEntries()];
+            Assert.AreEqual("heater1_onoff,heater2_onoff,update_temps,update_temps_targettime", string.Join(',', allFields.Select(v => v.Descriptor)));
+            expansion.Initialize(allFields.Select(v => v.Descriptor));
+            mathExpansion.Initialize(allFields.Select(v => v.Descriptor));
+            var vector = new DataVector([0, 0, 0, 0], DateTime.UtcNow);
+            (double, double)[] inputs = [(0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (1, 0), (0, 0)];
+            var filterValues = string.Join(',', inputs.Select(i => ApplyFilterCycle(ref vector, i)));
+            Assert.AreEqual("0,0,0,0,0,1,0,0", filterValues);
+
+            double ApplyFilterCycle(ref DataVector vector, (double heater1, double heater2) input)
+            {
+                vector = new(vector.Data, vector.Timestamp.AddSeconds(1));
+                (vector.Data[0], vector.Data[1]) = input;
+                using (var ctx = mathExpansion.NewContext(vector))
+                    expansion.Apply(ctx);
+                return vector.Data[2];
+            }
+        }
+
+        private static IEnumerable<IOconfFilter> GetFilters(string filter) => new IOconfFile([filter]).GetFilters();
         private static List<VectorDescriptionItem> ToDescItemInputs(IEnumerable<string> inputs) =>
             inputs.Select(n => new VectorDescriptionItem("double", n, DataTypeEnum.Input)).ToList();
     }
