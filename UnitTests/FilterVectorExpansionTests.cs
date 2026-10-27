@@ -106,6 +106,33 @@ namespace UnitTests
             }
         }
 
+        [TestMethod]
+        public void MathUsesSustainedFilterOutputFromSameCycle()
+        {
+            var ioconf = new IOconfFile(["Filter;MyFilter;Sustained;2;MyName > 0", "Math;MyMath;MyFilter * 10"]);
+            var inputsDesc = ToDescItemInputs(["MyName"]);
+            var expansion = new FilterVectorExpansion(inputsDesc, ioconf.GetFilters(), CALogLevel.Normal);
+            var mathExpansion = new MathVectorExpansion(ioconf.GetMath());
+            List<VectorDescriptionItem> allFields = [.. inputsDesc, .. expansion.GetDecisionVectorDescriptionEntries(), .. mathExpansion.GetVectorDescriptionEntries()];
+            expansion.Initialize(allFields.Select(v => v.Descriptor));
+            mathExpansion.Initialize(allFields.Select(v => v.Descriptor));
+            var vector = new DataVector([0, 0, 0, 0], DateTime.UtcNow);
+            var values = string.Join(',', new double[] { 1, 1, 1, 1, 0 }.Select(i => ApplyCycle(ref vector, i)));
+            Assert.AreEqual("0|0,0|0,1|10,1|10,0|0", values);
+
+            string ApplyCycle(ref DataVector vector, double input)
+            {
+                vector = new(vector.Data, vector.Timestamp.AddSeconds(1));
+                vector.Data[0] = input;
+                using (var ctx = mathExpansion.NewContext(vector))
+                {
+                    expansion.Apply(ctx);
+                    mathExpansion.Apply(ctx);
+                }
+                return $"{vector.Data[1]}|{vector.Data[3]}";
+            }
+        }
+
         private static IEnumerable<IOconfFilter> GetFilters(string filter) => new IOconfFile([filter]).GetFilters();
         private static List<VectorDescriptionItem> ToDescItemInputs(IEnumerable<string> inputs) =>
             inputs.Select(n => new VectorDescriptionItem("double", n, DataTypeEnum.Input)).ToList();
