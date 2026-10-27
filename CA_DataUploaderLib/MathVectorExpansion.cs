@@ -60,8 +60,15 @@ namespace CA_DataUploaderLib
 
             private readonly Dictionary<int, string> _fieldsByIndex;
             private readonly ObjectPool<Dictionary<string, object>> _reusableDictionaryPool;
-            public readonly DataVector Vector { get; }
+            private readonly DataVector _vector;
             private readonly Dictionary<string, object> _reusableFieldsDictionary;
+
+            public DateTime Timestamp => _vector.Timestamp;
+            public double this[int index]
+            {
+                get => _vector[index];
+                set => _reusableFieldsDictionary[_fieldsByIndex[index]] = _vector.Data[index] = value;
+            }
 
             public MathContext(Dictionary<int, string> fieldsByIndex, ObjectPool<Dictionary<string, object>> reusableDictionaryPool, DataVector vector)
             {
@@ -69,13 +76,13 @@ namespace CA_DataUploaderLib
                 if (vector.Data.Length != _fieldsByIndex.Count)
                     throw new ArgumentException($"The specified vector length does not match the fields received during initialize - {vector.Data.Length} vs {_fieldsByIndex.Count}", nameof(vector));
                 _reusableDictionaryPool = reusableDictionaryPool;
-                Vector = vector;
+                _vector = vector;
                 _reusableFieldsDictionary = reusableDictionaryPool.Get();
                 for (int i = 0; i < fieldsByIndex.Count; i++)
                     _reusableFieldsDictionary[fieldsByIndex[i]] = vector[i];
             }
 
-            public void Calculate(IOconfMath math, int index) => _reusableFieldsDictionary[_fieldsByIndex[index]] = Vector.Data[index] = math.Calculate(_reusableFieldsDictionary);
+            public void Calculate(IOconfMath math, int index) => this[index] = math.Calculate(_reusableFieldsDictionary);
             public void Dispose() => _reusableDictionaryPool.Return(_reusableFieldsDictionary);
             /// <remarks>this only calculates the expression result without updating any field</remarks>
             public bool CalculateBoolean(LogicalExpression sustainedExpression) => IOconfMath.CalculateBoolean(_reusableFieldsDictionary, sustainedExpression);

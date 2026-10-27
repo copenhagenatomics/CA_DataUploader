@@ -122,16 +122,14 @@ namespace CA_DataUploaderLib.IOconf
             public override IEnumerable<string> GetDecisionFields() => [_name, _name + "_targettime"];
             public override void MakeDecision(MathVectorExpansion.MathContext context)
             {
-                var (time, vector) = (context.Vector.Timestamp, context.Vector.Data);
-                ref var targetTime = ref vector[_targetTimeFieldIndex];
-                ref var output = ref vector[_outputFieldIndex];
+                var (time, targetTime) = (context.Timestamp, context[_targetTimeFieldIndex]);
 
                 if (!context.CalculateBoolean(_sustainedExpression))
-                    (output, targetTime) = (0, 0);//the condition is not met, reset both the filter output and target time
+                    (context[_outputFieldIndex], context[_targetTimeFieldIndex]) = (0, 0);//the condition is not met, reset both the filter output and target time
                 else if (targetTime == 0)
-                    (output, targetTime) = (0, time.AddSeconds(_length).ToOADate());//the first cycle meeting the condition sets the target time in filterLength seconds
+                    (context[_outputFieldIndex], context[_targetTimeFieldIndex]) = (0, time.AddSeconds(_length).ToOADate());//the first cycle meeting the condition sets the target time in filterLength seconds
                 else
-                    output = time >= DateTime.FromOADate(targetTime) ? 1 : 0; //set the output to 1 if we already reached the target time
+                    context[_outputFieldIndex] = time >= DateTime.FromOADate(targetTime) ? 1 : 0; //set the output to 1 if we already reached the target time
             }
 
             public override void Initialize(List<string> fields)
