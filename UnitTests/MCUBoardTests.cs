@@ -112,6 +112,111 @@ namespace UnitTests
             Assert.AreEqual("1.2", header.PcbVersion);
         }
 
+        private const string RetryHeader = "Serial Number: 1234\nProduct Type: HumidityChip\nSoftware Version: 1.7.0\nPCB Version: 2.0\n24, 40, 9\n";
+
+        [TestMethod]
+        [DataRow("")]
+        [DataRow("24, 40, 9\0umber: 1234\nProduct Type: HumidityChip\nSoftware Version: 1.7.0\nPCB Version: 2.0\n")]
+        [DataRow("Serial Number: 1234\n")]
+        public async Task ReadSerialRecoversOnTimedRetry(string initialReply)
+        {
+            var pipe = new Pipe();
+            await Write(pipe.Writer, initialReply);
+            var time = new FakeTimeProvider();
+            var logger = new StringBuilderLogger();
+            var header = new MCUBoard.Header(new(time, logger, Mock.Of<MCUBoard.IConnectionManager>(MockBehavior.Strict)));
+            var retries = 0;
+            var detection = header.DetectBoardHeader(pipe.Reader, TryReadLine, () =>
+            {
+                retries++;
+                Write(pipe.Writer, RetryHeader).GetAwaiter().GetResult();
+            }, "myport");
+
+            time.Advance(TimeSpan.FromMilliseconds(499));
+            Assert.AreEqual(0, retries);
+            Assert.IsFalse(detection.IsCompleted);
+            time.Advance(TimeSpan.FromMilliseconds(1));
+
+            Assert.IsTrue(await detection.WaitAsync(TimeSpan.FromSeconds(2)));
+            Assert.AreEqual(1, retries);
+            Assert.AreEqual("1234", header.SerialNumber);
+            Assert.AreEqual("HumidityChip", header.ProductType);
+            Assert.AreEqual("1.7.0", header.SoftwareVersion);
+            Assert.AreEqual("2.0", header.PcbVersion);
+            StringAssert.Contains(logger.ToString(), "500 ms");
+            StringAssert.Contains(logger.ToString(), "Board header detected after retry from myport");
+            StringAssert.Contains(logger.ToString(), initialReply.Replace("\n", Environment.NewLine));
+            time.Advance(TimeSpan.FromSeconds(5));
+            Assert.AreEqual(1, retries);
+        }
+
+        [TestMethod]
+        [DataRow(false)]
+        [DataRow(true)]
+        public async Task ReadSerialTimesOutAtOriginalDeadlineAfterOneRetry(bool writeFails)
+        {
+            var pipe = new Pipe();
+            var time = new FakeTimeProvider();
+            var logger = new StringBuilderLogger();
+            var header = new MCUBoard.Header(new(time, logger, Mock.Of<MCUBoard.IConnectionManager>(MockBehavior.Strict)));
+            var retried = new TaskCompletionSource();
+            var retries = 0;
+            var detection = header.DetectBoardHeader(pipe.Reader, TryReadLine, () =>
+            {
+                retries++;
+                retried.SetResult();
+                if (writeFails)
+                    throw new IOException("Serial write failed");
+            }, "myport");
+
+            time.Advance(TimeSpan.FromMilliseconds(500));
+            await retried.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            time.Advance(TimeSpan.FromMilliseconds(4499));
+            Assert.IsFalse(detection.IsCompleted);
+            time.Advance(TimeSpan.FromMilliseconds(1));
+            Assert.IsFalse(await detection.WaitAsync(TimeSpan.FromSeconds(2)));
+            Assert.AreEqual(1, retries);
+            StringAssert.Contains(logger.ToString(), "Unable to read from myport: timed out");
+        }
+
+        [TestMethod]
+        public async Task ReadSerialDoesNotRetryCompleteHeaderWhileWaitingForCalibration()
+        {
+            var pipe = new Pipe();
+            await Write(pipe.Writer, RetryHeader[..RetryHeader.LastIndexOf("24,", StringComparison.Ordinal)]);
+            var time = new FakeTimeProvider();
+            var header = new MCUBoard.Header(new(time, new StringBuilderLogger(), Mock.Of<MCUBoard.IConnectionManager>(MockBehavior.Strict)));
+            var retries = 0;
+            var detection = header.DetectBoardHeader(pipe.Reader, TryReadLine, () => retries++, "myport");
+            time.Advance(TimeSpan.FromMilliseconds(500));
+            await Write(pipe.Writer, "Calibration: abc\n24, 40, 9\n");
+            Assert.IsTrue(await detection.WaitAsync(TimeSpan.FromSeconds(2)));
+            Assert.AreEqual(0, retries);
+            Assert.AreEqual("abc", header.Calibration);
+        }
+
+        [TestMethod]
+        public async Task ReadSerialPreservesMisreadRetryBeforeTimedRetry()
+        {
+            var pipe = new Pipe();
+            await Write(pipe.Writer, "MISREAD\n");
+            var time = new FakeTimeProvider();
+            var logger = new StringBuilderLogger();
+            var header = new MCUBoard.Header(new(time, logger, Mock.Of<MCUBoard.IConnectionManager>(MockBehavior.Strict)));
+            var retries = 0;
+            var detection = header.DetectBoardHeader(pipe.Reader, TryReadLine, () =>
+            {
+                if (++retries == 2)
+                    Write(pipe.Writer, RetryHeader).GetAwaiter().GetResult();
+            }, "myport");
+
+            Assert.AreEqual(1, retries);
+            time.Advance(TimeSpan.FromMilliseconds(500));
+            Assert.IsTrue(await detection.WaitAsync(TimeSpan.FromSeconds(2)));
+            Assert.AreEqual(2, retries);
+            StringAssert.Contains(logger.ToString(), "Received misread without any serial");
+        }
+
         [TestMethod]
         public async Task ReadSerialRecognizesCalibration()
         {//this was *not* gathered from a box so might not be 100% accurate, but should be good enough
@@ -217,19 +322,22 @@ namespace UnitTests
             var time = new FakeTimeProvider();
             var logger = new StringBuilderLogger();
             var header = new MCUBoard.Header(new(time, logger, Mock.Of<MCUBoard.IConnectionManager>(MockBehavior.Strict)));
-            var res = header.DetectBoardHeader(reader, TryReadLine, () => Assert.Fail("unexpected resend Serial"), "myport");
+            var retried = new TaskCompletionSource();
             await Write(writer, "2\n");
             await Write(writer, "3\n");
             await Write(writer, "Serial Number: 123\n");
             await Write(writer, "Some unexpected failure\n");
             await Write(writer, "4:\n");
+            var res = header.DetectBoardHeader(reader, TryReadLine, () => retried.SetResult(), "myport");
             Assert.IsFalse(res.IsCompleted, "unexpected early completion");
-            await Task.Yield();
-            time.Advance(TimeSpan.FromSeconds(5000));
+            time.Advance(TimeSpan.FromMilliseconds(500));
+            await retried.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            time.Advance(TimeSpan.FromMilliseconds(4500));
             Assert.IsTrue(await res, "unexpected not able to read response when the board is returning data");
             Assert.AreEqual("123", header.SerialNumber);
             var expectedLog =
-@"error-A-Partial board header detected from myport: timed out
+@"info-A-Incomplete board header after 500 ms on port myport - re-sending serial command
+error-A-Partial board header detected from myport: timed out
 Reconnected Reason: watchdog
 1
 2
