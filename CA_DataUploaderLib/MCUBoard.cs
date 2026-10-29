@@ -486,13 +486,34 @@ namespace CA_DataUploaderLib
                 using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(5000), Dependencies.TimeProvider); // we use a cancellation token for the timeout as ReadAsync can otherwise hang if a device never sends a line
                 var token = cts.Token;
                 var linesRead = new StringBuilder(200);
+                var retryDelay = Task.Delay(TimeSpan.FromMilliseconds(500), Dependencies.TimeProvider, token);
+                var sentTimedRetry = false;
 
                 while (!finishedReadingHeader)
                 {
                     try
                     {
                         // we use the regular reads as only 1 thread uses the board during instance initialization
-                        var res = await pipeReader.ReadAsync(token);
+                        var read = pipeReader.ReadAsync(token).AsTask();
+                        if (!sentTimedRetry && !ReadFullHeader())
+                        {
+                            // Retry even when the board is silent, keeping the same pending read and overall deadline.
+                            await Task.WhenAny(read, retryDelay);
+                            if (retryDelay.IsCompleted && !token.IsCancellationRequested)
+                            {
+                                sentTimedRetry = true;
+                                Dependencies.LogInfo(LogID.A, $"Incomplete board header after 500 ms on port {port} - re-sending serial command");
+                                try
+                                {
+                                    resendSerial();
+                                }
+                                catch (Exception ex)
+                                {
+                                    Dependencies.LogException(LogID.A, $"Unable to re-send serial command on port {port}", ex);
+                                }
+                            }
+                        }
+                        var res = await read;
 
                         if (res.IsCanceled)
                         {
@@ -574,6 +595,8 @@ namespace CA_DataUploaderLib
                     }
                 }
 
+                if (sentTimedRetry)
+                    Dependencies.LogInfo(LogID.A, $"Board header detected after retry from {port}:{Environment.NewLine}{linesRead}");
                 await ReadOptionalNonEmptyLine(Dependencies, pipeReader, port, 2000, tryReadLine, _ => false, CancellationToken.None);//avoid any extra empty lines just after the full header from getting read by callers
                 Lines = linesRead.ToString();
                 return true;
