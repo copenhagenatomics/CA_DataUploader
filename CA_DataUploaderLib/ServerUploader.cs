@@ -494,45 +494,33 @@ namespace CA_DataUploaderLib
                 {
                     using var response = await Plot.PostVectorAsync(buffer, timestamp);
                     var success = CheckAndLogFailures(response, "Failed posting vector");
-                    TrackUploadRecovery(success, ref _consecutiveVectorUploadFailures, "Vector");
                     if (success)
                     {
+                        if (_consecutiveVectorUploadFailures >= 3)
+                            CALog.LogInfoAndConsoleLn(LogID.A, $"Vector uploads working again after {_consecutiveVectorUploadFailures} consecutive failures.");
+                        _consecutiveVectorUploadFailures = 0;
                         pendingVectors.Clear();
                         _pendingVectorUploadNonRetryableFailures = 0;
                         stateWriter.TryWrite(UploadState.UploadedVector);
                         return true;
                     }
 
+                    _consecutiveVectorUploadFailures++;
                     return HandleFailedVectorUpload(response.StatusCode, pendingVectors);
                 }
                 catch (HttpRequestException ex)
                 {
-                    TrackUploadRecovery(false, ref _consecutiveVectorUploadFailures, "Vector");
+                    _consecutiveVectorUploadFailures++;
                     OnError($"Failed posting vector (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}).", ex);
                     return HandleFailedVectorUpload(ex.StatusCode, pendingVectors);
                 }
                 catch (Exception ex)
                 {
-                    TrackUploadRecovery(false, ref _consecutiveVectorUploadFailures, "Vector");
+                    _consecutiveVectorUploadFailures++;
                     OnError("Failed posting vector", ex);
                     return false;
                 }
             }
-        }
-
-        internal static void TrackUploadRecovery(bool success, ref int consecutiveFailures, string uploadType, Action<string>? log = null)
-        {
-            if (!success)
-            {
-                consecutiveFailures++;
-                return;
-            }
-
-            var failures = consecutiveFailures;
-            consecutiveFailures = 0;
-            if (failures >= 3)
-                (log ?? (message => CALog.LogInfoAndConsoleLn(LogID.A, message)))
-                    ($"{uploadType} uploads working again after {failures} consecutive failures.");
         }
 
         private bool HandleFailedVectorUpload(HttpStatusCode? statusCode, List<DataVector> pendingVectors)
@@ -584,14 +572,17 @@ namespace CA_DataUploaderLib
             {
                 stateWriter.TryWrite(UploadState.EventUpload);
                 var result = await PostEventAsync(e);
-                TrackUploadRecovery(result.Success, ref _consecutiveEventUploadFailures, "Event");
                 if (result.Success)
                 {
+                    if (_consecutiveEventUploadFailures >= 3)
+                        CALog.LogInfoAndConsoleLn(LogID.A, $"Event uploads working again after {_consecutiveEventUploadFailures} consecutive failures.");
+                    _consecutiveEventUploadFailures = 0;
                     _pendingEventUploadNonRetryableFailures = 0;
                     stateWriter.TryWrite(UploadState.UploadedEvent);
                     return null;
                 }
 
+                _consecutiveEventUploadFailures++;
                 badEvents.Add(DateTime.UtcNow);
                 return HandleFailedEventUpload(
                     result.IsLocalFailure,
