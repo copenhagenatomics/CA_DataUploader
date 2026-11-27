@@ -51,6 +51,8 @@ namespace CA_DataUploaderLib
         private int _invalidValueEventsSkipped = 0;
         private int _pendingVectorUploadNonRetryableFailures = 0;
         private int _pendingEventUploadNonRetryableFailures = 0;
+        private bool _vectorUploadFailed;
+        private bool _eventUploadFailed;
         private IReadOnlyList<Func<EventFiredArgs, bool>> _eventFilters = [];
 
         public string Title => nameof(ServerUploader);
@@ -494,21 +496,31 @@ namespace CA_DataUploaderLib
                     var success = CheckAndLogFailures(response, "Failed posting vector");
                     if (success)
                     {
+                        if (_vectorUploadFailed)
+                        {
+                            const string message = "Vector uploads working again.";
+                            CALog.LogData(LogID.A, message);
+                            Console.WriteLine($"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} (UTC) - {message}");
+                        }
+                        _vectorUploadFailed = false;
                         pendingVectors.Clear();
                         _pendingVectorUploadNonRetryableFailures = 0;
                         stateWriter.TryWrite(UploadState.UploadedVector);
                         return true;
                     }
 
+                    _vectorUploadFailed = true;
                     return HandleFailedVectorUpload(response.StatusCode, pendingVectors);
                 }
                 catch (HttpRequestException ex)
                 {
+                    _vectorUploadFailed = true;
                     OnError($"Failed posting vector (HttpStatusCode={ex.StatusCode}, HttpRequestError={ex.HttpRequestError}).", ex);
                     return HandleFailedVectorUpload(ex.StatusCode, pendingVectors);
                 }
                 catch (Exception ex)
                 {
+                    _vectorUploadFailed = true;
                     OnError("Failed posting vector", ex);
                     return false;
                 }
@@ -566,11 +578,19 @@ namespace CA_DataUploaderLib
                 var result = await PostEventAsync(e);
                 if (result.Success)
                 {
+                    if (_eventUploadFailed)
+                    {
+                        const string message = "Event uploads working again.";
+                        CALog.LogData(LogID.A, message);
+                        Console.WriteLine($"{DateTime.UtcNow:MM.dd HH:mm:ss.fff} (UTC) - {message}");
+                    }
+                    _eventUploadFailed = false;
                     _pendingEventUploadNonRetryableFailures = 0;
                     stateWriter.TryWrite(UploadState.UploadedEvent);
                     return null;
                 }
 
+                _eventUploadFailed = true;
                 badEvents.Add(DateTime.UtcNow);
                 return HandleFailedEventUpload(
                     result.IsLocalFailure,
